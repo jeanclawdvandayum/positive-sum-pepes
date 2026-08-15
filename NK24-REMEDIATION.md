@@ -67,7 +67,64 @@ New code is new surface; the fixes were re-attacked:
 - `test/attack/NK24.t.sol` — P1–P10 death proofs on a mainnet fork against a hostile rate-marking mock (mock can move DOWN — happy-path mocks hide short-put risk)
 - `test/attack/NK24Repro.t.sol` — validate() regression proofs
 - `test/attack/NK24Math.t.sol` — solver/curve fuzzers
+- `test/attack/NK24MultiZone.t.sol` — multi-inflection-point crossing suite (MZ1–MZ8)
 - `test/invariant/ChaosInvariant.t.sol` — full-system accounting invariants
+
+## MZ pass — multi-inflection-point crossing audit (2026-08-15)
+
+Scope: large buys/sells traversing multiple log/exp flips, same-tx multi-leg
+sequences, boundary-exact landings, drain-to-dust edges, fund-freeze reachability.
+
+### F6 — shave-loop unit bug: over-minting buys on steep curves (HIGH, fixed)
+
+**Attack:** on curves steeper than anything the fuzzers generated (every exp
+zone at the validate() maximum, k·width = 7 WAD ≈ 1097x price span per zone),
+Newton's 8 iterations + the 3-pass clamp exit non-converged, and the NK24
+shave loop — the documented correctness backstop — could not recover: its
+token-space reduction was computed with raw integer division
+(`(spent − input) / price`) instead of `divWad`, making each pass 1e18x too
+small. The bounded 32-pass loop exhausted with the over-mint intact.
+
+**Impact:** `computeBuyOutput` minted up to 39% more PSP than the mixETH paid
+justified (repro: S=3442, input=1e19 → spent=1.39e19); buy→sell round trips
+were profitable by ~1.8bps. Dilutes every other holder's backing — the exact
+"swap too much, receive too many tokens" class. NOT reachable on the
+production single-curve shape (k·width ≈ 0.0046 WAD converges inside Newton);
+reachable on any future deployment using the multi-oscillation feature at
+legal steepness.
+
+**Why prior fuzzing missed it:** the math fuzzer's config generator clamped
+k·width ≤ 0.01 WAD (production-like), leaving a 700x-steeper legal domain
+untested. Lesson recorded: fuzzer generators that only emit production-like
+shapes leave the legal-extreme domain untested by construction.
+
+**Fix:** `divWad(spent − input, price)` in the shave loop (+ unreachable
+price==0 guard). Each pass now has full Newton-step bite; over-removal lands
+conservative and breaks the loop. Also cheaper: MZ1/MZ2 gas 4.28M → 3.60M.
+
+**Proofs:** MZ4 (2001-run fuzz, conservative mint across the full legal
+steepness domain), MZ5 (2001-run fuzz, cross-zone round trips never
+profitable), MZ2 (worst delivery 9980bps of fair — no gross shortchanging),
+MZ1 (20 size×position combos, 1–4 zone traversals + tail).
+
+### Verified-clean (no fix needed)
+
+- same-tx multi-leg (5 legs crossing zones in one unlock): state stays
+  solvent, reserve ≥ ∫supply, hook balance ≥ reserve, trader never in profit (MZ7)
+- boundary seams: price continuous, no free value composing across a flip,
+  integrals positive at meaningful width (MZ3); 1-wei strips quantize to zero
+  integral — inherent fixed-point granularity, dust-scale
+- split sells across inflections: no extraction beyond WAD-relative rounding
+  dust (2e-19 observed; bound set 10 orders below bps-scale) (MZ6)
+- fund freeze: exhaustive state-reachability walk found no irreversible
+  state. Flat mode is a phantom (carpetBomb sets Flat→Destroyed→drainAll
+  atomically; no swap can execute in Flat, so the reserve=0 flat-buy division
+  is unreachable). Sell guard `pspInput ≥ totalSupply` reverts; the last wei
+  of PSP is permanently unsellable by design (dust, documented). Genesis
+  `initializeCurve(0, >0)` unreachable (initialPSP==0 reverts launch). Solvent
+  reserve telescoping means no sell can underflow `reserveMixETH`. Draining to
+  the genesis boundary and probing follow-ups: clean reverts, zero state
+  change (MZ8).
 
 ## Prior reviews
 

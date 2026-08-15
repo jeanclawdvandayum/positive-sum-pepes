@@ -186,6 +186,14 @@ library CurveMath {
         // is capped; each pass removes `max(1, overshoot / price)` tokens, which
         // is a lower bound on the reduction needed, so deltaS decreases
         // monotonically toward integral <= ethInput.
+        // NK24-MZ fix: the reduction MUST be computed with divWad — raw
+        // integer division is 1e18x undersized, so on max-steepness shapes
+        // (k*width up to the 7 WAD validate() cap) where Newton exits
+        // non-converged, 32 passes of ~dust removal could not close the gap
+        // and the loop returned an over-minting deltaS (39% repro: S=3442,
+        // input=1e19 -> spent=1.39e19; round trip 1.8bps profitable). divWad
+        // gives each pass full Newton-step bite; overshooting removal only
+        // lands conservative (under-mint), which breaks the loop immediately.
         for (uint256 i = 0; i < 32; i++) {
             uint256 spent = curveIntegral(currentSupply, currentSupply + deltaS, cc);
             if (spent <= ethInput) break;
@@ -194,7 +202,8 @@ library CurveMath {
                 break;
             }
             uint256 price = marginalPrice(currentSupply + deltaS, cc);
-            uint256 adj = (spent - ethInput) / price; // eth-space overshoot -> token-space reduction
+            if (price == 0) break; // unreachable (P0 > 0 enforced); avoids panic
+            uint256 adj = FPML.divWad(spent - ethInput, price); // eth-space overshoot -> token-space reduction
             if (adj == 0) adj = 1;
             deltaS = adj >= deltaS ? deltaS / 2 : deltaS - adj;
         }
