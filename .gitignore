@@ -1,0 +1,12 @@
+# secrets — never commit
+.env
+
+# foundry build artifacts
+out/
+cache/
+
+# agent working files (review runs are captured in SECURITY-REVIEW*.md)
+.fix-prompt.txt
+.fix-run.log
+.review-prompt.txt
+.review-run.log

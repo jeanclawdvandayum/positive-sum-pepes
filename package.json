@@ -1,0 +1,17 @@
+{
+  "name": "psp-keeper",
+  "version": "1.0.0",
+  "description": "Yield reinvestment keeper bot for Positive Sum Pepes",
+  "type": "module",
+  "scripts": {
+    "keeper": "tsx scripts/Keeper.ts",
+    "keeper:dry": "tsx scripts/Keeper.ts --dry-run"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}
