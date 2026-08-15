@@ -126,6 +126,11 @@ MZ1 (20 size×position combos, 1–4 zone traversals + tail).
   the genesis boundary and probing follow-ups: clean reverts, zero state
   change (MZ8).
 
+**Post-fix deep fuzz (2026-08-15):** fresh seed
+`0x6b3a1ecf8a2495afa62f4d3cb55e3fa0597c743ce6186c43a60378b094ede8bd`,
+20,001 runs per fuzzer: NK24Math 9/9 (1257s), NK24MultiZone 8/8 — 17/17
+green on the fixed solver. Final gate 312/312 across 23 suites.
+
 ## Prior reviews
 
 - `SECURITY-REVIEW.md` — 2026-08-11 hermes (glm-5.2) pass, 7 findings fixed same-day
