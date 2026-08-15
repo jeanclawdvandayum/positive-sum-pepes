@@ -13,7 +13,6 @@ interface IRoundController {
 
     // ── Price conversion ──
     function mixETHToETH(uint256 mixETHAmount) external view returns (uint256);
-    function ethToMixETH(uint256 ethAmount) external view returns (uint256);
 
     // ── Swap support (called by hook) ──
     function mintPSPForSwap(uint256 amount) external;

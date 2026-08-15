@@ -150,6 +150,10 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     function getMixETH() external view returns (Currency) { return Currency.wrap(address(mixETH)); }
     function getCurveConfig() external view returns (CurveMath.CurveConfig memory) { return curveConfig; }
 
+    /// @dev DISPLAY ONLY — NK24 F1: mixETH is the sole unit of account.
+    ///      This view exists solely for the Predeposited event field and
+    ///      CurveHook.totalReserveETH(). Never call it in any settlement,
+    ///      mint, burn, fee, or accounting path.
     function mixETHToETH(uint256 mixETHAmount) public view returns (uint256) {
         if (mixETHAmount == 0) return 0;
         // ERC-4626: assets = shares * totalAssets / totalSupply
@@ -157,14 +161,6 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         uint256 totalSupply = mixETH.totalSupply();
         if (totalSupply == 0) return mixETHAmount; // 1:1 if no supply yet
         return (mixETHAmount * totalAssets) / totalSupply;
-    }
-
-    function ethToMixETH(uint256 ethAmount) public view returns (uint256) {
-        if (ethAmount == 0) return 0;
-        uint256 totalAssets = _getTotalAssets();
-        uint256 totalSupply = mixETH.totalSupply();
-        if (totalAssets == 0) return ethAmount; // 1:1 if no assets yet
-        return (ethAmount * totalSupply) / totalAssets;
     }
 
     function _getTotalAssets() internal view returns (uint256) {
