@@ -3,9 +3,10 @@
 
 .PHONY: test test-fork build clean slither
 
-# Run all unit/exploit/invariant tests (no fork needed)
+# Run all unit/exploit/invariant tests (no fork needed for unit suites;
+# fork suites read MAINNET_RPC_URL from .env if present)
 test:
-	forge test
+	@if [ -f .env ]; then set -a; . ./.env; set +a; fi; forge test
 
 # Run fork tests against mainnet
 # Usage: make test-fork MAINNET_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
