@@ -36,10 +36,13 @@ interface RoundControllerLike {
     function carpetBomb() external;
     function finalizeCarpet() external;
     function flatTime() external view returns (uint256);
+    function potState() external view returns (uint256, uint256);
     function locks(address) external view returns (uint256, uint256, uint256, uint256);
 }
 
 contract FlatExitTest is Test {
+    event CarpetBombExecuted(uint256 potRedemption);
+
     MockMixETH mixETH;
     MockPoolManager poolManager;
     PSPFactory factory;
@@ -123,12 +126,42 @@ contract FlatExitTest is Test {
         vm.prank(bob);
         controller.voteCarpetBomb(true);
         skip(3 days + 1);
+
+        // capture pre-bomb state to prove the side pot auto-sells at the
+        // flat rate (average backing), same formula as _handleFlatSell
+        (uint256 potPSPBefore,) = controller.potState();
+        uint256 reserveBefore = hook.reserveMixETH();
+        uint256 supplyBefore = hook.totalSupplyPSP();
+        uint256 factoryMixBefore = mixETH.balanceOf(address(factory));
+        assertGt(potPSPBefore, 0, "fees accrued to pot during buys");
+        uint256 expectedPotMix = (reserveBefore * potPSPBefore) / supplyBefore;
+
+        // the bomb reports exactly the average-backing redemption
+        vm.expectEmit(true, true, true, true);
+        emit CarpetBombExecuted(expectedPotMix);
         controller.carpetBomb();
 
         // ── the bomb flattens, it does not destroy ──
         assertEq(uint8(hook.mode()), uint8(CurveHook.Mode.Flat), "round is flat, not destroyed");
         assertEq(factory.currentRoundId(), 1, "round 2 waits for finalize");
         assertTrue(controller.flatTime() > 0, "flatTime set");
+
+        // ── side pot redeemed at the flat rate: reserve/supply per PSP ──
+        assertEq(hook.totalSupplyPSP(), supplyBefore - potPSPBefore, "pot PSP burned");
+        assertEq(hook.reserveMixETH(), reserveBefore - expectedPotMix, "proportional reserve out");
+        assertEq(
+            mixETH.balanceOf(address(factory)),
+            factoryMixBefore + expectedPotMix,
+            "redemption ring-fenced in factory side pot"
+        );
+        // redemption at the average is ratio-preserving: the flat rate is
+        // unchanged by the pot's own exit (floor-rounding aside)
+        assertApproxEqAbs(
+            (hook.reserveMixETH() * supplyBefore) / hook.totalSupplyPSP(),
+            reserveBefore,
+            5,
+            "flat rate unchanged by pot redemption"
+        );
 
         // ── THE PROOF: staker unlocks with 90 days still on the clock ──
         (uint256 lockedAmount,, uint256 lockTime, uint256 unlockTime) = controller.locks(alice);
