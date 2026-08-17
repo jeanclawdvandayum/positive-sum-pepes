@@ -18,6 +18,8 @@ interface IRoundController {
     function mintPSPForSwap(uint256 amount) external;
     function burnPSPForSwap(uint256 amount) external;
     function addFees(uint256 ethAmount) external;
+    function mintPotPSP(uint256 amount) external;
+    function creditPotPSP(uint256 amount) external;
 
     // ── Curve params ──
     function getCurveConfig() external view returns (CurveMath.CurveConfig memory);

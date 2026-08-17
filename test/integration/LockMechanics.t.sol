@@ -12,6 +12,8 @@ import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
+import {HookDeployer} from "../../src/HookDeployer.sol";
+import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
 
 import {MainnetConfig} from "./MainnetConfig.sol";
@@ -41,7 +43,7 @@ contract LockMechanicsTest is Test {
         mixETH = new MockMixETH();
         mixETH.depositETH{value: 100_000e18}();
 
-        factory = new PSPFactory(poolManager, IERC20(address(mixETH)));
+        factory = new PSPFactory(poolManager, IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer());
         router = new V4SwapRouter(poolManager);
 
         mixETH.transfer(alice, 1_000e18);

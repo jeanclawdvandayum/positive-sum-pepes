@@ -50,7 +50,11 @@ contract CurveHook is BaseHook {
     // ─────────────── Immutables ───────────────
     IRoundController public immutable controller;
     CurveMath.CurveConfig public curveConfig;
-    uint24 public constant SWAP_FEE_BIPS = 500; // 5%
+    uint24 public constant SWAP_FEE_BIPS = 500; // 5% total swap fee
+    /// @dev Side-pot cut of the swap fee, taken as PSP instead of mixETH:
+    ///      buys mint it through the curve (backed), sells skim it off the
+    ///      burned input. The remaining 475 bips go to the staker accumulator.
+    uint24 public constant POT_FEE_BIPS = 25; // 0.25%
     /// @dev Canonical V4 pool parameters — the only pool this hook serves.
     ///      0x800000 = dynamic-fee flag (hook-priced; fee field unused).
     uint24 public constant CANONICAL_FEE = 0x800000;
@@ -75,6 +79,7 @@ contract CurveHook is BaseHook {
     event PoolInitialized();
     event FeesSent(address indexed to, uint256 mixETHAmount);
     event Drained(address indexed to, uint256 mixETHAmount);
+    event PotBackingRedeemed(uint256 pspAmount, uint256 mixETHOut);
 
     // ─────────────── Constructor ───────────────
     constructor(IPoolManager _poolManager, IRoundController _controller, CurveMath.CurveConfig memory _config)
@@ -205,17 +210,25 @@ contract CurveHook is BaseHook {
 
         // NK24 fix: mixETH is the unit of account — the curve is solved
         // directly in mixETH. No vault-rate read anywhere in this path.
+        //
+        // Fee split: 5% total. 4.75% mixETH → staker accumulator; 0.25%
+        // flows through the curve AFTER the user's slice and mints PSP to
+        // the controller's side pot (backed 1:1 by its mixETH in reserve).
         uint256 feeMixETH = (mixETHInput * SWAP_FEE_BIPS) / 10000;
+        uint256 potMixETH = (mixETHInput * POT_FEE_BIPS) / 10000;
+        uint256 stakerFeeMixETH = feeMixETH - potMixETH;
         uint256 curveMixETH = mixETHInput - feeMixETH;
 
-        // Compute PSP output
+        // Compute PSP outputs — user first at 95%, pot second at 0.25%
         uint256 pspOut = CurveMath.computeBuyOutput(curveMixETH, totalSupplyPSP, curveConfig);
         if (pspOut == 0) revert ZeroOutput();
+        uint256 potPSP = CurveMath.computeBuyOutput(potMixETH, totalSupplyPSP + pspOut, curveConfig);
 
         // CEI: update state before external calls
-        // Only curveMixETH enters the reserve; feeMixETH stays in balance as available fees
-        reserveMixETH += curveMixETH;
-        totalSupplyPSP += pspOut;
+        // curveMixETH + potMixETH enter the reserve; stakerFeeMixETH stays in
+        // balance as available fees
+        reserveMixETH += curveMixETH + potMixETH;
+        totalSupplyPSP += pspOut + potPSP;
 
         emit Buy(msg.sender, mixETHInput, pspOut, totalSupplyPSP, reserveMixETH);
 
@@ -225,9 +238,15 @@ contract CurveHook is BaseHook {
         // Mint PSP for the buyer
         controller.mintPSPForSwap(pspOut);
 
-        // Route fee to controller accumulator (mixETH-denominated)
-        if (feeMixETH > 0) {
-            controller.addFees(feeMixETH);
+        // Mint the pot's backed PSP (held unlocked by the controller — never
+        // staked, never sold; the ONLY exit is carpet-bomb redemption)
+        if (potPSP > 0) {
+            controller.mintPotPSP(potPSP);
+        }
+
+        // Route staker fee to controller accumulator (mixETH-denominated)
+        if (stakerFeeMixETH > 0) {
+            controller.addFees(stakerFeeMixETH);
         }
 
         // Settle PSP to PoolManager
@@ -266,29 +285,42 @@ contract CurveHook is BaseHook {
         // reserve and bricked every sell).
         uint256 mixETHOut = CurveMath.computeSellOutput(pspInputAmount, totalSupplyPSP, curveConfig);
 
-        // Fee split
+        // Fee split: 5% of the out-value total. 4.75% mixETH → stakers.
+        // The pot's 0.25% is taken IN PSP: 0.25% of the sold PSP is
+        // transferred to the pot instead of burned, so its backing stays
+        // in the reserve. User still receives 95% of the full integral.
         uint256 feeMixETH = (mixETHOut * SWAP_FEE_BIPS) / 10000;
+        uint256 potMixETH = (mixETHOut * POT_FEE_BIPS) / 10000;
+        uint256 stakerFeeMixETH = feeMixETH - potMixETH;
         uint256 mixETHToUser = mixETHOut - feeMixETH;
+        uint256 potPSPCut = (pspInputAmount * POT_FEE_BIPS) / 10000;
+        uint256 burnAmount = pspInputAmount - potPSPCut;
         if (mixETHToUser == 0) revert ZeroOutput();
 
-        // CEI: reserve decreases by full output, fee portion stays in balance
-        reserveMixETH -= mixETHOut;
-        totalSupplyPSP -= pspInputAmount;
+        // CEI: reserve decreases by the out-value MINUS the pot slice (that
+        // mixETH now backs the pot's unburned PSP); supply drops by burnAmount
+        reserveMixETH -= (mixETHOut - potMixETH);
+        totalSupplyPSP -= burnAmount;
 
         emit Sell(msg.sender, pspInputAmount, mixETHToUser, totalSupplyPSP, reserveMixETH);
 
         // Take PSP from PoolManager to hook custody (pre-funded by router)
         poolManager.take(psp, address(this), pspInputAmount);
 
-        // Burn PSP from hook
-        controller.burnPSPForSwap(pspInputAmount);
+        // Burn the user's PSP; route the pot's cut to the controller (unlocked,
+        // never restaked — carpet-bomb redemption is its only exit)
+        controller.burnPSPForSwap(burnAmount);
+        if (potPSPCut > 0) {
+            IERC20(Currency.unwrap(psp)).safeTransfer(address(controller), potPSPCut);
+            controller.creditPotPSP(potPSPCut);
+        }
 
         // Send mixETH to user via PoolManager
         _settleCurrency(mixETH, mixETHToUser);
 
-        // Route fee
-        if (feeMixETH > 0) {
-            controller.addFees(feeMixETH);
+        // Route staker fee
+        if (stakerFeeMixETH > 0) {
+            controller.addFees(stakerFeeMixETH);
         }
 
         // V4 BeforeSwapDelta: specified positive = hook handles input, unspecified negative = hook provides output
@@ -311,22 +343,29 @@ contract CurveHook is BaseHook {
         // Flat price in mixETH terms
         uint256 flatPriceMixETH = (reserveMixETH * 1e18) / totalSupplyPSP;
 
+        // Fee split as on the curve: 4.75% stakers (mixETH), 0.25% pot (PSP
+        // at the flat price — buys leave the flat price invariant, so the
+        // pot's slice prices identically before or after the user's)
         uint256 feeMixETH = (mixETHInput * SWAP_FEE_BIPS) / 10000;
+        uint256 potMixETH = (mixETHInput * POT_FEE_BIPS) / 10000;
+        uint256 stakerFeeMixETH = feeMixETH - potMixETH;
         uint256 buyMixETH = mixETHInput - feeMixETH;
 
         uint256 pspOut = (buyMixETH * 1e18) / flatPriceMixETH;
         if (pspOut == 0) revert ZeroOutput();
+        uint256 potPSP = (potMixETH * 1e18) / flatPriceMixETH;
 
-        reserveMixETH += buyMixETH;
-        totalSupplyPSP += pspOut;
+        reserveMixETH += buyMixETH + potMixETH;
+        totalSupplyPSP += pspOut + potPSP;
 
         emit Buy(msg.sender, mixETHInput, pspOut, totalSupplyPSP, reserveMixETH);
 
         poolManager.take(mixETH, address(this), mixETHInput);
         controller.mintPSPForSwap(pspOut);
+        if (potPSP > 0) controller.mintPotPSP(potPSP);
         _settleCurrency(psp, pspOut);
 
-        if (feeMixETH > 0) controller.addFees(feeMixETH);
+        if (stakerFeeMixETH > 0) controller.addFees(stakerFeeMixETH);
 
         BeforeSwapDelta hookDelta = toBeforeSwapDelta(
             int128(int256(mixETHInput)),   // +input: hook handles specified input
@@ -347,22 +386,32 @@ contract CurveHook is BaseHook {
         // totalMixETHOut = pspInputAmount * flatPrice / 1e18
         //   = pspInputAmount * reserveMixETH / totalSupplyPSP
         uint256 totalMixETHOut = (pspInputAmount * reserveMixETH) / totalSupplyPSP;
+        // Fee split as on the curve: pot's 0.25% taken in PSP (unburned —
+        // its backing stays in reserve), stakers get 4.75% in mixETH
         uint256 feeMixETH = (totalMixETHOut * SWAP_FEE_BIPS) / 10000;
+        uint256 potMixETH = (totalMixETHOut * POT_FEE_BIPS) / 10000;
+        uint256 stakerFeeMixETH = feeMixETH - potMixETH;
         uint256 mixETHToUser = totalMixETHOut - feeMixETH;
+        uint256 potPSPCut = (pspInputAmount * POT_FEE_BIPS) / 10000;
+        uint256 burnAmount = pspInputAmount - potPSPCut;
         if (mixETHToUser == 0) revert ZeroOutput();
 
-        reserveMixETH -= totalMixETHOut;
-        totalSupplyPSP -= pspInputAmount;
+        reserveMixETH -= (totalMixETHOut - potMixETH);
+        totalSupplyPSP -= burnAmount;
 
         emit Sell(msg.sender, pspInputAmount, mixETHToUser, totalSupplyPSP, reserveMixETH);
 
         // Take PSP from PoolManager to hook custody (pre-funded by router)
         poolManager.take(psp, address(this), pspInputAmount);
 
-        controller.burnPSPForSwap(pspInputAmount);
+        controller.burnPSPForSwap(burnAmount);
+        if (potPSPCut > 0) {
+            IERC20(Currency.unwrap(psp)).safeTransfer(address(controller), potPSPCut);
+            controller.creditPotPSP(potPSPCut);
+        }
         _settleCurrency(mixETH, mixETHToUser);
 
-        if (feeMixETH > 0) controller.addFees(feeMixETH);
+        if (stakerFeeMixETH > 0) controller.addFees(stakerFeeMixETH);
 
         BeforeSwapDelta hookDelta = toBeforeSwapDelta(
             int128(int256(pspInputAmount)),  // +input: hook handles specified input
@@ -392,6 +441,24 @@ contract CurveHook is BaseHook {
     }
 
     // ─────────────── Destruction Support ───────────────
+
+    /// @notice Redeem the side pot's PSP at average backing (reserve/supply).
+    /// @dev Controller-only, called from carpetBomb() BEFORE drainAll — the
+    ///      pot PSP is never sold on any market during the round; this is its
+    ///      only exit. Pro-rata at average backing, not the sell integral:
+    ///      the pot is an eternal compounding position, not a round-tripper.
+    function redeemPotBacking(uint256 pspAmount) external returns (uint256 mixETHOut) {
+        if (msg.sender != address(controller)) revert NotController();
+        if (pspAmount == 0 || totalSupplyPSP == 0) return 0;
+
+        mixETHOut = (reserveMixETH * pspAmount) / totalSupplyPSP;
+        reserveMixETH -= mixETHOut;
+        totalSupplyPSP -= pspAmount;
+
+        IERC20(Currency.unwrap(controller.getMixETH())).safeTransfer(msg.sender, mixETHOut);
+
+        emit PotBackingRedeemed(pspAmount, mixETHOut);
+    }
 
     /// @notice Drain ALL mixETH (reserve + fees) for round carry-over
     /// @return mixETHAmount Total mixETH transferred to `to`
@@ -438,6 +505,11 @@ contract CurveHook is BaseHook {
     }
 
     // ─────────────── View Functions ───────────────
+
+    /// @notice Full curve zones (auto-getter omits arrays)
+    function getCurveZones() external view returns (CurveMath.Zone[] memory) {
+        return curveConfig.zones;
+    }
 
     /// @return mixETH-denominated marginal price (curve unit of account)
     function getMarginalPrice() external view returns (uint256) {

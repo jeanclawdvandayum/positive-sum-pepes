@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  --color-psp-sky: #38bdf8;
+  --color-psp-sky-soft: #bae6fd;
+  --color-psp-mint: #4ade80;
+  --color-psp-mint-soft: #bbf7d0;
+  --color-psp-deep: #0369a1;
+  --font-display: ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-white text-slate-800 antialiased;
+  font-family: var(--font-display);
+}
+
+/* bright gradient blobs for hero sections */
+.blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.card {
+  @apply rounded-3xl border border-sky-100 bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 to-emerald-400 px-5 py-3 font-bold text-white shadow-lg shadow-sky-200 transition active:scale-[0.98] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-white px-4 py-2 font-semibold text-psp-deep transition active:scale-[0.98] hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-40;
+}
+
+.input-amount {
+  @apply w-full rounded-2xl border border-sky-100 bg-sky-50/60 px-4 py-3 text-2xl font-bold text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-psp-sky focus:bg-white;
+}
+
+.chip {
+  @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold;
+}
+
+/* rainbowkit modal on mobile */
+@media (max-width: 640px) {
+ RainbowKitProvider { --rk-modal-width: 92vw; }
+}

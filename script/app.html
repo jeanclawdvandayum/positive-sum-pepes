@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>positive sum pepes</title>
+<style>
+:root{--bg:#0b120d;--card:#121c14;--line:#1f3123;--tx:#d8efe0;--dim:#7fa98c;--acc:#39d98a;--red:#e05a5a;--gold:#e8c46a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font:15px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:24px 16px 80px}
+.wrap{max-width:760px;margin:0 auto}
+h1{font-size:22px;color:var(--acc);letter-spacing:1px}
+h1 small{color:var(--dim);font-size:13px;font-weight:400}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:14px}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:3px 0;flex-wrap:wrap}
+.k{color:var(--dim)}.v{font-weight:700}
+.bar{height:8px;background:#0a0f0b;border:1px solid var(--line);border-radius:4px;margin:8px 0;overflow:hidden}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,#1f7a4d,var(--acc))}
+button{background:var(--acc);color:#04170c;border:0;border-radius:8px;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer;width:100%;margin-top:8px}
+button.sec{background:#1c2b1f;color:var(--tx);border:1px solid var(--line)}
+button:disabled{opacity:.4;cursor:not-allowed}
+input{width:100%;background:#0a0f0b;border:1px solid var(--line);border-radius:8px;color:var(--tx);font:inherit;padding:10px;margin-top:6px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+a{color:var(--acc)}
+.badge{display:inline-block;padding:1px 8px;border-radius:5px;font-size:12px;border:1px solid var(--line);color:var(--dim)}
+.badge.on{color:var(--acc);border-color:var(--acc)}
+.badge.dead{color:var(--red);border-color:var(--red)}
+.badge.pre{color:var(--gold);border-color:var(--gold)}
+.round{border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.round.sel{border-color:var(--acc)}
+.foot{color:var(--dim);font-size:12px;margin-top:24px;text-align:center}
+.err{color:var(--red);font-size:13px;margin-top:6px;word-break:break-all}
+.ok{color:var(--acc);font-size:13px;margin-top:6px;word-break:break-all}
+#top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="top">
+    <h1>positive sum pepes <small id="chain"></small></h1>
+    <button class="sec" style="width:auto;margin:0" id="btnConnect" onclick="connect()">connect</button>
+  </div>
+
+  <div class="card" id="roundCard">
+    <div class="row"><span class="k" id="rname">loading…</span><span id="rstate"></span></div>
+    <div class="bar"><i id="pbar" style="width:0%"></i></div>
+    <div class="row"><span class="k">predeposit</span><span class="v" id="pdep">–</span></div>
+    <div class="row"><span class="k" id="winfo"></span><span class="v" id="wval"></span></div>
+    <div class="row"><span class="k">your deposit</span><span class="v" id="udep">–</span></div>
+    <div class="row"><span class="k">your PSP (locked)</span><span class="v" id="upsp">–</span></div>
+    <div id="launchWrap"></div>
+  </div>
+
+  <div class="card" id="depCard">
+    <div class="row"><span class="k">join the predeposit</span><span class="k" id="headroom"></span></div>
+    <input id="amt" type="text" inputmode="decimal" placeholder="mixETH amount">
+    <div class="grid2">
+      <button class="sec" style="margin-top:8px" onclick="setMax()">max headroom</button>
+      <button style="margin-top:8px" id="btnDep" onclick="deposit()">deposit</button>
+    </div>
+  </div>
+
+  <div class="card" id="claimCard" style="display:none">
+    <div class="row"><span class="k">claim your PSP</span><span class="k">auto-locks 90 days · earns fees</span></div>
+    <button onclick="claim()">claim predeposit PSP</button>
+  </div>
+
+  <div class="card">
+    <div class="row"><span class="k">rounds</span><span class="k" id="rcount"></span></div>
+    <div id="rounds"></div>
+  </div>
+
+  <div id="msg"></div>
+  <div class="foot">
+    this page lives entirely onchain — <span class="v">html()</span> on the factory serves it.<br>
+    no backend, no domain, nothing to take offline. fetch it from any rpc:<br>
+    <code style="color:var(--acc)">cast call FACTORY "html()" | xargs -I{} cast --to-utf8 {}</code><br><br>
+    factory: <span id="faddr" style="color:var(--acc)"></span>
+  </div>
+</div>
+
+<script>
+"use strict";
+// factory address is injected at deploy (vm.replace __FACTORY__)
+var FACTORY="__FACTORY__";
+var SEL={cur:"0x9cbe5efd",rounds:"0x8c65c81f",pstate:"0xa81c1eed",pdep:"0xaed1af6b",claim:"0x6989bb72",launch:"0x2ffc07fe",dep:"0xf2a89c35",getPSP:"0x345634ce",locks:"0x5de9a137",appr:"0x095ea7b3",bal:"0x70a08231",allow:"0xdd62ed3e",sym:"0x95d89b41",mixETH:"0x762d8140",name:"0x06fdde03",fees:"0xd294f093"};
+var RPC={8453:"https://mainnet.base.org",84532:"https://sepolia.base.org",1:"https://eth.llamarpc.com",11155111:"https://ethereum-sepolia-rpc.publicnode.com"};
+var acct=null,cid=null,MIX=null,sel={id:0,tok:"",ctl:"",hk:"",name:"",sym:"",psp:""};
+var $=function(i){return document.getElementById(i)};
+function msg(s,cls){$("msg").innerHTML=s?'<div class="card"><div class="'+cls+'">'+s+"</div></div>":""}
+function pad(a){return a.toLowerCase().replace(/^0x/,"").padStart(64,"0")}
+function padN(n){return BigInt(n).toString(16).padStart(64,"0")}
+function enc(){var s="";for(var i=0;i<arguments.length;i++)s+=/^0x/.test(arguments[i])?pad(arguments[i]):padN(arguments[i]);return s}
+async function callRaw(to,data){
+  var p={to:to,data:data};
+  var r=await (acct?eth.request({method:"eth_call",params:[p,"latest"]}):fetch((RPC[cid]||RPC[8453]),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_call",params:[p,"latest"]})}).then(function(x){return x.json()}).then(function(x){if(x.error)throw x.error;return{result:x.result}}));
+  return raw(r.result); // callers get a clean hex body (no 0x prefix)
+}
+var eth=window.ethereum;
+async function rpc(m,p){return eth.request({method:m,params:p})}
+function n16(h){h=h?String(h).replace(/^0x/,""):"";return h?BigInt("0x"+h):0n}
+function raw(hex){return hex?String(hex).replace(/^0x/,""):""}
+function fmt(b,dg){var v=Number(b)/1e18;return v>=1000?Math.round(v).toLocaleString():v.toFixed(dg==null?2:dg)}
+function short(a){return a?a.slice(0,6)+"…"+a.slice(-4):""}
+
+async function connect(){
+  if(!eth){msg("no injected wallet found — install any evm wallet","err");return}
+  try{
+    acct=(await rpc("eth_requestAccounts"))[0];
+    cid=parseInt(await rpc("eth_chainId"));
+    $("btnConnect").textContent=short(acct);
+    $("chain").textContent="· chain "+cid;
+    await load();
+  }catch(e){msg(e.message||String(e),"err")}
+}
+
+async function factoryMix(){
+  if(!MIX)MIX="0x"+raw(await callRaw(FACTORY,SEL.mixETH)).slice(24,64);
+  return MIX;
+}
+
+async function loadRound(id){
+  // rounds(id) returns the flattened tuple: token, controller, hook,
+  // destroyed, nameOffset, symbolOffset (+ string data at those offsets)
+  // callRaw hands back a prefix-stripped body; word k = chars [k*64,(k+1)*64)
+  var r=raw(await callRaw(FACTORY,SEL.rounds+padN(id)));
+  var tok="0x"+r.slice(24,64),ctl="0x"+r.slice(88,128),hk="0x"+r.slice(152,192);
+  var destroyed=n16(r.slice(192,256))!=0n;
+  var nm=decodeAt(r,parseInt(r.slice(256,320),16));
+  var sy=decodeAt(r,parseInt(r.slice(320,384),16));
+  return{id:id,tok:tok,ctl:ctl,hk:hk,dead:destroyed,name:nm,sym:sy};
+}
+function decodeAt(hex,off){ // off = byte offset from body start; hex has 0x stripped
+  if(!off)return"";
+  var len=parseInt(hex.slice(off*2,off*2+64),16),s="";
+  for(var i=0;i<len;i++)s+=String.fromCharCode(parseInt(hex.substr(off*2+64+i*2,2),16));
+  return s;
+}
+
+async function refresh(){
+  try{
+    var cur=Number(n16(await callRaw(FACTORY,SEL.cur)));
+    if(!sel.id||sel.id>cur)sel=await loadRound(cur);
+    $("faddr").textContent=short(FACTORY);
+    // selected round card
+    $("rname").textContent="#"+sel.id+" "+sel.name+" ("+sel.sym+")";
+    var st=raw(await callRaw(sel.ctl,SEL.pstate));
+    var total=n16(st.slice(0,64)),cap=n16(st.slice(64,128)),start=n16(st.slice(128,192));
+    var closed=n16("0x"+st.slice(192,256))!=0n,capR=n16("0x"+st.slice(256,320))!=0n,winOver=n16("0x"+st.slice(320,384))!=0n,launchable=n16("0x"+st.slice(384,448))!=0n;
+    $("pdep").textContent=fmt(total)+" / "+fmt(cap)+" mixETH";
+    $("pbar").style.width=Math.min(100,Number(total*10000n/cap)/100)+"%";
+    var badge='<span class="badge '+(sel.dead?"dead":closed?"on":"pre")+'">'+(sel.dead?"destroyed":closed?"curve live":"predeposit open")+"</span>";
+    $("rstate").innerHTML=badge;
+    if(!closed&&!sel.dead){
+      var end=Number(start)+7*86400,nows=Math.floor(Date.now()/1000),left=end-nows;
+      $("winfo").textContent="window";
+      $("wval").textContent=capR?"cap reached — launchable":(winOver?"window over — launchable":(left>0?Math.floor(left/86400)+"d "+Math.floor(left%86400/3600)+"h left":"launchable"));
+    }else{$("winfo").textContent="";$("wval").textContent=""}
+    // launch button
+    $("launchWrap").innerHTML=(launchable&&!sel.dead)?'<button onclick="doSend(\''+sel.ctl+'\',\''+SEL.launch+'\',\'0x\',\'launch\')">launch the curve</button>':"";
+    // user
+    if(acct){
+      var mix=await factoryMix();
+      var d=raw(await callRaw(sel.ctl,SEL.pdep+pad(acct)));
+      var amt=n16(d.slice(0,64)),claimed=n16(d.slice(64,128))!=0n;
+      $("udep").textContent=fmt(amt)+" mixETH"+(claimed?" · claimed":"");
+      var psp="0x"+raw(await callRaw(sel.ctl,SEL.getPSP)).slice(24,64);
+      sel.psp=psp;
+      var wal=n16(await callRaw(psp,SEL.bal+pad(acct)));
+      var l=raw(await callRaw(sel.ctl,SEL.locks+pad(acct)));
+      var lk=n16(l.slice(0,64)),ul=n16(l.slice(192,256)); // LockInfo: amount,rewardDebt,lockTime,unlockTime
+      $("upsp").textContent=fmt(wal)+" free · "+fmt(lk)+" locked"+(lk>0n&&ul>BigInt(Math.floor(Date.now()/1000))?" → "+new Date(Number(ul)*1000).toLocaleDateString():"");
+      $("headroom").textContent="headroom "+fmt(cap>total?cap-total:0n)+" mixETH";
+      $("claimCard").style.display=amt>0n&&!claimed&&!sel.dead?"":"none";
+      $("depCard").style.display=!closed&&!sel.dead?"":"none";
+    }
+    // rounds list
+    var h="";
+    for(var i=cur;i>0&&i>cur-8;i--){
+      var r=await loadRound(i);
+      h+='<div class="round'+(i===sel.id?" sel":"")+'" onclick="pick('+i+')"><span>#'+i+" "+r.name+'</span><span class="badge '+(r.dead?"dead":"on")+'">'+(r.dead?"dead":"alive")+"</span></div>";
+    }
+    $("rounds").innerHTML=h;
+    $("rcount").textContent=cur+" total";
+  }catch(e){msg(String(e.message||e),"err")}
+}
+async function pick(i){sel=await loadRound(i);await refresh()}
+async function setMax(){
+  try{
+    var st=raw(await callRaw(sel.ctl,SEL.pstate));
+    var total=n16(st.slice(0,64)),cap=n16(st.slice(64,128));
+    var hr=cap>total?cap-total:0n;
+    $("amt").value=Number(hr-1000000000000000n)/1e18; // 0.001 dust under headroom
+  }catch(e){$("amt").value="499.99"}
+}
+
+async function doSend(to,data0,data1,label){
+  if(!acct){msg("connect a wallet first","err");return}
+  try{
+    msg("signing: "+label+" …","ok");
+    var tx=await rpc("eth_sendTransaction",{from:acct,to:to,data:data1==="0x"?data0:data0+data1});
+    msg(label+" sent: "+tx,"ok");
+    var t0=Date.now();
+    var rec=null;
+    while(Date.now()-t0<60000&&!rec){try{rec=await rpc("eth_getTransactionReceipt",[tx])}catch(_){}await new Promise(function(r){setTimeout(r,2000)})}
+    msg((rec&&rec.status==="0x1"?"✓ "+label+" confirmed: ":"✗ "+label+" reverted: ")+tx,rec&&rec.status==="0x1"?"ok":"err");
+    await refresh();
+  }catch(e){msg(e.message&&e.message.replace(/Error: /,"")||String(e),"err")}
+}
+
+async function deposit(){
+  var a=$("amt").value.trim();
+  if(!a||isNaN(+a)){msg("enter a mixETH amount","err");return}
+  var wei=BigInt(Math.round(+a*1e18));
+  if(wei<=0n){msg("enter a positive amount","err");return}
+  var mix=await factoryMix();
+  var al=n16(await callRaw(mix,SEL.allow+enc(acct,sel.ctl)));
+  if(al<wei){
+    msg("approving mixETH …","ok");
+    await doSend(mix,SEL.appr,enc(sel.ctl,"0x"+wei.toString(16)),"approve");
+  }
+  await doSend(sel.ctl,SEL.dep,padN(wei),"deposit "+a+" mixETH");
+}
+async function claim(){await doSend(sel.ctl,SEL.claim,"0x","claim")}
+
+window.addEventListener("load",function(){
+  if(eth){eth.on&&eth.on("accountsChanged",function(){location.reload()})}
+  if(!acct){
+    // read-only via public rpc on default chain (base)
+    cid=8453;
+    load().then(function(){});
+  }
+});
+async function load(){await refresh();setInterval(refresh,15000)}
+</script>
+</body>
+</html>

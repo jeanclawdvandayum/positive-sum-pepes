@@ -59,14 +59,17 @@ contract ForkDestructionTest is V4IntegrationTest {
         controller.voteCarpetBomb(true);
 
         // Phase 5: Warp past voting period
-        vm.warp(block.timestamp + 3 days + 1);
+        skip(3 days + 1);
 
-        // Phase 6: Execute destruction
-        uint256 factoryMixBefore = mixETH.balanceOf(address(factory));
+        // Phase 6: Execute destruction — carry forwards into spawned round 2
         controller.carpetBomb();
-        uint256 factoryMixAfter = mixETH.balanceOf(address(factory));
+        skip(3 days + 1);
+        controller.finalizeCarpet();
 
-        assertTrue(factoryMixAfter > factoryMixBefore, "Factory received carried mixETH");
+        assertTrue(factory.currentRoundId() == 2, "Round 2 spawned");
+        uint256 seeded = mixETH.balanceOf(address(factory.getRound(2).controller));
+        assertTrue(seeded > 0, "Carry seeded into round 2");
+        assertEq(mixETH.balanceOf(address(factory)), 0, "Factory emptied");
 
         (,,,, bool executed,) = controller.getCarpetBombState();
         assertTrue(executed, "Destruction executed");
@@ -87,7 +90,7 @@ contract ForkDestructionTest is V4IntegrationTest {
         router.swap(poolKey, destroyParams);
         vm.stopPrank();
 
-        console.log("mixETH carried to factory:", factoryMixAfter - factoryMixBefore);
+        console.log("mixETH seeded to round 2 predeposit:", seeded);
     }
 
     function test_Fork_CarryToNextRound() public {
@@ -121,19 +124,18 @@ contract ForkDestructionTest is V4IntegrationTest {
         vm.prank(bob);
         controller.voteCarpetBomb(true);
 
-        vm.warp(block.timestamp + 3 days + 1);
+        skip(3 days + 1);
         controller.carpetBomb();
+        skip(3 days + 1);
+        controller.finalizeCarpet();
 
-        // Now carry to next round
-        uint256 roundId = factory.currentRoundId();
-        uint256 factoryBefore = mixETH.balanceOf(address(factory));
-        uint256 ownerBefore = mixETH.balanceOf(address(this));
+        // carpetBomb birthed round 2 and seeded it with the entire carry
+        assertEq(factory.currentRoundId(), 2, "round 2 spawned");
+        PSPFactory.Round memory r2 = factory.getRound(2);
+        uint256 seeded = mixETH.balanceOf(address(r2.controller));
+        assertGt(seeded, 0, "carry seeded into round 2 predeposit");
+        assertEq(mixETH.balanceOf(address(factory)), 0, "factory emptied");
 
-        factory.carryToNextRound(roundId);
-
-        uint256 ownerAfter = mixETH.balanceOf(address(this));
-        assertGe(ownerAfter, ownerBefore, "Owner received carried funds");
-
-        console.log("Funds carried:", ownerAfter - ownerBefore);
+        console.log("Funds carried:", seeded);
     }
 }

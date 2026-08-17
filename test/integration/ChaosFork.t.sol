@@ -16,6 +16,8 @@ import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
+import {HookDeployer} from "../../src/HookDeployer.sol";
+import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
 
 import {MainnetConfig} from "./MainnetConfig.sol";
@@ -53,7 +55,7 @@ contract ChaosForkTest is Test {
         mixETH = new MockMixETH();
         mixETH.depositETH{value: 1_000_000e18}();
 
-        factory = new PSPFactory(poolManager, mixETH);
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer());
 
         mixETH.transfer(alice, 50_000e18);
         mixETH.transfer(bob, 50_000e18);
@@ -77,8 +79,10 @@ contract ChaosForkTest is Test {
         r1.controller.proposeCarpetBomb();
         vm.prank(alice);
         r1.controller.voteCarpetBomb(true);
-        vm.warp(block.timestamp + 3 days + 1);
+        skip(3 days + 1);
         r1.controller.carpetBomb();
+        skip(3 days + 1);
+        r1.controller.finalizeCarpet();
 
         assertEq(uint8(r1.hook.mode()), uint8(CurveHook.Mode.Destroyed));
 
@@ -106,7 +110,7 @@ contract ChaosForkTest is Test {
         r1.controller.proposeCarpetBomb();
         vm.prank(alice);
         r1.controller.voteCarpetBomb(true);
-        vm.warp(block.timestamp + 3 days + 1);
+        skip(3 days + 1);
         r1.controller.carpetBomb();
 
         // Bob tries to lock his PSP into the dead round → rejected
@@ -169,7 +173,7 @@ contract ChaosForkTest is Test {
         uint256 buySize = 3e18;
 
         uint256 mixBefore = mixETH.balanceOf(address(churner));
-        churner.churn(r1.key, cycles, buySize);
+        churner.churn(r1.key, cycles, buySize, address(mixETH));
         uint256 mixAfter = mixETH.balanceOf(address(churner));
 
         console.log("churner start:", mixBefore);
@@ -200,25 +204,27 @@ contract ChaosForkTest is Test {
         r1.controller.proposeCarpetBomb();
         vm.prank(alice);
         r1.controller.voteCarpetBomb(true);
-        vm.warp(block.timestamp + 3 days + 1);
+        skip(3 days + 1);
         r1.controller.carpetBomb();
+        skip(3 days + 1);
+        r1.controller.finalizeCarpet();
 
-        // Factory received everything
-        uint256 factoryBalance = mixETH.balanceOf(address(factory));
-        assertGe(factoryBalance, r1Reserve, "factory got less than the reserve");
-
-        // deployNextRound: one call, new round seeded + launched
-        CurveMath.CurveConfig memory config = _curveConfig();
-        PSPFactory.RoundParams memory params = PSPFactory.RoundParams({
-            name: "PSP Round 2", symbol: "PSP2", curveConfig: config
-        });
-        (uint256 roundId2,) = factory.deployNextRound(1, params);
+        // carpetBomb birthed round 2 and forwarded the entire carry into its
+        // predeposit — factory never holds it
+        uint256 roundId2 = factory.currentRoundId();
         assertEq(roundId2, 2);
 
         PSPFactory.Round memory r2 = factory.getRound(2);
+        uint256 seeded = mixETH.balanceOf(address(r2.controller));
+        assertGe(seeded, r1Reserve, "round 2 seeded with at least the reserve");
+        assertEq(mixETH.balanceOf(address(factory)), 0, "factory emptied");
+        assertFalse(r2.controller.predepositClosed(), "round 2 in its predeposit window");
+
+        // Owner launches round 2's curve with the carried funds
+        vm.prank(address(factory));
+        r2.controller.launchPooledBuy();
         assertGt(r2.hook.totalSupplyPSP(), 0, "round 2 launched with carried funds");
         assertGt(r2.hook.reserveMixETH(), 0, "round 2 has reserves");
-        assertEq(mixETH.balanceOf(address(factory)), 0, "factory emptied");
 
         // New round trades normally; old round is dead
         _buy(_ctx(2), attacker, 5e18);
@@ -351,7 +357,7 @@ contract ChaosForkTest is Test {
         uint256 aliceFees = mixETH.balanceOf(alice) - aliceMixBefore;
 
         // ~5% of 30 ETH = 1.5 ETH to the sole locker
-        assertApproxEqRel(aliceFees, 1.5e18, 5e16, "sole locker rebate mismatch");
+        assertApproxEqRel(aliceFees, 1.425e18, 1e16, "sole locker rebate mismatch");
         console.log("sole locker extracted from bob's churn:", aliceFees);
     }
 
@@ -488,51 +494,64 @@ contract AtomicChurner {
         poolManager = _pm;
     }
 
-    function churn(PoolKey calldata key, uint256 cycles, uint256 buySize) external {
-        poolManager.unlock(abi.encode(key, cycles, buySize));
+    function churn(PoolKey calldata key, uint256 cycles, uint256 buySize, address mixToken) external {
+        poolManager.unlock(abi.encode(key, cycles, buySize, mixToken));
     }
 
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         require(msg.sender == address(poolManager), "not PM");
-        (PoolKey memory key, uint256 cycles, uint256 buySize) =
-            abi.decode(data, (PoolKey, uint256, uint256));
+        (PoolKey memory key, uint256 cycles, uint256 buySize, address mixToken) =
+            abi.decode(data, (PoolKey, uint256, uint256, address));
 
-        IERC20 mix = IERC20(Currency.unwrap(key.currency0));
-        IERC20 psp = IERC20(Currency.unwrap(key.currency1));
+        // Pool currency ordering is address-sorted, not semantic (moving the
+        // PSP deploy to ControllerDeployer flipped it for this suite). Detect
+        // which side mixETH is on instead of assuming currency0.
+        bool mixIsZero = Currency.unwrap(key.currency0) == mixToken;
+        Currency mixCur = mixIsZero ? key.currency0 : key.currency1;
+        Currency pspCur = mixIsZero ? key.currency1 : key.currency0;
+        IERC20 mix = IERC20(mixToken);
+        IERC20 psp = IERC20(Currency.unwrap(pspCur));
+        uint160 buyLimit = mixIsZero ? 4295128740 : 1461446703485210103287273052203988822378723970341;
+        uint160 sellLimit = mixIsZero ? 1461446703485210103287273052203988822378723970341 : 4295128740;
 
         for (uint256 i = 0; i < cycles; i++) {
             // BUY: settle mix in, swap, take PSP out
-            poolManager.sync(key.currency0);
+            poolManager.sync(mixCur);
             mix.safeTransfer(address(poolManager), buySize);
             poolManager.settle();
 
             BalanceDelta buyDelta = poolManager.swap(key, SwapParams({
                 amountSpecified: -int256(buySize),
-                sqrtPriceLimitX96: 4295128740,
-                zeroForOne: true
+                sqrtPriceLimitX96: buyLimit,
+                zeroForOne: mixIsZero
             }), "");
 
             uint256 pspOut;
-            if (buyDelta.amount1() > 0) {
+            if (!mixIsZero && buyDelta.amount0() > 0) {
+                pspOut = uint256(int256(buyDelta.amount0()));
+                poolManager.take(pspCur, address(this), pspOut);
+            } else if (mixIsZero && buyDelta.amount1() > 0) {
                 pspOut = uint256(int256(buyDelta.amount1()));
-                poolManager.take(key.currency1, address(this), pspOut);
+                poolManager.take(pspCur, address(this), pspOut);
             } else {
                 pspOut = psp.balanceOf(address(this));
             }
 
             // SELL: settle PSP in, swap, take mix out
-            poolManager.sync(key.currency1);
+            poolManager.sync(pspCur);
             psp.safeTransfer(address(poolManager), pspOut);
             poolManager.settle();
 
             BalanceDelta sellDelta = poolManager.swap(key, SwapParams({
                 amountSpecified: -int256(pspOut),
-                sqrtPriceLimitX96: 1461446703485210103287273052203988822378723970341,
-                zeroForOne: false
+                sqrtPriceLimitX96: sellLimit,
+                zeroForOne: !mixIsZero
             }), "");
 
-            if (sellDelta.amount0() > 0) {
-                poolManager.take(key.currency0, address(this), uint256(int256(sellDelta.amount0())));
+            if (mixIsZero && sellDelta.amount0() > 0) {
+                poolManager.take(mixCur, address(this), uint256(int256(sellDelta.amount0())));
+            } else if (!mixIsZero && sellDelta.amount1() > 0) {
+                poolManager.take(mixCur, address(this), uint256(int256(sellDelta.amount1())));
             }
         }
         return "";

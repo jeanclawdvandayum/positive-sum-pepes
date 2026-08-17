@@ -13,6 +13,8 @@ import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
+import {HookDeployer} from "../../src/HookDeployer.sol";
+import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
 
 import {MainnetConfig} from "./MainnetConfig.sol";
@@ -59,7 +61,7 @@ contract MultiUserScenarioTest is Test {
         mockMix.depositETH{value: 100_000e18}();
         mixETH = IERC20(address(mockMix));
 
-        factory = new PSPFactory(poolManager, mixETH);
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer());
         router = new V4SwapRouter(poolManager);
 
         // Fund all users
@@ -404,27 +406,29 @@ contract MultiUserScenarioTest is Test {
         assertGt(yesVotes, noVotes, "Yes > No");
 
         // Warp past voting
-        vm.warp(block.timestamp + 3 days + 1);
+        skip(3 days + 1);
 
         uint256 factoryBefore = mixETH.balanceOf(address(factory));
         controller.carpetBomb();
+        skip(3 days + 1);
+        controller.finalizeCarpet();
         uint256 factoryAfter = mixETH.balanceOf(address(factory));
 
         console.log("=== Destruction ===");
-        console.log("mixETH carried to factory:", factoryAfter - factoryBefore);
+        console.log("mixETH held by factory (instantly reseeded):", factoryAfter - factoryBefore);
         console.log("Hook mode:", uint8(hook.mode()));
         assertEq(uint8(hook.mode()), uint8(CurveHook.Mode.Destroyed), "Destroyed");
 
-        // Carry to next round
-        uint256 factoryBefore2 = mixETH.balanceOf(address(factory));
-        uint256 ownerBefore = mixETH.balanceOf(address(this));
-        factory.carryToNextRound(1);
-        uint256 ownerAfter = mixETH.balanceOf(address(this));
+        // carpetBomb birthed round 2, seeded with the entire carry
+        assertEq(factory.currentRoundId(), 2, "round 2 spawned");
+        PSPFactory.Round memory r2 = factory.getRound(2);
+        uint256 seeded = mixETH.balanceOf(address(r2.controller));
 
         console.log("=== Round Carry ===");
-        console.log("Funds to owner:", ownerAfter - ownerBefore);
-        console.log("Factory remaining:", factoryBefore2 - (factoryAfter - factoryBefore) + (factoryAfter - factoryBefore) - mixETH.balanceOf(address(factory)));
-        assertGe(ownerAfter, ownerBefore, "Owner received carried funds");
+        console.log("Funds seeded to round 2:", seeded);
+        console.log("Factory remaining:", mixETH.balanceOf(address(factory)));
+        assertGt(seeded, 0, "Carry seeded into next round");
+        assertEq(mixETH.balanceOf(address(factory)), 0, "factory emptied");
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -454,7 +458,7 @@ contract MultiUserScenarioTest is Test {
         vm.prank(alice);
         controller.voteCarpetBomb(true);
 
-        vm.warp(block.timestamp + 3 days + 1);
+        skip(3 days + 1);
 
         // Should fail quorum check
         vm.expectRevert(RoundController.QuorumNotReached.selector);
@@ -539,22 +543,21 @@ contract MultiUserScenarioTest is Test {
         controller.voteCarpetBomb(true);
         vm.prank(carol);
         controller.voteCarpetBomb(true);
-        vm.warp(block.timestamp + 3 days + 1);
+        skip(3 days + 1);
 
         console.log("Phase 7: Destruction");
-        uint256 factoryBefore = mixETH.balanceOf(address(factory));
         controller.carpetBomb();
-        uint256 carried = mixETH.balanceOf(address(factory)) - factoryBefore;
-        console.log("mixETH carried to factory:", carried);
-
+        skip(3 days + 1);
+        controller.finalizeCarpet();
         assertEq(uint8(hook.mode()), uint8(CurveHook.Mode.Destroyed), "Destroyed");
 
         console.log("Phase 8: Round Carry");
-        uint256 ownerBefore = mixETH.balanceOf(address(this));
-        factory.carryToNextRound(1);
-        uint256 ownerGained = mixETH.balanceOf(address(this)) - ownerBefore;
-        console.log("Funds received by owner:", ownerGained);
-        assertGt(ownerGained, 0, "Owner received funds");
+        // carpetBomb birthed round 2 seeded with the entire carry
+        assertEq(factory.currentRoundId(), 2, "round 2 spawned");
+        uint256 seeded = mixETH.balanceOf(address(factory.getRound(2).controller));
+        console.log("Funds seeded to round 2:", seeded);
+        assertGt(seeded, 0, "Carry seeded into next round");
+        assertEq(mixETH.balanceOf(address(factory)), 0, "factory emptied");
 
         console.log("=== LIFECYCLE COMPLETE ===");
     }

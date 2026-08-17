@@ -10,6 +10,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {PSPFactory} from "../../src/PSPFactory.sol";
+import {HookDeployer} from "../../src/HookDeployer.sol";
+import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {PSPToken} from "../../src/PSPToken.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {RoundController} from "../../src/RoundController.sol";
@@ -58,7 +60,7 @@ contract NK24MultiZoneTest is Test {
         vm.createSelectFork(vm.envString("MAINNET_RPC_URL"));
         mixETH = new HostileMixETH();
         mixETH.deposit{value: 200_000_000e18}();
-        factory = new PSPFactory(poolManager, mixETH);
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer());
         mixETH.transfer(alice, 1_000_000e18);
         mixETH.transfer(whale, 100_000_000e18);
         r = _deployRound();
@@ -381,14 +383,18 @@ contract NK24MultiZoneTest is Test {
 
         uint256 whalePSP = r.token.balanceOf(whale);
         assertGt(whalePSP, 1e12, "no PSP to drain");
+        (uint256 potAfterBuy,) = r.controller.potState();
 
-        // sell everything bought EXCEPT one wei -> supply lands exactly on
-        // the genesis boundary (start of the shaped region)
+        // everything unburned after the drain = genesis + 1 wei of whale dust
+        // + every PSP the pot ever minted/skimmed (buy cut + sell cut)
+        uint256 potCut = ((whalePSP - 1) * 25) / 10000;
         Leg[] memory drain = new Leg[](1);
         drain[0] = Leg({isBuy: false, amount: whalePSP - 1});
         _multiLeg(whale, drain);
 
-        assertEq(r.hook.totalSupplyPSP(), genesisSupply + 1, "supply did not land on genesis boundary + dust");
+        (uint256 potPSP,) = r.controller.potState();
+        assertEq(r.hook.totalSupplyPSP(), genesisSupply + 1 + potPSP, "supply = genesis + dust + unburned pot PSP");
+        assertApproxEqAbs(potPSP - potAfterBuy, potCut, 2, "pot ledger did not accrue the skimmed cut");
         assertGe(r.hook.reserveMixETH(), CurveMath.curveIntegral(0, genesisSupply, cc), "reserve below backing");
 
         // the last wei: input < MIN_SWAP_INPUT -> clean revert, no panic,

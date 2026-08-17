@@ -14,7 +14,12 @@ import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
+import {HookDeployer} from "../../src/HookDeployer.sol";
+import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
+import {PSPZapIn} from "../../src/PSPZapIn.sol";
+import {PSPZapOut} from "../../src/PSPZapOut.sol";
+import {IMixETH} from "../../src/interfaces/IMixETH.sol";
 
 import {MockMixETH} from "../mocks/MockMixETH.sol";
 import {MockPoolManager} from "../mocks/MockPoolManager.sol";
@@ -45,7 +50,7 @@ contract FactoryTest is Test {
         mixETH = new MockMixETH();
         mixETH.depositETH{value: 100_000e18}();
         poolManager = new MockPoolManager();
-        factory = new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)));
+        factory = new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer());
 
         _deployRound1();
     }
@@ -176,10 +181,10 @@ contract FactoryTest is Test {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  L-1: carryToNextRound is owner-only
+    //  L-1 evolution: carpetBomb births the next round automatically
     // ═══════════════════════════════════════════════════════════════
 
-    function test_L1_CarryToNextRoundOwnerOnly() public {
+    function test_L1_CarrySpawnsNextRoundAutomatically() public {
         // Destroy round 1 through the real governance flow
         mixETH.transfer(alice, 200e18);
         mixETH.transfer(bob, 200e18);
@@ -212,35 +217,39 @@ contract FactoryTest is Test {
         vm.prank(bob);
         controller.voteCarpetBomb(true);
 
-        vm.warp(block.timestamp + 3 days + 1);
+        skip(3 days + 1);
         controller.carpetBomb();
+        skip(3 days + 1);
+        controller.finalizeCarpet();
 
         (,,,,, bool canExecute) = controller.getCarpetBombState();
         assertFalse(canExecute, "proposal already executed");
         assertEq(uint8(hook.mode()), uint8(CurveHook.Mode.Destroyed), "round destroyed");
 
-        // Attacker can no longer front-run the carry (L-1)
-        uint256 factoryBalance = mixETH.balanceOf(address(factory));
-        assertGt(factoryBalance, 0, "factory holds carried mixETH");
-
-        vm.prank(attacker);
-        vm.expectRevert(
-            abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, attacker, address(this))
-        );
-        factory.carryToNextRound(1);
-
-        // Factory balance untouched by the failed attempt
-        assertEq(mixETH.balanceOf(address(factory)), factoryBalance, "no drain on failed attempt");
-
-        // Owner path still works and sweeps the carry to owner()
-        uint256 ownerBefore = mixETH.balanceOf(address(this));
-        factory.carryToNextRound(1);
+        // carpetBomb birthed round 2 and seeded it with the entire carry
+        assertEq(factory.currentRoundId(), 2, "round 2 spawned");
+        PSPFactory.Round memory r2 = factory.getRound(2);
+        uint256 carried = mixETH.balanceOf(address(r2.controller));
+        assertGt(carried, 0, "carry seeded as round-2 predeposit");
         assertEq(mixETH.balanceOf(address(factory)), 0, "factory drained");
+        assertFalse(r2.controller.predepositClosed(), "round 2 awaiting its own window");
+        (uint256 factoryDeposit,) = r2.controller.predeposits(address(factory));
         assertEq(
-            mixETH.balanceOf(address(this)) - ownerBefore,
-            factoryBalance,
-            "owner received carry"
+            factoryDeposit,
+            carried,
+            "factory recorded as depositor"
         );
+        assertEq(r2.token.symbol(), "PSP2", "spawned round naming");
+        assertEq(r2.token.name(), "Positive Sum Pepes 2", "spawned round naming");
+
+        // spam is impossible: round 1 is no longer the latest round
+        vm.prank(attacker);
+        vm.expectRevert(PSPFactory.NotLatestRound.selector);
+        factory.spawnNextRound(1);
+        // round 2 exists but is not destroyed
+        vm.prank(attacker);
+        vm.expectRevert(PSPFactory.RoundNotDestroyed.selector);
+        factory.spawnNextRound(2);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -268,5 +277,47 @@ contract FactoryTest is Test {
         vm.prank(address(r.controller));
         factory.markDestroyed(1);
         assertTrue(factory.getRound(1).destroyed, "round marked destroyed");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  EIP-170 guard: every contract that can live on-chain must stay
+    //  under the 24,576-byte runtime limit. The factory hit 41KB before
+    //  the deployer-vessel split because `new X` embeds creation code;
+    //  this test makes that class of regression a hard failure.
+    // ═══════════════════════════════════════════════════════════════
+
+    function test_EIP170_AllDeployablesUnderLimit() public {
+        // Fresh deployers (setUp creates them inline; we want them anyway)
+        HookDeployer hd = new HookDeployer();
+        ControllerDeployer cd = new ControllerDeployer();
+
+        assertLe(address(hd).code.length, 24_576, "HookDeployer over EIP-170");
+        assertLe(address(cd).code.length, 24_576, "ControllerDeployer over EIP-170");
+        assertLe(address(factory).code.length, 24_576, "PSPFactory over EIP-170");
+
+        // Live children from setUp's round 1
+        assertLe(address(controller).code.length, 24_576, "RoundController over EIP-170");
+        assertLe(address(hook).code.length, 24_576, "CurveHook over EIP-170");
+        assertLe(address(pspToken).code.length, 24_576, "PSPToken over EIP-170");
+
+        // QoL routers
+        PSPZapIn zi = new PSPZapIn(IMixETH(address(mixETH)), IPoolManager(address(poolManager)));
+        PSPZapOut zo = new PSPZapOut(IMixETH(address(mixETH)), IPoolManager(address(poolManager)));
+        assertLe(address(zi).code.length, 24_576, "PSPZapIn over EIP-170");
+        assertLe(address(zo).code.length, 24_576, "PSPZapOut over EIP-170");
+    }
+
+    // ControllerDeployer embeds the creation code of RoundController AND
+    // PSPToken, so its size tracks theirs. Fail early if headroom shrinks
+    // below ~0.5KB so nobody ships an undeployable vessel by accident.
+    // (Side-pot feature ate ~600B of headroom; controller itself has ~1.2KB
+    // of growth left before the vessel math breaks — refactor before big adds.)
+    function test_EIP170_ControllerDeployerHeadroom() public {
+        ControllerDeployer cd = new ControllerDeployer();
+        assertLt(
+            address(cd).code.length,
+            24_000,
+            "ControllerDeployer headroom < ~0.5KB; shrink before adding code"
+        );
     }
 }

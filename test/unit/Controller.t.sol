@@ -224,6 +224,8 @@ contract ControllerTest is Test {
 
         uint256 factoryBefore = mixETH.balanceOf(factory);
         controller.carpetBomb();
+        skip(3 days + 1);
+        controller.finalizeCarpet();
         uint256 factoryAfter = mixETH.balanceOf(factory);
 
         (,,,, bool executed,) = controller.getCarpetBombState();
@@ -365,9 +367,9 @@ contract ControllerTest is Test {
         vm.prank(factory);
         c2.setHook(CurveHook(address(hook2)));
 
-        // Alice predeposits 1000 mixETH; carol predeposits 1 wei of dust
+        // Alice predeposits 400 mixETH (under the 500 cap); carol adds 1 wei dust
         mixETH.approve(address(c2), type(uint256).max);
-        c2.predeposit(1_000e18);
+        c2.predeposit(400e18);
         address carol = makeAddr("carol");
         mixETH.transfer(carol, 1);
         vm.startPrank(carol);
@@ -375,7 +377,7 @@ contract ControllerTest is Test {
         c2.predeposit(1);
         vm.stopPrank();
 
-        // Launch: totalInitialPSP ≈ 1e21 / 1000e18 ≈ 1e18 PSP (curve-minted)
+        // Launch: totalInitialPSP ≈ 400e21 / 1000e18 ≈ 0.4 PSP (curve-minted)
         vm.prank(factory);
         c2.launchPooledBuy();
         uint256 initialPSP = c2.totalInitialPSP();
@@ -469,6 +471,8 @@ contract ControllerTest is Test {
         vm.stopPrank();
         vm.warp(block.timestamp + 3 days + 1);
         controller.carpetBomb();
+        skip(3 days + 1);
+        controller.finalizeCarpet();
         assertEq(mixETH.balanceOf(address(hook)), 0, "hook fully drained");
 
         // Explicit fee claims stay strict and revert informatively

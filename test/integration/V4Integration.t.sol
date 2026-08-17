@@ -16,6 +16,8 @@ import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
+import {HookDeployer} from "../../src/HookDeployer.sol";
+import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
 
 import {MainnetConfig} from "./MainnetConfig.sol";
@@ -71,7 +73,7 @@ contract V4IntegrationTest is Test {
         mixETH = IERC20(address(mockMix));
 
         // Deploy PSPFactory with real PoolManager
-        factory = new PSPFactory(poolManager, mixETH);
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer());
 
         // Deploy V4 swap router (handles unlock/callback + pre-settle pattern)
         router = new V4SwapRouter(poolManager);

@@ -17,6 +17,8 @@ import {PSPToken} from "./PSPToken.sol";
 import {CurveHook} from "./CurveHook.sol";
 import {RoundController} from "./RoundController.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
+import {HookDeployer} from "./HookDeployer.sol";
+import {ControllerDeployer} from "./ControllerDeployer.sol";
 
 /// @title PSPFactory — Deploys and manages PSP rounds
 /// @notice Each round gets fresh contracts. ETH (as mixETH) is carried from destruction to next round.
@@ -29,11 +31,16 @@ contract PSPFactory is Ownable2Step {
     error ZeroAddress();
     error NotRoundController(); // only the round's own controller may markDestroyed (I-4)
     error HookAddressMismatch();
-    error NoCarryBalance();
     error RoundAlreadyDestroyed();
+    error NotLatestRound(); // spawn chains strictly forward: latest destroyed round only
+    error GameConfigUnset(); // no round has been deployed yet — no curve to inherit
+    error SidePotOverdrawn(); // ledger credit exceeds the tokens actually held
 
     event RoundDeployed(uint256 indexed roundId, address token, address controller, address hook);
     event ETHCarried(uint256 indexed fromRound, uint256 indexed toRound, uint256 mixETHAmount);
+    event SidePotCredited(uint256 amount); // dying round's pot redemption received
+    event SidePotContributed(uint256 indexed toRound, uint256 mixETHAmount); // released into a new round's curve
+    event HtmlUpdated();
 
     struct Round {
         PSPToken token;
@@ -52,17 +59,64 @@ contract PSPFactory is Ownable2Step {
 
     IPoolManager public immutable poolManager;
     IERC20 public immutable mixETH;
-    address public constant CREATE2_FACTORY = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+    /// @dev EIP-170: holds the CurveHook creation-code literal so the factory
+    ///      stays under the 24,576-byte limit (see HookDeployer docs)
+    HookDeployer public immutable hookDeployer;
+    /// @dev EIP-170: holds RoundController's + PSPToken's creation code
+    ControllerDeployer public immutable controllerDeployer;
 
     uint256 public currentRoundId;
     mapping(uint256 => Round) public rounds;
     int24 public constant tickSpacing = 60;
 
-    constructor(IPoolManager _poolManager, IERC20 _mixETH) Ownable(msg.sender) {
+    /// @dev Curve inherited by every spawned round. Captured from the last
+    ///      explicit deployRound() call — no drift between genesis round and
+    ///      its descendants.
+    CurveMath.CurveConfig public gameCurve;
+
+    /// @dev Ring-fenced protocol reserve, fed by dying rounds' side-pot
+    ///      redemptions (25bps swap fee, accrued as PSP, exited at average
+    ///      backing on carpet bomb). NOT part of the generic carry: at spawn
+    ///      it is forwarded to the new round via potDeposit() — it thickens
+    ///      the genesis curve for everyone, cap-exempt and share-less. The
+    ///      public predeposit cap (500 mixETH) applies to USERS only, so a
+    ///      round can open with 500 user mixETH + whatever the pot holds.
+    ///      Invariant: sidePot <= mixETH.balanceOf(factory) at all times
+    ///      (credits only follow a matching transfer from a round controller).
+    uint256 public sidePot;
+
+    /// @dev Naming for spawned rounds: "<baseName> <id>" / "<baseSymbol><id>".
+    string public baseName = "Positive Sum Pepes";
+    string public baseSymbol = "PSP";
+
+    /// @dev The walk-away test: the full front-end, served from the contract.
+    ///      Anyone can fetch html() over any RPC and render it locally with
+    ///      zero backend. Updatable by owner so the UI can evolve without a
+    ///      redeploy; the deployed UI keeps working forever either way.
+    string private _html;
+
+    constructor(IPoolManager _poolManager, IERC20 _mixETH, HookDeployer _hookDeployer, ControllerDeployer _controllerDeployer)
+        Ownable(msg.sender)
+    {
         if (address(_poolManager) == address(0)) revert ZeroAddress();
         if (address(_mixETH) == address(0)) revert ZeroAddress();
+        if (address(_hookDeployer) == address(0)) revert ZeroAddress();
+        if (address(_controllerDeployer) == address(0)) revert ZeroAddress();
         poolManager = _poolManager;
         mixETH = _mixETH;
+        hookDeployer = _hookDeployer;
+        controllerDeployer = _controllerDeployer;
+    }
+
+    // ─────────────── Walk-away UI ───────────────
+
+    function setHtml(string calldata h) external onlyOwner {
+        _html = h;
+        emit HtmlUpdated();
+    }
+
+    function html() external view returns (string memory) {
+        return _html;
     }
 
     /// @notice Deploy a new PSP round with all contracts wired together
@@ -74,51 +128,38 @@ contract PSPFactory is Ownable2Step {
         return _deployRound(params);
     }
 
-    /// @dev Internal deployment logic, callable from deployRound and deployNextRound
-    function _deployRound(RoundParams calldata params)
+    /// @dev Internal deployment logic, callable from deployRound and spawnNextRound
+    function _deployRound(RoundParams memory params)
         internal
         returns (uint256 roundId, address hookAddr)
     {
-        // M-3: reject malformed curve configs before anything is deployed
-        CurveMath.validate(params.curveConfig);
+        // M-3: curve validation happens in the RoundController constructor —
+        // inlining CurveMath here pushed the factory past EIP-170's 24KB limit
+        gameCurve = params.curveConfig;
 
         roundId = ++currentRoundId;
 
-        // 1. Deploy PSPToken (factory as temp admin)
-        PSPToken token = new PSPToken(params.name, params.symbol, address(this));
+        // 1. Deploy PSPToken (factory as temp admin) — via ControllerDeployer
+        //    (EIP-170: keeps PSPToken's creation code out of this contract)
+        PSPToken token = controllerDeployer.deployToken(params.name, params.symbol, address(this));
 
-        // 2. Deploy RoundController
-        RoundController controller = new RoundController(
-            token,
-            mixETH,
-            params.curveConfig,
-            address(this)
+        // 2. Deploy RoundController — via ControllerDeployer (EIP-170)
+        RoundController controller = controllerDeployer.deployController(
+            token, mixETH, params.curveConfig, address(this)
         );
 
         // 3. Wire controller as token's controller
         token.setController(address(controller));
 
-        // 4. Mine hook address via CREATE2
-        //    deployer is address(this) because `new Contract{salt}` deploys from this contract
-        //    L-2: BEFORE_INITIALIZE_FLAG added so the hook gates pool initialization
-        //    to the canonical {mixETH, PSP} pair (see CurveHook._beforeInitialize).
-        uint160 flags = uint160(
-            Hooks.BEFORE_INITIALIZE_FLAG
-                | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
-                | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
-                | Hooks.BEFORE_SWAP_FLAG
-                | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
+        // 4. Mine + deploy hook via the dedicated deployer
+        //    (EIP-170: keeps CurveHook's creation code out of this contract —
+        //    the factory was 41KB with it embedded twice. The deployer holds
+        //    the literal once and verifies the mined address on-chain.)
+        (address hookAddress,) = hookDeployer.deployHook(
+            poolManager, address(controller), params.curveConfig
         );
-
-        bytes memory constructorArgs = abi.encode(poolManager, controller, params.curveConfig);
-        (address expectedAddr, bytes32 salt) = HookMiner.find(
-            address(this), flags, type(CurveHook).creationCode, constructorArgs
-        );
-
-        // 5. Deploy hook
-        CurveHook hook = new CurveHook{salt: salt}(poolManager, controller, params.curveConfig);
-        if (address(hook) != expectedAddr) revert HookAddressMismatch();
-        hookAddr = address(hook);
+        CurveHook hook = CurveHook(hookAddress);
+        hookAddr = hookAddress;
 
         // 6. Wire hook to controller
         controller.setHook(hook);
@@ -157,53 +198,82 @@ contract PSPFactory is Ownable2Step {
         emit RoundDeployed(roundId, address(token), address(controller), address(hook));
     }
 
-    /// @notice Carry mixETH from a destroyed round to the next round
-    /// @dev L-1: owner-only. Permissionless carry let anyone front-run the
-    ///      owner's deployNextRound to drain the carry balance to owner() early,
-    ///      forcing NoCarryBalance and a manual rescue flow.
-    function carryToNextRound(uint256 fromRoundId) external onlyOwner returns (uint256) {
-        Round storage round = rounds[fromRoundId];
-        if (address(round.token) == address(0)) revert RoundNotFound();
-        if (!round.destroyed) revert RoundNotDestroyed();
+    /// @notice Spawn the next round from the latest destroyed one — permissionless.
+    /// @dev The game loop's rebirth step. Normally invoked by the dying round's
+    ///      carpetBomb() (itself permissionless), but callable by anyone as a
+    ///      fallback: the strict latest-destroyed-round guard makes spamming
+    ///      impossible (each round can spawn exactly one successor, and only
+    ///      while it is the latest).
+    ///
+    ///      The destroyed round's carry (reserve + staker fees) becomes the new
+    ///      round's opening predeposit via seedCarry() (cap-exempt), and the
+    ///      ring-fenced side pot is forwarded separately via potDeposit() —
+    ///      it buys NO predeposit shares, it thickens the genesis curve for
+    ///      every participant of the new round (cap-exempt, share-less).
+    ///      Zero carry / zero pot are both fine — the round simply opens empty
+    ///      and waits for the public window (or owner launch).
+    function spawnNextRound(uint256 fromRoundId) external returns (uint256 newRoundId, address hookAddr) {
+        Round storage from = rounds[fromRoundId];
+        if (address(from.token) == address(0)) revert RoundNotFound();
+        if (!from.destroyed) revert RoundNotDestroyed();
+        if (fromRoundId != currentRoundId) revert NotLatestRound();
+        if (gameCurve.zones.length == 0) revert GameConfigUnset();
 
-        uint256 balance = mixETH.balanceOf(address(this));
-        if (balance > 0) {
-            // Transfer to owner (factory owner) for redeployment
-            // In production, this would auto-deploy the next round
-            mixETH.safeTransfer(owner(), balance);
-        }
+        // Generic carry = factory balance MINUS the ring-fenced side pot.
+        // Both pots were funded by this round's death; they leave separately.
+        uint256 carry = mixETH.balanceOf(address(this)) - sidePot;
+        uint256 pot = sidePot;
 
-        emit ETHCarried(fromRoundId, currentRoundId + 1, balance);
-        return balance;
-    }
-
-    /// @notice Deploy the next round, auto-seeded with carried mixETH from a destroyed round.
-    /// @dev Combines carryToNextRound + deployRound + predeposit in one call.
-    ///      The destroyed round's mixETH becomes the predeposit for the new round.
-    function deployNextRound(uint256 fromRoundId, RoundParams calldata params)
-        external
-        onlyOwner
-        returns (uint256 newRoundId, address hookAddr)
-    {
-        Round storage oldRound = rounds[fromRoundId];
-        if (address(oldRound.token) == address(0)) revert RoundNotFound();
-        if (!oldRound.destroyed) revert RoundNotDestroyed();
-
-        uint256 carryBalance = mixETH.balanceOf(address(this));
-        if (carryBalance == 0) revert NoCarryBalance();
-
-        // Deploy new round (internal deployment)
+        newRoundId = currentRoundId + 1;
+        RoundParams memory params;
+        params.name = string.concat(baseName, " ", _itoa(newRoundId));
+        params.symbol = string.concat(baseSymbol, _itoa(newRoundId));
+        params.curveConfig = gameCurve;
         (newRoundId, hookAddr) = _deployRound(params);
 
-        // Seed the new round with carried mixETH as a predeposit
-        RoundController newController = rounds[newRoundId].controller;
-        mixETH.forceApprove(address(newController), carryBalance);
-        newController.predeposit(carryBalance);
+        if (carry > 0) {
+            RoundController newController = rounds[newRoundId].controller;
+            mixETH.forceApprove(address(newController), carry);
+            newController.seedCarry(carry);
+        }
 
-        // Launch immediately with the carried funds
-        newController.launchPooledBuy();
+        if (pot > 0) {
+            RoundController newController = rounds[newRoundId].controller;
+            mixETH.forceApprove(address(newController), pot);
+            newController.potDeposit(pot);
+            sidePot = 0;
+            emit SidePotContributed(newRoundId, pot);
+        }
 
-        emit ETHCarried(fromRoundId, newRoundId, carryBalance);
+        emit ETHCarried(fromRoundId, newRoundId, carry);
+    }
+
+    /// @dev Minimal uint → decimal string (round ids are small; loop is short)
+    function _itoa(uint256 v) internal pure returns (string memory) {
+        if (v == 0) return "0";
+        uint256 digits;
+        for (uint256 x = v; x > 0; x /= 10) digits++;
+        bytes memory b = new bytes(digits);
+        for (uint256 i = digits; i > 0; i--) {
+            b[i - 1] = bytes1(uint8(48 + (v % 10)));
+            v /= 10;
+        }
+        return string(b);
+    }
+
+    // ─────────────── Side pot (protocol reserve) ───────────────
+
+    /// @notice Credit the side pot. Called by the dying round's controller
+    ///         immediately after transferring its pot redemption mixETH here.
+    /// @dev Ledger-only: the tokens must already be at the factory. Guarded to
+    ///      the CURRENT round's controller so nobody can earmark the generic
+    ///      carry as pot (earmarking changes next round's allocation — pot
+    ///      funds buy no predeposit shares, carry does).
+    function creditSidePot(uint256 amount) external {
+        if (msg.sender != address(rounds[currentRoundId].controller)) revert NotRoundController();
+        if (mixETH.balanceOf(address(this)) < sidePot + amount) revert SidePotOverdrawn();
+        sidePot += amount;
+        emit SidePotCredited(amount);
     }
 
     /// @notice Mark a round as destroyed (called by its controller during destruction)

@@ -13,6 +13,8 @@ import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
+import {HookDeployer} from "../../src/HookDeployer.sol";
+import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
 
 import {MainnetConfig} from "./MainnetConfig.sol";
@@ -46,7 +48,7 @@ contract AdvancedScenarioTest is Test {
         mixETH = new MockMixETH();
         mixETH.depositETH{value: 100_000e18}();
 
-        factory = new PSPFactory(poolManager, IERC20(address(mixETH)));
+        factory = new PSPFactory(poolManager, IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer());
         router = new V4SwapRouter(poolManager);
 
         _dealMixETH(alice, 1_000e18);
@@ -155,31 +157,29 @@ contract AdvancedScenarioTest is Test {
 
         skip(3 days + 1);
 
-        uint256 factoryBeforeDestroy = mixETH.balanceOf(address(factory));
+        // carpetBomb destroys round 1 AND births round 2 with the carry seeded
         controller.carpetBomb();
-        uint256 carried = mixETH.balanceOf(address(factory)) - factoryBeforeDestroy;
-        console.log("Round 1: carried mixETH:", carried);
+        skip(3 days + 1);
+        controller.finalizeCarpet();
+        console.log("Round 1 destroyed; round 2 auto-spawned with carry");
 
-        // Deploy round 2 with carried funds
-        CurveMath.CurveConfig memory config = CurveMath.singleCurve(
-            0.001e18, 1_000_000e18, 0.0000000046e18, 0.05e18
-        );
-
-        PSPFactory.RoundParams memory params = PSPFactory.RoundParams({
-            name: "PSP Round 2",
-            symbol: "PSP2",
-            curveConfig: config
-        });
-
-        factory.deployNextRound(1, params);
-
-        // Verify round 2 exists and is active
+        // Verify round 2 exists, seeded, in its predeposit window
         uint256 round2Id = factory.currentRoundId();
         assertEq(round2Id, 2, "Round 2 deployed");
 
         PSPFactory.Round memory round2 = factory.getRound(2);
         RoundController controller2 = round2.controller;
         CurveHook hook2 = round2.hook;
+
+        assertGt(
+            mixETH.balanceOf(address(controller2)), 0, "Round 2 seeded with carry"
+        );
+        assertFalse(controller2.predepositClosed(), "Round 2 in predeposit window");
+        assertEq(mixETH.balanceOf(address(factory)), 0, "factory emptied");
+
+        // Launch round 2's curve with the carried funds
+        vm.prank(address(factory));
+        controller2.launchPooledBuy();
 
         console.log("Round 2 mode:", uint8(hook2.mode()));
         assertEq(uint8(hook2.mode()), uint8(CurveHook.Mode.Active), "Round 2 active");
@@ -255,19 +255,24 @@ contract AdvancedScenarioTest is Test {
         controller.voteCarpetBomb(true);
         skip(3 days + 1);
         controller.carpetBomb();
-        console.log("Round 1 destroyed");
+        skip(3 days + 1);
+        controller.finalizeCarpet();
+        console.log("Round 1 destroyed (and round 2 auto-spawned)");
 
-        // Round 2
-        PSPFactory.RoundParams memory params = PSPFactory.RoundParams({
-            name: "PSP2", symbol: "PSP2", curveConfig: config
-        });
-        factory.deployNextRound(1, params);
-        console.log("Round 2 deployed + seeded");
-
-        // Round 2: check state
+        // Round 2: born inside carpetBomb, seeded with the carry, NOT launched —
+        // it opens its own predeposit window
         PSPFactory.Round memory r2 = factory.getRound(2);
         RoundController c2 = r2.controller;
         CurveHook h2 = r2.hook;
+        assertFalse(c2.predepositClosed(), "round 2 in its predeposit window");
+        assertGt(mixETH.balanceOf(address(c2)), 0, "round 2 seeded with carry");
+
+        // Owner launches round 2 (window floor is for the public, not the protocol)
+        vm.prank(address(factory));
+        c2.launchPooledBuy();
+        console.log("Round 2 deployed + seeded + launched");
+
+        // Round 2 state checks continue (c2 = r2.controller, h2 = r2.hook above)
 
         // Factory deposited all carried funds and is the sole depositor
         // PSP is minted to controller, factory claims (auto-locked)
@@ -300,17 +305,19 @@ contract AdvancedScenarioTest is Test {
         // Warp well past voting period
         skip(3 days + 1);
         c2.carpetBomb();
+        skip(3 days + 1);
+        c2.finalizeCarpet();
         console.log("Round 2 destroyed");
 
-        // Round 3
-        PSPFactory.RoundParams memory params3 = PSPFactory.RoundParams({
-            name: "PSP3", symbol: "PSP3", curveConfig: config
-        });
-        factory.deployNextRound(2, params3);
+        // Round 3: auto-spawned by round 2's bomb, seeded, in its predeposit window
         console.log("Round 3 deployed + seeded");
-
         assertEq(factory.currentRoundId(), 3, "3 rounds exist");
         PSPFactory.Round memory r3 = factory.getRound(3);
+        assertFalse(r3.controller.predepositClosed(), "R3 in predeposit window");
+
+        // Owner launches round 3
+        vm.prank(address(factory));
+        r3.controller.launchPooledBuy();
         assertEq(uint8(CurveHook(address(r3.hook)).mode()), uint8(CurveHook.Mode.Active), "R3 active");
         assertGt(CurveHook(address(r3.hook)).totalSupplyPSP(), 0, "R3 has supply");
 
@@ -430,8 +437,10 @@ contract AdvancedScenarioTest is Test {
         uint256 supplyAfter = hook.totalSupplyPSP();
 
         uint256 totalInput = 10e18 + 20e18 + 15e18;
-        assertEq(reserveAfter - reserveBefore, totalInput - (totalInput * 500) / 10000,
-                 "Reserve increased by total minus fees");
+        // 95% curve + 0.25% side-pot PSP mint (both enter the reserve);
+        // 4.75% is the staker fee, held over the reserve
+        assertEq(reserveAfter - reserveBefore, totalInput - (totalInput * 475) / 10000,
+                 "Reserve increased by total minus staker fees");
         assertGt(supplyAfter, supplyBefore, "Supply increased");
 
         console.log("=== Same-Block Sequential Buys ===");

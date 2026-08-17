@@ -11,6 +11,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {PSPFactory} from "../../src/PSPFactory.sol";
+import {HookDeployer} from "../../src/HookDeployer.sol";
+import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {PSPToken} from "../../src/PSPToken.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {RoundController} from "../../src/RoundController.sol";
@@ -57,7 +59,7 @@ contract NK24Test is Test {
         vm.createSelectFork(vm.envString("MAINNET_RPC_URL"));
         mixETH = new HostileMixETH();
         mixETH.deposit{value: 2_000_000e18}();
-        factory = new PSPFactory(poolManager, mixETH);
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer());
         mixETH.transfer(alice, 50_000e18);
         mixETH.transfer(bob, 50_000e18);
         mixETH.transfer(carol, 50_000e18);
@@ -267,10 +269,13 @@ contract NK24Test is Test {
         ctx.controller.claimPredepositPSP();
         uint256 carolFees = mixETH.balanceOf(carol) - carolBefore;
 
-        // 60/40 split of the ~5e18 stream — no winner-take-all
-        assertGt(aliceFees, 2.7e18, "alice (60% depositor) accrued her share");
-        assertGt(carolFees, 1.7e18, "carol (40% depositor) accrued her share");
-        assertApproxEqAbs(aliceFees + carolFees, 5e18, 0.1e18, "full fee stream distributed");
+        // 60/40 split of the ~4.75e18 staker stream — no winner-take-all.
+        // (The other 0.25% of volume accrued to the side pot as PSP.)
+        assertGt(aliceFees, 2.5e18, "alice (60% depositor) accrued her share");
+        assertGt(carolFees, 1.6e18, "carol (40% depositor) accrued her share");
+        assertApproxEqAbs(aliceFees + carolFees, 4.75e18, 0.1e18, "full staker fee stream distributed");
+        (uint256 potBal,) = ctx.controller.potState();
+        assertGt(potBal, 0, "side pot accrued its PSP cut from the buy");
         emit log_named_decimal_uint("alice accrued pre-claim", aliceFees, 18);
         emit log_named_decimal_uint("carol accrued pre-claim", carolFees, 18);
     }
@@ -320,10 +325,15 @@ contract NK24Test is Test {
         r.controller.voteCarpetBomb(true);
         skip(3 days + 1);
         r.controller.carpetBomb();
+        skip(3 days + 1);
+        r.controller.finalizeCarpet();
 
         assertEq(uint8(r.hook.mode()), uint8(CurveHook.Mode.Destroyed), "honest bomb executes");
-        assertGt(mixETH.balanceOf(address(factory)), 100e18, "funds recovered to factory");
-        emit log_named_decimal_uint("factory recovery (mixETH)", mixETH.balanceOf(address(factory)), 18);
+        uint256 seededN = mixETH.balanceOf(
+            address(factory.getRound(factory.currentRoundId()).controller)
+        );
+        assertGt(seededN, 100e18, "funds recovered via next-round seed");
+        emit log_named_decimal_uint("recovery seeded to next round (mixETH)", seededN, 18);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -415,6 +425,8 @@ contract NK24Test is Test {
         ctx.controller.voteCarpetBomb(true);
         skip(3 days + 1);
         ctx.controller.carpetBomb();
+        skip(3 days + 1);
+        ctx.controller.finalizeCarpet();
         assertEq(uint8(ctx.hook.mode()), uint8(CurveHook.Mode.Destroyed), "round destroyed");
 
         // late claim: PSP principal moves out of the genesis lock even
