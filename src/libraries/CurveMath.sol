@@ -511,6 +511,9 @@ library CurveMath {
 
     /// @notice Pack a timing profile into the CurveConfig.timings slot.
     ///         All five fields MUST be non-zero (zero encodes defaults).
+    ///         Reverts on any field >= 2^51 — an oversized field would
+    ///         otherwise spill nonzero garbage into the next slot, which
+    ///         the deploy-side TimingsIncomplete guard cannot see.
     function packTimings(
         uint256 predeposit,
         uint256 lock,
@@ -518,6 +521,12 @@ library CurveMath {
         uint256 relock,
         uint256 vote
     ) internal pure returns (uint256) {
+        if (
+            predeposit >= (1 << 51) || lock >= (1 << 51) || extend >= (1 << 51) || relock >= (1 << 51)
+                || vote >= (1 << 51)
+        ) revert TimingsOverflow();
         return predeposit | (lock << 51) | (extend << 102) | (relock << 153) | (vote << 204);
     }
+
+    error TimingsOverflow();
 }
