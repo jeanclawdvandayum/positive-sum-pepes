@@ -340,9 +340,15 @@ contract CurveHook is BaseHook {
     {
         if (totalSupplyPSP == 0) revert NotActive();
 
-        // Flat price in mixETH terms
-        uint256 flatPriceMixETH = (reserveMixETH * 1e18) / totalSupplyPSP;
-
+        // L-3 fix: price the buy DIRECTLY pro-rata — (x * S) / R — the exact
+        // mirror of _handleFlatSell's (psp * R) / S. The old form derived a
+        // floored flatPrice = (R * 1e18) / S and divided by it again, which
+        // could over-mint vs true pro-rata (backing dilution, bounded by
+        // x*S/F but nonzero). Direct form: R1*S == R*S1 holds exactly, and
+        // the floor favors the reserve (dust stays), like the sell path.
+        // Overflow: buyMixETH/potMixETH are real swap inputs (<= 1e30 class),
+        // S <= MAX_SUPPLY (1e28) → product <= 1e58, fits uint256 easily.
+        //
         // Fee split as on the curve: 4.75% stakers (mixETH), 0.25% pot (PSP
         // at the flat price — buys leave the flat price invariant, so the
         // pot's slice prices identically before or after the user's)
@@ -351,9 +357,9 @@ contract CurveHook is BaseHook {
         uint256 stakerFeeMixETH = feeMixETH - potMixETH;
         uint256 buyMixETH = mixETHInput - feeMixETH;
 
-        uint256 pspOut = (buyMixETH * 1e18) / flatPriceMixETH;
+        uint256 pspOut = (buyMixETH * totalSupplyPSP) / reserveMixETH;
         if (pspOut == 0) revert ZeroOutput();
-        uint256 potPSP = (potMixETH * 1e18) / flatPriceMixETH;
+        uint256 potPSP = (potMixETH * totalSupplyPSP) / reserveMixETH;
 
         reserveMixETH += buyMixETH + potMixETH;
         totalSupplyPSP += pspOut + potPSP;
@@ -387,9 +393,21 @@ contract CurveHook is BaseHook {
         //   = pspInputAmount * reserveMixETH / totalSupplyPSP
         uint256 totalMixETHOut = (pspInputAmount * reserveMixETH) / totalSupplyPSP;
         // Fee split as on the curve: pot's 0.25% taken in PSP (unburned —
-        // its backing stays in reserve), stakers get 4.75% in mixETH
-        uint256 feeMixETH = (totalMixETHOut * SWAP_FEE_BIPS) / 10000;
-        uint256 potMixETH = (totalMixETHOut * POT_FEE_BIPS) / 10000;
+        // its backing stays in reserve), stakers get 4.75% in mixETH.
+        // A7/L-3 fix: CEIL the user-facing fee and the pot's mixETH slice.
+        // Reserve loses (totalOut - potMix); a floored potMix let the
+        // reserve keep less than exact pro-rata per sell (wrong-direction
+        // dust in a zero-slack invariant), and a floored FEE let the user
+        // walk with the pot's sub-wei slice entirely (repro: R=2 wei,
+        // out=1 wei → fee floor = 0 → ratio diluted 0.25%). With both
+        // ceiled: R1*S >= R*S1 provably for every input. The dust shifts
+        // to over-backing the pot / under-paying the user by <= 1 wei —
+        // protocol-conservative. ZeroOutput still guards dust sells.
+        uint256 feeMixETH = ((totalMixETHOut * SWAP_FEE_BIPS) + 9999) / 10000;
+        uint256 potMixETH = ((totalMixETHOut * POT_FEE_BIPS) + 9999) / 10000;
+        // dust-sell guard: for out < 400 wei, ceil(pot) can exceed ceil(fee)
+        // only when the fee itself ceiled to 1 — cap at fee
+        if (potMixETH > feeMixETH) potMixETH = feeMixETH;
         uint256 stakerFeeMixETH = feeMixETH - potMixETH;
         uint256 mixETHToUser = totalMixETHOut - feeMixETH;
         uint256 potPSPCut = (pspInputAmount * POT_FEE_BIPS) / 10000;

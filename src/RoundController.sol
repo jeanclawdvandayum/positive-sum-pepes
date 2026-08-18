@@ -29,6 +29,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     error ZeroAddress();
     error NothingToClaim();
     error NotLocker();
+    error FactoryMarkFailed();
+    error FactorySpawnFailed();
     error ProposalExists();
     error VotingEnded();
     error AlreadyVoted();
@@ -243,8 +245,16 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     /// @notice Mint the side pot's PSP (buy-path fee cut) — hook-only
     /// @dev Minted fresh through the curve with its own mixETH backing; held
     ///      here unlocked. Never enters the lock ledger.
+    ///      H-1 fix: the PSP must be REAL. The hook's supply ledger counts
+    ///      potPSP (totalSupplyPSP += pspOut + potPSP) and carpetBomb()
+    ///      burns potPSPBalance from this wallet — a ledger-only credit left
+    ///      the wallet short of totalLocked by exactly the phantom amount,
+    ///      bricking the last staker(s) to unlock (ERC20InsufficientBalance,
+    ///      permanent). Invariant after this fix:
+    ///        psp.balanceOf(controller) == totalLocked + potPSPBalance
     function mintPotPSP(uint256 amount) external onlyHook {
         potPSPBalance += amount;
+        pspToken.mint(address(this), amount);
         emit PotPSPCredited(amount);
     }
 
@@ -774,7 +784,9 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
                 mixETH.safeTransfer(factory, potRedemption);
                 // Ledger credit; on failure the funds ride the generic carry
                 // (allocation shift, never a loss) — see comment above.
-                factory.call(abi.encodeWithSignature("creditSidePot(uint256)", potRedemption));
+                // EIP-170: precomputed selector for creditSidePot(uint256)
+                // (encodeWithSignature embeds the string + keccak per call)
+                factory.call(abi.encodeWithSelector(bytes4(0xada2e425), potRedemption));
             }
         }
 
@@ -809,15 +821,17 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         uint256 mixETHCarried = hook.drainAll(factory);
 
         // Notify factory that this round is destroyed
-        (bool ok,) = factory.call(abi.encodeWithSignature("markDestroyed(uint256)", factoryRoundId));
-        require(ok, "FactoryMarkFailed");
+        // EIP-170: precomputed selector for markDestroyed(uint256)
+        (bool ok,) = factory.call(abi.encodeWithSelector(bytes4(0x723c5612), factoryRoundId));
+        if (!ok) revert FactoryMarkFailed();
 
         // Birth the next iteration, seeded with the carry as its opening
         // predeposit offer — death, inheritance, rebirth in one
         // permissionless call.
+        // EIP-170: precomputed selector for spawnNextRound(uint256)
         (bool okSpawn,) =
-            factory.call(abi.encodeWithSignature("spawnNextRound(uint256)", factoryRoundId));
-        require(okSpawn, "FactorySpawnFailed");
+            factory.call(abi.encodeWithSelector(bytes4(0x1c9424dc), factoryRoundId));
+        if (!okSpawn) revert FactorySpawnFailed();
 
         emit RoundFinalized(mixETHCarried);
     }

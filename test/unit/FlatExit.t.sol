@@ -177,7 +177,8 @@ contract FlatExitTest is Test {
         // ── and sells against the flat curve at average backing ──
         // same arithmetic order as _handleFlatSell: single division
         uint256 expectedGross = (alicePSP * hook.reserveMixETH()) / hook.totalSupplyPSP();
-        uint256 expectedNet = expectedGross - (expectedGross * 500) / 10000; // 5% toll
+        uint256 expectedNet =
+            expectedGross - ((expectedGross * 500 + 9999) / 10000); // 5% toll, ceiled (A7 fix)
 
         vm.startPrank(alice);
         pspToken.approve(address(zapOut), type(uint256).max);
