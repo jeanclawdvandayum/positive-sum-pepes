@@ -20,9 +20,21 @@ import {HookMiner} from "./utils/HookMiner.sol";
 contract HookDeployer {
     error DeployFailed();
 
+    /// @dev C-1 remediation: how many mined salt candidates deployHook will
+    ///      fall through before giving up. Each squatted candidate costs the
+    ///      spawn one extra ~2^14 mining pass (~2-3M gas); 4 candidates cap
+    ///      the worst-case mining at ~11M so a fully squatted block still
+    ///      reverts well inside mainnet gas. Sustaining a block requires
+    ///      occupying every candidate in the same block (same entropy), then
+    ///      re-squatting in every subsequent retry block — unbounded grief
+    ///      cost against a one-tx defense.
+    uint256 public constant MAX_SALT_CANDIDATES = 4;
+
     /// @dev Permissionless by design: an orphan CurveHook is inert — the
     ///      factory only ever trusts hooks it wired into a round itself.
-    ///      Returns (hookAddress, salt) so callers can verify determinism.
+    ///      Returns (hookAddress, salt) so callers can verify the deployed
+    ///      address matches a candidate the caller derived from the same
+    ///      block context.
     function deployHook(
         IPoolManager pm,
         address controller,
@@ -44,14 +56,38 @@ contract HookDeployer {
             abi.encode(pm, controller, config)
         );
 
-        // find() packs (creationCode, args) internally; passing (initCode, "")
-        // hashes exactly the bytes we deploy with
-        (address expected, bytes32 s) = HookMiner.find(address(this), flags, initCode, "");
-        salt = s;
+        // C-1 (2026-08-18, fork-verified HIGH): the legacy deterministic scan
+        // (salt 0,1,2,...) made every future hook address computable from
+        // public state — vessel nonce -> controller address -> first salt —
+        // so an orphan deployed at the predicted address collided the create2
+        // and bricked finalizeCarpet forever. Salt candidates are now keyed
+        // to block context: unknowable before the block that runs the spawn,
+        // so pre-squatting is impossible and same-block front-runs must hit
+        // every candidate to matter.
+        bytes32 entropy =
+            keccak256(abi.encode(block.prevrandao, block.timestamp, block.number, controller));
 
-        assembly ("memory-safe") {
-            hookAddr := create2(0, add(initCode, 0x20), mload(initCode), s)
+        // Probe-then-create2 is race-free inside one atomic call: nothing can
+        // deploy between the extcodesize probe and the create2. Each squatted
+        // candidate costs one cold probe plus one resumed mining pass.
+        uint256 scanFrom;
+        for (uint256 k; k < MAX_SALT_CANDIDATES; k++) {
+            (address cand, bytes32 s, uint256 next) =
+                HookMiner.nextCandidate(address(this), entropy, flags, initCode, "", scanFrom);
+            scanFrom = next;
+            if (cand.code.length > 0) continue; // squatted: fall through
+            assembly ("memory-safe") {
+                hookAddr := create2(0, add(initCode, 0x20), mload(initCode), s)
+            }
+            if (hookAddr != cand) {
+                // defense-in-depth: an intra-call collision is impossible
+                // after the probe; guard the create2 result regardless
+                hookAddr = address(0);
+                continue;
+            }
+            salt = s;
+            return (hookAddr, salt);
         }
-        if (hookAddr != expected) revert DeployFailed();
+        revert DeployFailed();
     }
 }
