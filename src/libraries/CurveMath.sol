@@ -500,4 +500,24 @@ library CurveMath {
     ///      validate() can divide instead of multiplying (no overflow on
     ///      huge widths).
     uint256 internal constant MAX_EXP_K_WIDTH = 7e18 * 1e18; // = 7e36
+
+    // ─────────────── Timing-profile packing ───────────────
+    /// @dev Five 51-bit fields, 255 bits total. (The naive 5x64 layout
+    ///      needs 320 bits: the fifth slot silently truncated to zero —
+    ///      found on the sepolia dry-run 2026-08-19, vote window closed
+    ///      instantly. 51 bits still caps each field at ~71M years.)
+    ///      timings == 0 encodes "mainnet defaults" in RoundController.
+    uint256 internal constant TIMINGS_MASK = (1 << 51) - 1;
+
+    /// @notice Pack a timing profile into the CurveConfig.timings slot.
+    ///         All five fields MUST be non-zero (zero encodes defaults).
+    function packTimings(
+        uint256 predeposit,
+        uint256 lock,
+        uint256 extend,
+        uint256 relock,
+        uint256 vote
+    ) internal pure returns (uint256) {
+        return predeposit | (lock << 51) | (extend << 102) | (relock << 153) | (vote << 204);
+    }
 }

@@ -44,6 +44,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     error NotFlattened();
     error ExitWindowOpen();
     error VoteLockedAfterPropose();
+    error TimingsIncomplete(); // 2026-08-19: packed profile must fill all five slots
     error ProtectedToken(); // L-3: sweep() protection has its own error, not ZeroAddress
     error ZeroShare(); // L-4: predeposit share rounded to 0 — claim refused, flag not set
     error PredepositOpen(); // window still live and cap not reached — only owner may launch early
@@ -97,11 +98,10 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // ─────────────── Timing profile ───────────────
     // Constants → constructor-set immutables (2026-08-18): packed `_timings`
     // arg allows a fast testnet profile; 0 (mainnet default) keeps the
-    // original values. NO per-field fallback in the non-zero branch — a
-    // zero slot decodes to a zero duration. Non-zero profiles MUST set all
-    // five slots (see constructor note).
-    // Slots (64 bits each): [0] predeposit [64] lock [128] extend
-    //                        [192] relockWindow [256] vote
+    // original values. Slots are 51 bits (2026-08-19: the original 5x64
+    // layout overflowed uint256 — the [256] vote slot silently truncated
+    // to zero, closing the vote window instantly on every custom profile).
+    // Slots: [0] predeposit [51] lock [102] extend [153] relock [204] vote
     uint256 public immutable PREDEPOSIT_DURATION; // default 7 days
     uint256 public constant PREDEPOSIT_CAP = 500e18; // 500 mixETH
     uint256 public immutable predepositStartTime;
@@ -170,9 +170,10 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
 
     // ─────────────── Constructor ───────────────
     /// @dev `_config.timings == 0` → mainnet defaults (7d/90d/90d/7d/3d).
-    ///      Non-zero: NO per-field fallback — every slot decodes verbatim,
-    ///      so all five must be non-zero. Packed fast profile for testnets —
-    ///      see "Timing profile" above.
+    ///      Non-zero: five 51-bit slots decode verbatim (CurveMath.packTimings)
+    ///      and all five must be non-zero — a zero slot reverts
+    ///      TimingsIncomplete (2026-08-19: the pre-guard 5x64 layout let the
+    ///      vote slot truncate to zero silently). See "Timing profile" above.
     constructor(
         PSPToken _pspToken,
         IERC20 _mixETH,
@@ -182,7 +183,6 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // Packed profile decode — `_config.timings == 0` → mainnet defaults.
         // Branch form (not per-field fallbacks) keeps the creation code —
         // embedded inside ControllerDeployer — under EIP-170's 24.5kB cap.
-        // Non-zero profiles must set ALL five slots non-zero.
         uint256 t = _config.timings;
         if (t == 0) {
             PREDEPOSIT_DURATION = 7 days;
@@ -191,11 +191,17 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             RELOCK_WINDOW = 7 days;
             VOTE_DURATION = 3 days;
         } else {
-            PREDEPOSIT_DURATION = t & type(uint64).max;
-            LOCK_DURATION = (t >> 64) & type(uint64).max;
-            EXTEND_DURATION = (t >> 128) & type(uint64).max;
-            RELOCK_WINDOW = (t >> 192) & type(uint64).max;
-            VOTE_DURATION = t >> 256;
+            PREDEPOSIT_DURATION = t & CurveMath.TIMINGS_MASK;
+            LOCK_DURATION = (t >> 51) & CurveMath.TIMINGS_MASK;
+            EXTEND_DURATION = (t >> 102) & CurveMath.TIMINGS_MASK;
+            RELOCK_WINDOW = (t >> 153) & CurveMath.TIMINGS_MASK;
+            VOTE_DURATION = (t >> 204) & CurveMath.TIMINGS_MASK;
+            // 2026-08-19 tripwire: the vote-slot truncation deployed silently
+            // on the first sepolia dry-run — never again.
+            if (
+                PREDEPOSIT_DURATION == 0 || LOCK_DURATION == 0 || EXTEND_DURATION == 0
+                    || RELOCK_WINDOW == 0 || VOTE_DURATION == 0
+            ) revert TimingsIncomplete();
         }
         if (address(_pspToken) == address(0)) revert ZeroAddress();
         if (address(_mixETH) == address(0)) revert ZeroAddress();

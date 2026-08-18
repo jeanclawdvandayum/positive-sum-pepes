@@ -49,11 +49,12 @@ contract DeployPSP is Script {
     address constant PM_UNICHAIN_SEPOLIA = 0x9cB26A7183B2F4515945Dc52CB4195B0d2D06C95; // 1301
 
     /// @dev Packed testnet timing profile (see RoundController "Timing profile"):
-    ///      [0]=24h predeposit offer · [64]=3d lock · [128]=+1d relock
-    ///      [192]=1d relock window · [256]=1d bomb vote. Flat exit: constant 3d.
+    ///      24h predeposit offer · 3d lock · +1d relock · 1d relock window ·
+    ///      1d bomb vote. Flat exit: constant 3d. Packs via CurveMath.packTimings
+    ///      (2026-08-19: the old hand-rolled 5x64 packing shifted the vote slot
+    ///      by 256 — silently zero).
     function _testnetTimings() internal pure returns (uint256) {
-        return uint256(1 days) | (uint256(3 days) << 64) | (uint256(1 days) << 128)
-            | (uint256(1 days) << 192) | (uint256(1 days) << 256);
+        return CurveMath.packTimings(1 days, 3 days, 1 days, 1 days, 1 days);
     }
 
     function run() external {
