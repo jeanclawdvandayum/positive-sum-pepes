@@ -86,10 +86,11 @@ export default function Landing() {
         <h2 className="text-2xl font-black text-slate-900 sm:text-3xl">what is this?</h2>
         <p className="mt-3 max-w-3xl text-slate-600">
           a memecoin with a mechanical soul. PSP mints and burns along a deterministic
-          price curve denominated in mixETH — an ETH yield token. sells pay a toll that
-          accrues to everyone who stakes, and mixETH keeps farming underneath the whole
-          pot. there is no team allocation silently diluting you: the only way new PSP
-          exists is someone paying real reserves in.
+          price curve denominated in mixETH — an ETH yield token. sells on the curve pay
+          a toll that accrues to everyone who stakes, and mixETH keeps farming underneath
+          the whole pot. when a round is dying, exits are toll-free at exact average
+          backing — nobody pays to leave a loser. there is no team allocation silently
+          diluting you: the only way new PSP exists is someone paying real reserves in.
         </p>
       </section>
 

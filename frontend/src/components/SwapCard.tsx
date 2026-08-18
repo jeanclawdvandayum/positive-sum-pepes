@@ -423,8 +423,8 @@ export default function SwapCard() {
         </div>
       )}
       {round.mode === 2 && (
-        <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-500">
-          curve is flat — trading paused.
+        <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-600">
+          ⚪ round is dying — exits are toll-free at exact average backing.
         </div>
       )}
     </div>
