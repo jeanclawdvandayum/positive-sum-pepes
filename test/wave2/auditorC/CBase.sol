@@ -125,11 +125,13 @@ contract CBase is Test {
 
     /// @dev Predict the address of the controller that the NEXT round would
     ///      get: the ControllerDeployer vessel is a plain CREATE deployer, so
-    ///      addresses are (vessel, nonce) pairs, fully public. The next round
-    ///      consumes two nonces: token first, controller second.
+    ///      addresses are (vessel, nonce) pairs, fully public. POST-SPLIT
+    ///      (2026-08-18) the vessel deploys ONLY the controller — the token
+    ///      rides a fresh TokenDeployer created by the factory each round —
+    ///      so the next controller consumes the vessel's NEXT nonce directly.
     function _predictedNextController() internal view returns (address) {
         uint256 n = vm.getNonce(address(controllerDeployer));
-        return vm.computeCreateAddress(address(controllerDeployer), n + 1);
+        return vm.computeCreateAddress(address(controllerDeployer), n);
     }
 }
 

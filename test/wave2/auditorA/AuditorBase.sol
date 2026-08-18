@@ -70,10 +70,15 @@ contract AuditorBase is Test {
         controller.launchPooledBuy();
     }
 
-    /// @dev claim genesis PSP — auto-locks into the governance lock
+    /// @dev claim genesis PSP — auto-locks into the governance lock.
+    ///      Warps +1s after claiming: vote() disenfranchises locks whose
+    ///      lockTime >= proposeTime (anti lock-capture, see voteCarpetBomb),
+    ///      so a claim and a propose in the same test timestamp would leave
+    ///      the claimer unable to vote. The nudge keeps harness flows real.
     function _claim(address who) internal {
         vm.prank(who);
         controller.claimPredepositPSP();
+        vm.warp(block.timestamp + 1);
     }
 
     /// @dev `proposer` proposes + votes yes, window passes, bomb executes
@@ -91,7 +96,13 @@ contract AuditorBase is Test {
     }
 
     function _warpPastFlatWindow() internal {
-        vm.warp(controller.flatTime() + controller.FLAT_EXIT_WINDOW() + 1);
+        _warpPastFlatWindow(controller);
+    }
+
+    /// @dev multi-instance tests (e.g. FailFactory spawn-failure) drive a
+    ///      second controller — warp THAT one's flat window, not the base's.
+    function _warpPastFlatWindow(RoundController c) internal {
+        vm.warp(c.flatTime() + c.FLAT_EXIT_WINDOW() + 1);
     }
 
     /// @dev H-1 custody: every PSP at the controller is accounted for

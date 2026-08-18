@@ -266,8 +266,8 @@ contract LockMechanicsTest is Test {
             // Warp to relock window (85 days from last lock)
             skip(85 days);
 
-            (uint256 amount,,,) = controller.locks(alice);
-            assertGt(amount, 0, "Still locked");
+            (uint256 loopAmount,,,) = controller.locks(alice);
+            assertGt(loopAmount, 0, "Still locked");
 
             vm.prank(alice);
             controller.relock();

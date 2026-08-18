@@ -21,8 +21,10 @@ import {HookMiner} from "../../../src/utils/HookMiner.sol";
 ///      ~2-3M gas and deployHook's whole honest call stays block-comfortable.
 contract C5_GasBisect is CBase {
     function test_C5_inline() public {
+        // POST-SPLIT (2026-08-18): vessel deploys only the controller, so the
+        // next controller is at the vessel's CURRENT nonce (no +1 token skip).
         address predictedController =
-            vm.computeCreateAddress(address(controllerDeployer), vm.getNonce(address(controllerDeployer)) + 1);
+            vm.computeCreateAddress(address(controllerDeployer), vm.getNonce(address(controllerDeployer)));
 
         // deploy a hook through the real vessel (attacker position: any caller)
         vm.prank(attacker);

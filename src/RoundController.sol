@@ -97,7 +97,9 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // ─────────────── Timing profile ───────────────
     // Constants → constructor-set immutables (2026-08-18): packed `_timings`
     // arg allows a fast testnet profile; 0 (mainnet default) keeps the
-    // original values. Field == 0 after unpack also falls back to default.
+    // original values. NO per-field fallback in the non-zero branch — a
+    // zero slot decodes to a zero duration. Non-zero profiles MUST set all
+    // five slots (see constructor note).
     // Slots (64 bits each): [0] predeposit [64] lock [128] extend
     //                        [192] relockWindow [256] vote
     uint256 public immutable PREDEPOSIT_DURATION; // default 7 days
@@ -167,9 +169,10 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     uint256 public constant MAJORITY_BIPS = 5001; // >50% of cast votes
 
     // ─────────────── Constructor ───────────────
-    /// @dev `_config.timings == 0` → mainnet defaults (7d/90d/90d/7d/3d);
-    ///      per-field 0 also falls back to that field's default. Packed
-    ///      fast profile for testnets — see "Timing profile" above.
+    /// @dev `_config.timings == 0` → mainnet defaults (7d/90d/90d/7d/3d).
+    ///      Non-zero: NO per-field fallback — every slot decodes verbatim,
+    ///      so all five must be non-zero. Packed fast profile for testnets —
+    ///      see "Timing profile" above.
     constructor(
         PSPToken _pspToken,
         IERC20 _mixETH,

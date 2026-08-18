@@ -72,9 +72,9 @@ contract C1SquatForkTest is AuditForkTest {
     /// ControllerDeployer vessel - unchanged by the C-1 fix).
     function _predictedCtrl2() internal view returns (address) {
         address vessel = address(factory.controllerDeployer());
-        uint256 vesselNonce = vm.getNonce(vessel); // 3 after round 1 (born at 1, +2 deploys)
-        // round 2: token consumes `vesselNonce`, controller consumes `vesselNonce + 1`
-        return vm.computeCreateAddress(vessel, vesselNonce + 1);
+        uint256 vesselNonce = vm.getNonce(vessel); // 2 after round 1 (born at 1, +1 deploy — POST-SPLIT token rides TokenDeployer)
+        // round 2 controller consumes `vesselNonce` directly (token is off-vessel)
+        return vm.computeCreateAddress(vessel, vesselNonce);
     }
 
     /// Replicate deployHook's candidate derivation test-side: proves which
@@ -175,7 +175,14 @@ contract C1SquatForkTest is AuditForkTest {
         controller.finalizeCarpet();
         uint256 honestSpent = g0 - gasleft();
         emit log_named_uint("finalizeCarpet gas (honest path, post-fix)", honestSpent);
-        assertLt(honestSpent, 12_000_000, "honest finalize+spawn regressed");
+        // Bound = block-executability discipline, not per-iter cost (that is
+        // C5_GasBisect's tight 4M single-pass tripwire). The walk length is
+        // geometric luck keyed to (prevrandao, ts, number, controller): the
+        // POST-SPLIT controller address (2026-08-18 TokenDeployer nonce shift)
+        // drew an ~82k-iter pass (~0.7% tail) ≈ 13.6M of this 19.1M total.
+        // 24M keeps a 30M-block margin and still trips on a 2x per-iter
+        // regression (un-hoisted preimage rewrite) or multi-pass blowup.
+        assertLt(honestSpent, 24_000_000, "honest finalize+spawn regressed");
 
         PSPFactory.Round memory r2 = factory.getRound(2);
         assertTrue(address(r2.controller) != address(0), "round 2 spawns on the retry block");

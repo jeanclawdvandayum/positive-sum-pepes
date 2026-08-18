@@ -292,17 +292,17 @@ contract A3_LifecycleTest is AuditorBase {
         c2.carpetBomb();
         assertGt(c2.flatTime(), 0, "flat window open");
 
-        _warpPastFlatWindow();
+        _warpPastFlatWindow(c2);
 
-        // factory spawn reverts -> finalize is atomic: revert bubbles,
-        // nothing half-applied
-        vm.expectRevert("spawn failed");
+        // factory spawn reverts -> finalize is atomic: the typed
+        // FactorySpawnFailed() wraps the failure, nothing half-applied
+        vm.expectRevert(RoundController.FactorySpawnFailed.selector);
         c2.finalizeCarpet();
 
         // still flat, hook untouched: retry possible once factory is fixed
         assertGt(c2.flatTime(), 0, "still flat after failed finalize");
         assertEq(uint256(h2.mode()), 2, "hook still Flat");
-        vm.expectRevert("spawn failed");
+        vm.expectRevert(RoundController.FactorySpawnFailed.selector);
         c2.finalizeCarpet();
     }
 }

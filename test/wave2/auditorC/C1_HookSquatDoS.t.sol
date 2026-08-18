@@ -47,9 +47,11 @@ contract C1_HookSquatDoS is CBase {
     /// round 2 at precisely the predicted controller address.
     function test_C1_control_PredictionIsExact_CleanSpawnWorks() public {
         address predicted = _predictedNextController();
-        // EIP-161: contracts are born with nonce 1; each round consumes
-        // exactly two vessel nonces (token, controller) - proven in C4_Probe.
-        assertEq(vm.getNonce(address(controllerDeployer)), 3, "vessel nonce after round 1");
+        // EIP-161: contracts are born with nonce 1. POST-SPLIT (2026-08-18)
+        // each round consumes exactly ONE vessel nonce (controller only —
+        // the token deploys via a fresh TokenDeployer off the factory) -
+        // proven in C4_Probe.
+        assertEq(vm.getNonce(address(controllerDeployer)), 2, "vessel nonce after round 1");
 
         _launchRound1();
         _bombRound1();
@@ -70,8 +72,8 @@ contract C1_HookSquatDoS is CBase {
     function test_C1_attack_PreLaunchSquatIsNowInert() public {
         // ---- attacker squats immediately after round 1 deploys ----
         // Everything below derives from PUBLIC state; no privileged role.
-        uint256 vesselNonce = vm.getNonce(address(controllerDeployer)); // == 3
-        address predictedController = vm.computeCreateAddress(address(controllerDeployer), vesselNonce + 1);
+        uint256 vesselNonce = vm.getNonce(address(controllerDeployer)); // == 2
+        address predictedController = vm.computeCreateAddress(address(controllerDeployer), vesselNonce);
         assertEq(predictedController, _predictedNextController(), "nonce math");
 
         vm.prank(attacker);
