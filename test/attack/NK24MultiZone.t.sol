@@ -60,7 +60,7 @@ contract NK24MultiZoneTest is Test {
         vm.createSelectFork(vm.envString("MAINNET_RPC_URL"));
         mixETH = new HostileMixETH();
         mixETH.deposit{value: 200_000_000e18}();
-        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer());
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), 0);
         mixETH.transfer(alice, 1_000_000e18);
         mixETH.transfer(whale, 100_000_000e18);
         r = _deployRound();

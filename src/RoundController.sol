@@ -94,13 +94,20 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     ///      previous round's destruction is exempt from the cap — it IS the
     ///      bootstrap, and if it alone reaches the cap the round is instantly
     ///      launchable by anyone.
-    uint256 public constant PREDEPOSIT_DURATION = 7 days;
+    // ─────────────── Timing profile ───────────────
+    // Constants → constructor-set immutables (2026-08-18): packed `_timings`
+    // arg allows a fast testnet profile; 0 (mainnet default) keeps the
+    // original values. Field == 0 after unpack also falls back to default.
+    // Slots (64 bits each): [0] predeposit [64] lock [128] extend
+    //                        [192] relockWindow [256] vote
+    uint256 public immutable PREDEPOSIT_DURATION; // default 7 days
     uint256 public constant PREDEPOSIT_CAP = 500e18; // 500 mixETH
     uint256 public immutable predepositStartTime;
 
     // ─────────────── Locking (vlCVX-style) ───────────────
-    uint256 public constant LOCK_DURATION = 90 days;   // 3 months
-    uint256 public constant RELOCK_WINDOW = 7 days;     // last week before expiry
+    uint256 public immutable LOCK_DURATION;   // default 90 days (3 months)
+    uint256 public immutable EXTEND_DURATION; // relock adds this; default 90 days
+    uint256 public immutable RELOCK_WINDOW;   // last window before expiry; default 7 days
     uint256 public constant PRECISION = 1e18;
 
     struct LockInfo {
@@ -154,18 +161,39 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     ///      so a new proposal re-enfranchises everyone without iterating a mapping.
     uint256 public proposalCount;
     mapping(address => uint256) public lastVotedOn;
-    uint256 public constant VOTE_DURATION = 3 days;
+    uint256 public immutable VOTE_DURATION; // default 3 days
     uint256 public constant FLAT_EXIT_WINDOW = 3 days;
     uint256 public constant QUORUM_BIPS = 6900;  // 69% of locked PSP (nice)
     uint256 public constant MAJORITY_BIPS = 5001; // >50% of cast votes
 
     // ─────────────── Constructor ───────────────
+    /// @dev `_config.timings == 0` → mainnet defaults (7d/90d/90d/7d/3d);
+    ///      per-field 0 also falls back to that field's default. Packed
+    ///      fast profile for testnets — see "Timing profile" above.
     constructor(
         PSPToken _pspToken,
         IERC20 _mixETH,
         CurveMath.CurveConfig memory _config,
         address _factory
     ) Ownable(_factory) {
+        // Packed profile decode — `_config.timings == 0` → mainnet defaults.
+        // Branch form (not per-field fallbacks) keeps the creation code —
+        // embedded inside ControllerDeployer — under EIP-170's 24.5kB cap.
+        // Non-zero profiles must set ALL five slots non-zero.
+        uint256 t = _config.timings;
+        if (t == 0) {
+            PREDEPOSIT_DURATION = 7 days;
+            LOCK_DURATION = 90 days;
+            EXTEND_DURATION = 90 days;
+            RELOCK_WINDOW = 7 days;
+            VOTE_DURATION = 3 days;
+        } else {
+            PREDEPOSIT_DURATION = t & type(uint64).max;
+            LOCK_DURATION = (t >> 64) & type(uint64).max;
+            EXTEND_DURATION = (t >> 128) & type(uint64).max;
+            RELOCK_WINDOW = (t >> 192) & type(uint64).max;
+            VOTE_DURATION = t >> 256;
+        }
         if (address(_pspToken) == address(0)) revert ZeroAddress();
         if (address(_mixETH) == address(0)) revert ZeroAddress();
         if (_factory == address(0)) revert ZeroAddress();
@@ -577,14 +605,15 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         emit Unlocked(msg.sender, amount);
     }
 
-    /// @notice Extend lock for another 90 days. Only callable in the last 7 days.
+    /// @notice Extend lock by EXTEND_DURATION (mainnet +90 days, testnet +1
+    ///         day). Only callable in the last RELOCK_WINDOW before expiry.
     function relock() external nonReentrant {
         LockInfo storage userLock = locks[msg.sender];
         if (userLock.amount == 0) revert NotLocker();
         if (userLock.unlockTime == 0) revert NotLocker();
         // No relocking a flat round — its only future is exit or inheritance
         if (flatTime != 0) revert RoundFlattened();
-        // Only in the relock window (last 7 days before expiry)
+        // Only in the relock window (last RELOCK_WINDOW before expiry)
         if (block.timestamp < userLock.unlockTime - RELOCK_WINDOW) revert TooEarlyToRelock();
 
         // Claim pending fees before resetting (H-1 rewardDebt refresh +
@@ -592,7 +621,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         _updateAccumulator();
         _claimPendingFees(true);
 
-        userLock.unlockTime = block.timestamp + LOCK_DURATION;
+        userLock.unlockTime = block.timestamp + EXTEND_DURATION;
         userLock.lockTime = block.timestamp;
 
         emit Relocked(msg.sender, userLock.unlockTime);

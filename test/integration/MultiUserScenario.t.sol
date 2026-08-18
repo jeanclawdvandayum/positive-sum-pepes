@@ -61,7 +61,7 @@ contract MultiUserScenarioTest is Test {
         mockMix.depositETH{value: 100_000e18}();
         mixETH = IERC20(address(mockMix));
 
-        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer());
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), 0);
         router = new V4SwapRouter(poolManager);
 
         // Fund all users

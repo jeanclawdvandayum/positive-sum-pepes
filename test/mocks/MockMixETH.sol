@@ -28,6 +28,14 @@ contract MockMixETH is ERC20 {
         _mint(msg.sender, shares);
     }
 
+    /// @dev TESTNET FAUCET — free mixETH for demos. The PSP_TESTNET deploy
+    ///      path uses this mock on public testnets where wrapping real ETH
+    ///      at the 500 mixETH predeposit cap would cost 500 real testnet ETH.
+    ///      Never deploy this mock to mainnet.
+    function faucet(uint256 amount) external {
+        _mint(msg.sender, amount);
+    }
+
     /// @notice Redeem mixETH shares for ETH at current exchange rate
     function redeemETH(uint256 shareAmount) external returns (uint256 ethOut) {
         require(shareAmount > 0, "Zero amount");

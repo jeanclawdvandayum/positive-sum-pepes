@@ -55,7 +55,7 @@ contract ChaosForkTest is Test {
         mixETH = new MockMixETH();
         mixETH.depositETH{value: 1_000_000e18}();
 
-        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer());
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), 0);
 
         mixETH.transfer(alice, 50_000e18);
         mixETH.transfer(bob, 50_000e18);

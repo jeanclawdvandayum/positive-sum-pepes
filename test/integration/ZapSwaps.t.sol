@@ -54,7 +54,7 @@ contract ZapSwapsTest is Test {
 
         factory = new PSPFactory(
             poolManager, IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer()
-        );
+        , 0);
         zapIn = new PSPZapIn(IMixETH(address(mixETH)), poolManager);
         zapOut = new PSPZapOut(IMixETH(address(mixETH)), poolManager);
 

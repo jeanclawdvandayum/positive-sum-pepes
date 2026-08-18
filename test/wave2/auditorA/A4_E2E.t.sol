@@ -43,7 +43,7 @@ contract A4_E2ETest is Test {
         poolManager = new MockPoolManager();
         factory = new PSPFactory(
             IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer()
-        );
+        , 0);
 
         PSPFactory.RoundParams memory params = PSPFactory.RoundParams({
             name: "Positive Sum Pepes",

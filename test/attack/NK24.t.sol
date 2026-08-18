@@ -59,7 +59,7 @@ contract NK24Test is Test {
         vm.createSelectFork(vm.envString("MAINNET_RPC_URL"));
         mixETH = new HostileMixETH();
         mixETH.deposit{value: 2_000_000e18}();
-        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer());
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), 0);
         mixETH.transfer(alice, 50_000e18);
         mixETH.transfer(bob, 50_000e18);
         mixETH.transfer(carol, 50_000e18);

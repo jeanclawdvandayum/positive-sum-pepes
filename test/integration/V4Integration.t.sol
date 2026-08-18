@@ -73,7 +73,7 @@ contract V4IntegrationTest is Test {
         mixETH = IERC20(address(mockMix));
 
         // Deploy PSPFactory with real PoolManager
-        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer());
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), 0);
 
         // Deploy V4 swap router (handles unlock/callback + pre-settle pattern)
         router = new V4SwapRouter(poolManager);

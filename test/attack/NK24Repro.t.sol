@@ -52,7 +52,7 @@ contract NK24Repro is Test {
             isExponential: false
         });
         CurveMath.CurveConfig memory cc =
-            CurveMath.CurveConfig({P0: 12039415137778920, zones: zones});
+            CurveMath.CurveConfig({timings: 0, P0: 12039415137778920, zones: zones});
 
         _expectValidateRevert(cc, "CurveMath: exp zone too steep (k*width)");
     }
@@ -73,7 +73,7 @@ contract NK24Repro is Test {
             rate: 4e17, // log k = 0.4
             isExponential: false
         });
-        CurveMath.CurveConfig memory cc = CurveMath.CurveConfig({P0: 5e18, zones: zones});
+        CurveMath.CurveConfig memory cc = CurveMath.CurveConfig({timings: 0, P0: 5e18, zones: zones});
 
         _expectValidateRevert(cc, "CurveMath: exp zone too steep (k*width)");
     }
@@ -121,7 +121,7 @@ contract NK24Repro is Test {
             rate: 0,
             isExponential: true // flat tail
         });
-        CurveMath.CurveConfig memory cc = CurveMath.CurveConfig({P0: 1e14, zones: zones});
+        CurveMath.CurveConfig memory cc = CurveMath.CurveConfig({timings: 0, P0: 1e14, zones: zones});
         _expectValidateRevert(cc, "CurveMath: first zone must be exponential");
     }
 
@@ -160,7 +160,7 @@ contract NK24Repro is Test {
             rate: 0,
             isExponential: true // flat tail
         });
-        return CurveMath.CurveConfig({P0: p0, zones: zones});
+        return CurveMath.CurveConfig({timings: 0, P0: p0, zones: zones});
     }
 }
 

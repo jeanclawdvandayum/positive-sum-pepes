@@ -57,7 +57,7 @@ contract PoCPhantomPotTest is Test {
             IERC20(address(mix)),
             new HookDeployer(),
             new ControllerDeployer()
-        );
+        , 0);
         zapIn = new PSPZapIn(IMixETH(address(mix)), IPoolManager(address(pm)));
         zapOut = new PSPZapOut(IMixETH(address(mix)), IPoolManager(address(pm)));
 

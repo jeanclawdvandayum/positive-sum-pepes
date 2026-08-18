@@ -51,7 +51,7 @@ contract SidePotTest is Test {
         mixETH = new MockMixETH();
         mixETH.depositETH{value: 100_000e18}();
 
-        factory = new PSPFactory(poolManager, IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer());
+        factory = new PSPFactory(poolManager, IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), 0);
         router = new V4SwapRouter(poolManager);
 
         _dealMixETH(alice, 2_000e18);

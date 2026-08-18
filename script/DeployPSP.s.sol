@@ -30,16 +30,35 @@ import {MockPoolManager} from "../test/mocks/MockPoolManager.sol";
 ///         there, don't hand-edit.
 ///
 /// Env:
-///   PSP_PM       pool manager (default: Base mainnet v4)
-///   PSP_MIXETH   mixETH token (required unless PSP_ANVIL=1)
+///   PSP_PM       pool manager (default: Base mainnet v4; REQUIRED with PSP_TESTNET)
+///   PSP_MIXETH   mixETH token (required unless PSP_ANVIL/PSP_TESTNET)
 ///   PSP_HTML     ui file (default: script/app.html)
 ///   PSP_ANVIL    =1 to deploy MockMixETH+MockPoolManager first (local e2e)
+///   PSP_TESTNET  =1 to deploy MockMixETH against a canonical v4 testnet
+///                PoolManager + fast timing profile (24h predeposit offer,
+///                3d stake lock, +1d relock, 1d bomb vote; flat exit 3d)
 contract DeployPSP is Script {
     // Base mainnet Uniswap v4 PoolManager
     address constant PM_BASE = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
 
+    // Official v4 testnet PoolManagers (Uniswap deployments feed, verified
+    // on-chain 2026-08-18 via eth_getCode — 24009 bytes each)
+    address constant PM_SEPOLIA = 0xE03A1074c86CFeDd5C142C4F04F1a1536e203543;      // 11155111
+    address constant PM_BASE_SEPOLIA = 0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408; // 84532
+    address constant PM_ARB_SEPOLIA = 0xFB3e0C6F74eB1a21CC1Da29aeC80D2Dfe6C9a317;  // 421614
+    address constant PM_UNICHAIN_SEPOLIA = 0x9cB26A7183B2F4515945Dc52CB4195B0d2D06C95; // 1301
+
+    /// @dev Packed testnet timing profile (see RoundController "Timing profile"):
+    ///      [0]=24h predeposit offer · [64]=3d lock · [128]=+1d relock
+    ///      [192]=1d relock window · [256]=1d bomb vote. Flat exit: constant 3d.
+    function _testnetTimings() internal pure returns (uint256) {
+        return uint256(1 days) | (uint256(3 days) << 64) | (uint256(1 days) << 128)
+            | (uint256(1 days) << 192) | (uint256(1 days) << 256);
+    }
+
     function run() external {
         bool anvil = vm.envOr("PSP_ANVIL", false);
+        bool testnet = vm.envOr("PSP_TESTNET", false);
         address pm;
         IERC20 mix;
         if (anvil) {
@@ -50,6 +69,16 @@ contract DeployPSP is Script {
             pm = address(mockPM);
             mix = IERC20(address(mockMix));
             console.log("ANVIL mock mixETH:", address(mockMix));
+        } else if (testnet) {
+            // Canonical v4 PoolManager of the target testnet — no default:
+            // pass PSP_PM explicitly (constants above for copy-paste).
+            pm = vm.envAddress("PSP_PM");
+            vm.startBroadcast();
+            MockMixETH mockMix = new MockMixETH();
+            vm.stopBroadcast();
+            mix = IERC20(address(mockMix));
+            console.log("TESTNET PoolManager:", pm);
+            console.log("TESTNET mock mixETH:", address(mockMix));
         } else {
             pm = vm.envOr("PSP_PM", PM_BASE);
             mix = IERC20(vm.envAddress("PSP_MIXETH"));
@@ -57,7 +86,9 @@ contract DeployPSP is Script {
         string memory htmlPath = vm.envOr("PSP_HTML", string("script/app.html"));
 
         vm.startBroadcast();
-        PSPFactory factory = new PSPFactory(IPoolManager(pm), mix, new HookDeployer(), new ControllerDeployer());
+        PSPFactory factory = new PSPFactory(
+            IPoolManager(pm), mix, new HookDeployer(), new ControllerDeployer(), testnet ? _testnetTimings() : 0
+        );
 
         (uint256 roundId, address hookAddr) = factory.deployRound(_housestyleParams());
 
@@ -137,7 +168,7 @@ contract DeployPSP is Script {
         return PSPFactory.RoundParams({
             name: "Positive Sum Pepes",
             symbol: "PSP",
-            curveConfig: CurveMath.CurveConfig({P0: 431045771, zones: zones})
+            curveConfig: CurveMath.CurveConfig({timings: 0, P0: 431045771, zones: zones})
         });
     }
 }

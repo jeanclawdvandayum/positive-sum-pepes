@@ -18,7 +18,7 @@ import {CurveHook} from "./CurveHook.sol";
 import {RoundController} from "./RoundController.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
 import {HookDeployer} from "./HookDeployer.sol";
-import {ControllerDeployer} from "./ControllerDeployer.sol";
+import {ControllerDeployer, TokenDeployer} from "./ControllerDeployer.sol";
 
 /// @title PSPFactory — Deploys and manages PSP rounds
 /// @notice Each round gets fresh contracts. ETH (as mixETH) is carried from destruction to next round.
@@ -95,7 +95,9 @@ contract PSPFactory is Ownable2Step {
     ///      redeploy; the deployed UI keeps working forever either way.
     string private _html;
 
-    constructor(IPoolManager _poolManager, IERC20 _mixETH, HookDeployer _hookDeployer, ControllerDeployer _controllerDeployer)
+    /// @dev `_timings == 0` → mainnet defaults, forwarded to every round's
+    ///      RoundController. See RoundController "Timing profile".
+    constructor(IPoolManager _poolManager, IERC20 _mixETH, HookDeployer _hookDeployer, ControllerDeployer _controllerDeployer, uint256 _timings)
         Ownable(msg.sender)
     {
         if (address(_poolManager) == address(0)) revert ZeroAddress();
@@ -106,7 +108,10 @@ contract PSPFactory is Ownable2Step {
         mixETH = _mixETH;
         hookDeployer = _hookDeployer;
         controllerDeployer = _controllerDeployer;
+        roundTimings = _timings;
     }
+
+    uint256 public immutable roundTimings;
 
     // ─────────────── Walk-away UI ───────────────
 
@@ -139,11 +144,14 @@ contract PSPFactory is Ownable2Step {
 
         roundId = ++currentRoundId;
 
-        // 1. Deploy PSPToken (factory as temp admin) — via ControllerDeployer
-        //    (EIP-170: keeps PSPToken's creation code out of this contract)
-        PSPToken token = controllerDeployer.deployToken(params.name, params.symbol, address(this));
+        // 1. Deploy PSPToken — via a fresh TokenDeployer (EIP-170: keeps
+        //    PSPToken's creation code out of both this contract and
+        //    ControllerDeployer)
+        PSPToken token = new TokenDeployer().deployToken(params.name, params.symbol, address(this));
 
-        // 2. Deploy RoundController — via ControllerDeployer (EIP-170)
+        // 2. Deploy RoundController — via ControllerDeployer (EIP-170).
+        //    Timings ride inside the config (see CurveMath.CurveConfig).
+        params.curveConfig.timings = roundTimings;
         RoundController controller = controllerDeployer.deployController(
             token, mixETH, params.curveConfig, address(this)
         );

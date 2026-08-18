@@ -32,6 +32,12 @@ library CurveMath {
     struct CurveConfig {
         uint256 P0;           // starting price at supply=0 (1e18 ETH)
         Zone[] zones;         // ordered zones from supply 0 onward
+        // Packed timing profile, consumed ONLY by RoundController's
+        // constructor (0 = mainnet defaults). Curve math ignores it.
+        // Slots (64 bits each): [0] predeposit · [64] lock · [128] extend
+        // · [192] relockWindow · [256] vote. Rides inside the config so
+        // ControllerDeployer's 4-arg ABI (and EIP-170 size) stays frozen.
+        uint256 timings;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -397,7 +403,7 @@ library CurveMath {
             rate: k2,
             isExponential: false
         });
-        return CurveConfig({P0: P0, zones: zones});
+        return CurveConfig({timings: 0, P0: P0, zones: zones});
     }
 
     /// @notice Build a multi-oscillation curve with alternating exp/log zones
@@ -424,7 +430,7 @@ library CurveMath {
                 isExponential: expFlags[i]
             });
         }
-        return CurveConfig({P0: P0, zones: zones});
+        return CurveConfig({timings: 0, P0: P0, zones: zones});
     }
 
     /// @notice Validate a CurveConfig before deployment (M-3).

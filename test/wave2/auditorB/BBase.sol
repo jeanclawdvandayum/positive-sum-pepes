@@ -49,7 +49,7 @@ abstract contract BBase is Test {
         poolManager = new PoolManager(address(this)); // REAL v4-core PM
         factory = new PSPFactory(
             IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer()
-        );
+        , 0);
 
         PSPFactory.RoundParams memory params =
             PSPFactory.RoundParams({name: "B", symbol: "AUD", curveConfig: _curve()});
@@ -172,7 +172,10 @@ abstract contract BBase is Test {
     // ─────────────── invariant helpers ───────────────
 
     function _cfg() internal view returns (CurveMath.CurveConfig memory c) {
-        c.P0 = hook.curveConfig();
+        // CurveConfig gained a scalar `timings` field (2026-08-18) — the
+        // auto-getter now returns (P0, timings); zones still need the
+        // flattened getter. Destructure keeps this compiling both ways.
+        (c.P0,) = hook.curveConfig();
         c.zones = hook.getCurveZones();
     }
 

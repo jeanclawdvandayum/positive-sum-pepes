@@ -70,7 +70,7 @@ contract NK24MathTest is Test {
             });
         }
         uint256 p0 = 1e14 + ((s * 31) % 1e20);
-        CurveMath.CurveConfig memory cc = CurveMath.CurveConfig({P0: p0, zones: zones});
+        CurveMath.CurveConfig memory cc = CurveMath.CurveConfig({timings: 0, P0: p0, zones: zones});
         cc.validate(); // must be a valid config (factory-guaranteed)
         return cc;
     }

@@ -49,7 +49,7 @@ contract B4_CurveMathFuzz is Test {
             rate: lastExp ? 0 : (r % (1e18 + 1)),
             isExponential: lastExp
         });
-        c = CurveMath.CurveConfig({P0: P0, zones: z});
+        c = CurveMath.CurveConfig({timings: 0, P0: P0, zones: z});
         CurveMath.validate(c); // must pass by construction
     }
 
