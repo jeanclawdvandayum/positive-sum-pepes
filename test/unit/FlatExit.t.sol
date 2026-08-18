@@ -174,18 +174,17 @@ contract FlatExitTest is Test {
         uint256 alicePSP = pspToken.balanceOf(alice);
         assertEq(alicePSP, lockedAmount, "full principal returned");
 
-        // ── and sells against the flat curve at average backing ──
-        // same arithmetic order as _handleFlatSell: single division
-        uint256 expectedGross = (alicePSP * hook.reserveMixETH()) / hook.totalSupplyPSP();
-        uint256 expectedNet =
-            expectedGross - ((expectedGross * 500 + 9999) / 10000); // 5% toll, ceiled (A7 fix)
+        // ── and sells against the flat curve at EXACTLY average backing ──
+        // F-9 fix: zero-fee flat window — no toll, floor-only pro-rata.
+        // Same arithmetic order as _handleFlatSell: single division.
+        uint256 expectedNet = (alicePSP * hook.reserveMixETH()) / hook.totalSupplyPSP();
 
         vm.startPrank(alice);
         pspToken.approve(address(zapOut), type(uint256).max);
         uint256 mixOut = zapOut.sellToMix(_poolKey(), alicePSP, 0, 0);
         vm.stopPrank();
 
-        assertEq(mixOut, expectedNet, "sold at average backing minus toll");
+        assertEq(mixOut, expectedNet, "sold at exactly average backing (zero flat toll)");
         // balance delta additionally includes pending staker fees paid at
         // unlock() — asserted separately below via mixOut exactness
         assertGt(mixETH.balanceOf(alice) - mixBefore, mixOut, "alice banked the exit");

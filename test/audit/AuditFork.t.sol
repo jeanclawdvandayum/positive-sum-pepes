@@ -176,12 +176,12 @@ contract AuditForkTest is Test {
         uint256 alicePSP = psp.balanceOf(alice);
         assertGt(alicePSP, 0);
         uint256 expGross = (alicePSP * hook.reserveMixETH()) / hook.totalSupplyPSP();
-        uint256 expNet = expGross - (expGross * 500) / 10000;
+        uint256 expNet = expGross; // F-9 fix: zero-fee flat window — no toll
         vm.startPrank(alice);
         psp.approve(address(zapOut), type(uint256).max);
         uint256 got = zapOut.sellToMix(key, alicePSP, 0, 0);
         vm.stopPrank();
-        assertApproxEqAbs(got, expNet, 3, "C1: staker exit != avg backing - toll");
+        assertApproxEqAbs(got, expNet, 3, "C1: staker exit != exact avg backing (zero toll)");
         _solvent("C1 staker exit");
 
         // ── finalize + rebirth ──

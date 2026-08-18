@@ -321,7 +321,11 @@ contract AuditLifecycleTest is Test {
         assertGt(a1 + a2, 0);
         assertGt(b1, 0);
         assertGt(c1, 0);
-        assertLt(c1, 2e18, "B2d: carol round-tripped at profit");
+        // F-9 fix: zero-fee flat window — carol's buy→sell round trip is
+        // EXACTLY break-even (floor dust only), never profitable.
+        // Pre-fix the toll made it strictly < input.
+        assertLe(c1, 2e18, "B2d: carol round-tripped at profit");
+        assertApproxEqAbs(c1, 2e18, 5, "B2d: flat round trip breaks even (zero fee)");
         _solvent("B2d");
     }
 
@@ -354,14 +358,16 @@ contract AuditLifecycleTest is Test {
         _solvent("B3a");
     }
 
-    // B3b: fees accrue DURING flat window (late trades feed the pot too)
-    function test_B3b_PotAccruesDuringFlat() public {
+    // B3b: FLIPPED by F-9 fix — zero-fee flat window: late trades accrue
+    // NOTHING to the pot (flat-window pot PSP was never redeemed at
+    // finalize; the fee is now killed at the source instead)
+    function test_B3b_NoPotAccrualDuringFlat() public {
         _launchAndStake();
         _bomb();
         (uint256 potPSP0,) = controller.potState();
         _buy(carol, 1e18);
         (uint256 potPSP1,) = controller.potState();
-        assertGt(potPSP1, potPSP0, "B3b: flat fees not accrued");
+        assertEq(potPSP1, potPSP0, "B3b: flat trades must not accrue pot");
     }
 
     // ═══════════════════════════════════════════════════════════

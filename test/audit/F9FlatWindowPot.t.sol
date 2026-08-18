@@ -5,42 +5,61 @@ import {Test, console2} from "forge-std/Test.sol";
 
 import {AuditLifecycleTest} from "./AuditLifecycle.t.sol";
 
-/// @title F-9 probe: flat-window pot accrual at finalize.
-/// @notice Second-eyes finding: pot PSP credited during the 3-day flat
-///         window is never redeemed by finalizeCarpet. Its backing drains
-///         to the factory as generic carry (round-2 predeposit shares)
-///         instead of the ring-fenced side pot (share-less thickening),
-///         and the residual pot PSP tokens die at the controller.
-///         This test PINS current behavior — flip the asserts when fixed.
+/// @title F-9 regression: zero-fee flat window.
+/// @notice Original finding (wave-1 F-9, re-found by auditorA wave-2): pot
+///         PSP credited during the 3-day flat window was never redeemed by
+///         finalizeCarpet — backing drained to the factory as generic carry
+///         (round-2 predeposit shares) instead of the ring-fenced pot, and
+///         the residual pot PSP tokens died at the controller.
+///         FIXED 2026-08-19 by killing the swap fee at the source: Flat-mode
+///         trades accrue nothing (no pot leg, no staker leg) and exits pay
+///         exactly pro-rata avg backing, floor-only.
 contract F9FlatWindowPotTest is AuditLifecycleTest {
-    function test_F9_FlatWindowPotNeverRedeemed() public {
+    function test_F9_FlatWindowIsZeroFee() public {
         _launchAndStake();
         _bomb();
 
         // carol trades during the flat window: buy then sell
         uint256 bought = _buy(carol, 10e18);
+        // capture PRE-sell state: the sell prices off reserve/supply as of
+        // this moment (floor((in * R) / S) — mirrors _handleFlatSell)
+        uint256 rPre = hook.reserveMixETH();
+        uint256 sPre = hook.totalSupplyPSP();
         vm.startPrank(carol);
         psp.approve(address(zapOut), type(uint256).max);
         uint256 back = zapOut.sellToMix(_key(), bought, 0, 0);
         vm.stopPrank();
         assertGt(back, 0, "flat sell paid");
 
+        // FIX: no pot accrual during the flat window at all
         (uint256 potAfterSell,) = controller.potState();
-        console2.log("pot PSP accrued during flat window:", potAfterSell);
-        assertGt(potAfterSell, 0, "F9 setup: flat sell should accrue pot");
+        assertEq(potAfterSell, 0, "F9 fixed: flat trades accrue no pot PSP");
+
+        // FIX: the exit paid EXACTLY pro-rata avg backing (no 4.95% toll)
+        uint256 expectedOut = (bought * rPre) / sPre;
+        assertEq(back, expectedOut, "F9 fixed: flat exit is exactly avg backing");
+
+        // no orphaned staker fees either: flat trades add NOTHING to the
+        // hook's available fees (live-phase fees legitimately sit there
+        // until stakers claim — the invariant is UNCHANGED, not zero).
+        // sendFees invariant: available = hookBalance - reserveMixETH.
+        uint256 hookAvail0 = mixETH.balanceOf(address(hook)) - hook.reserveMixETH();
+        assertGt(hookAvail0, 0, "F9 setup: live-phase fees exist pre-flat");
+        _buy(carol, 1e18); // more flat volume AFTER the measured sell
+        uint256 hookAvail1 = mixETH.balanceOf(address(hook)) - hook.reserveMixETH();
+        assertEq(hookAvail1, hookAvail0, "F9 fixed: flat trades accrue no staker fees");
 
         // finalize the round
         skip(3 days + 1);
         controller.finalizeCarpet();
 
+        // FIX: pot ledger stays zero; nothing to mis-route, nothing dies
         (uint256 potAfterFinal,) = controller.potState();
-        console2.log("pot PSP AFTER finalize:", potAfterFinal);
-        // PIN: pot ledger still nonzero — never redeemed at finalize
-        assertEq(potAfterFinal, potAfterSell, "PIN: F-9 present (not redeemed)");
+        assertEq(potAfterFinal, 0, "F9 fixed: pot ledger clean through finalize");
 
-        // residual PSP physically at controller beyond locker principal
+        // no residual pot PSP stranded at the dying controller
         uint256 resid = psp.balanceOf(address(controller));
         uint256 locked = controller.totalLocked();
-        assertEq(resid - locked, potAfterSell, "residual == unredeemed pot PSP");
+        assertEq(resid, locked, "F9 fixed: no orphaned PSP beyond locker principal");
     }
 }

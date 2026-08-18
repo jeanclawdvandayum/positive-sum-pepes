@@ -349,29 +349,26 @@ contract CurveHook is BaseHook {
         // Overflow: buyMixETH/potMixETH are real swap inputs (<= 1e30 class),
         // S <= MAX_SUPPLY (1e28) → product <= 1e58, fits uint256 easily.
         //
-        // Fee split as on the curve: 4.75% stakers (mixETH), 0.25% pot (PSP
-        // at the flat price — buys leave the flat price invariant, so the
-        // pot's slice prices identically before or after the user's)
-        uint256 feeMixETH = (mixETHInput * SWAP_FEE_BIPS) / 10000;
-        uint256 potMixETH = (mixETHInput * POT_FEE_BIPS) / 10000;
-        uint256 stakerFeeMixETH = feeMixETH - potMixETH;
-        uint256 buyMixETH = mixETHInput - feeMixETH;
+        // F-9 fix (2026-08-19): NO swap fee in Flat. The flat window is
+        // settlement at fair value, not a live market — late trades accrue
+        // nothing to the pot (flat-window pot PSP was never redeemed at
+        // finalize: its backing drained to generic carry and the tokens
+        // died at the controller) and nothing to stakers. Price is exactly
+        // pro-rata; floor-only rounding keeps the round over-backed (pspOut
+        // floors, the full input enters the reserve).
+        uint256 buyMixETH = mixETHInput;
 
         uint256 pspOut = (buyMixETH * totalSupplyPSP) / reserveMixETH;
         if (pspOut == 0) revert ZeroOutput();
-        uint256 potPSP = (potMixETH * totalSupplyPSP) / reserveMixETH;
 
-        reserveMixETH += buyMixETH + potMixETH;
-        totalSupplyPSP += pspOut + potPSP;
+        reserveMixETH += buyMixETH;
+        totalSupplyPSP += pspOut;
 
         emit Buy(msg.sender, mixETHInput, pspOut, totalSupplyPSP, reserveMixETH);
 
         poolManager.take(mixETH, address(this), mixETHInput);
         controller.mintPSPForSwap(pspOut);
-        if (potPSP > 0) controller.mintPotPSP(potPSP);
         _settleCurrency(psp, pspOut);
-
-        if (stakerFeeMixETH > 0) controller.addFees(stakerFeeMixETH);
 
         BeforeSwapDelta hookDelta = toBeforeSwapDelta(
             int128(int256(mixETHInput)),   // +input: hook handles specified input
@@ -392,44 +389,24 @@ contract CurveHook is BaseHook {
         // totalMixETHOut = pspInputAmount * flatPrice / 1e18
         //   = pspInputAmount * reserveMixETH / totalSupplyPSP
         uint256 totalMixETHOut = (pspInputAmount * reserveMixETH) / totalSupplyPSP;
-        // Fee split as on the curve: pot's 0.25% taken in PSP (unburned —
-        // its backing stays in reserve), stakers get 4.75% in mixETH.
-        // A7/L-3 fix: CEIL the user-facing fee and the pot's mixETH slice.
-        // Reserve loses (totalOut - potMix); a floored potMix let the
-        // reserve keep less than exact pro-rata per sell (wrong-direction
-        // dust in a zero-slack invariant), and a floored FEE let the user
-        // walk with the pot's sub-wei slice entirely (repro: R=2 wei,
-        // out=1 wei → fee floor = 0 → ratio diluted 0.25%). With both
-        // ceiled: R1*S >= R*S1 provably for every input. The dust shifts
-        // to over-backing the pot / under-paying the user by <= 1 wei —
-        // protocol-conservative. ZeroOutput still guards dust sells.
-        uint256 feeMixETH = ((totalMixETHOut * SWAP_FEE_BIPS) + 9999) / 10000;
-        uint256 potMixETH = ((totalMixETHOut * POT_FEE_BIPS) + 9999) / 10000;
-        // dust-sell guard: for out < 400 wei, ceil(pot) can exceed ceil(fee)
-        // only when the fee itself ceiled to 1 — cap at fee
-        if (potMixETH > feeMixETH) potMixETH = feeMixETH;
-        uint256 stakerFeeMixETH = feeMixETH - potMixETH;
-        uint256 mixETHToUser = totalMixETHOut - feeMixETH;
-        uint256 potPSPCut = (pspInputAmount * POT_FEE_BIPS) / 10000;
-        uint256 burnAmount = pspInputAmount - potPSPCut;
+        // F-9 fix (2026-08-19): NO fee in Flat — exits pay exactly pro-rata
+        // avg backing, floor-only. (The previous A7/L-3 ceils guarded the
+        // fee slices that no longer exist in this mode; the Active curve
+        // paths keep their own fee math. out = floor(in*R/S) keeps
+        // R1*S >= R*S1 exactly — no user dust in either direction.)
+        uint256 mixETHToUser = totalMixETHOut;
         if (mixETHToUser == 0) revert ZeroOutput();
 
-        reserveMixETH -= (totalMixETHOut - potMixETH);
-        totalSupplyPSP -= burnAmount;
+        reserveMixETH -= totalMixETHOut;
+        totalSupplyPSP -= pspInputAmount;
 
         emit Sell(msg.sender, pspInputAmount, mixETHToUser, totalSupplyPSP, reserveMixETH);
 
         // Take PSP from PoolManager to hook custody (pre-funded by router)
         poolManager.take(psp, address(this), pspInputAmount);
 
-        controller.burnPSPForSwap(burnAmount);
-        if (potPSPCut > 0) {
-            IERC20(Currency.unwrap(psp)).safeTransfer(address(controller), potPSPCut);
-            controller.creditPotPSP(potPSPCut);
-        }
+        controller.burnPSPForSwap(pspInputAmount);
         _settleCurrency(mixETH, mixETHToUser);
-
-        if (stakerFeeMixETH > 0) controller.addFees(stakerFeeMixETH);
 
         BeforeSwapDelta hookDelta = toBeforeSwapDelta(
             int128(int256(pspInputAmount)),  // +input: hook handles specified input
