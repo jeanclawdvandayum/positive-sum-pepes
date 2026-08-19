@@ -2,7 +2,6 @@
 pragma solidity 0.8.26;
 
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {CurveMath} from "../libraries/CurveMath.sol";
 
@@ -17,9 +16,15 @@ interface IRoundController {
     // ── Swap support (called by hook) ──
     function mintPSPForSwap(uint256 amount) external;
     function burnPSPForSwap(uint256 amount) external;
-    function addFees(uint256 ethAmount) external;
-    function mintPotPSP(uint256 amount) external;
-    function creditPotPSP(uint256 amount) external;
+    function addFees(uint256 mixETHAmount) external;
+
+    // ── Staker wiring (PSPStaker reads these through this interface) ──
+    function stakerAddress() external view returns (address);
+    function hookAddress() external view returns (address);
+    function flatTime() external view returns (uint256);
+    function LOCK_DURATION() external view returns (uint256);
+    function EXTEND_DURATION() external view returns (uint256);
+    function RELOCK_WINDOW() external view returns (uint256);
 
     // ── Curve params ──
     function getCurveConfig() external view returns (CurveMath.CurveConfig memory);

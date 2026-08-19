@@ -7,6 +7,8 @@ import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {CurveHook} from "./CurveHook.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
 import {HookMiner} from "./utils/HookMiner.sol";
+import {IRoundController} from "./interfaces/IRoundController.sol";
+import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
 
 /// @title HookDeployer — mines and CREATE2-deploys CurveHook instances
 /// @notice Exists purely for EIP-170: the factory embedded CurveHook's ~11KB
@@ -38,6 +40,7 @@ contract HookDeployer {
     function deployHook(
         IPoolManager pm,
         address controller,
+        address referralRegistry,
         CurveMath.CurveConfig memory config
     ) external returns (address hookAddr, bytes32 salt) {
         // L-2: BEFORE_INITIALIZE_FLAG gates pool initialization to the
@@ -53,7 +56,7 @@ contract HookDeployer {
         // Single embedding of the creation code — reused for mining AND deploy
         bytes memory initCode = bytes.concat(
             type(CurveHook).creationCode,
-            abi.encode(pm, controller, config)
+            abi.encode(pm, IRoundController(controller), PSPReferralRegistry(referralRegistry), config)
         );
 
         // C-1 (2026-08-18, fork-verified HIGH): the legacy deterministic scan

@@ -19,6 +19,7 @@ import {RoundController} from "./RoundController.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
 import {HookDeployer} from "./HookDeployer.sol";
 import {ControllerDeployer, TokenDeployer} from "./ControllerDeployer.sol";
+import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
 
 /// @title PSPFactory — Deploys and manages PSP rounds
 /// @notice Each round gets fresh contracts. ETH (as mixETH) is carried from destruction to next round.
@@ -34,12 +35,9 @@ contract PSPFactory is Ownable2Step {
     error RoundAlreadyDestroyed();
     error NotLatestRound(); // spawn chains strictly forward: latest destroyed round only
     error GameConfigUnset(); // no round has been deployed yet — no curve to inherit
-    error SidePotOverdrawn(); // ledger credit exceeds the tokens actually held
 
-    event RoundDeployed(uint256 indexed roundId, address token, address controller, address hook);
+    event RoundDeployed(uint256 indexed roundId, address token, address controller, address hook, address staker);
     event ETHCarried(uint256 indexed fromRound, uint256 indexed toRound, uint256 mixETHAmount);
-    event SidePotCredited(uint256 amount); // dying round's pot redemption received
-    event SidePotContributed(uint256 indexed toRound, uint256 mixETHAmount); // released into a new round's curve
     event HtmlUpdated();
 
     struct Round {
@@ -74,16 +72,18 @@ contract PSPFactory is Ownable2Step {
     ///      its descendants.
     CurveMath.CurveConfig public gameCurve;
 
-    /// @dev Ring-fenced protocol reserve, fed by dying rounds' side-pot
-    ///      redemptions (25bps swap fee, accrued as PSP, exited at average
-    ///      backing on carpet bomb). NOT part of the generic carry: at spawn
-    ///      it is forwarded to the new round via potDeposit() — it thickens
-    ///      the genesis curve for everyone, cap-exempt and share-less. The
-    ///      public predeposit cap (500 mixETH) applies to USERS only, so a
-    ///      round can open with 500 user mixETH + whatever the pot holds.
-    ///      Invariant: sidePot <= mixETH.balanceOf(factory) at all times
-    ///      (credits only follow a matching transfer from a round controller).
-    uint256 public sidePot;
+    /// @dev Referral graph — permanent, cross-round. Born here so every
+    ///      spawned round wires into the SAME social graph: the factory
+    ///      points it at each new round's staker (min-stake oracle) and
+    ///      authorizes each new hook as a lazy recorder.
+    PSPReferralRegistry public immutable referralRegistry;
+
+    /// @dev Minimum locked PSP to qualify as a referrer (skin in the game).
+    uint256 public constant REFERRAL_MIN_STAKE = 1000e18;
+
+    /// @dev Ring-fenced side pot REMOVED (2026-08-19) — the 25bps pot fee is
+    ///      dead; the 50bps referral carve-out pays out live in mixETH. The
+    ///      whole factory balance is now the generic carry.
 
     /// @dev Naming for spawned rounds: "<baseName> <id>" / "<baseSymbol><id>".
     string public baseName = "Positive Sum Pepes";
@@ -109,6 +109,9 @@ contract PSPFactory is Ownable2Step {
         hookDeployer = _hookDeployer;
         controllerDeployer = _controllerDeployer;
         roundTimings = _timings;
+        // The social graph outlives every round. Owner = this factory: only
+        // _deployRound wires it (setStaker/setRecorder per round).
+        referralRegistry = new PSPReferralRegistry(REFERRAL_MIN_STAKE);
     }
 
     uint256 public immutable roundTimings;
@@ -164,10 +167,16 @@ contract PSPFactory is Ownable2Step {
         //    the factory was 41KB with it embedded twice. The deployer holds
         //    the literal once and verifies the mined address on-chain.)
         (address hookAddress,) = hookDeployer.deployHook(
-            poolManager, address(controller), params.curveConfig
+            poolManager, address(controller), address(referralRegistry), params.curveConfig
         );
         CurveHook hook = CurveHook(hookAddress);
         hookAddr = hookAddress;
+
+        // 5. Wire the referral graph into this round: the new staker becomes
+        //    the min-stake oracle; the new hook becomes a lazy recorder
+        //    (hookData attribution). Registry owner = this factory.
+        referralRegistry.setStaker(controller.stakerAddress());
+        referralRegistry.setRecorder(hookAddress, true);
 
         // 6. Wire hook to controller
         controller.setHook(hook);
@@ -203,7 +212,7 @@ contract PSPFactory is Ownable2Step {
             symbol: params.symbol
         });
 
-        emit RoundDeployed(roundId, address(token), address(controller), address(hook));
+        emit RoundDeployed(roundId, address(token), address(controller), address(hook), controller.stakerAddress());
     }
 
     /// @notice Spawn the next round from the latest destroyed one — permissionless.
@@ -214,11 +223,9 @@ contract PSPFactory is Ownable2Step {
     ///      while it is the latest).
     ///
     ///      The destroyed round's carry (reserve + staker fees) becomes the new
-    ///      round's opening predeposit via seedCarry() (cap-exempt), and the
-    ///      ring-fenced side pot is forwarded separately via potDeposit() —
-    ///      it buys NO predeposit shares, it thickens the genesis curve for
-    ///      every participant of the new round (cap-exempt, share-less).
-    ///      Zero carry / zero pot are both fine — the round simply opens empty
+    ///      round's opening predeposit via seedCarry() (cap-exempt). The old
+    ///      side-pot split is gone (2026-08-19) — the whole factory balance is
+    ///      the carry now. Zero carry is fine — the round simply opens empty
     ///      and waits for the public window (or owner launch).
     function spawnNextRound(uint256 fromRoundId) external returns (uint256 newRoundId, address hookAddr) {
         Round storage from = rounds[fromRoundId];
@@ -227,10 +234,7 @@ contract PSPFactory is Ownable2Step {
         if (fromRoundId != currentRoundId) revert NotLatestRound();
         if (gameCurve.zones.length == 0) revert GameConfigUnset();
 
-        // Generic carry = factory balance MINUS the ring-fenced side pot.
-        // Both pots were funded by this round's death; they leave separately.
-        uint256 carry = mixETH.balanceOf(address(this)) - sidePot;
-        uint256 pot = sidePot;
+        uint256 carry = mixETH.balanceOf(address(this));
 
         newRoundId = currentRoundId + 1;
         RoundParams memory params;
@@ -243,14 +247,6 @@ contract PSPFactory is Ownable2Step {
             RoundController newController = rounds[newRoundId].controller;
             mixETH.forceApprove(address(newController), carry);
             newController.seedCarry(carry);
-        }
-
-        if (pot > 0) {
-            RoundController newController = rounds[newRoundId].controller;
-            mixETH.forceApprove(address(newController), pot);
-            newController.potDeposit(pot);
-            sidePot = 0;
-            emit SidePotContributed(newRoundId, pot);
         }
 
         emit ETHCarried(fromRoundId, newRoundId, carry);
@@ -269,20 +265,9 @@ contract PSPFactory is Ownable2Step {
         return string(b);
     }
 
-    // ─────────────── Side pot (protocol reserve) ───────────────
-
-    /// @notice Credit the side pot. Called by the dying round's controller
-    ///         immediately after transferring its pot redemption mixETH here.
-    /// @dev Ledger-only: the tokens must already be at the factory. Guarded to
-    ///      the CURRENT round's controller so nobody can earmark the generic
-    ///      carry as pot (earmarking changes next round's allocation — pot
-    ///      funds buy no predeposit shares, carry does).
-    function creditSidePot(uint256 amount) external {
-        if (msg.sender != address(rounds[currentRoundId].controller)) revert NotRoundController();
-        if (mixETH.balanceOf(address(this)) < sidePot + amount) revert SidePotOverdrawn();
-        sidePot += amount;
-        emit SidePotCredited(amount);
-    }
+    // ─────────────── (side pot removed 2026-08-19) ───────────────
+    // creditSidePot deleted with the pot — nothing credits a ring-fenced
+    // reserve anymore; the whole factory balance is the generic carry.
 
     /// @notice Mark a round as destroyed (called by its controller during destruction)
     function markDestroyed(uint256 roundId) external {

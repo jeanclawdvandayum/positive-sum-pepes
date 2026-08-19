@@ -38,6 +38,8 @@ contract PSPZapIn {
         uint256 mixIn;
         uint256 minPspOut;
         address to;
+        address trader;   // referral attribution (0x0 = none)
+        address referrer;
     }
 
     constructor(IMixETH _mixETH, IPoolManager _poolManager) {
@@ -68,8 +70,11 @@ contract PSPZapIn {
     /// @param key The round's {mixETH, PSP} pool key (either currency sort)
     /// @param minPspOut Revert if fewer PSP tokens come out
     /// @param deadline Revert if executed after this timestamp (0 = off)
+    /// @param referrer Optional referral attribution (0x0 = unattributed).
+    ///        First attributed trade binds the caller's referral edge
+    ///        permanently; later referrers are ignored (registry-enforced).
     /// @return pspOut PSP sent to the caller
-    function zapInBuy(PoolKey calldata key, uint256 minPspOut, uint256 deadline)
+    function zapInBuy(PoolKey calldata key, uint256 minPspOut, uint256 deadline, address referrer)
         external
         payable
         returns (uint256 pspOut)
@@ -86,7 +91,10 @@ contract PSPZapIn {
         uint256 mixIn = _wrap(msg.value);
 
         bytes memory result = poolManager.unlock(
-            abi.encode(BuyData({key: key, mixIn: mixIn, minPspOut: minPspOut, to: msg.sender}))
+            abi.encode(BuyData({
+                key: key, mixIn: mixIn, minPspOut: minPspOut, to: msg.sender,
+                trader: msg.sender, referrer: referrer
+            }))
         );
         pspOut = abi.decode(result, (uint256));
     }
@@ -96,8 +104,9 @@ contract PSPZapIn {
     /// @param mixIn mixETH to spend (caller must have approved this router)
     /// @param minPspOut Revert if fewer PSP tokens come out
     /// @param deadline Revert if executed after this timestamp (0 = off)
+    /// @param referrer Optional referral attribution (see zapInBuy)
     /// @return pspOut PSP sent to the caller
-    function buyWithMix(PoolKey calldata key, uint256 mixIn, uint256 minPspOut, uint256 deadline)
+    function buyWithMix(PoolKey calldata key, uint256 mixIn, uint256 minPspOut, uint256 deadline, address referrer)
         external
         returns (uint256 pspOut)
     {
@@ -111,7 +120,10 @@ contract PSPZapIn {
         IERC20(address(mixETH)).safeTransferFrom(msg.sender, address(this), mixIn);
 
         bytes memory result = poolManager.unlock(
-            abi.encode(BuyData({key: key, mixIn: mixIn, minPspOut: minPspOut, to: msg.sender}))
+            abi.encode(BuyData({
+                key: key, mixIn: mixIn, minPspOut: minPspOut, to: msg.sender,
+                trader: msg.sender, referrer: referrer
+            }))
         );
         pspOut = abi.decode(result, (uint256));
     }
@@ -139,6 +151,8 @@ contract PSPZapIn {
         poolManager.settle();
 
         // Buy: mix -> PSP. Price limit is the far bound in swap direction.
+        // hookData carries (trader, referrer) for the 50bps referral
+        // carve-out; empty when unattributed (fees then all go to stakers).
         BalanceDelta delta = poolManager.swap(
             d.key,
             SwapParams({
@@ -148,7 +162,7 @@ contract PSPZapIn {
                     : TickMath.MAX_SQRT_PRICE - 1,
                 zeroForOne: mixIsZero
             }),
-            ""
+            d.referrer != address(0) ? abi.encode(d.trader, d.referrer) : new bytes(0)
         );
 
         // PSP delta is positive (owed to us); take it for the caller.

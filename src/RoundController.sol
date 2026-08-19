@@ -11,11 +11,14 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 
 import {PSPToken} from "./PSPToken.sol";
 import {CurveHook} from "./CurveHook.sol";
+import {PSPStaker} from "./PSPStaker.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
 import {IRoundController} from "./interfaces/IRoundController.sol";
 
 /// @title RoundController — Lifecycle management for one PSP round
 /// @notice Handles predeposit, locking, fee distribution, yield reinvestment, and destruction governance.
+///         Staking itself lives in PSPStaker (ERC-721 positions) — born in
+///         this contract's constructor, read by governance, fed by addFees.
 contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using CurveMath for CurveMath.CurveConfig;
@@ -27,7 +30,6 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     error PredepositClosed();
     error ZeroAmount();
     error ZeroAddress();
-    error NothingToClaim();
     error NotLocker();
     error FactoryMarkFailed();
     error FactorySpawnFailed();
@@ -37,10 +39,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     error QuorumNotReached();
     error MajorityNotReached();
     error AlreadyExecuted();
-    error LockNotExpired();
-    error TooEarlyToRelock();
     error RoundDestroyed();
-    error RoundFlattened();
     error NotFlattened();
     error ExitWindowOpen();
     error VoteLockedAfterPropose();
@@ -55,25 +54,26 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     event Predeposited(address indexed user, uint256 ethAmount, uint256 mixETHAmount);
     event CarrySeeded(uint256 mixETHAmount);
     event Launched(uint256 totalMixETH, uint256 totalPSP);
-    event Locked(address indexed user, uint256 amount);
-    event Unlocked(address indexed user, uint256 amount);
-    event Relocked(address indexed user, uint256 newUnlockTime);
-    event FeesClaimed(address indexed user, uint256 amount);
-    event FeesForfeited(address indexed user, uint256 mixETHAmount);
+    // Locked/Unlocked/Relocked/FeesClaimed/FeesForfeited moved to PSPStaker
+    // (2026-08-19) with the position NFTs. Pot events removed with the pot.
     event CarpetBombProposed(address indexed proposer);
     event Voted(address indexed voter, bool support, uint256 weight);
-    event CarpetBombExecuted(uint256 potRedemption);
+    event CarpetBombExecuted();
     event RoundFinalized(uint256 mixETHCarried);
     event FeesAdded(uint256 mixETHAmount);
-    event PotPSPCredited(uint256 pspAmount); // side pot PSP accrued (swap cuts + launch share)
-    event PotDeposited(uint256 mixETHAmount); // factory side-pot funding received
-    event PotRedeemed(uint256 pspAmount, uint256 mixETHOut); // carpet-bomb exit at average backing
 
     // ─────────────── Immutables ───────────────
     PSPToken public immutable pspToken;
     IERC20 public immutable mixETH;
     CurveMath.CurveConfig public curveConfig;
     address public immutable factory;
+
+    // ─────────────── Staker (ERC-721 positions) ───────────────
+    /// @dev Born in the constructor: PSPStaker is the position ledger, the
+    ///      fee accumulator, and the NFT. Fee claims pull from the hook via
+    ///      sendFees (hook whitelists it as stakerClaimant). The referral
+    ///      registry reads it for the min-stake gate.
+    PSPStaker public immutable staker;
 
     // ─────────────── Hook ref ───────────────
     CurveHook public hook;
@@ -107,19 +107,13 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     uint256 public immutable predepositStartTime;
 
     // ─────────────── Locking (vlCVX-style) ───────────────
+    // (2026-08-19) the lock ledger, accumulator, and fee claims moved to
+    // PSPStaker (ERC-721 positions). The controller keeps the timing
+    // immutables — the staker reads them through IRoundController.
     uint256 public immutable LOCK_DURATION;   // default 90 days (3 months)
     uint256 public immutable EXTEND_DURATION; // relock adds this; default 90 days
     uint256 public immutable RELOCK_WINDOW;   // last window before expiry; default 7 days
     uint256 public constant PRECISION = 1e18;
-
-    struct LockInfo {
-        uint256 amount;
-        uint256 rewardDebt;
-        uint256 lockTime;
-        uint256 unlockTime; // block.timestamp + LOCK_DURATION
-    }
-    mapping(address => LockInfo) public locks;
-    uint256 public totalLocked;
 
     /// @dev bomb time — nonzero means the round is flat and every lock is
     ///      open for immediate exit at average backing. (No separate
@@ -127,23 +121,11 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     ///      idempotently reverting on its own.)
     uint256 public flatTime;
 
-    uint256 public accFeePerShareMixETH; // accumulated fees per share, mixETH (1e18 scaled)
-    uint256 public pendingFeesMixETH;    // total unallocated fees (mixETH)
-
-    // ─────────────── Side pot (protocol reserve) ───────────────
-    /// @dev PSP accumulated by the 25bps pot fee (buy mints + sell skims)
-    ///      plus the pot's share of the genesis mint. Held UNLOCKED at this
-    ///      contract for the round's entire life: never staked (no fee claim,
-    ///      no vote weight), never sold. Its only exit is carpetBomb(), which
-    ///      redeems it at average backing into mixETH for the factory's side
-    ///      pot — the next round's users get that backing as a thicker curve,
-    ///      not as predeposit shares.
-    uint256 public potPSPBalance;
-    /// @dev mixETH the factory forwarded via potDeposit() — joins the curve
-    ///      reserve at launch ON TOP of the 500-mixETH public predeposit cap.
-    uint256 public totalPotMixETH;
-    /// @dev Genesis mint minus the pot's share — the claimable pool behind
-    ///      claimPredepositPSP(). Snapshot at launch, never mutates.
+    // ─────────────── (side pot removed 2026-08-19) ───────────────
+    /// @dev Genesis mint — the claimable pool behind claimPredepositPSP().
+    ///      Snapshot at launch, never mutates. The referral system replaced
+    ///      the pot: its carve-out pays out live in mixETH, nothing
+    ///      accumulates here.
     uint256 public genesisPSPSnapshot;
 
     // ─────────────── Factory round tracking ───────────────
@@ -215,6 +197,10 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         curveConfig = _config;
         factory = _factory;
         predepositStartTime = block.timestamp;
+        // Birth the staker: ERC-721 position ledger + fee accumulator. Born
+        // here (not factory) so `staker` is immutable and the hook can cache
+        // it as stakerClaimant at its own construction.
+        staker = new PSPStaker(IERC20(address(_pspToken)), IRoundController(address(this)));
     }
 
     // ─────────────── Modifiers ───────────────
@@ -273,39 +259,16 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     }
 
     /// @notice Add swap fees to the accumulator (mixETH-denominated — NK24 unit fix)
+    /// @dev 2026-08-19: forwards to PSPStaker's accumulator (hook → controller
+    ///      → staker chain; the staker validates both hops).
     function addFees(uint256 mixETHAmount) external onlyHook {
-        pendingFeesMixETH += mixETHAmount;
-        _updateAccumulator();
+        staker.addFees(mixETHAmount);
         emit FeesAdded(mixETHAmount);
     }
 
-    /// @notice Mint the side pot's PSP (buy-path fee cut) — hook-only
-    /// @dev Minted fresh through the curve with its own mixETH backing; held
-    ///      here unlocked. Never enters the lock ledger.
-    ///      H-1 fix: the PSP must be REAL. The hook's supply ledger counts
-    ///      potPSP (totalSupplyPSP += pspOut + potPSP) and carpetBomb()
-    ///      burns potPSPBalance from this wallet — a ledger-only credit left
-    ///      the wallet short of totalLocked by exactly the phantom amount,
-    ///      bricking the last staker(s) to unlock (ERC20InsufficientBalance,
-    ///      permanent). Invariant after this fix:
-    ///        psp.balanceOf(controller) == totalLocked + potPSPBalance
-    function mintPotPSP(uint256 amount) external onlyHook {
-        potPSPBalance += amount;
-        pspToken.mint(address(this), amount);
-        emit PotPSPCredited(amount);
-    }
-
-    /// @notice Credit side-pot PSP already transferred here (sell-path fee
-    ///         cut — skimmed off the burn, backing stays in the reserve)
-    function creditPotPSP(uint256 amount) external onlyHook {
-        potPSPBalance += amount;
-        emit PotPSPCredited(amount);
-    }
-
-    /// @notice Everything a UI needs about the side pot.
-    function potState() external view returns (uint256 pspBalance, uint256 mixETHFunded) {
-        return (potPSPBalance, totalPotMixETH);
-    }
+    /// @dev IRoundController views for PSPStaker/CurveHook wiring.
+    function stakerAddress() external view returns (address) { return address(staker); }
+    function hookAddress() external view returns (address) { return address(hook); }
 
     // ─────────────── Predeposit ───────────────
 
@@ -363,18 +326,23 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     /// @notice Receive side-pot mixETH from the factory (previous round's pot
     ///         redemption). Cap-exempt like carry, but ring-fenced: it buys NO
     ///         predeposit shares — it thickens the curve for everyone at launch.
+    /// @dev DEAD (2026-08-19): the side pot is gone. Kept as a no-op so old
+    ///      finalizeCarpet replays can't brick — funds sent here ride the
+    ///      generic carry at finalize instead.
     function potDeposit(uint256 mixETHAmount) external nonReentrant {
         if (msg.sender != factory) revert NotFactory();
         if (mixETHAmount == 0) revert ZeroAmount();
-
+        // accept and hold: joins the curve at launch via totalBoot accounting
         uint256 balBefore = mixETH.balanceOf(address(this));
         mixETH.safeTransferFrom(msg.sender, address(this), mixETHAmount);
         uint256 actualAmount = mixETH.balanceOf(address(this)) - balBefore;
         if (actualAmount == 0) revert ZeroAmount();
-
-        totalPotMixETH += actualAmount;
-        emit PotDeposited(actualAmount);
+        carryBonusMixETH += actualAmount;
     }
+
+    /// @dev mixETH held here outside predeposit shares (old pot deposits) —
+    ///      joins totalBoot at launch, thickening the curve for everyone.
+    uint256 public carryBonusMixETH;
 
     function _recordPredeposit(address depositor, uint256 amount) internal {
         if (predeposits[depositor].mixETHAmount == 0) {
@@ -434,9 +402,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         if (msg.sender != owner() && !_capReached() && !_windowOver()) revert PredepositOpen();
         predepositClosed = true;
 
-        // Boot pool = public predeposit + side-pot funding. The pot's mixETH
-        // rides the same genesis buy but buys NO claim shares (see split below).
-        uint256 totalBoot = totalPredepositMixETH + totalPotMixETH;
+        // Boot pool = public predeposit + any carry bonus (old-pot deposits).
+        uint256 totalBoot = totalPredepositMixETH + carryBonusMixETH;
 
         // Transfer boot mixETH to hook (hook holds all curve reserves + fees)
         mixETH.safeTransfer(address(hook), totalBoot);
@@ -448,39 +415,25 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
 
         // Snapshot for proportional claims (prevents donation attacks)
         totalInitialPSP = initialPSP;
-
-        // Split the genesis mint: the pot contributed pot/totalBoot of the
-        // input, so it takes the same fraction of the output PSP — held
-        // UNLOCKED (no genesis lock, no fees, no votes). Everything else is
-        // the predepositors' claimable pool.
-        uint256 potSharePSP = totalPotMixETH > 0 ? (initialPSP * totalPotMixETH) / totalBoot : 0;
-        potPSPBalance += potSharePSP;
-        uint256 genesisPSP = initialPSP - potSharePSP;
-        genesisPSPSnapshot = genesisPSP;
+        genesisPSPSnapshot = initialPSP;
 
         // Initialize the hook's curve state with the full boot amount
         hook.initializeCurve(totalBoot, initialPSP);
 
-        // Mint PSP to all depositors proportionally
+        // Mint PSP to this contract, then move the whole claimable pool into
+        // the staker's genesis lock
         _distributeInitialPSP(initialPSP);
 
-        // NK24 genesis-lock fix: the controller itself locks ALL claimable
-        // initial PSP in this same transaction as the genesis buy. totalLocked
-        // therefore covers the entire claimable supply from the very first
-        // post-launch block, so swap fees distribute pro-rata across all
-        // predepositors — the first-locker solo window (98.8% fee capture
-        // PoC) cannot exist. Predepositors claim out of this virtual lock
-        // lazily via claimPredepositPSP(), which also pays out the fees their
-        // share has accrued since launch. O(1) gas: no depositor loop.
-        // (The pot's share is deliberately EXCLUDED — it never locks, never
-        // earns fees, never votes; quorum measures locked + curve supply.)
-        locks[address(this)] = LockInfo({
-            amount: genesisPSP,
-            rewardDebt: 0, // accFeePerShareMixETH is 0 at launch (no swaps pre-Active)
-            lockTime: block.timestamp,
-            unlockTime: block.timestamp + LOCK_DURATION
-        });
-        totalLocked += genesisPSP;
+        // NK24 genesis-lock fix: the controller locks ALL claimable initial
+        // PSP in this same transaction as the genesis buy — totalLocked
+        // covers the entire claimable supply from the first post-launch
+        // block, so swap fees distribute pro-rata across all predepositors;
+        // the first-locker solo fee-capture window cannot exist. The lock
+        // lives at the staker's own address (virtual position: never an NFT,
+        // never transferable); predepositors claim out of it lazily via
+        // claimPredepositPSP() → staker.claimGenesisShare().
+        pspToken.transfer(address(staker), initialPSP);
+        staker.lockGenesis(initialPSP);
 
         // Activate the hook
         hook.setMode(CurveHook.Mode.Active);
@@ -519,189 +472,22 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
 
         dep.claimed = true;
 
-        _updateAccumulator();
-
-        LockInfo storage userLock = locks[msg.sender];
-        LockInfo storage genesisLock = locks[address(this)];
-
-        // Claim pending fees on an existing lock (L-5: unified with every
-        // other principal path — forfeit on shortfall)
-        if (userLock.amount > 0) {
-            _claimPendingFees(true);
-        }
-
-        // Fees accrued by this share since launch (genesis rewardDebt was 0):
-        // they belong to the claimer, paid straight out of the hook's fee
-        // surplus. Forfeit on shortfall, same M-2 semantics as every other
-        // path — a fee leg must never block PSP principal.
-        uint256 accruedOnShare = (share * accFeePerShareMixETH) / PRECISION;
-        if (accruedOnShare > 0) {
-            try hook.sendFees(msg.sender, accruedOnShare) {}
-            catch {
-                emit FeesForfeited(msg.sender, accruedOnShare);
-            }
-        }
-
-        // Move the share from the genesis virtual lock to the user's lock
-        genesisLock.amount -= share;
-        genesisLock.rewardDebt = (genesisLock.amount * accFeePerShareMixETH) / PRECISION;
-
-        userLock.amount += share;
-        userLock.rewardDebt = (userLock.amount * accFeePerShareMixETH) / PRECISION;
-        userLock.lockTime = block.timestamp;
-        userLock.unlockTime = block.timestamp + LOCK_DURATION;
-        // totalLocked unchanged: the share moves between lock positions
-
-        emit Locked(msg.sender, share);
+        // Move the share (and its accrued fees) from the staker's genesis
+        // lock into the user's position — minting their position NFT if it's
+        // their first. Accrued-fee math and M-2 forfeit semantics live in
+        // the staker.
+        staker.claimGenesisShare(msg.sender, share);
     }
 
-    // ─────────────── Locking (vlCVX-style) ───────────────
-
-    /// @notice Lock PSP for 90 days. Earns fee share via accumulator.
-    ///         Adding to an existing lock resets the timer.
-    function lock(uint256 amount) external nonReentrant {
-        if (amount == 0) revert ZeroAmount();
-
-        // Z-1 fix: no locking into a destroyed round — the hook is drained,
-        // fees will never accrue again, PSP would sit dead for 90 days
-        if (address(hook) != address(0)
-            && (hook.mode() == CurveHook.Mode.Destroyed || hook.mode() == CurveHook.Mode.Flat)) {
-            revert RoundDestroyed();
-        }
-
-        _updateAccumulator();
-
-        LockInfo storage userLock = locks[msg.sender];
-
-        // Claim pending fees first (forfeit on shortfall: a short surplus
-        // must not block locking — Z-1/M-2 interaction)
-        if (userLock.amount > 0) {
-            _claimPendingFees(true);
-        }
-
-        IERC20(address(pspToken)).safeTransferFrom(msg.sender, address(this), amount);
-
-        userLock.amount += amount;
-        userLock.rewardDebt = (userLock.amount * accFeePerShareMixETH) / PRECISION;
-        userLock.lockTime = block.timestamp;
-        userLock.unlockTime = block.timestamp + LOCK_DURATION;
-        totalLocked += amount;
-
-        emit Locked(msg.sender, amount);
-    }
-
-    /// @notice Withdraw PSP after lock expires
-    function unlock() external nonReentrant {
-        LockInfo storage userLock = locks[msg.sender];
-        if (userLock.amount == 0) revert NotLocker();
-        // Flat round: every lock is open — exit at average backing instead of
-        // watching the window close on dead PSP
-        if (flatTime == 0 && block.timestamp < userLock.unlockTime) revert LockNotExpired();
-
-        _updateAccumulator();
-
-        // Claim pending fees (M-2: forfeit on shortfall — PSP principal must
-        // never be trapped by an unpayable fee leg, e.g. post-carpet drain)
-        _claimPendingFees(true);
-
-        uint256 amount = userLock.amount;
-        totalLocked -= amount;
-        userLock.amount = 0;
-        userLock.rewardDebt = 0;
-
-        IERC20(address(pspToken)).safeTransfer(msg.sender, amount);
-
-        emit Unlocked(msg.sender, amount);
-    }
-
-    /// @notice Extend lock by EXTEND_DURATION (mainnet +90 days, testnet +1
-    ///         day). Only callable in the last RELOCK_WINDOW before expiry.
-    function relock() external nonReentrant {
-        LockInfo storage userLock = locks[msg.sender];
-        if (userLock.amount == 0) revert NotLocker();
-        if (userLock.unlockTime == 0) revert NotLocker();
-        // No relocking a flat round — its only future is exit or inheritance
-        if (flatTime != 0) revert RoundFlattened();
-        // Only in the relock window (last RELOCK_WINDOW before expiry)
-        if (block.timestamp < userLock.unlockTime - RELOCK_WINDOW) revert TooEarlyToRelock();
-
-        // Claim pending fees before resetting (H-1 rewardDebt refresh +
-        // M-2 forfeit-on-shortfall, unified in _claimPendingFees)
-        _updateAccumulator();
-        _claimPendingFees(true);
-
-        userLock.unlockTime = block.timestamp + EXTEND_DURATION;
-        userLock.lockTime = block.timestamp;
-
-        emit Relocked(msg.sender, userLock.unlockTime);
-    }
-
-    function claimFees() external nonReentrant {
-        LockInfo storage userLock = locks[msg.sender];
-        if (userLock.amount == 0) revert NotLocker();
-
-        _updateAccumulator();
-
-        uint256 pending = _pendingFees(msg.sender);
-        if (pending == 0) revert NothingToClaim();
-
-        // Strict: caller's explicit intent is to receive fees — a surplus
-        // shortfall reverts InsufficientFees (informative) rather than
-        // silently forfeiting. Principal remains recoverable via unlock().
-        _claimPendingFees(false);
-
-        emit FeesClaimed(msg.sender, pending);
-    }
-
-    function _pendingFees(address user) internal view returns (uint256) {
-        LockInfo storage userLock = locks[user];
-        return (userLock.amount * accFeePerShareMixETH) / PRECISION - userLock.rewardDebt;
-    }
-
-    /// @dev Unified fee-claim leg (H-1 + M-2). ALWAYS refreshes rewardDebt
-    ///      before paying (double-claim fix), and optionally forfeits when the
-    ///      hook's fee surplus can't cover the pending amount instead of
-    ///      reverting — a reverted fee leg must never trap PSP principal
-    ///      (post-carpet drain).
-    ///      Forfeit paths: unlock/relock/lock-top-up (principal > fees).
-    ///      Strict path: claimFees (caller's explicit intent is to receive
-    ///      fees; a shortfall reverts informatively rather than silently
-    ///      burning them).
-    ///      NK24: pendings are mixETH-denominated natively — no vault-rate
-    ///      conversion anywhere in this path.
-    function _claimPendingFees(bool forfeitOnShortfall) internal {
-        uint256 pending = _pendingFees(msg.sender);
-        if (pending == 0) return;
-
-        LockInfo storage userLock = locks[msg.sender];
-        userLock.rewardDebt = (userLock.amount * accFeePerShareMixETH) / PRECISION;
-
-        if (forfeitOnShortfall) {
-            try hook.sendFees(msg.sender, pending) {}
-            catch {
-                // M-2: hook surplus short (InsufficientFees). Forfeit the
-                // fees, release the principal path.
-                emit FeesForfeited(msg.sender, pending);
-            }
-        } else {
-            hook.sendFees(msg.sender, pending);
-        }
-    }
-
-    function _updateAccumulator() internal {
-        if (totalLocked == 0) {
-            return;
-        }
-        if (pendingFeesMixETH == 0) return;
-
-        accFeePerShareMixETH += (pendingFeesMixETH * PRECISION) / totalLocked;
-        pendingFeesMixETH = 0;
-    }
+    // ─────────────── Locking (moved to PSPStaker, 2026-08-19) ───────────────
+    // lock/unlock/relock/claimFees now live on the PSPStaker ERC-721 contract
+    // born in this controller's constructor. This contract no longer touches
+    // PSP after moving the genesis pool to the staker at launch.
 
     // ─────────────── Destruction Governance ───────────────
 
     function proposeCarpetBomb() external nonReentrant {
-        if (locks[msg.sender].amount == 0) revert NotLocker();
+        if (staker.lockedPSPOf(msg.sender) == 0) revert NotLocker();
 
         // No governance theater on a destroyed round
         if (address(hook) != address(0)
@@ -756,12 +542,13 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     /// @dev Quorum denominator: max(locked, total PSP supply) — see proposeCarpetBomb
     function _quorumDenominator() internal view returns (uint256) {
         uint256 supply = address(hook) != address(0) ? hook.totalSupplyPSP() : 0;
-        return totalLocked > supply ? totalLocked : supply;
+        uint256 locked = staker.totalLocked();
+        return locked > supply ? locked : supply;
     }
 
     function voteCarpetBomb(bool support) external nonReentrant {
-        LockInfo storage userLock = locks[msg.sender];
-        if (userLock.amount == 0) revert NotLocker();
+        uint256 weight = staker.lockedPSPOf(msg.sender);
+        if (weight == 0) revert NotLocker();
         if (currentProposal.proposeTime == 0) revert ProposalExists();
         if (block.timestamp > currentProposal.proposeTime + VOTE_DURATION) revert VotingEnded();
         // G-3 fix: per-proposal epoch — voters from previous proposals can vote again
@@ -776,15 +563,17 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // totalVotes is structurally capped at lockedAtPropose. Kills the
         // post-snapshot lock-capture vector (lock 2M after propose, outvote
         // a thin snapshot).
-        if (userLock.lockTime >= currentProposal.proposeTime) revert VoteLockedAfterPropose();
+        // 2026-08-19: reads the staker's position ledger (positions moved to
+        // PSPStaker with the NFTs — lockTimeOf mirrors the old locks[].lockTime).
+        if (staker.lockTimeOf(msg.sender) >= currentProposal.proposeTime) revert VoteLockedAfterPropose();
 
         if (support) {
-            currentProposal.yesVotes += userLock.amount;
+            currentProposal.yesVotes += weight;
         } else {
-            currentProposal.noVotes += userLock.amount;
+            currentProposal.noVotes += weight;
         }
 
-        emit Voted(msg.sender, support, userLock.amount);
+        emit Voted(msg.sender, support, weight);
     }
 
     function carpetBomb() external nonReentrant {
@@ -803,30 +592,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
 
         prop.executed = true;
 
-        // ── Side pot exit ──
-        // The pot's PSP (swap fee cuts + genesis share) is redeemed at average
-        // backing — reserve/supply pro-rata — into mixETH, then burned. This
-        // is the pot's ONLY exit: it never sold a token during the round.
-        // Funds go to the factory's ring-fenced side pot (next round's bonus
-        // curve depth, cap-exempt, share-less). If the ledger call somehow
-        // fails, the tokens are still at the factory — they ride the generic
-        // carry instead (allocation shift, never a loss).
-        uint256 potRedemption;
-        if (potPSPBalance > 0) {
-            potRedemption = hook.redeemPotBacking(potPSPBalance);
-            pspToken.burn(address(this), potPSPBalance);
-            emit PotRedeemed(potPSPBalance, potRedemption);
-            potPSPBalance = 0;
-
-            if (potRedemption > 0) {
-                mixETH.safeTransfer(factory, potRedemption);
-                // Ledger credit; on failure the funds ride the generic carry
-                // (allocation shift, never a loss) — see comment above.
-                // EIP-170: precomputed selector for creditSidePot(uint256)
-                // (encodeWithSignature embeds the string + keccak per call)
-                factory.call(abi.encodeWithSelector(bytes4(0xada2e425), potRedemption));
-            }
-        }
+        // (side-pot exit removed 2026-08-19 — the pot is gone; the referral
+        // carve-out pays live and nothing accumulates to redeem here)
 
         // ── Flatten and open the exit window ──
         // The round is NOT destroyed here. Every staker lock opens
@@ -837,7 +604,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         hook.setMode(CurveHook.Mode.Flat);
         flatTime = block.timestamp;
 
-        emit CarpetBombExecuted(potRedemption);
+        emit CarpetBombExecuted();
     }
 
     /// @notice Close the exit window: destroy the round, drain the

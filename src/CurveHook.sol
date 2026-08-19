@@ -16,6 +16,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {CurveMath} from "./libraries/CurveMath.sol";
 import {IRoundController} from "./interfaces/IRoundController.sol";
+import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
 
 /// @title CurveHook - V4 hook implementing S-curve bonding curve for PSP
 /// @notice Handles pricing, minting/burning PSP, and fee extraction.
@@ -50,11 +51,20 @@ contract CurveHook is BaseHook {
     // ─────────────── Immutables ───────────────
     IRoundController public immutable controller;
     CurveMath.CurveConfig public curveConfig;
+    /// @dev Permanent cross-round referral graph — attribution + tier weights.
+    PSPReferralRegistry public immutable referralRegistry;
+    /// @dev Cached at construction (staker is born in the controller's
+    ///      constructor, so it exists before this hook does). sendFees is
+    ///      callable by the controller and the staker it birthed.
+    address public immutable stakerClaimant;
     uint24 public constant SWAP_FEE_BIPS = 500; // 5% total swap fee
-    /// @dev Side-pot cut of the swap fee, taken as PSP instead of mixETH:
-    ///      buys mint it through the curve (backed), sells skim it off the
-    ///      burned input. The remaining 475 bips go to the staker accumulator.
-    uint24 public constant POT_FEE_BIPS = 25; // 0.25%
+    /// @dev Referral carve-out of the swap fee (2026-08-19, replaces the
+    ///      side pot): paid LIVE in mixETH to the trader's attribution chain
+    ///      (up to 5 tiers, registry-weighted). Unattributed trades — and any
+    ///      tier weight left on the table by a short chain — fall through to
+    ///      the staker accumulator by subtraction. Stakers take 500bps
+    ///      unattributed, 450bps under a full chain.
+    uint24 public constant REFERRAL_FEE_BIPS = 50; // 0.50%
     /// @dev Canonical V4 pool parameters — the only pool this hook serves.
     ///      0x800000 = dynamic-fee flag (hook-priced; fee field unused).
     uint24 public constant CANONICAL_FEE = 0x800000;
@@ -79,14 +89,16 @@ contract CurveHook is BaseHook {
     event PoolInitialized();
     event FeesSent(address indexed to, uint256 mixETHAmount);
     event Drained(address indexed to, uint256 mixETHAmount);
-    event PotBackingRedeemed(uint256 pspAmount, uint256 mixETHOut);
+    event ReferralPaid(address indexed trader, address indexed referrer, uint256 tier, uint256 mixETHAmount);
 
     // ─────────────── Constructor ───────────────
-    constructor(IPoolManager _poolManager, IRoundController _controller, CurveMath.CurveConfig memory _config)
+    constructor(IPoolManager _poolManager, IRoundController _controller, PSPReferralRegistry _referralRegistry, CurveMath.CurveConfig memory _config)
         BaseHook(_poolManager)
     {
         controller = _controller;
         curveConfig = _config;
+        referralRegistry = _referralRegistry;
+        stakerClaimant = _controller.stakerAddress();
     }
 
     // ─────────────── Settlement Helpers ───────────────
@@ -171,7 +183,7 @@ contract CurveHook is BaseHook {
         internal pure override returns (bytes4)
     { revert("NoStandardLiquidity"); }
 
-    function _beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata)
+    function _beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
         internal override returns (bytes4, BeforeSwapDelta, uint24)
     {
         if (mode != Mode.Active && mode != Mode.Flat) revert NotActive();
@@ -179,9 +191,13 @@ contract CurveHook is BaseHook {
         Currency mixETH = controller.getMixETH();
         Currency psp = Currency.wrap(address(controller.getPSP()));
 
-        bool isBuy = params.zeroForOne
-            ? (key.currency0 == mixETH)
-            : (key.currency1 == mixETH);
+        // Determine direction: negative amountSpecified = exact-input.
+        // mixETH in = BUY (PSP out); PSP in = SELL (mixETH out).
+        bool isBuy;
+        {
+            Currency inputCurrency = params.zeroForOne ? key.currency0 : key.currency1;
+            isBuy = inputCurrency == mixETH;
+        }
 
         if (params.amountSpecified >= 0) revert("ExactOutNotSupported");
 
@@ -191,17 +207,61 @@ contract CurveHook is BaseHook {
         // fixed-point precision can make round-trips profitable (in wei terms)
         if (inputAmount < MIN_SWAP_INPUT) revert SwapTooSmall();
 
+        // Referral identity (2026-08-19): canonical zaps forward
+        // (trader, referrer) through hookData. Exactly 64 bytes decodes;
+        // anything else (router-direct swaps, empty) trades unattributed —
+        // the 50bps carve-out then lands entirely with stakers (D6).
+        address refTrader;
+        address referrer;
+        if (hookData.length == 64) {
+            (refTrader, referrer) = abi.decode(hookData, (address, address));
+        }
+
         if (isBuy) {
-            return _handleBuy(key, params, inputAmount, mixETH, psp);
+            return _handleBuy(key, params, inputAmount, mixETH, psp, refTrader, referrer);
         } else {
-            return _handleSell(key, params, inputAmount, mixETH, psp);
+            return _handleSell(key, params, inputAmount, mixETH, psp, refTrader, referrer);
+        }
+    }
+
+    // ─────────────── Referral payouts ───────────────
+
+    /// @dev One-time lazy attribution, then live tier payouts. Returns the
+    ///      total actually paid out of the fee slice — the caller's staker
+    ///      fee is feeMixETH - paid (subtraction: rounding dust and any
+    ///      unpaid tier weight always land with stakers, never vanish).
+    ///      A bad/expired referral link NEVER reverts the trade: record
+    ///      failures are swallowed and payoutFor simply returns what exists.
+    function _payReferrals(address trader, address referrer, uint256 feeMixETH, Currency mixETH)
+        internal
+        returns (uint256 paid)
+    {
+        if (trader == address(0)) return 0;
+        PSPReferralRegistry reg = referralRegistry;
+        if (address(reg) == address(0)) return 0;
+
+        if (referrer != address(0) && reg.referrerOf(trader) == address(0)) {
+            try reg.recordFor(trader, referrer) {} catch {}
+        }
+
+        (address[5] memory who, uint24[5] memory bps) = reg.payoutFor(trader);
+        uint256 budget = (feeMixETH * REFERRAL_FEE_BIPS) / 10000;
+        IERC20 mix = IERC20(Currency.unwrap(mixETH));
+        for (uint256 i = 0; i < 5; i++) {
+            if (who[i] == address(0)) break;
+            uint256 cut = (budget * bps[i]) / 10000;
+            if (cut > 0) {
+                mix.safeTransfer(who[i], cut);
+                paid += cut;
+                emit ReferralPaid(trader, who[i], i, cut);
+            }
         }
     }
 
     // ─────────────── Buy Logic ───────────────
 
     function _handleBuy(PoolKey calldata key, SwapParams calldata params, uint256 mixETHInput,
-        Currency mixETH, Currency psp)
+        Currency mixETH, Currency psp, address refTrader, address referrer)
         internal returns (bytes4, BeforeSwapDelta, uint24)
     {
         if (mode == Mode.Flat) {
@@ -211,24 +271,18 @@ contract CurveHook is BaseHook {
         // NK24 fix: mixETH is the unit of account — the curve is solved
         // directly in mixETH. No vault-rate read anywhere in this path.
         //
-        // Fee split: 5% total. 4.75% mixETH → staker accumulator; 0.25%
-        // flows through the curve AFTER the user's slice and mints PSP to
-        // the controller's side pot (backed 1:1 by its mixETH in reserve).
+        // Fee split (2026-08-19, side pot retired): 5% total. 50bps referral
+        // carve-out paid live to the trader's chain; the remainder — plus
+        // every unpaid tier weight — to the staker accumulator.
         uint256 feeMixETH = (mixETHInput * SWAP_FEE_BIPS) / 10000;
-        uint256 potMixETH = (mixETHInput * POT_FEE_BIPS) / 10000;
-        uint256 stakerFeeMixETH = feeMixETH - potMixETH;
         uint256 curveMixETH = mixETHInput - feeMixETH;
 
-        // Compute PSP outputs — user first at 95%, pot second at 0.25%
         uint256 pspOut = CurveMath.computeBuyOutput(curveMixETH, totalSupplyPSP, curveConfig);
         if (pspOut == 0) revert ZeroOutput();
-        uint256 potPSP = CurveMath.computeBuyOutput(potMixETH, totalSupplyPSP + pspOut, curveConfig);
 
         // CEI: update state before external calls
-        // curveMixETH + potMixETH enter the reserve; stakerFeeMixETH stays in
-        // balance as available fees
-        reserveMixETH += curveMixETH + potMixETH;
-        totalSupplyPSP += pspOut + potPSP;
+        reserveMixETH += curveMixETH;
+        totalSupplyPSP += pspOut;
 
         emit Buy(msg.sender, mixETHInput, pspOut, totalSupplyPSP, reserveMixETH);
 
@@ -238,13 +292,10 @@ contract CurveHook is BaseHook {
         // Mint PSP for the buyer
         controller.mintPSPForSwap(pspOut);
 
-        // Mint the pot's backed PSP (held unlocked by the controller — never
-        // staked, never sold; the ONLY exit is carpet-bomb redemption)
-        if (potPSP > 0) {
-            controller.mintPotPSP(potPSP);
-        }
-
-        // Route staker fee to controller accumulator (mixETH-denominated)
+        // Referral cuts leave custody immediately; staker fee joins the
+        // claimable surplus. paid <= feeMixETH always (subtraction is exact).
+        uint256 refPaid = _payReferrals(refTrader, referrer, feeMixETH, mixETH);
+        uint256 stakerFeeMixETH = feeMixETH - refPaid;
         if (stakerFeeMixETH > 0) {
             controller.addFees(stakerFeeMixETH);
         }
@@ -266,7 +317,7 @@ contract CurveHook is BaseHook {
     // ─────────────── Sell Logic ───────────────
 
     function _handleSell(PoolKey calldata key, SwapParams calldata params, uint256 pspInputAmount,
-        Currency mixETH, Currency psp)
+        Currency mixETH, Currency psp, address refTrader, address referrer)
         internal returns (bytes4, BeforeSwapDelta, uint24)
     {
         if (pspInputAmount == 0) revert BuyZeroAmount();
@@ -285,40 +336,32 @@ contract CurveHook is BaseHook {
         // reserve and bricked every sell).
         uint256 mixETHOut = CurveMath.computeSellOutput(pspInputAmount, totalSupplyPSP, curveConfig);
 
-        // Fee split: 5% of the out-value total. 4.75% mixETH → stakers.
-        // The pot's 0.25% is taken IN PSP: 0.25% of the sold PSP is
-        // transferred to the pot instead of burned, so its backing stays
-        // in the reserve. User still receives 95% of the full integral.
+        // Fee split (2026-08-19, side pot retired): 5% of the out-value.
+        // 50bps referral carve-out paid live in mixETH; remainder to stakers.
+        // The ENTIRE sold PSP is burned — no pot skim, backing stays clean.
         uint256 feeMixETH = (mixETHOut * SWAP_FEE_BIPS) / 10000;
-        uint256 potMixETH = (mixETHOut * POT_FEE_BIPS) / 10000;
-        uint256 stakerFeeMixETH = feeMixETH - potMixETH;
         uint256 mixETHToUser = mixETHOut - feeMixETH;
-        uint256 potPSPCut = (pspInputAmount * POT_FEE_BIPS) / 10000;
-        uint256 burnAmount = pspInputAmount - potPSPCut;
         if (mixETHToUser == 0) revert ZeroOutput();
 
-        // CEI: reserve decreases by the out-value MINUS the pot slice (that
-        // mixETH now backs the pot's unburned PSP); supply drops by burnAmount
-        reserveMixETH -= (mixETHOut - potMixETH);
-        totalSupplyPSP -= burnAmount;
+        // CEI: full out-value leaves the reserve (user + fees + referrals all
+        // draw from it); supply drops by the FULL burned input.
+        reserveMixETH -= mixETHOut;
+        totalSupplyPSP -= pspInputAmount;
 
         emit Sell(msg.sender, pspInputAmount, mixETHToUser, totalSupplyPSP, reserveMixETH);
 
         // Take PSP from PoolManager to hook custody (pre-funded by router)
         poolManager.take(psp, address(this), pspInputAmount);
 
-        // Burn the user's PSP; route the pot's cut to the controller (unlocked,
-        // never restaked — carpet-bomb redemption is its only exit)
-        controller.burnPSPForSwap(burnAmount);
-        if (potPSPCut > 0) {
-            IERC20(Currency.unwrap(psp)).safeTransfer(address(controller), potPSPCut);
-            controller.creditPotPSP(potPSPCut);
-        }
+        // Burn the user's PSP — all of it
+        controller.burnPSPForSwap(pspInputAmount);
 
         // Send mixETH to user via PoolManager
         _settleCurrency(mixETH, mixETHToUser);
 
-        // Route staker fee
+        // Referral cuts from the fee slice; remainder to stakers
+        uint256 refPaid = _payReferrals(refTrader, referrer, feeMixETH, mixETH);
+        uint256 stakerFeeMixETH = feeMixETH - refPaid;
         if (stakerFeeMixETH > 0) {
             controller.addFees(stakerFeeMixETH);
         }
@@ -417,12 +460,16 @@ contract CurveHook is BaseHook {
 
     // ─────────────── Fee Distribution ───────────────
 
-    /// @notice Send accumulated fees to a locker (called by controller during claimFees)
+    /// @notice Send accumulated fees to a position holder (called by the
+    ///         staker during claims, or the controller in legacy paths)
     /// @dev Available fees = hook's mixETH balance - reserveMixETH.
     ///      No separate counter needed: the invariant is
     ///      balanceOf(hook) = reserveMixETH + availableFees.
     function sendFees(address to, uint256 mixETHAmount) external {
-        if (msg.sender != address(controller)) revert NotController();
+        // 2026-08-19: fee claims moved to PSPStaker — it pulls payouts for
+        // its positions directly. Controller retains access (genesis share
+        // payouts ride the same path).
+        if (msg.sender != address(controller) && msg.sender != stakerClaimant) revert NotController();
 
         address mixETHAddr = Currency.unwrap(controller.getMixETH());
         uint256 balance = IERC20(mixETHAddr).balanceOf(address(this));
@@ -437,23 +484,8 @@ contract CurveHook is BaseHook {
 
     // ─────────────── Destruction Support ───────────────
 
-    /// @notice Redeem the side pot's PSP at average backing (reserve/supply).
-    /// @dev Controller-only, called from carpetBomb() BEFORE drainAll — the
-    ///      pot PSP is never sold on any market during the round; this is its
-    ///      only exit. Pro-rata at average backing, not the sell integral:
-    ///      the pot is an eternal compounding position, not a round-tripper.
-    function redeemPotBacking(uint256 pspAmount) external returns (uint256 mixETHOut) {
-        if (msg.sender != address(controller)) revert NotController();
-        if (pspAmount == 0 || totalSupplyPSP == 0) return 0;
-
-        mixETHOut = (reserveMixETH * pspAmount) / totalSupplyPSP;
-        reserveMixETH -= mixETHOut;
-        totalSupplyPSP -= pspAmount;
-
-        IERC20(Currency.unwrap(controller.getMixETH())).safeTransfer(msg.sender, mixETHOut);
-
-        emit PotBackingRedeemed(pspAmount, mixETHOut);
-    }
+    // (redeemPotBacking removed 2026-08-19 with the side pot — the pot no
+    // longer exists; carpetBomb flattens straight to the exit window.)
 
     /// @notice Drain ALL mixETH (reserve + fees) for round carry-over
     /// @return mixETHAmount Total mixETH transferred to `to`
