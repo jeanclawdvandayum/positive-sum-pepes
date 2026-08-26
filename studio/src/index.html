@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PSP Trait Studio</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div id="brand">🐸 <span>PSP TRAIT STUDIO</span></div>
+  <nav id="tabs" aria-label="Trait axes">
+    <button class="tab" data-axis="head">HEAD</button>
+    <button class="tab" data-axis="expressions">EXPRESSIONS <span class="count" id="count-expressions"></span></button>
+    <button class="tab" data-axis="eyes">EYES <span class="count" id="count-eyes"></span></button>
+    <button class="tab" data-axis="hats">HATS <span class="count" id="count-hats"></span></button>
+    <button class="tab" data-axis="eyewear">EYEWEAR <span class="count" id="count-eyewear"></span></button>
+    <button class="tab" data-axis="items">ITEMS <span class="count" id="count-items"></span></button>
+    <button class="tab" data-axis="palettes">PALETTES</button>
+  </nav>
+  <div id="actions">
+    <button id="btn-import" title="Import trait .txt files and/or palettes.json">Import…</button>
+    <button id="btn-export" title="Download expressions/eyes/hats/eyewear/items.txt (+ palettes.py if edited)">Export Files</button>
+    <button id="btn-compile" class="accent" title="Compile state to PepeArtData.sol">▶ Compile</button>
+    <button id="btn-selftest" title="Re-run the compiler-chain self test">Self-Test</button>
+    <span id="dirty-dot" title="state matches last export"></span>
+    <div id="menu-wrap">
+      <button id="btn-menu" title="Menu">⋯</button>
+      <div id="menu" class="hidden">
+        <button id="btn-reset-all">Reset all…</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <aside id="left">
+    <div class="panel">
+      <div class="panel-head">
+        <span id="traitlist-title">TRAITS</span>
+      </div>
+      <div class="row-btns">
+        <button id="t-new" title="Append a new trait at the end (safe — no DNA shift)">+ New</button>
+        <button id="t-dup" title="Duplicate this trait (appends at the end)">Duplicate</button>
+        <button id="t-rename">Rename</button>
+        <button id="t-del" class="danger" title="Delete this trait (may shift DNA ids)">Delete</button>
+        <button id="t-up" title="Move up (reorders DNA)">▲</button>
+        <button id="t-down" title="Move down (reorders DNA)">▼</button>
+      </div>
+      <div id="trait-list"></div>
+    </div>
+  </aside>
+
+  <section id="center">
+    <div id="palette-editor" class="panel hidden"></div>
+
+    <div id="editor-ui">
+      <div id="toolbar">
+        <div class="tgroup" id="tool-buttons">
+          <button class="tool" data-tool="pencil"  title="Pencil — paint single cells (B)">Pencil <kbd>B</kbd></button>
+          <button class="tool" data-tool="eraser"  title="Eraser — paint transparent (E)">Eraser <kbd>E</kbd></button>
+          <button class="tool" data-tool="fill"    title="Flood-fill connected same-slot cells (G)">Fill <kbd>G</kbd></button>
+          <button class="tool" data-tool="line"    title="Line — click start, drag, release (L)">Line <kbd>L</kbd></button>
+          <button class="tool" data-tool="rect"    title="Rectangle outline — drag corner to corner (R)">Rect <kbd>R</kbd></button>
+          <button class="tool" data-tool="picker"  title="Eyedropper — arm the slot under the cursor (I)">Pick <kbd>I</kbd></button>
+        </div>
+        <div class="tgroup">
+          <button id="btn-mirror" class="toggle" title="Mirror-X — every stroke also paints x → 47−x (M). Eyes and mouths are symmetric.">Mirror-X <kbd>M</kbd></button>
+        </div>
+        <div class="tgroup">
+          <button id="btn-undo" title="Undo (Ctrl/Cmd-Z)">↶ Undo</button>
+          <button id="btn-redo" title="Redo (Shift-Ctrl/Cmd-Z)">↷ Redo</button>
+        </div>
+        <div class="tgroup">
+          <button id="btn-gridlines" class="toggle on" title="Show grid lines">Grid</button>
+          <button id="btn-ghost" class="toggle on" title="Ghost the traced base head under this trait — for placing hats/eyewear/items">Ghost</button>
+          <label id="ghost-opacity-wrap" title="Ghost underlay opacity">α <input type="range" id="ghost-opacity" min="0" max="100" value="40"></label>
+        </div>
+        <div class="tgroup" id="bgmode-buttons" title="Editor canvas background">
+          <button id="bg-checker" class="toggle on">◧ checker</button>
+          <button id="bg-dark" class="toggle">▪ dark</button>
+        </div>
+        <div class="tgroup grow">
+          <label title="Editor cell size (px)">cell <input type="range" id="cell-size" min="8" max="28" value="16"> <span id="cell-size-label">16</span></label>
+        </div>
+      </div>
+
+      <div id="canvas-wrap">
+        <canvas id="editor" width="768" height="768"></canvas>
+        <div id="editor-hint" class="hidden"></div>
+      </div>
+
+      <div id="statusline" class="mono"></div>
+    </div>
+  </section>
+
+  <aside id="right">
+    <div class="panel" id="preview-panel">
+      <div class="panel-head"><span>LIVE PREVIEW</span>
+        <label class="dim-label">zoom
+          <select id="preview-scale">
+            <option value="1">1×</option>
+            <option value="2">2×</option>
+            <option value="4" selected>4×</option>
+            <option value="10">10×</option>
+          </select>
+        </label>
+      </div>
+      <div id="preview-wrap"><canvas id="preview" width="192" height="192"></canvas></div>
+      <div id="dna-line" class="mono" title="packed DNA — same bit layout as PepeDescriptor.pack()"></div>
+      <div id="preview-controls">
+        <label>skin <select id="sel-skin"></select></label>
+        <label>iris <select id="sel-iris"></select></label>
+        <label>bg <select id="sel-bg"></select></label>
+      </div>
+      <div class="row-btns">
+        <button id="btn-random" class="accent" title="Random DNA combo">RANDOM 🎲</button>
+        <button id="btn-png" title="Save the preview PNG at the current zoom">PNG ↓</button>
+      </div>
+    </div>
+
+    <div class="panel" id="palette-panel">
+      <div class="panel-head"><span>PALETTE</span><span class="dim" id="pal-note">click to arm</span></div>
+      <div id="palette-dock"></div>
+    </div>
+
+    <div class="panel" id="validation-panel">
+      <div class="panel-head">
+        <button id="validation-toggle" title="Show/hide">▸ <span>VALIDATION</span> <span id="validation-badge"></span></button>
+      </div>
+      <div id="validation-list" class="hidden"></div>
+    </div>
+  </aside>
+
+</main>
+
+<footer id="statusbar">
+  <span id="selftest-badge" class="mono">…</span>
+  <span id="statusbar-mid"></span>
+  <span id="autosave-note" class="dim"></span>
+</footer>
+
+<div id="modal-root" class="hidden"></div>
+<input type="file" id="file-input" class="hidden" multiple
+       accept=".txt,.json,text/plain,application/json">
+
+<script src="../compiler.js"></script>
+<script src="defaults.js"></script>
+<script src="app-core.js"></script>
+<script src="app-canvas.js"></script>
+<script src="app-panels.js"></script>
+<script src="app-dialogs.js"></script>
+<script src="app-boot.js"></script>
+</body>
+</html>

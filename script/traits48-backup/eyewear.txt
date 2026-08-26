@@ -1,0 +1,128 @@
+# PSP pepe traits — EYEWEAR
+# Letters: s shades-black(14) W white(5) g gold(11)
+# Format: '# name:' + '# dx:' + '# dy:' then rows of uniform
+# width. '.' = transparent. DNA id 0 is always NONE (implicit).
+# Other blocks: DNA id = file order + 1.
+
+# name: SHADES
+# dx: 7
+# dy: 17
+ssssssssssssssssssssssssssssssssss
+ss...sWWssssssssss..sWWsssssssssss
+.....sssssssssssss..ssssssssssssss
+.....sssssssssssss..ssssssssssssss
+.....sssssssssssss..ssssssssssssss
+.....sssssssssssss..ssssssssssssss
+.....sssssssssssss..ssssssssssssss
+.....sssssssssssss..ssssssssssssss
+......sssssssssss....ssssssssssss.
+
+# name: MONOCLE
+# dx: 25
+# dy: 15
+...ggggggggg...
+..ggggggggggg..
+.gg.........gg.
+.gg.........gg.
+.gg.........gg.
+gg...........gg
+gg...........gg
+gg...........gg
+gg...........gg
+.gg.........gg.
+.gg.........gg.
+..ggggggggggg..
+...ggggggggg...
+..........gg...
+...........gg..
+............gg.
+.............gg
+
+# name: GLASSES
+# dx: 10
+# dy: 17
+..sssssssssssss...sssssssssssss
+ssss.........ss...ss.........ss
+ssss.........ss...ss.........ss
+..ss.........sssssss.........ss
+..ss.........ss...ss.........ss
+..ss.........ss...ss.........ss
+..ss.........ss...ss.........ss
+..ss.........ss...ss.........ss
+..sssssssssssss...sssssssssssss
+
+# name: MOGGED
+# dx: 10
+# dy: 16
+sssssssssssssssssssssssssssssss
+sggggggggggggsssssggggggggggggs
+sgggggggggggggggggggggggggggggs
+sgggggggggggggggggggggggggggggs
+sgggggggggggggggggggggggggggggs
+sgggggggggggggsssgggggggggggggs
+sgggggggggggggs.sgggggggggggggs
+sgggggggggggggs.sggggggggggggss
+ssgggggggggggss.ssggggggggggss.
+.ssssssssssssss..ssssssssssss..
+
+# name: MAGNIFYING
+# dx: 3
+# dy: 10
+.......................sssssss.......
+.....................sssssssssss.....
+....................ssss.....ssss....
+...................sss.........sss...
+..................sss...........sss..
+..................ss.............ss..
+..................ss..............ss.
+.................ss...............ss.
+.................ss................ss
+.................ss................ss
+.................ss................ss
+.................ss................ss
+..................ss..............ss.
+..................sss............sss.
+.................ssss...........ssss.
+................ssssss.........sssss.
+..............ssssssssss......ssss...
+...........sssssssss.ssssssssssss....
+.........sssssssss......ssssss.......
+........ssssssss.....................
+......ssssssss.......................
+.....sssssss.........................
+...sssssss...........................
+.sssssss.............................
+ssssss...............................
+ssss.................................
+ss...................................
+
+# name: EYEPATCH
+# dx: 11
+# dy: 16
+.....sssssssss.........ssss
+sss.sssssssssss.....sssssss
+ssssssssssssssssssssssss...
+sssssssssssssssssssss......
+...sssssssssssss...........
+...sssssssssssss...........
+...sssssssssssss...........
+...sssssssssssss...........
+...sssssssssssss...........
+....sssssssssss............
+.....sssssssss.............
+
+# name: HEARTGLASSES
+# dx: 8
+# dy: 16
+.....ccc...ccc.......ccc...ccc..
+....cc.cc.cc.cc.....cc.cc.cc.cc.
+...cc...ccc...cc...cc...ccc...cc
+...c.....c.....ccccc.....c.....c
+cccc...........ccccc...........c
+c..cc.........ccG..cc.........cc
+....cc.......ccGG..Gcc.......cc.
+.....cc.....ccGGG..GGcc.....cc..
+......cc...ccGGGG..GGGcc...ccG..
+.......cccccGGG....G.GGccccc....
+.........c...G...........c......
+............GG..................

@@ -1,0 +1,29 @@
+# secrets — never commit
+.env
+
+# foundry build artifacts
+out/
+cache/
+
+# agent working files (review runs are captured in SECURITY-REVIEW*.md)
+.fix-prompt.txt
+.fix-run.log
+.review-prompt.txt
+.review-run.log
+
+# public-repo hygiene (2026-08-27)
+node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/tsconfig.tsbuildinfo
+.herenow/
+.DS_Store
+**/__pycache__/
+*.DS_Store
+
+# not-for-public (kept locally, excluded from the github tree)
+audits/
+HANDOFF.md
+GATE-LOG.md
+broadcast/
+test/integration/PoisonedAttribution.t.sol

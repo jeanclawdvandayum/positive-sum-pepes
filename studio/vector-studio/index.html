@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PSP Vector Studio</title>
+<style>
+  :root {
+    --bg: #101418; --panel: #181f26; --panel2: #1e2730; --line: #2a3641;
+    --text: #d7e2dc; --dim: #7d8f9a; --green: #62c875; --green2: #3f8f52;
+    --red: #c8626d; --amber: #d4af37;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  header { display: flex; align-items: baseline; gap: 14px; padding: 14px 18px;
+           border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; color: var(--green); letter-spacing: .5px; }
+  header .sub { color: var(--dim); font-size: 12px; }
+  main { display: flex; gap: 18px; padding: 18px; align-items: flex-start; flex-wrap: wrap; }
+
+  #stageWrap { background: var(--panel); border: 1px solid var(--line);
+               border-radius: 10px; padding: 14px; }
+  #stage { width: 640px; height: 640px; display: block; cursor: grab;
+          border-radius: 6px; background:
+            repeating-conic-gradient(#141a20 0% 25%, #10151b 0% 50%) 0 0 / 24px 24px; }
+  #stage.dragging { cursor: grabbing; }
+  #stage * { pointer-events: visiblePainted; }
+  .hint { color: var(--dim); font-size: 11px; margin-top: 8px; max-width: 640px; }
+  .hint b { color: var(--text); }
+
+  aside { width: 380px; display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line);
+          border-radius: 10px; padding: 12px 14px; }
+  .card h2 { font-size: 12px; margin: 0 0 10px; color: var(--dim);
+             text-transform: uppercase; letter-spacing: 1px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .row label { width: 88px; color: var(--dim); font-size: 12px; }
+  select, button, input[type=file] { font: inherit; }
+  select { flex: 1; background: var(--panel2); color: var(--text);
+           border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+           border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--green2); }
+  button.primary { background: var(--green2); border-color: var(--green2); color: #fff; }
+  button.primary:hover { background: var(--green); }
+  button.danger:hover { border-color: var(--red); color: var(--red); }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+
+  #layerSel { font-weight: bold; color: var(--amber); }
+  #offTable { width: 100%; border-collapse: collapse; font-size: 12px; }
+  #offTable td { padding: 3px 6px; border-top: 1px solid var(--line); }
+  #offTable td:first-child { color: var(--dim); }
+  #offTable .cur { color: var(--amber); }
+  #dna { font-size: 12px; color: var(--dim); word-break: break-all; }
+  #dna b { color: var(--text); }
+  textarea { width: 100%; height: 110px; background: var(--panel2); color: var(--text);
+             border: 1px solid var(--line); border-radius: 6px; padding: 8px;
+             font-size: 11px; resize: vertical; }
+  footer { color: var(--dim); font-size: 11px; padding: 0 18px 24px; max-width: 1080px; }
+  code { color: var(--green); }
+</style>
+</head>
+<body>
+<header>
+  <h1>PSP VECTOR STUDIO</h1>
+  <span class="sub">drag layers into place &middot; export overrides &middot; regen contracts</span>
+</header>
+<main>
+  <div id="stageWrap">
+    <svg id="stage" viewBox="0 0 480 480" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="hint">
+      <b>drag</b> = move selected layer (snaps to 10px cells) &middot;
+      <b>click</b> = select layer under cursor &middot;
+      <b>arrows</b> = nudge 1 cell (<b>shift</b> = 5)
+    </div>
+  </div>
+  <aside>
+    <div class="card">
+      <h2>DNA</h2>
+      <div class="row"><label>expression</label><select id="sel-expr"></select></div>
+      <div class="row"><label>eyes</label><select id="sel-eyes"></select></div>
+      <div class="row"><label>hat</label><select id="sel-hat"></select></div>
+      <div class="row"><label>eyewear</label><select id="sel-wear"></select></div>
+      <div class="row"><label>item</label><select id="sel-item"></select></div>
+      <div class="row"><label>skin</label><select id="sel-skin"></select></div>
+      <div class="row"><label>iris</label><select id="sel-iris"></select></div>
+      <div class="row"><label>background</label><select id="sel-bg"></select></div>
+      <div class="btns">
+        <button id="btnRandom" class="primary">RANDOM</button>
+        <button id="btnResetLayer">reset layer</button>
+      </div>
+      <div id="dna" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Placement</h2>
+      <div class="row"><label>layer</label><select id="layerSel"></select></div>
+      <table id="offTable"></table>
+    </div>
+
+    <div class="card">
+      <h2>Export / Import</h2>
+      <div class="btns">
+        <button id="btnExport" class="primary">download overrides.json</button>
+        <button id="btnCopy">copy JSON</button>
+        <button id="btnImport">import</button>
+        <input type="file" id="fileImport" accept=".json" style="display:none">
+        <button id="btnClear" class="danger">clear all overrides</button>
+      </div>
+      <textarea id="jsonBox" spellcheck="false" style="margin-top:8px"></textarea>
+    </div>
+  </aside>
+</main>
+<footer>
+  round-trip: adjust placements &rarr; <b>download overrides.json</b> &rarr; drop it at
+  <code>script/out/vector/overrides.json</code> &rarr; run <code>python3 script/trace_vector.py</code>
+  (regenerates VectorBaseArt / VectorTraitArt / VectorTraitArt2 + previews with your offsets baked in)
+  &rarr; <code>forge build</code>. Session autosaves to localStorage.
+</footer>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

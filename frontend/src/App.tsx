@@ -1,0 +1,65 @@
+import { WagmiProvider } from 'wagmi'
+import { RainbowKitProvider, lightTheme, darkTheme } from '@rainbow-me/rainbowkit'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { HashRouter, Routes, Route } from 'react-router-dom'
+import { wagmiConfig } from './lib/config'
+import { ThemeProvider, useTheme } from './lib/theme'
+import Topbar from './components/Topbar'
+import Landing from './pages/Landing'
+import Trade from './pages/Trade'
+import Stake from './pages/Stake'
+
+const queryClient = new QueryClient()
+
+function Shell() {
+  const { resolved } = useTheme()
+
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitProvider
+          theme={
+            resolved === 'dark'
+              ? darkTheme({
+                  accentColor: '#38bdf8',
+                  accentColorForeground: '#06101d',
+                  borderRadius: 'large',
+                  overlayBlur: 'small',
+                })
+              : lightTheme({
+                  accentColor: '#38bdf8',
+                  accentColorForeground: 'white',
+                  borderRadius: 'large',
+                  overlayBlur: 'small',
+                })
+          }
+          modalSize="compact"
+        >
+          <HashRouter>
+            <div className="min-h-dvh bg-gradient-to-b from-sky-50 via-white to-emerald-50">
+              <Topbar />
+              <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-4 sm:px-6">
+                <Routes>
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/trade" element={<Trade />} />
+                  <Route path="/stake" element={<Stake />} />
+                </Routes>
+              </main>
+              <footer className="pb-8 text-center text-xs text-slate-400">
+                positive sum pepes — the game that pays you to stay
+              </footer>
+            </div>
+          </HashRouter>
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <Shell />
+    </ThemeProvider>
+  )
+}

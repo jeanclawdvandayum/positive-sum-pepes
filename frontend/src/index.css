@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Geist Pixel";
+  src: url("/fonts/GeistPixel.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ELSH morphs the pixel shape of every glyph: 0 regular / 1 square /
+   20 circle / 40 grid / 60 triangle / 80 line — dial it site-wide here */
+:root {
+  --psp-elsh: 0;
+}
+
+/* class-based dark mode (toggled on <html> by ThemeProvider) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-psp-sky: #38bdf8;
+  --color-psp-sky-soft: #bae6fd;
+  --color-psp-mint: #4ade80;
+  --color-psp-mint-soft: #bbf7d0;
+  --color-psp-deep: #0369a1;
+  --font-display: "Geist Pixel", ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+}
+
+/* chart colors (plain :root so they are always emitted, unlike @theme) */
+:root {
+  color-scheme: light;
+  --chart-grid: #e0f2fe;
+  --chart-grid-minor: #f0fdfa;
+  --chart-panel: #ffffff;
+  --chart-panel-border: #bae6fd;
+  --chart-live: #0369a1;
+  --chart-hover-dash: #94a3b8;
+}
+
+/* ---------------------------------------------------------------------------
+   DARK / NIGHT THEME
+   Tailwind v4 utilities resolve to var(--color-*), so remapping the palette
+   variables under .dark re-themes the whole app (surfaces, borders, text,
+   tints, shadows) without touching component markup.
+   --------------------------------------------------------------------------- */
+.dark {
+  color-scheme: dark;
+
+  /* surfaces */
+  --color-white: #0b1424;        /* cards, panels, topbar glass */
+  --color-slate-100: #16233b;    /* progress tracks */
+  --color-slate-200: #223150;
+
+  /* sky tints & borders */
+  --color-sky-50: #0f1b30;       /* soft tint zones, toggle wells */
+  --color-sky-100: #1c2b47;      /* card borders */
+  --color-sky-200: #26395c;      /* stronger borders */
+
+  /* emerald tints */
+  --color-emerald-50: #0c211b;
+  --color-emerald-100: #17362c;
+  --color-emerald-200: #1f4a3a;
+
+  /* text */
+  --color-slate-300: #33436a;    /* placeholders */
+  --color-slate-400: #7e8fb3;    /* secondary text */
+  --color-slate-500: #93a4c6;
+  --color-slate-800: #d7e3f4;    /* body text */
+  --color-slate-900: #e9f1fc;    /* headings */
+
+  /* brand */
+  --color-psp-deep: #53c2ff;     /* readable on dark surfaces */
+  --color-psp-sky-soft: #1c3a5e;
+  --color-psp-mint-soft: #123527;
+
+  /* chart */
+  --chart-grid: #16233c;
+  --chart-grid-minor: #101a2c;
+  --chart-panel: #101b30;
+  --chart-panel-border: #26395c;
+  --chart-live: #53c2ff;
+  --chart-hover-dash: #7e8fb3;
+}
+
+body {
+  @apply bg-white text-slate-800 antialiased;
+  font-family: var(--font-display);
+  font-variation-settings: "ELSH" var(--psp-elsh);
+}
+
+/* bright gradient blobs for hero sections */
+.blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.dark .blob {
+  opacity: 0.18;
+}
+
+.card {
+  @apply rounded-3xl border border-sky-100 bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur;
+}
+
+.dark .card {
+  box-shadow: 0 8px 30px rgb(0, 0, 0, 0.4);
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 to-emerald-400 px-5 py-3 font-bold text-[#fff] shadow-lg shadow-sky-200 transition active:scale-[0.98] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-white px-4 py-2 font-semibold text-psp-deep transition active:scale-[0.98] hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-40;
+}
+
+.input-amount {
+  @apply w-full rounded-2xl border border-sky-100 bg-sky-50/60 px-4 py-3 text-2xl font-bold text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-psp-sky focus:bg-white;
+}
+
+.chip {
+  @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold;
+}
+
+/* rainbowkit modal on mobile */
+@media (max-width: 640px) {
+  RainbowKitProvider { --rk-modal-width: 92vw; }
+}

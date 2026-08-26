@@ -1,0 +1,36 @@
+[profile.default]
+fs_permissions = [
+    { access = "read", path = "./script/" },
+    { access = "write", path = "./out/" }
+]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.26"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+bytecode_hash = "none"
+
+[profile.default.fuzz]
+runs = 256
+
+[profile.invariant]
+runs = 64
+depth = 32
+fail_on_revert = true
+
+[profile.fork]
+via_ir = true
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+ffi = true
+
+[profile.sepolia]
+eth-rpc-url = "${SEPOLIA_RPC_URL}"
+verify = false
+
+[etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
