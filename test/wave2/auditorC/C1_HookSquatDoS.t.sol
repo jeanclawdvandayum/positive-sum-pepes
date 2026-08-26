@@ -48,7 +48,7 @@ contract C1_HookSquatDoS is CBase {
     /// v5.1: registries are per-round — orphan deploys only need SOME
     /// registry address for the ctor arg; a throwaway is fine.
     function _dummyRegistry() internal returns (address) {
-        return address(new PSPReferralRegistry(address(1), address(2), 1000e18));
+        return address(new PSPReferralRegistry(address(2), 1000e18));
     }
     /// Control: the nonce-based prediction is exact. A clean finalize spawns
     /// round 2 at precisely the predicted controller address.

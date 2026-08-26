@@ -63,7 +63,7 @@ contract C1SquatForkTest is AuditForkTest {
 
         vm.startPrank(bob);
         mixETH.approve(address(zapIn), type(uint256).max);
-        uint256 bobPSP = zapIn.buyWithMix(key, 20e18, 0, 0, 0);
+        uint256 bobPSP = zapIn.buyWithMix(key, 20e18, 0, 0);
         vm.stopPrank();
         vm.startPrank(bob);
         psp.approve(address(stakerV), type(uint256).max);

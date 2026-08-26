@@ -102,7 +102,7 @@ contract A4_E2ETest is Test {
         // ── curve-phase trade: bob buys, pot accrues ──
         vm.startPrank(bob);
         mixETH.approve(address(zapIn), 10e18);
-        uint256 bobPSP = zapIn.buyWithMix(_poolKey(), 10e18, 0, 0, 0);
+        uint256 bobPSP = zapIn.buyWithMix(_poolKey(), 10e18, 0, 0);
         vm.stopPrank();
         // (2026-08-19) pot accrual removed — curve buys pay the 50bps
         // referral carve-out live (unattributed here → stakers)
@@ -124,13 +124,13 @@ contract A4_E2ETest is Test {
 
         vm.startPrank(alice);
         pspToken.approve(address(zapOut), alicePSP / 2);
-        uint256 mixOut = zapOut.sellToMix(_poolKey(), alicePSP / 2, 0, 0, 0);
+        uint256 mixOut = zapOut.sellToMix(_poolKey(), alicePSP / 2, 0, 0);
         vm.stopPrank();
         assertGt(mixOut, 0, "flat sell paid out");
 
         vm.startPrank(bob);
         mixETH.approve(address(zapIn), 5e18);
-        zapIn.buyWithMix(_poolKey(), 5e18, 0, 0, 0);
+        zapIn.buyWithMix(_poolKey(), 5e18, 0, 0);
         vm.stopPrank();
 
         // F-9 FIXED (2026-08-19): zero-fee flat window — dying-round trades
@@ -204,7 +204,7 @@ contract A4_E2ETest is Test {
         });
         vm.startPrank(bob);
         IERC20(address(mixETH)).approve(address(zapIn), 3e18);
-        uint256 out = zapIn.buyWithMix(key2, 3e18, 0, 0, 0);
+        uint256 out = zapIn.buyWithMix(key2, 3e18, 0, 0);
         vm.stopPrank();
         assertGt(out, 0, "round 2 trades fine");
     }

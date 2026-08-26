@@ -325,7 +325,7 @@ contract ReentrantForward {
 
     function sell(uint256 pspIn) external {
         psp.approve(address(zap), pspIn);
-        zap.zapOut(key, pspIn, 0, 0, 0);
+        zap.zapOut(key, pspIn, 0, 0);
     }
 
     receive() external payable {
@@ -335,7 +335,7 @@ contract ReentrantForward {
             uint256 bal = psp.balanceOf(address(this));
             if (bal > 0) {
                 psp.approve(address(zap), bal);
-                try zap.zapOut(key, bal, 0, 0, 0) {} catch {}
+                try zap.zapOut(key, bal, 0, 0) {} catch {}
             }
         }
     }

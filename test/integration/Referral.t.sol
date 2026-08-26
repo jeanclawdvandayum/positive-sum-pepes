@@ -29,8 +29,9 @@ import {StakerDeployer} from "src/StakerDeployer.sol";
 /// @title ReferralTest (fork) — v5.1 per-round, NFT-keyed referral graph
 /// @notice Proves the 50bps referral carve-out end to end (2026-08-19 v5.1:
 ///         attribution targets a staker position NFT ID and the graph RESETS
-///         at every round boundary):
-///         R1 one-time lazy attribution per round — first attributed trade binds
+///         at every round boundary; A-1 fix 2026-08-26: attribution binds
+///         ONLY via the user-signed registry.record()):
+///         R1 one-time attribution per round — explicit record() binds
 ///         R2 min-stake gate — dead NFT / under-1000-PSP referrer never binds
 ///         R3 unattributed trades route the full 500bps to stakers
 ///         R4 5-dimensional split on buys: 80/12/5/2/1 of the 50bps budget
@@ -80,25 +81,29 @@ contract ReferralTest is Test {
     }
 
     // ══════════════════════════════════════════════════════════════
-    //  R1: one-time lazy attribution (per round)
+    //  R1: one-time attribution (per round) — user-signed record() only
     // ══════════════════════════════════════════════════════════════
     function test_R1_AttributionBindsOnce() public {
         _launchWithAlice();
         uint256 aliceNft = _nftOf(alice);
 
-        // bob's FIRST attributed trade binds him to alice's position NFT
-        _buy(bob, 10e18, alice);
+        // bob explicitly records alice's position NFT — the ONLY bind path
+        // (A-1 fix: swaps, routers and forged hookData bind nothing)
+        vm.prank(bob);
+        registry.record(aliceNft);
         assertEq(registry.traderRefNftOf(bob), aliceNft, "bob bound to alice's NFT");
 
-        // later trades claiming carol as referrer change nothing
+        // a second record is rejected — attribution is one-shot per round
         _buyAndLock(carol, 10e18, alice); // carol becomes referable
-        _buy(bob, 5e18, carol);
-        assertEq(registry.traderRefNftOf(bob), aliceNft, "attribution locked for the round");
+        uint256 carolNft = _nftOf(carol); // hoisted: staticcall would eat the revert slot
+        vm.prank(bob);
+        vm.expectRevert(PSPReferralRegistry.AlreadyReferred.selector);
+        registry.record(carolNft);
 
-        // and carol earns nothing from bob's later trade
+        // and carol earns nothing from bob's later trades
         uint256 carolBefore = mixETH.balanceOf(carol);
-        _buy(bob, 5e18, carol);
-        assertEq(mixETH.balanceOf(carol), carolBefore, "later referrer earns nothing");
+        _buy(bob, 5e18);
+        assertEq(mixETH.balanceOf(carol), carolBefore, "non-recorded referrer earns nothing");
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -111,9 +116,10 @@ contract ReferralTest is Test {
         assertFalse(registry.canReferNft(_nftOf(carol)), "carol has no NFT");
         assertTrue(registry.canReferNft(_nftOf(alice)), "alice's NFT is referable");
 
-        // a nonexistent NFT id is a dead link: lazy recording is swallowed
-        // (a bad link NEVER reverts a trade) and the trade stays unattributed
-        _buy(bob, 10e18, 999_999);
+        // a nonexistent NFT id is a dead link: bob never binds (there is no
+        // lazy path anymore — nothing to swallow) and his trade stays
+        // unattributed unless he explicitly records a live referrer
+        _buy(bob, 10e18);
         assertEq(registry.traderRefNftOf(bob), 0, "dead NFT link never binds");
 
         // direct record with a dead NFT reverts loudly
@@ -204,7 +210,7 @@ contract ReferralTest is Test {
         // bob sells his whole stack, attributed to alice's NFT
         vm.startPrank(bob);
         pspToken.approve(address(zapOut), bobPSP);
-        zapOut.sellToMix(poolKey, bobPSP, 0, 0, _nftOf(alice));
+        zapOut.sellToMix(poolKey, bobPSP, 0, 0);
         vm.stopPrank();
 
         // single-dim 80% cut of 50bps of the sell output — exact math:
@@ -225,9 +231,9 @@ contract ReferralTest is Test {
         // chain contains alice's NFT) — the registry must reject it
         // (precompute the NFT id: arg evaluation would eat the revert slot)
         uint256 bobNft = _nftOf(bob);
-        vm.prank(address(hook));
+        vm.prank(alice);
         vm.expectRevert(PSPReferralRegistry.WouldCreateCycle.selector);
-        registry.recordFor(alice, bobNft);
+        registry.record(bobNft);
 
         assertEq(registry.traderRefNftOf(alice), 0, "no cycle created");
     }
@@ -337,15 +343,22 @@ contract ReferralTest is Test {
         return stakerV.tokenOf(user);
     }
 
+    /// @dev Buy with a referrer: the user's OWN record() binds attribution
+    ///      first (A-1 fix — the only bind path), then the plain zap buy
+    ///      pays the recorded chain. Later ref args are inert (one-shot).
     function _buy(address user, uint256 mixAmount, address ref) internal returns (uint256) {
         uint256 refNft = ref == address(0) ? 0 : _nftOf(ref);
-        return _buy(user, mixAmount, refNft);
+        if (refNft != 0 && !registry.attributed(user)) {
+            vm.prank(user);
+            registry.record(refNft);
+        }
+        return _buy(user, mixAmount);
     }
 
-    function _buy(address user, uint256 mixAmount, uint256 refNft) internal returns (uint256) {
+    function _buy(address user, uint256 mixAmount) internal returns (uint256) {
         vm.startPrank(user);
         mixETH.approve(address(zapIn), mixAmount);
-        uint256 out = zapIn.buyWithMix(poolKey, mixAmount, 0, 0, refNft);
+        uint256 out = zapIn.buyWithMix(poolKey, mixAmount, 0, 0);
         vm.stopPrank();
         return out;
     }

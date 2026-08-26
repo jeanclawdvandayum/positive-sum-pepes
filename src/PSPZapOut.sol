@@ -36,8 +36,7 @@ contract PSPZapOut {
         uint256 pspIn;
         address pspToken;
         address to;
-        address trader;   // referral attribution (0x0 = none)
-        uint256 referrerNftId;
+        address trader;   // referral payout identity (0x0 = none)
     }
 
     constructor(IMixETH _mixETH, IPoolManager _poolManager) {
@@ -50,9 +49,10 @@ contract PSPZapOut {
     /// @param pspIn Amount of PSP to sell (caller must have approved this router)
     /// @param minMixOut Revert if the swap yields fewer mixETH shares
     /// @param deadline Revert if executed after this timestamp (0 = off)
-    /// @param referrerNftId Optional referral attribution — staker position NFT ID (0 = unattributed)
     /// @return ethOut ETH forwarded to the caller
-    function zapOut(PoolKey calldata key, uint256 pspIn, uint256 minMixOut, uint256 deadline, uint256 referrerNftId)
+    /// @dev Referral attribution binds only via registry.record(refNft) —
+    ///      never through this router (A-1 fix 2026-08-26).
+    function zapOut(PoolKey calldata key, uint256 pspIn, uint256 minMixOut, uint256 deadline)
         external
         returns (uint256 ethOut)
     {
@@ -69,7 +69,7 @@ contract PSPZapOut {
         bytes memory result = poolManager.unlock(
             abi.encode(SellData({
                 key: key, pspIn: pspIn, pspToken: address(psp), to: msg.sender,
-                trader: msg.sender, referrerNftId: referrerNftId
+                trader: msg.sender
             }))
         );
         uint256 mixOut = abi.decode(result, (uint256));
@@ -89,9 +89,10 @@ contract PSPZapOut {
     /// @param pspIn Amount of PSP to sell (caller must have approved this router)
     /// @param minMixOut Revert if the swap yields fewer mixETH shares
     /// @param deadline Revert if executed after this timestamp (0 = off)
-    /// @param referrerNftId Optional referral attribution — staker position NFT ID (0 = unattributed)
     /// @return mixOut mixETH sent to the caller
-    function sellToMix(PoolKey calldata key, uint256 pspIn, uint256 minMixOut, uint256 deadline, uint256 referrerNftId)
+    /// @dev Referral attribution binds only via registry.record(refNft) —
+    ///      never through this router (A-1 fix 2026-08-26).
+    function sellToMix(PoolKey calldata key, uint256 pspIn, uint256 minMixOut, uint256 deadline)
         external
         returns (uint256 mixOut)
     {
@@ -109,7 +110,7 @@ contract PSPZapOut {
         bytes memory result = poolManager.unlock(
             abi.encode(SellData({
                 key: key, pspIn: pspIn, pspToken: pspTokenAddr, to: msg.sender,
-                trader: msg.sender, referrerNftId: referrerNftId
+                trader: msg.sender
             }))
         );
         mixOut = abi.decode(result, (uint256));
@@ -132,8 +133,9 @@ contract PSPZapOut {
         poolManager.settle();
 
         // Sell: PSP -> mix. Price limit is the far bound in swap direction.
-        // hookData carries (trader, referrerNftId) for the 50bps referral
-        // carve-out; empty when unattributed (fees then all go to stakers).
+        // hookData carries the TRADER address so the hook can pay the
+        // trader's already-RECORDED referral chain (attribution itself is
+        // never created here — A-1 fix 2026-08-26).
         BalanceDelta delta = poolManager.swap(
             d.key,
             SwapParams({
@@ -143,11 +145,11 @@ contract PSPZapOut {
                     : TickMath.MIN_SQRT_PRICE + 1,
                 zeroForOne: !mixIsZero
             }),
-            // ALWAYS carry (trader, referrerNftId) — an already-attributed
-            // trader must keep paying their chain on every trade, including
-            // ones placed without a ref param (empty hookData made the hook
-            // see trader == 0 and skip payouts entirely; fixed 2026-08-19)
-            abi.encode(d.trader, d.referrerNftId)
+            // ALWAYS carry the trader — an attributed trader must keep
+            // paying their chain on every trade, including plain ones
+            // (empty hookData made the hook see trader == 0 and skip
+            // payouts entirely; fixed 2026-08-19)
+            abi.encode(d.trader)
         );
 
         // mix delta is positive (owed to us); take it here so we can redeem.

@@ -112,7 +112,7 @@ contract FlatExitTest is Test {
         // bob buys on the curve and locks too, so quorum is honest
         vm.startPrank(bob);
         mixETH.approve(address(zapIn), type(uint256).max);
-        uint256 bobPSP = zapIn.buyWithMix(_poolKey(), 20e18, 0, 0, 0);
+        uint256 bobPSP = zapIn.buyWithMix(_poolKey(), 20e18, 0, 0);
         pspToken.approve(address(controller.staker()), type(uint256).max);
         stakerV.lock(bobPSP);
         vm.stopPrank();
@@ -178,7 +178,7 @@ contract FlatExitTest is Test {
 
         vm.startPrank(alice);
         pspToken.approve(address(zapOut), type(uint256).max);
-        uint256 mixOut = zapOut.sellToMix(_poolKey(), alicePSP, 0, 0, 0);
+        uint256 mixOut = zapOut.sellToMix(_poolKey(), alicePSP, 0, 0);
         vm.stopPrank();
 
         assertEq(mixOut, expectedNet, "sold at exactly average backing (zero flat toll)");

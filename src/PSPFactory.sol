@@ -20,7 +20,6 @@ import {CurveMath} from "./libraries/CurveMath.sol";
 import {HookDeployer} from "./HookDeployer.sol";
 import {ControllerDeployer, TokenDeployer} from "./ControllerDeployer.sol";
 import {StakerDeployer} from "./StakerDeployer.sol";
-import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
 
 /// @title PSPFactory — Deploys and manages PSP rounds
 /// @notice Each round gets fresh contracts. ETH (as mixETH) is carried from destruction to next round.
@@ -182,8 +181,10 @@ contract PSPFactory is Ownable2Step {
         //     graph resets at round boundaries and attribution is keyed by
         //     staker position NFT ID (?ref=<tokenId>). Via HookDeployer
         //     (EIP-170: keeps the creation code out of this contract).
+        //     Fully permissionless since the A-1 fix (2026-08-26): the hook
+        //     only READS it (payoutFor); attribution is user-signed record().
         address registry = hookDeployer.deployRegistry(
-            address(this), controller.stakerAddress(), REFERRAL_MIN_STAKE
+            controller.stakerAddress(), REFERRAL_MIN_STAKE
         );
         referralRegistryOf[roundId] = registry;
 
@@ -197,17 +198,13 @@ contract PSPFactory is Ownable2Step {
         CurveHook hook = CurveHook(hookAddress);
         hookAddr = hookAddress;
 
-        // 5. Wire the round's registry: the hook becomes its lazy recorder
-        //    (hookData attribution). Staker was bound immutably at birth.
-        PSPReferralRegistry(registry).setRecorder(hookAddress, true);
-
-        // 6. Wire hook to controller
+        // 5. Wire hook to controller
         controller.setHook(hook);
 
-        // 6b. Wire controller's roundId in factory
+        // 5b. Wire controller's roundId in factory
         controller.setFactoryRoundId(roundId);
 
-        // 7. Initialize V4 pool
+        // 6. Initialize V4 pool
         Currency currency0 = Currency.wrap(address(mixETH));
         Currency currency1 = Currency.wrap(address(token));
         if (currency0 > currency1) {
