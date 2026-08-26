@@ -112,7 +112,7 @@ contract AuditLifecycleTest is Test {
 
         vm.startPrank(bob);
         mixETH.approve(address(zapIn), type(uint256).max);
-        uint256 bobPSP = zapIn.buyWithMix(_key(), 20e18, 0, 0, 0);
+        uint256 bobPSP = zapIn.buyWithMix(_key(), 20e18, 0, 0);
         psp.approve(address(stakerV), type(uint256).max);
         stakerV.lock(bobPSP);
         vm.stopPrank();
@@ -278,7 +278,7 @@ contract AuditLifecycleTest is Test {
         vm.startPrank(carol);
         psp.approve(address(zapOut), type(uint256).max);
         vm.expectRevert();
-        zapOut.sellToMix(_key(), out, 0, 0, 0);
+        zapOut.sellToMix(_key(), out, 0, 0);
         vm.stopPrank();
         assertEq(uint8(hook.mode()), uint8(CurveHook.Mode.Destroyed));
     }
@@ -398,7 +398,7 @@ contract AuditLifecycleTest is Test {
         _buy(bob, 1e18); // bob has more PSP now
         vm.startPrank(bob);
         psp.approve(address(zapOut), type(uint256).max);
-        try zapOut.sellToMix(_key(), 1, 0, 0, 0) {
+        try zapOut.sellToMix(_key(), 1, 0, 0) {
             emit log("wei sell succeeded (paid something)");
         } catch {
             emit log("wei sell reverted (guard)");
@@ -413,7 +413,7 @@ contract AuditLifecycleTest is Test {
         _launchAndStake();
         vm.startPrank(carol);
         mixETH.approve(address(zapIn), type(uint256).max);
-        try zapIn.buyWithMix(_key(), 1, 0, 0, 0) {
+        try zapIn.buyWithMix(_key(), 1, 0, 0) {
             emit log("1-wei buy succeeded");
         } catch {
             emit log("1-wei buy reverted (guard)");
@@ -463,7 +463,7 @@ contract AuditLifecycleTest is Test {
         vm.startPrank(carol);
         mixETH.approve(address(zapIn), type(uint256).max);
         vm.expectRevert();
-        zapIn.buyWithMix(_key(), 1e18, type(uint256).max, 0, 0); // impossible min
+        zapIn.buyWithMix(_key(), 1e18, type(uint256).max, 0); // impossible min
         vm.stopPrank();
     }
 
@@ -489,7 +489,7 @@ contract AuditLifecycleTest is Test {
     function _buy(address who, uint256 amt) internal returns (uint256) {
         vm.startPrank(who);
         mixETH.approve(address(zapIn), type(uint256).max);
-        uint256 out = zapIn.buyWithMix(_key(), amt, 0, 0, 0);
+        uint256 out = zapIn.buyWithMix(_key(), amt, 0, 0);
         vm.stopPrank();
         return out;
     }
@@ -497,7 +497,7 @@ contract AuditLifecycleTest is Test {
     function _sell(address who, uint256 amt) internal returns (uint256) {
         vm.startPrank(who);
         psp.approve(address(zapOut), type(uint256).max);
-        uint256 out = zapOut.sellToMix(_key(), amt, 0, 0, 0);
+        uint256 out = zapOut.sellToMix(_key(), amt, 0, 0);
         vm.stopPrank();
         return out;
     }
@@ -510,6 +510,6 @@ contract RevertingReceiver {
 
     function attack(address payable zapOut, PoolKey calldata key, uint256 pspAmt) external {
         IERC20(address(Currency.unwrap(key.currency1))).approve(zapOut, type(uint256).max);
-        PSPZapOut(zapOut).zapOut(key, pspAmt, 0, 0, 0);
+        PSPZapOut(zapOut).zapOut(key, pspAmt, 0, 0);
     }
 }

@@ -122,7 +122,7 @@ contract AuditForkTest is Test {
         // ── bob buys on curve + locks (real V4 swap) ──
         vm.startPrank(bob);
         mixETH.approve(address(zapIn), type(uint256).max);
-        uint256 bobPSP = zapIn.buyWithMix(key, 20e18, 0, 0, 0);
+        uint256 bobPSP = zapIn.buyWithMix(key, 20e18, 0, 0);
         vm.stopPrank();
         vm.startPrank(bob);
         psp.approve(address(stakerV), type(uint256).max);
@@ -133,11 +133,11 @@ contract AuditForkTest is Test {
         // ── carol round trip on curve (real V4): must be lossy ──
         vm.startPrank(carol);
         mixETH.approve(address(zapIn), type(uint256).max);
-        uint256 out = zapIn.buyWithMix(key, 5e18, 0, 0, 0);
+        uint256 out = zapIn.buyWithMix(key, 5e18, 0, 0);
         vm.stopPrank();
         vm.startPrank(carol);
         psp.approve(address(zapOut), type(uint256).max);
-        uint256 back = zapOut.sellToMix(key, out, 0, 0, 0);
+        uint256 back = zapOut.sellToMix(key, out, 0, 0);
         vm.stopPrank();
         assertLt(back, 5e18, "C1: curve round trip profitable on real V4");
         _solvent("C1 roundtrip");
@@ -160,8 +160,8 @@ contract AuditForkTest is Test {
 
         // ── flat window on real V4: late buyer round trip STILL lossy ──
         vm.startPrank(carol);
-        uint256 lateOut = zapIn.buyWithMix(key, 1e18, 0, 0, 0);
-        uint256 lateBack = zapOut.sellToMix(key, lateOut, 0, 0, 0);
+        uint256 lateOut = zapIn.buyWithMix(key, 1e18, 0, 0);
+        uint256 lateBack = zapOut.sellToMix(key, lateOut, 0, 0);
         vm.stopPrank();
         assertLt(lateBack, 1e18, "C1: FLAT round trip profitable on real V4");
         _solvent("C1 flat roundtrip");
@@ -177,7 +177,7 @@ contract AuditForkTest is Test {
         uint256 expNet = expGross; // F-9 fix: zero-fee flat window — no toll
         vm.startPrank(alice);
         psp.approve(address(zapOut), type(uint256).max);
-        uint256 got = zapOut.sellToMix(key, alicePSP, 0, 0, 0);
+        uint256 got = zapOut.sellToMix(key, alicePSP, 0, 0);
         vm.stopPrank();
         assertApproxEqAbs(got, expNet, 3, "C1: staker exit != exact avg backing (zero toll)");
         _solvent("C1 staker exit");
@@ -206,14 +206,14 @@ contract AuditForkTest is Test {
             if (((roll >> 1) & 1) == 0 || psp.balanceOf(who) == 0) {
                 vm.startPrank(who);
                 mixETH.approve(address(zapIn), type(uint256).max);
-                zapIn.buyWithMix(key, 1e14 + (roll % 2e18), 0, 0, 0);
+                zapIn.buyWithMix(key, 1e14 + (roll % 2e18), 0, 0);
                 vm.stopPrank();
             } else {
                 uint256 amt = psp.balanceOf(who) / ((roll % 3) + 1);
                 if (amt > 0) {
                     vm.startPrank(who);
                     psp.approve(address(zapOut), type(uint256).max);
-                    zapOut.sellToMix(key, amt, 0, 0, 0);
+                    zapOut.sellToMix(key, amt, 0, 0);
                     vm.stopPrank();
                 }
             }
@@ -237,14 +237,14 @@ contract AuditForkTest is Test {
         vm.deal(carol, 100e18);
         vm.startPrank(carol);
         mixETH.approve(address(zapIn), type(uint256).max);
-        uint256 out = zapIn.buyWithMix(key, 1e18, 0, 0, 0);
+        uint256 out = zapIn.buyWithMix(key, 1e18, 0, 0);
         vm.stopPrank();
         assertGt(out, 0, "C3: buy failed");
 
         // sell back through the ETH leg: zapOut redeems mix -> ETH to carol
         vm.startPrank(carol);
         psp.approve(address(zapOut), type(uint256).max);
-        zapOut.zapOut(key, out, 0, 0, 0);
+        zapOut.zapOut(key, out, 0, 0);
         vm.stopPrank();
         _solvent("C3 native path");
     }
@@ -263,7 +263,7 @@ contract AuditForkTest is Test {
         // bob buys + locks for quorum
         vm.startPrank(bob);
         mixETH.approve(address(zapIn), type(uint256).max);
-        uint256 bobPSP = zapIn.buyWithMix(key, 20e18, 0, 0, 0);
+        uint256 bobPSP = zapIn.buyWithMix(key, 20e18, 0, 0);
         psp.approve(address(stakerV), type(uint256).max);
         stakerV.lock(bobPSP);
         vm.stopPrank();

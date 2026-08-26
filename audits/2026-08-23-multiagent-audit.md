@@ -11,7 +11,7 @@ checklists, with the A-1 finding verified by an executable fork PoC rather than 
 
 ## Findings
 
-### A-1 (HIGH) — Referral attribution poisoning via forged hookData
+### A-1 (HIGH) — Referral attribution poisoning via forged hookData — **FIXED 2026-08-26**
 **Where:** `CurveHook._payReferrals` (`src/CurveHook.sol`), `PSPReferralRegistry.recordFor`.
 **Mechanics:** the hook is the registry's authorized recorder, but it decodes
 `(trader, referrerNftId)` from V4 `swap()` hookData — bytes controlled by ANY caller of
@@ -25,24 +25,34 @@ The hook then:
 From then on every trade the victim makes via the canonical zap pays the attacker's chain
 (tier-1 80% of the carve-out). The victim cannot rebind (per-round first-bind-wins).
 
-The registry's own docstring (lines 110-115) considers only a MALICIOUS RECORDER burning
+The registry's own docstring (lines 110-115) considered only a MALICIOUS RECORDER burning
 its own users' attribution ("a malicious router can already steal from its users") — it
 misses that the LEGITIMATE hook performs the poisoned record when fed forged bytes by a
 third party. No zap compromise is required.
 
-**PoC:** `test/integration/PoisonedAttribution.t.sol` (mainnet fork, PASSES on current
-code): bob never trades; mallory's direct-pool swap binds bob→mallory; bob's subsequent
-legit zap trade (`referrerNftId = aliceNft`) silently skips the record and pays mallory's
-chain forever.
+**PoC:** `test/integration/PoisonedAttribution.t.sol` (mainnet fork; pre-fix it PASSED
+proving the hijack).
 
-**Recommended fix (design call, not applied):** drop lazy recording from the hook —
-attribution binds exclusively via the user-signed `registry.record(refNft)` (already the
-frontend's documented primary path; unattributed traders' carve-out already defaults to
-stakers per D6). Alternative (weaker): require `hookData.trader` to equal the pool
-`msg.sender` — binds to the zap contract's identity, coarser but honest. Note: applying
-the recommended fix invalidates the R1 lazy-attribution tests in
-`test/integration/Referral.t.sol` (they must be rewritten to explicit `record()`), and
-flips the A-1 PoC's assertions from "hijack succeeds" to "hijack blocked".
+**Remediation (2026-08-26, recommended fix applied):** lazy recording is GONE from the
+hook — attribution binds exclusively via the user-signed `registry.record(refNft)`
+(msg.sender). Concretely:
+- `CurveHook` decodes a 32-byte `(trader)` hint from hookData purely for payout
+  continuation; the `recordFor` call path no longer exists. Forged 64-byte payloads are
+  length-mismatched and ignored wholesale.
+- `PSPReferralRegistry` is now fully permissionless: `recordFor`, `setRecorder`,
+  `authorizedRecorders`, `owner`, `NotAuthorized`, `NotOwner`, `RecorderAuthorized` and
+  the dead `StakerUpdated` event are deleted. Constructor slims to `(staker, minStake)`.
+- Zaps (`PSPZapIn`/`PSPZapOut`) drop the `referrerNftId` parameter entirely (pre-deploy,
+  clean break; the frontend never referenced it) and encode only the trader identity.
+- Unattributed traders' carve-out still defaults to stakers (D6), unchanged.
+- UX note: binding is no longer order-sensitive — a trader can record any time; trades
+  before the record simply pay stakers (nothing is consumed by trading).
+
+**Regression proof:** `PoisonedAttribution.t.sol` flipped to `test_PoC_ForgedHookDataCannotStealAttribution`
+(same fork, same attacker contract, byte-identical forged payload): forged swap binds
+nothing (`attributed(bob)` stays false), attacker earns exactly nothing (balance pinned),
+victim still binds his intended referrer afterwards and tier-1 pays HER, not the attacker.
+`Referral.t.sol` R1/R2/R6 rewritten to the explicit-record semantics.
 
 ### Reviewed-and-clean (Pass A/B/C)
 - CEI/access: controller privileged fns all `onlyHook`; factory wiring owner-gated;

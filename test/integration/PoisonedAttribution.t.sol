@@ -27,8 +27,10 @@ import {MainnetConfig} from "./MainnetConfig.sol";
 import {MockMixETH} from "../mocks/MockMixETH.sol";
 
 /// @dev minimal direct-to-PM swapper carrying FORGED hookData — the attacker
-///      side of finding A-1. The swap itself settles honestly; ONLY the
-///      64 hookData bytes naming (trader, referrerNft) are forged.
+///      side of finding A-1. The swap itself settles honestly; the hookData
+///      bytes naming (trader, refNft) are forged. Post-fix (2026-08-26) the
+///      hook only honors 32-byte (trader) hints and NEVER records, so these
+///      forged bytes are inert: they cannot create or consume attribution.
 contract AttackerSwapper {
     IPoolManager public immutable pm;
 
@@ -60,8 +62,10 @@ contract AttackerSwapper {
         pm.sync(Currency.wrap(address(mixETH)));
         mixETH.transfer(address(pm), mixIn);
         pm.settle();
-        // the swap itself is honest; ONLY the hookData is forged. The hook
-        // cannot verify who really trades — it trusts these bytes.
+        // the swap itself is honest; the hookData is forged. Pre-fix, the
+        // hook TRUSTED these bytes to lazily bind attribution; post-fix it
+        // decodes only 32-byte (trader) hints and never records, so the
+        // forged 64-byte payload is ignored wholesale.
         BalanceDelta delta = pm.swap(
             key,
             SwapParams({
@@ -81,22 +85,24 @@ contract AttackerSwapper {
     }
 }
 
-/// @title PoisonedAttributionTest — PoC for the forged-hookData referral
-///        attribution attack (multi-agent audit 2026-08-23, finding A-1).
+/// @title PoisonedAttributionTest — regression proof for the forged-hookData
+///        referral attribution attack (multi-agent audit 2026-08-23, A-1;
+///        FIXED 2026-08-26).
 ///
-///        Vector: PSPReferralRegistry.recordFor is authorized-hook-only, but
-///        the HOOK decodes (trader, referrerNftId) from V4 hookData, which
-///        ANY pool caller controls on a direct poolManager.swap — not just
-///        the canonical zaps. A qualified attacker who swaps directly with
-///        hookData=(victim, attackerNft) permanently binds the victim's
-///        one-time lazy attribution to the ATTACKER's chain before the
-///        victim's first attributed trade. Every future trade by the victim
-///        then pays the 50bps referral carve-out to the attacker's chain.
+///        Pre-fix vector: PSPReferralRegistry.recordFor was authorized-hook-only,
+///        but the HOOK decoded (trader, referrerNftId) from V4 hookData — bytes
+///        ANY direct poolManager.swap caller controls. A qualified attacker
+///        swapping with hookData=(victim, attackerNft) consumed the victim's
+///        one-time lazy attribution and rerouted every future carve-out.
 ///
-///        Documented as accepted-by-design for MALICIOUS RECORDERS (a rogue
-///        zap burning its own users' attribution) — but this PoC shows the
-///        attacker needs no zap at all: the legitimate hook itself performs
-///        the poisoned record when fed forged bytes by a direct swapper.
+///        Fix: attribution binds ONLY via the user-signed registry.record()
+///        (msg.sender). The hook decodes a 32-byte trader hint purely for
+///        payout continuation and never records; recordFor/setRecorder and
+///        the whole authorized-recorder surface are deleted.
+///
+///        This test replays the exact pre-fix attack and asserts it is DEAD:
+///        the forged swap binds nothing, the attacker earns nothing, and the
+///        victim can still bind his intended referrer afterwards.
 contract PoisonedAttributionTest is Test {
     using CurrencyLibrary for Currency;
 
@@ -164,16 +170,16 @@ contract PoisonedAttributionTest is Test {
         mixETH.transfer(to, amount);
     }
 
-    function _buyViaZap(address user, uint256 mixAmount, uint256 refNft) internal returns (uint256) {
+    function _buyViaZap(address user, uint256 mixAmount) internal returns (uint256) {
         vm.startPrank(user);
         mixETH.approve(address(zapIn), mixAmount);
-        uint256 out = zapIn.buyWithMix(poolKey, mixAmount, 0, 0, refNft);
+        uint256 out = zapIn.buyWithMix(poolKey, mixAmount, 0, 0);
         vm.stopPrank();
         return out;
     }
 
     function _buyPlain(address user, uint256 mixAmount) internal returns (uint256) {
-        return _buyViaZap(user, mixAmount, 0);
+        return _buyViaZap(user, mixAmount);
     }
 
     function _predepositAndLaunch(address user, uint256 amount) internal {
@@ -189,7 +195,7 @@ contract PoisonedAttributionTest is Test {
         skip(1);
     }
 
-    function test_PoC_ForgedHookDataStealsVictimAttribution() public {
+    function test_PoC_ForgedHookDataCannotStealAttribution() public {
         // ── arrange: two QUALIFIED referrers (≥1000 PSP locked each) ──
         _predepositAndLaunch(alice, 200e18);
         uint256 aliceNft = stakerV.tokenOf(alice);
@@ -207,24 +213,33 @@ contract PoisonedAttributionTest is Test {
         assertFalse(registry.attributed(bob), "bob not yet attributed");
 
         // ── act: attacker swaps DIRECTLY on the pool with forged hookData ──
+        //        (byte-identical to the pre-fix exploit: 64 forged bytes
+        //        naming (victim, attackerNft))
         vm.startPrank(relayer);
         mixETH.approve(address(attacker), 5e18);
         attacker.attack(poolKey, 5e18, bob, malloryNft, IERC20(address(mixETH)));
         vm.stopPrank();
 
-        // ── assert: bob's one-time attribution is stolen ──
-        assertTrue(registry.attributed(bob), "A-1: victim attribution consumed by forged swap");
+        // ── assert: hijack BLOCKED (A-1 fix 2026-08-26) ──
+        assertFalse(registry.attributed(bob), "FIXED: forged hookData consumed nothing");
         (address[5] memory who,) = registry.payoutFor(bob);
-        assertEq(who[0], mallory, "A-1: tier-1 payout now routes to the ATTACKER");
+        assertEq(who[0], address(0), "FIXED: no payout edge exists to the attacker");
+        assertEq(mixETH.balanceOf(mallory), 800e18, "FIXED: attacker earned nothing from the forged swap");
 
-        // bob's LEGIT first attributed trade (via the canonical zap, naming
-        // alice) can no longer bind alice — the lazy record skips silently
-        // and the carve-out pays mallory's chain on every future trade
-        uint256 bobBag = _buyViaZap(bob, 10e18, aliceNft);
-        assertGt(bobBag, 0);
+        // bob's LEGIT attribution still works after the attack: he records
+        // alice himself — the one-time slot was never consumed
+        vm.prank(bob);
+        registry.record(aliceNft);
         (who,) = registry.payoutFor(bob);
-        assertEq(who[0], mallory, "A-1: every future bob trade pays the attacker's chain");
+        assertEq(who[0], alice, "victim binds his INTENDED referrer after the attack");
 
-        console.log("PoC: victim referral stream hijacked to attacker NFT", malloryNft);
+        // and bob's subsequent trade pays alice's chain — never mallory's
+        uint256 aliceBefore = mixETH.balanceOf(alice);
+        uint256 bobBag = _buyPlain(bob, 10e18);
+        assertGt(bobBag, 0);
+        assertGt(mixETH.balanceOf(alice), aliceBefore, "tier-1 paid to the intended referrer");
+        assertEq(mixETH.balanceOf(mallory), 800e18, "attacker never earns");
+
+        console.log("A-1 regression: forged hookData is inert; victim binds intended referrer");
     }
 }

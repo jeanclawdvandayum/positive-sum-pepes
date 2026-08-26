@@ -33,7 +33,7 @@ contract C5_GasBisect is CBase {
         // two addresses → two initCode hashes → disjoint candidate spaces, so
         // the final `cand == orphan` pin could never hold (previously masked
         // by the failing 4M gas bound in front of it).
-        address throwawayRegistry = address(new PSPReferralRegistry(address(1), address(2), 1000e18));
+        address throwawayRegistry = address(new PSPReferralRegistry(address(2), 1000e18));
         vm.prank(attacker);
         (address orphan,) = hookDeployer.deployHook(
             IPoolManager(address(poolManager)),
@@ -119,7 +119,7 @@ contract C5Probe is CBase {
             abi.encode(
                 IPoolManager(address(poolManager)),
                 predictedController,
-                address(new PSPReferralRegistry(address(1), address(2), 1000e18)),
+                address(new PSPReferralRegistry(address(2), 1000e18)),
                 _gameCurveFromPublicState()
             )
         );

@@ -15,8 +15,14 @@ import {IPSPStaker} from "./interfaces/IPSPStaker.sol";
 ///         referraees generate) transfers with it. Payouts resolve to the
 ///         NFT's CURRENT owner at swap time, live.
 ///
-///         One referrer per trader per round (first attributed trade binds;
-///         explicit self-record also works). Tier walk: the trader's referrer
+///         One referrer per trader per round — bound ONLY by the trader's
+///         own signature: `record(referrerNftId)` with the trader as
+///         msg.sender. Swaps can never create attribution (A-1 fix
+///         2026-08-28: V4 hookData is attacker-controlled bytes, so the
+///         hook only READS the graph via payoutFor — the one-time lazy
+///         bind it used to perform from hookData let any direct
+///         poolManager.swap caller poison a victim's attribution).
+///         Tier walk: the trader's referrer
 ///         NFT gets tier 1, that NFT's own referrer NFT tier 2, … out to 5
 ///         hops [80/12/5/2/1]% of the 50bps carve-out. Dead links (burned
 ///         NFT, unlocked referrer) truncate the walk — unpaid weight flows
@@ -43,13 +49,9 @@ contract PSPReferralRegistry {
     error AlreadyReferred();
     error NotQualifiedReferrer(); // NFT dead or owner below MIN_STAKE_PSP
     error WouldCreateCycle();
-    error NotAuthorized(); // msg.sender may not record for this trader
-    error NotOwner();
 
     // ─────────────── Events ───────────────
     event Referred(address indexed trader, uint256 indexed traderNftId, uint256 indexed referrerNftId);
-    event StakerUpdated(address indexed oldStaker, address indexed newStaker);
-    event RecorderAuthorized(address indexed recorder, bool allowed);
 
     // ─────────────── Constants ───────────────
     uint256 public constant MAX_DEPTH = 5;
@@ -63,7 +65,6 @@ contract PSPReferralRegistry {
     uint256 public immutable MIN_STAKE_PSP;
 
     // ─────────────── State ───────────────
-    address public owner; // factory
     IPSPStaker public immutable staker; // this round's staker (min-stake oracle)
     /// @dev NFT → referrer NFT. Chain edges ride the token: transfer the
     ///      position and the subtree follows. Set when the NFT's owner
@@ -74,48 +75,28 @@ contract PSPReferralRegistry {
     ///      follow nftRefOf), so these edges cannot create cycles.
     mapping(address => uint256) public traderRefNftOf;
     /// @dev One attribution per trader per round — the graph resets by
-    ///      rebirth, this flag enforces first-bind-wins within the round.
+    ///      rebirth, this flag enforces one record per round.
     mapping(address => bool) public attributed;
 
-    mapping(address => bool) public authorizedRecorders; // this round's hook
-
     // ─────────────── Constructor ───────────────
-    constructor(address _owner, address _staker, uint256 _minStakePSP) {
-        if (_owner == address(0)) revert ZeroAddress();
+
+    constructor(address _staker, uint256 _minStakePSP) {
         if (_staker == address(0)) revert ZeroAddress();
         if (_minStakePSP == 0) revert ZeroAddress();
-        owner = _owner;
         staker = IPSPStaker(_staker);
         MIN_STAKE_PSP = _minStakePSP;
     }
 
-    // ─────────────── Admin (factory) ───────────────
-
-    function setRecorder(address recorder, bool allowed) external {
-        if (msg.sender != owner) revert NotOwner();
-        authorizedRecorders[recorder] = allowed;
-        emit RecorderAuthorized(recorder, allowed);
-    }
-
     // ─────────────── Attribution ───────────────
 
-    /// @notice Explicit self-registration: "I was referred by the holder of
-    ///         position `referrerNftId`." One shot per round. The frontend's
-    ///         ?ref=<tokenId> capture ends here on the user's first wallet
-    ///         interaction if not recorded lazily by a swap.
+    /// @notice Self-registration: "I was referred by the holder of position
+    ///         `referrerNftId`." One shot per round. The frontend's
+    ///         ?ref=<tokenId> capture ends here — this is the ONLY way
+    ///         attribution is created, and it binds msg.sender directly, so
+    ///         no third party (router, direct pool swapper) can ever bind or
+    ///         burn a trader's attribution (A-1 fix 2026-08-26).
     function record(uint256 referrerNftId) external {
         _record(msg.sender, referrerNftId);
-    }
-
-    /// @notice Lazy registration by a trusted recorder (this round's hook,
-    ///         decoding the canonical zaps' hookData). The trader identity is
-    ///         the zap's caller — a malicious recorder can burn its own
-    ///         users' attribution, but a malicious router can already steal
-    ///         from its users; the chain cannot outrun that trust boundary
-    ///         (D6/D7).
-    function recordFor(address trader, uint256 referrerNftId) external {
-        if (!authorizedRecorders[msg.sender]) revert NotAuthorized();
-        _record(trader, referrerNftId);
     }
 
     function _record(address trader, uint256 referrerNftId) internal {

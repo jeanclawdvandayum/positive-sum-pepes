@@ -124,7 +124,7 @@ contract MockPoolManagerE2ETest is Test {
         uint256 feeLedgerBeforeBuy = mixETH.balanceOf(hookAddr) - hookReserve();
         vm.startPrank(alice);
         mixETH.approve(address(zapIn), 10e18);
-        uint256 pspOut = zapIn.buyWithMix(_poolKey(), 10e18, 0, 0, 0);
+        uint256 pspOut = zapIn.buyWithMix(_poolKey(), 10e18, 0, 0);
         vm.stopPrank();
 
         assertGt(pspOut, 0, "zap buy returned nothing");
@@ -153,7 +153,7 @@ contract MockPoolManagerE2ETest is Test {
         uint256 accBeforeSell = stakerV.accFeePerShareMixETH();
         vm.startPrank(alice);
         pspToken.approve(address(zapOut), pspOut);
-        uint256 mixBack = zapOut.sellToMix(_poolKey(), pspOut, 0, 0, 0);
+        uint256 mixBack = zapOut.sellToMix(_poolKey(), pspOut, 0, 0);
         vm.stopPrank();
 
         assertGt(mixBack, 0, "zap sell returned nothing");

@@ -75,8 +75,8 @@ contract DriveAnvil is Script, StdCheats {
         vm.startBroadcast(bob);
         MockMixETH(payable(address(mix))).depositETH{value: 100e18}();
         mix.approve(zapInAddr, type(uint256).max);
-        uint256 b1 = zapIn.buyWithMix(key, 25e18, 0, 0, aliceNft);
-        uint256 b2 = zapIn.buyWithMix(key, 12e18, 0, 0, aliceNft);
+        uint256 b1 = zapIn.buyWithMix(key, 25e18, 0, 0);
+        uint256 b2 = zapIn.buyWithMix(key, 12e18, 0, 0);
         vm.stopBroadcast();
         console.log("bob bought:", b1, b2);
         console.log("bob referredByNft:", registry.traderRefNftOf(bob));
@@ -93,7 +93,7 @@ contract DriveAnvil is Script, StdCheats {
         vm.startBroadcast(carol);
         MockMixETH(payable(address(mix))).depositETH{value: 60e18}();
         mix.approve(zapInAddr, type(uint256).max);
-        uint256 c1out = zapIn.buyWithMix(key, 30e18, 0, 0, bobNft);
+        uint256 c1out = zapIn.buyWithMix(key, 30e18, 0, 0);
         vm.stopBroadcast();
         console.log("carol bought:", c1out);
         console.log("carol referredByNft:", registry.traderRefNftOf(carol));

@@ -26,7 +26,7 @@ contract B5_Zaps is BBase {
     // ── zapInBuy: wrap → swap, delivered PSP, exact accounting ──
     function test_B5a_zapInBuyHappy() public {
         vm.deal(alice, 50 ether);
-        uint256 pspOut = zapInBuy(alice, 10 ether, 0, address(0));
+        uint256 pspOut = zapInBuy(alice, 10 ether, 0);
         assertGt(pspOut, 0);
         assertEq(psp.balanceOf(alice), pspOut);
         assertEq(address(zapIn).balance, 0, "zap holds no ETH after");
@@ -34,15 +34,9 @@ contract B5_Zaps is BBase {
         assertGt(_slack(), 0);
     }
 
-    function zapInBuy(address who, uint256 eth, uint256 minOut, address ref) internal returns (uint256) {
-        // v5.1: referrer arg is an NFT id — callers pass address(0) meaning
-        // "unattributed"; normalize to 0
-        return zapInBuy(who, eth, minOut, ref == address(0) ? 0 : 1);
-    }
-
-    function zapInBuy(address who, uint256 eth, uint256 minOut, uint256 refNft) internal returns (uint256) {
+    function zapInBuy(address who, uint256 eth, uint256 minOut) internal returns (uint256) {
         vm.prank(who);
-        return zapIn.zapInBuy{value: eth}(key, minOut, 0, refNft);
+        return zapIn.zapInBuy{value: eth}(key, minOut, 0);
     }
 
     // ── minPspOut enforcement reverts the WHOLE tx — no partial state ──
@@ -62,7 +56,7 @@ contract B5_Zaps is BBase {
 
         vm.prank(alice);
         vm.expectRevert(PSPZapIn.InsufficientOutput.selector);
-        zapIn.zapInBuy{value: 10 ether}(key, fair + 1, 0, 0);
+        zapIn.zapInBuy{value: 10 ether}(key, fair + 1, 0);
 
         assertEq(psp.balanceOf(alice), pspBefore, "psp changed on reverted zap");
         assertEq(alice.balance, 50 ether, "ETH not returned");
@@ -72,7 +66,7 @@ contract B5_Zaps is BBase {
     function test_B5c_buyWithMixHappyAndRevert() public {
         vm.startPrank(alice);
         mixETH.approve(address(zapIn), 10e18);
-        uint256 out = zapIn.buyWithMix(key, 10e18, 0, 0, 0);
+        uint256 out = zapIn.buyWithMix(key, 10e18, 0, 0);
         vm.stopPrank();
         assertEq(psp.balanceOf(alice), out);
 
@@ -81,7 +75,7 @@ contract B5_Zaps is BBase {
         vm.startPrank(alice);
         mixETH.approve(address(zapIn), 10e18);
         vm.expectRevert(PSPZapIn.InsufficientOutput.selector);
-        zapIn.buyWithMix(key, 10e18, out + 1, 0, 0); // impossible min
+        zapIn.buyWithMix(key, 10e18, out + 1, 0); // impossible min
         vm.stopPrank();
         assertEq(mixETH.balanceOf(alice), mixBefore, "mix not returned on revert");
         assertEq(psp.balanceOf(alice), out, "psp unchanged");
@@ -93,7 +87,7 @@ contract B5_Zaps is BBase {
         vm.deal(alice, 50 ether);
         vm.prank(alice);
         vm.expectRevert(PSPZapIn.Expired.selector);
-        zapIn.zapInBuy{value: 1 ether}(key, 0, 999, 0);
+        zapIn.zapInBuy{value: 1 ether}(key, 0, 999);
     }
 
     // ── zapOut: swap → redeem → forward ETH ──
@@ -103,7 +97,7 @@ contract B5_Zaps is BBase {
 
         vm.startPrank(alice);
         psp.approve(address(zapOut), out);
-        uint256 ethOut = zapOut.zapOut(key, out, 0, 0, 0);
+        uint256 ethOut = zapOut.zapOut(key, out, 0, 0);
         vm.stopPrank();
 
         assertGt(ethOut, 0);
@@ -122,7 +116,7 @@ contract B5_Zaps is BBase {
         vm.startPrank(address(rr));
         psp.approve(address(zapOut), out);
         vm.expectRevert(PSPZapOut.EthForwardFailed.selector);
-        zapOut.zapOut(key, out, 0, 0, 0);
+        zapOut.zapOut(key, out, 0, 0);
         vm.stopPrank();
 
         // rolled back: rr still holds its PSP, zap holds nothing
@@ -157,7 +151,7 @@ contract B5_Zaps is BBase {
         uint256 mixBefore = mixETH.balanceOf(alice);
         vm.startPrank(alice);
         psp.approve(address(zapOut), out);
-        uint256 mixOut = zapOut.sellToMix(key, out, 0, 0, 0);
+        uint256 mixOut = zapOut.sellToMix(key, out, 0, 0);
         vm.stopPrank();
         assertGt(mixOut, 0);
         assertEq(mixETH.balanceOf(alice) - mixBefore, mixOut, "mix not delivered exactly");
@@ -168,7 +162,7 @@ contract B5_Zaps is BBase {
         vm.startPrank(alice);
         psp.approve(address(zapOut), out2);
         vm.expectRevert(PSPZapOut.InsufficientOutput.selector);
-        zapOut.sellToMix(key, out2, type(uint256).max, 0, 0);
+        zapOut.sellToMix(key, out2, type(uint256).max, 0);
         vm.stopPrank();
         assertEq(psp.balanceOf(alice), out2, "PSP returned on minOut revert");
     }
@@ -188,7 +182,7 @@ contract B5_Zaps is BBase {
         // alice sells via zapOut: forwarded ETH must be ONLY her redeem delta
         vm.startPrank(alice);
         psp.approve(address(zapOut), out - 1e15);
-        uint256 ethOut = zapOut.zapOut(key, out - 1e15, 0, 0, 0);
+        uint256 ethOut = zapOut.zapOut(key, out - 1e15, 0, 0);
         vm.stopPrank();
 
         assertEq(address(zapOut).balance, 1 ether, "donated ETH stolen by user");
@@ -196,7 +190,7 @@ contract B5_Zaps is BBase {
 
         // zapIn with donated mix+PSP present: user's buy must use only their own wrap
         vm.deal(alice, 20 ether);
-        uint256 psp2 = zapInBuy(alice, 10 ether, 0, address(0));
+        uint256 psp2 = zapInBuy(alice, 10 ether, 0);
         assertGt(psp2, 0);
         assertEq(mixETH.balanceOf(address(zapIn)), 5e18, "donated mix swapped");
         assertEq(psp.balanceOf(address(zapIn)), 1e15, "donated PSP spent");

@@ -30,7 +30,7 @@ contract F9FlatWindowPotTest is AuditLifecycleTest {
         uint256 sPre = hook.totalSupplyPSP();
         vm.startPrank(carol);
         psp.approve(address(zapOut), type(uint256).max);
-        uint256 back = zapOut.sellToMix(_key(), bought, 0, 0, 0);
+        uint256 back = zapOut.sellToMix(_key(), bought, 0, 0);
         vm.stopPrank();
         assertGt(back, 0, "flat sell paid");
 

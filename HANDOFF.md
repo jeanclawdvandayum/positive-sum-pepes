@@ -1,5 +1,27 @@
 # PSP session state — 2026-08-17
 
+## UPDATE 2026-08-26: A-1 FIXED — referral attribution poisoning (HIGH, audit 2026-08-23)
+
+**the fix (design: user-signed binding only):**
+- `CurveHook`: hookData slims to a 32-byte `(trader)` payout hint; the lazy
+  `recordFor` block is deleted — swaps can never CREATE attribution. Forged
+  64-byte payloads are length-mismatched → ignored wholesale.
+- `PSPReferralRegistry`: fully permissionless — `recordFor`, `setRecorder`,
+  `authorizedRecorders`, `owner`, `NotAuthorized`/`NotOwner`,
+  `RecorderAuthorized`, dead `StakerUpdated` all deleted. Ctor `(staker, minStake)`.
+  `record()` (msg.sender-bound) is the ONLY bind path.
+- Zaps drop the lying `referrerNftId` param (pre-deploy clean break; frontend
+  never used it); encode only the trader identity (2026-08-19 always-carry fix preserved).
+- Factory/HookDeployer: recorder wiring deleted; `deployRegistry(staker, minStake)`.
+- UX change: binding is order-insensitive now — record() any time; trades before
+  the record pay stakers (nothing consumed by trading).
+
+**tests:** PoC flipped to `test_PoC_ForgedHookDataCannotStealAttribution`
+(byte-identical attack, hijack blocked, attacker earns 0, victim binds intended
+referrer after). Referral.t.sol R1 (explicit record + AlreadyReferred + inert
+later refs), R2 (no lazy swallow path), R6 (user-signed cycle guard) rewritten.
+62 zap callsites swept (param drop) + Longitudinal `_buyViaZap` binds via record().
+
 ## UPDATE 2026-08-24 (c): DARK/NIGHT THEME + system/light/dark switcher
 
 **what shipped:** full dark theme via Tailwind v4 variable remap — zero changes
@@ -222,9 +244,9 @@ new `test/unit/FlatExit.t.sol`:
 - AUDIT: audits/2026-08-23-multiagent-audit.md. One HIGH: A-1 referral
   attribution poisoning via forged V4 hookData on direct pool swaps —
   PoC test/integration/PoisonedAttribution.t.sol (passes = vulnerable).
-  Fix is a design call (drop hook-lazy recording, bind via user-signed
-  registry.record()) — NOT yet applied; applying requires rewriting the
-  R1 lazy-attribution tests in test/integration/Referral.t.sol.
+  **FIXED 2026-08-26** (see next entry): user-signed record() is the only
+  bind path; hook/registry/zap surfaces rewritten, PoC flipped to
+  hijack-blocked, R1/R2/R6 rewritten to explicit record().
 - E2E: test/integration/LongitudinalLifecycle.t.sol (4 tests) — 8 users,
   2 full rounds, ~4 months, per-phase mixETH/PSP conservation audits,
   staggered-join fee fairness, 102-cycle buy/sell chains, carry exactness.

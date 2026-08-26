@@ -670,10 +670,17 @@ contract LongitudinalLifecycleTest is Test {
 
     function _buyViaZap(address user, uint256 mixAmount, address referrer) internal returns (uint256) {
         uint256 before = psp.balanceOf(user);
-        uint256 refNft = referrer == address(0) ? 0 : stakerV.tokenOf(referrer);
+        // A-1 fix: attribution binds via the user's own record() — never
+        // via the trade. Hoist tokenOf: a staticcall in arg position would
+        // eat the vm.prank.
+        if (referrer != address(0) && !registry.attributed(user)) {
+            uint256 refNft = stakerV.tokenOf(referrer);
+            vm.prank(user);
+            registry.record(refNft);
+        }
         vm.startPrank(user);
         mixETH.approve(address(zapIn), mixAmount);
-        zapIn.buyWithMix(poolKey, mixAmount, 0, 0, refNft);
+        zapIn.buyWithMix(poolKey, mixAmount, 0, 0);
         vm.stopPrank();
         return psp.balanceOf(user) - before;
     }
