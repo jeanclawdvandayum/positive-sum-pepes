@@ -17,6 +17,8 @@ import {PepeDescriptor} from "../src/PepeDescriptor.sol";
 import {PSPZapIn} from "../src/PSPZapIn.sol";
 import {PSPZapOut} from "../src/PSPZapOut.sol";
 import {IMixETH} from "../src/interfaces/IMixETH.sol";
+import {SepoliaMixETH} from "../src/testnet/SepoliaMixETH.sol";
+import {MixETHFaucet} from "../src/testnet/MixETHFaucet.sol";
 
 import {MockMixETH} from "../test/mocks/MockMixETH.sol";
 import {MockPoolManager} from "../test/mocks/MockPoolManager.sol";
@@ -42,9 +44,12 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///   PSP_MIXETH   mixETH token (required unless PSP_ANVIL/PSP_TESTNET)
 ///   PSP_HTML     ui file (default: script/app.html)
 ///   PSP_ANVIL    =1 to deploy MockMixETH+MockPoolManager first (local e2e)
-///   PSP_TESTNET  =1 to deploy MockMixETH against a canonical v4 testnet
-///                PoolManager + fast timing profile (24h predeposit offer,
-///                3d stake lock, +1d relock, 1d bomb vote; flat exit 3d)
+///   PSP_TESTNET  =1 to deploy SepoliaMixETH (dumb 1:1, no yield) +
+///                MixETHFaucet (0.0001 ETH -> 100 mixETH) against a
+///                canonical v4 testnet PoolManager + playtest timing
+///                profile (24h predeposit offer, 2d stake lock, +1d
+///                relock extend, 1d relock window, 1d bomb vote;
+///                flat exit 3d)
 ///   PSP_FORK     =1 to vm.deal the broadcaster 5 ETH first — lets you
 ///                dry-run the FULL testnet path (PSP_TESTNET + PSP_PM +
 ///                --fork-url $SEPOLIA_RPC_URL) with any throwaway key and
@@ -62,13 +67,15 @@ contract DeployPSP is Script {
     address constant PM_ARB_SEPOLIA = 0xFB3e0C6F74eB1a21CC1Da29aeC80D2Dfe6C9a317;  // 421614
     address constant PM_UNICHAIN_SEPOLIA = 0x9cB26A7183B2F4515945Dc52CB4195B0d2D06C95; // 1301
 
-    /// @dev Packed testnet timing profile (see RoundController "Timing profile"):
-    ///      24h predeposit offer · 3d lock · +1d relock · 1d relock window ·
-    ///      1d bomb vote. Flat exit: constant 3d. Packs via CurveMath.packTimings
+    /// @dev Packed playtest timing profile (see RoundController "Timing
+    ///      profile"): 24h predeposit offer · 2d lock · +1d relock extend ·
+    ///      1d relock window (relock opens 1 day before expiry) · 1d bomb
+    ///      vote. Flat exit: constant 3d. Packs via CurveMath.packTimings
     ///      (2026-08-19: the old hand-rolled 5x64 packing shifted the vote slot
-    ///      by 256 — silently zero).
+    ///      by 256 — silently zero). 2026-08-26: lock 3d -> 2d for the
+    ///      Friday playtest (lock Fri expires Sun, relock window Sat+).
     function _testnetTimings() internal pure returns (uint256) {
-        return CurveMath.packTimings(1 days, 3 days, 1 days, 1 days, 1 days);
+        return CurveMath.packTimings(1 days, 2 days, 1 days, 1 days, 1 days);
     }
 
     function run() external {
@@ -92,11 +99,17 @@ contract DeployPSP is Script {
             // pass PSP_PM explicitly (constants above for copy-paste).
             pm = vm.envAddress("PSP_PM");
             vm.startBroadcast();
-            MockMixETH mockMix = new MockMixETH();
+            // Dumb 1:1 wrapper (no yield, no admin) + subsidized faucet:
+            // the constructor mints 10M mixETH to the broadcaster, which
+            // seeds the faucet in full — testers pay 0.0001 ETH per 100.
+            SepoliaMixETH mixT = new SepoliaMixETH();
+            MixETHFaucet faucet = new MixETHFaucet(IERC20(address(mixT)));
+            mixT.transfer(address(faucet), mixT.balanceOf(msg.sender));
             vm.stopBroadcast();
-            mix = IERC20(address(mockMix));
+            mix = IERC20(address(mixT));
             console.log("TESTNET PoolManager:", pm);
-            console.log("TESTNET mock mixETH:", address(mockMix));
+            console.log("TESTNET mixETH (1:1, no yield):", address(mixT));
+            console.log("TESTNET faucet (0.0001 ETH -> 100 mix):", address(faucet));
         } else {
             pm = vm.envOr("PSP_PM", PM_BASE);
             mix = IERC20(vm.envAddress("PSP_MIXETH"));

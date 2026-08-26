@@ -1,5 +1,31 @@
 # PSP session state — 2026-08-17
 
+## UPDATE 2026-08-26 (b): BRANCH `sepolia` — Friday playtest kit
+
+**scope** (scoopy, for Friday small-group test into early next week):
+- predeposit window 1 day ✓ (already 1d in testnet profile)
+- PSP locks 2 days (was 3d), relock opens 1 day before expiry ✓ (already 1d window)
+- dumb mixETH: SepoliaMixETH — hardcoded 1:1, no yield, no admin, no free mint
+  (replaces MockMixETH in the PSP_TESTNET deploy path; old mock had a
+  free-unlimited faucet() + yield knobs — wrong for group testing)
+- MixETHFaucet: 0.0001 testnet ETH → 100 mixETH (multiples ok, dust kept,
+  reverts TooLittle / FaucetEmpty; no owner). SepoliaMixETH ctor mints 10M
+  to the deployer, deploy script seeds the faucet with all of it.
+
+**files:** src/testnet/SepoliaMixETH.sol, src/testnet/MixETHFaucet.sol,
+script/DeployPSP.s.sol (testnet branch + _testnetTimings lock 3d→2d),
+test/testnet/SepoliaTestnet.t.sol (8 tests: 1:1 both ways, rate frozen
+across 30d, drip exact/multiples/too-little/empty, timing readback through
+a real factory round: 1d/2d/+1d/1d/1d).
+
+**playtest timeline (Friday deploy):** predeposit closes Sat ~same time;
+locks taken Fri expire Sun, relock window opens Sat; bomb vote 1d; flat
+exit 3d — a full lifecycle fits inside the feedback window.
+
+**deploy Friday FROM THIS BRANCH** (PSP_TESTNET=1 path now emits TESTNET
+mixETH + TESTNET faucet addresses in the console output — paste them along
+with factory/zaps; dapp env wiring incl. a faucet button follows).
+
 ## UPDATE 2026-08-26: A-1 FIXED — referral attribution poisoning (HIGH, audit 2026-08-23)
 
 **the fix (design: user-signed binding only):**
