@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Geist Pixel";
+  src: url("/fonts/GeistPixel.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ELSH morphs the pixel shape of every glyph: 0 regular / 1 square /
+   20 circle / 40 grid / 60 triangle / 80 line — dial it site-wide here */
+:root {
+  --psp-elsh: 0;
+}
+
 /* class-based dark mode (toggled on <html> by ThemeProvider) */
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -9,7 +23,7 @@
   --color-psp-mint: #4ade80;
   --color-psp-mint-soft: #bbf7d0;
   --color-psp-deep: #0369a1;
-  --font-display: ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Geist Pixel", ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
 }
 
 /* chart colors (plain :root so they are always emitted, unlike @theme) */
@@ -71,6 +85,7 @@
 body {
   @apply bg-white text-slate-800 antialiased;
   font-family: var(--font-display);
+  font-variation-settings: "ELSH" var(--psp-elsh);
 }
 
 /* bright gradient blobs for hero sections */

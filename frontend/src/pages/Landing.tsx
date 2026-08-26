@@ -1,40 +1,41 @@
 import { Link } from 'react-router-dom'
+import { PixelIcon } from '../components/PixelIcon'
 import { useRound } from '../lib/useRound'
 import { fmtAmount, fmtPrice } from '../lib/format'
 
 const mechanics = [
   {
-    icon: '📈',
+    icon: 'chart',
     title: 'bonding curve',
     color: 'from-sky-400 to-sky-500',
     body: 'every buy climbs a preset price curve; every sell walks it back down. no LPs to farm you, no rug to pull — the curve is the market and it never sleeps.',
   },
   {
-    icon: '🪙',
+    icon: 'coin',
     title: 'predeposit window',
     color: 'from-emerald-400 to-emerald-500',
     body: 'each round opens with a 7-day window. up to 500 mixETH gets first position at the seed price and PSP auto-locks at launch. miss it and you buy on the open curve.',
   },
   {
-    icon: '💎',
+    icon: 'diamond',
     title: 'stake & earn fees',
     color: 'from-teal-400 to-emerald-400',
     body: 'lock PSP for 90 days and every curve fee flows to stakers pro-rata, in mixETH. your bag yield-farms the degens. extend anytime in the final week.',
   },
   {
-    icon: '💣',
+    icon: 'bomb',
     title: 'carpet bomb',
     color: 'from-amber-400 to-orange-500',
     body: 'if stakers vote with 69% quorum and a majority, the round is flattened: every lock opens immediately and the curve goes flat so stakers can exit at average backing. after the exit window closes, whatever remains drains to the factory and the next round is born with the treasure.',
   },
   {
-    icon: '♻️',
+    icon: 'recycle',
     title: 'positive sum',
     color: 'from-sky-400 to-emerald-400',
     body: 'the whole reserve sits in mixETH, an ETH yield token, so the pot earns from outside the game — your backing compounds even when nobody trades. add fees that recycle to stakers instead of extracting, and the math tilts positive for everyone who stays.',
   },
   {
-    icon: '🛡️',
+    icon: 'shield',
     title: 'your keys, your pepes',
     color: 'from-cyan-400 to-sky-500',
     body: 'non-custodial end to end. trade with ETH or mixETH through zaps in a single transaction. no admin keys on the curve, no pausing, no upgrades mid-game.',
@@ -104,9 +105,9 @@ export default function Landing() {
           {mechanics.map((m) => (
             <div key={m.title} className="card p-5">
               <div
-                className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${m.color} text-xl shadow-md`}
+                className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${m.color} shadow-md`}
               >
-                {m.icon}
+                <PixelIcon name={m.icon} />
               </div>
               <h3 className="mt-3 text-lg font-extrabold text-slate-900">{m.title}</h3>
               <p className="mt-1 text-sm leading-relaxed text-slate-600">{m.body}</p>
