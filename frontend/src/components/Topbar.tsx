@@ -1,5 +1,7 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { NavLink } from 'react-router-dom'
+import { useMemo } from 'react'
+import { renderPepeSvg, randomDna } from '../lib/pepeRender'
 import ThemeSwitcher from './ThemeSwitcher'
 
 const links = [
@@ -9,11 +11,15 @@ const links = [
 ]
 
 export default function Topbar() {
+  // a random pepe every load — the header IS the art
+  const logo = useMemo(() => renderPepeSvg(randomDna()), [])
   return (
     <header className="sticky top-0 z-20 border-b border-sky-100 bg-white/80 backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-3 sm:gap-6 sm:px-6">
         <NavLink to="/" className="flex shrink-0 items-center gap-2">
-          <span className="text-2xl">🐸</span>
+          <span className="block h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-sky-200 shadow-sm">
+            <span className="block h-full w-full [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: logo }} />
+          </span>
           <span className="hidden text-lg font-black tracking-tight text-psp-deep sm:block">
             positive sum pepes
           </span>

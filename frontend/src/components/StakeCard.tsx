@@ -162,7 +162,7 @@ export default function StakeCard() {
         </div>
       )}
 
-      {isConnected && !hasPepe && (
+      {!hasPepe && (
         <div className="mt-3">
           <PepePicker
             round={round}

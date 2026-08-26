@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { keccak256, toHex } from 'viem'
 import { stakerAbi, descriptorAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
+import { renderPepeSvg } from '../lib/pepeRender'
 import type { RoundInfo } from '../lib/useRound'
 
 const isZero = (a: string | undefined) => !a || /^0x0+$/.test(a)
@@ -28,6 +29,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
   const staker = round.staker
   const [descriptor, setDescriptor] = useState<string | undefined>()
   const [svgs, setSvgs] = useState<Record<string, string>>({})
+  const [localMode, setLocalMode] = useState(false)
 
   // candidate ids: random uints in a range that never collides with the
   // sequential counter's early ids — user-entropy territory.
@@ -49,6 +51,19 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
       .then((d) => setDescriptor(d as string))
       .catch(() => setDescriptor(undefined))
   }, [staker])
+
+  // no descriptor / chain down? render locally from the same art data the
+  // contract renders — the picker never shows empty tiles
+  useEffect(() => {
+    if (descriptor && !isZero(descriptor)) {
+      setLocalMode(false)
+      return
+    }
+    const next: Record<string, string> = {}
+    for (const id of candidates) next[id.toString()] = renderPepeSvg(dnaOfId(id))
+    setSvgs(next)
+    setLocalMode(true)
+  }, [descriptor, candidates])
 
   useEffect(() => {
     if (!descriptor || isZero(descriptor)) return
@@ -79,7 +94,9 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
         <div>
           <h2 className="text-lg font-black text-slate-900">🎨 choose your pepe</h2>
           <p className="text-xs text-slate-400">
-            rolled fresh from the on-chain renderer · the one you pick is the one you mint
+            {localMode
+              ? 'rolled locally — same art data the contract renders'
+              : 'rolled fresh from the on-chain renderer · the one you pick is the one you mint'}
           </p>
         </div>
         <button

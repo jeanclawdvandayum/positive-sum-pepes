@@ -8,7 +8,7 @@ const mechanics = [
     icon: 'chart',
     title: 'bonding curve',
     color: 'from-sky-400 to-sky-500',
-    body: 'every buy climbs a preset price curve; every sell walks it back down. no LPs to farm you, no rug to pull — the curve is the market and it never sleeps.',
+    body: 'every buy climbs a preset price curve; every sell walks it back down. no LPs to farm you, no rug to pull — the curve is the market and it never sleeps. it runs as a uniswap v4 hook on a real v4 pool: battle-tested plumbing, zero custodians.',
   },
   {
     icon: 'coin',
@@ -32,7 +32,7 @@ const mechanics = [
     icon: 'recycle',
     title: 'positive sum',
     color: 'from-sky-400 to-emerald-400',
-    body: 'the whole reserve sits in mixETH, an ETH yield token, so the pot earns from outside the game — your backing compounds even when nobody trades. add fees that recycle to stakers instead of extracting, and the math tilts positive for everyone who stays.',
+    body: 'the whole reserve sits in mixETH, an ETH yield token curated by alchemix dao — defi OGs running trusted infrastructure since 2021 — so the pot earns from outside the game and your backing compounds even when nobody trades. fees recycle to stakers instead of extracting. the math tilts positive for everyone who stays.',
   },
   {
     icon: 'shield',
@@ -52,9 +52,12 @@ export default function Landing() {
         <div className="blob left-[-80px] top-[-60px] h-64 w-64 bg-psp-sky" />
         <div className="blob right-[-60px] bottom-[-80px] h-64 w-64 bg-psp-mint" />
         <div className="relative">
-          <span className="chip bg-white/80 text-psp-deep shadow-sm">
-            🐸 round #{round.id.toString()} · {round.mode === 1 ? 'live' : round.mode === 0 ? 'predeposit open' : round.mode === 3 ? 'destroyed' : 'flat'}
-          </span>
+          <div className="flex flex-col items-center justify-center gap-2 sm:flex-row">
+            <span className="chip bg-white/80 text-psp-deep shadow-sm">
+              round #{round.id.toString()} · {round.mode === 1 ? 'live' : round.mode === 0 ? 'predeposit open' : round.mode === 3 ? 'destroyed' : 'flat'}
+            </span>
+            <span className="chip bg-white/80 text-psp-deep shadow-sm">built on uniswap v4</span>
+          </div>
           <h1 className="mt-4 text-4xl font-black leading-tight text-slate-900 sm:text-6xl">
             the game that pays you{' '}
             <span className="bg-gradient-to-r from-sky-500 to-emerald-500 bg-clip-text text-transparent">
@@ -85,7 +88,7 @@ export default function Landing() {
       {/* what is this */}
       <section className="mt-10">
         <h2 className="text-2xl font-black text-slate-900 sm:text-3xl">what is this?</h2>
-        <p className="mt-3 max-w-3xl text-slate-600">
+        <p className="mt-3 text-slate-600">
           a memecoin with a mechanical soul. PSP mints and burns along a deterministic
           price curve denominated in mixETH — an ETH yield token. sells on the curve pay
           a toll that accrues to everyone who stakes, and because the entire reserve
@@ -93,8 +96,11 @@ export default function Landing() {
           your backing compounds whether the chart is green or not. that outside yield
           is what makes this positive sum — most memecoins recycle nothing. when a
           round is dying, exits are toll-free at exact average backing — nobody pays to
-          leave a loser. and there is no team allocation silently diluting you: the
-          only way new PSP exists is someone paying real reserves in.
+          leave a loser. and there is no team allocation silently diluting
+          you: the only way new PSP exists is someone paying real reserves
+          in. and the whole engine is a uniswap v4 hook — the curve lives
+          inside a real v4 pool, so this is v4-grade plumbing under a meme
+          hood, not an erc-20 with a website.
         </p>
       </section>
 
