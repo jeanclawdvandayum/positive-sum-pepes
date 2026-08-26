@@ -10,3 +10,13 @@ cache/
 .fix-run.log
 .review-prompt.txt
 .review-run.log
+
+# public-repo hygiene (2026-08-27)
+node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/tsconfig.tsbuildinfo
+.herenow/
+.DS_Store
+**/__pycache__/
+*.DS_Store

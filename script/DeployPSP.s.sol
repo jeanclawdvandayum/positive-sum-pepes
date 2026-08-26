@@ -45,6 +45,10 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///   PSP_TESTNET  =1 to deploy MockMixETH against a canonical v4 testnet
 ///                PoolManager + fast timing profile (24h predeposit offer,
 ///                3d stake lock, +1d relock, 1d bomb vote; flat exit 3d)
+///   PSP_FORK     =1 to vm.deal the broadcaster 5 ETH first — lets you
+///                dry-run the FULL testnet path (PSP_TESTNET + PSP_PM +
+///                --fork-url $SEPOLIA_RPC_URL) with any throwaway key and
+///                zero gas. Never set this for a real deployment.
 ///   PSP_CURVE    1|2|3 rolling curves (glide/longswell/switchback,
 ///                default 1); 0 = legacy anchor-ladder staircase
 contract DeployPSP is Script {
@@ -70,6 +74,9 @@ contract DeployPSP is Script {
     function run() external {
         bool anvil = vm.envOr("PSP_ANVIL", false);
         bool testnet = vm.envOr("PSP_TESTNET", false);
+        if (vm.envOr("PSP_FORK", false)) {
+            vm.deal(msg.sender, 5 ether); // fork dry-run gas (see env docs)
+        }
         address pm;
         IERC20 mix;
         if (anvil) {

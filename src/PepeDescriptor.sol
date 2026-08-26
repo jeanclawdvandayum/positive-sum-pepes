@@ -67,111 +67,35 @@ contract PepeDescriptor {
             | (uint256(t.bg) << 28);
     }
 
+    /// @dev all 80 trait names, NUL-separated, axis order: expr(0-9),
+    ///      eyes(10-19), hat(20-29), wear(30-39), item(40-49), skin(50-59),
+    ///      iris(60-69), bg(70-79). Packed table keeps the runtime well
+    ///      under the EIP-170 size limit (the branching tables blew past).
+    bytes internal constant NAMES = hex"4E65757472616C00536D696C65004772696E004C61756768005361640053636172656400416E67727900536D69726B004372696E6765004D656800436C6173736963004665656C7300536C65657079004465727000576964650042616B656400537461727279004579726F6C6C00446561640043726F737365796564004E6F6E65004261636B7761726473204361700054696E666F696C0043726F776E004865616462616E64004E617275746F00546F7020486174004672656E63680057697A61726400486F6F646965004E6F6E6500536861646573004D6F6E6F636C6500476C6173736573004D6F6767656400457965706174636800486561727420476C617373657300334420476C61737365730043796265722053686164657300436F6F6C20536861646573004E6F6E6500436967617265747465005069706500436861696E005374697463686573004E6F6F736500436967617200426F6E67004A617268656164004C6F6C6C69706F7000436C617373696300476F6C64005A6F6D626965004469616D6F6E64004E69676874004C696D65004F72616E676500477265656E00546F6164005369636B00536C61746500536B7900416D62657200456D6572616C64004372696D736F6E004F6E79780042415345004D6167656E7461004E656F6E20477265656E004772657900536B79004D696E74005065616368004C6176656E6465720053756E736574004372696D736F6E004D69646E6967687400566F69640059656C6C6F77004D4147454E544100";
+    /// @dev 81 big-endian uint16 start-offsets into NAMES (80 names + end)
+    bytes internal constant NAME_OFFS = hex"00000008000E00130019001D0024002A00300037003B0043004900500055005A00600067006E0073007D008200900098009E00A700AE00B600BD00C400CB00D000D700DF00E700EE00F701050110011D0129012E0138013D0143014C01520158015D0165016E0176017B0182018A01900195019C01A201A701AC01B201B601BC01C401CC01D101D601DE01E901EE01F201F701FD0206020D0215021E0223022A0232";
+
+    function _off(uint256 i) internal pure returns (uint256) {
+        return (uint256(uint8(NAME_OFFS[i * 2])) << 8) | uint8(NAME_OFFS[i * 2 + 1]);
+    }
+
+    function _name(uint256 idx) internal pure returns (string memory s) {
+        uint256 a = _off(idx);
+        uint256 end = _off(idx + 1) - 1; // exclude the NUL
+        s = new string(end - a);
+        for (uint256 i; i < end - a; ++i) bytes(s)[i] = NAMES[a + i];
+    }
+
     // ───────────────────────── metadata ─────────────────────────
 
-    function exprName(uint8 id) public pure returns (string memory) {
-        if (id == 0) return "Neutral";
-        if (id == 1) return "Smile";
-        if (id == 2) return "Grin";
-        if (id == 3) return "Laugh";
-        if (id == 4) return "Sad";
-        if (id == 5) return "Scared";
-        if (id == 6) return "Angry";
-        if (id == 7) return "Smirk";
-        if (id == 8) return "Cringe";
-        return "Meh";
-    }
-
-    function eyeName(uint8 id) public pure returns (string memory) {
-        if (id == 0) return "Classic";
-        if (id == 1) return "Feels";
-        if (id == 2) return "Sleepy";
-        if (id == 3) return "Derp";
-        if (id == 4) return "Wide";
-        if (id == 5) return "Baked";
-        if (id == 6) return "Starry";
-        if (id == 7) return "Eyroll";
-        if (id == 8) return "Dead";
-        return "Crosseyed";
-    }
-
-    function hatName(uint8 id) public pure returns (string memory) {
-        if (id == 0) return "None";
-        if (id == 1) return "Backwards Cap";
-        if (id == 2) return "Tinfoil";
-        if (id == 3) return "Crown";
-        if (id == 4) return "Headband";
-        if (id == 5) return "Naruto";
-        if (id == 6) return "Top Hat";
-        if (id == 7) return "French";
-        if (id == 8) return "Wizard";
-        return "Hoodie";
-    }
-
-    function wearName(uint8 id) public pure returns (string memory) {
-        if (id == 0) return "None";
-        if (id == 1) return "Shades";
-        if (id == 2) return "Monocle";
-        if (id == 3) return "Glasses";
-        if (id == 4) return "Mogged";
-        if (id == 5) return "Eyepatch";
-        if (id == 6) return "Heart Glasses";
-        if (id == 7) return "3D Glasses";
-        if (id == 8) return "Cyber Shades";
-        return "Cool Shades";
-    }
-
-    function itemName(uint8 id) public pure returns (string memory) {
-        if (id == 0) return "None";
-        if (id == 1) return "Cigarette";
-        if (id == 2) return "Pipe";
-        if (id == 3) return "Chain";
-        if (id == 4) return "Stitches";
-        if (id == 5) return "Noose";
-        if (id == 6) return "Cigar";
-        if (id == 7) return "Bong";
-        if (id == 8) return "Jarhead";
-        return "Lollipop";
-    }
-
-    function skinName(uint8 id) public pure returns (string memory) {
-        if (id == 0) return "Classic";
-        if (id == 1) return "Gold";
-        if (id == 2) return "Zombie";
-        if (id == 3) return "Diamond";
-        if (id == 4) return "Night";
-        if (id == 5) return "Lime";
-        if (id == 6) return "Orange";
-        if (id == 7) return "Green";
-        if (id == 8) return "Toad";
-        return "Sick";
-    }
-
-    function irisName(uint8 id) public pure returns (string memory) {
-        if (id == 0) return "Slate";
-        if (id == 1) return "Sky";
-        if (id == 2) return "Amber";
-        if (id == 3) return "Emerald";
-        if (id == 4) return "Crimson";
-        if (id == 5) return "Onyx";
-        if (id == 6) return "BASE";
-        if (id == 7) return "Magenta";
-        if (id == 8) return "Neon Green";
-        return "Grey";
-    }
-
-    function bgName(uint8 id) public pure returns (string memory) {
-        if (id == 0) return "Sky";
-        if (id == 1) return "Mint";
-        if (id == 2) return "Peach";
-        if (id == 3) return "Lavender";
-        if (id == 4) return "Sunset";
-        if (id == 5) return "Crimson";
-        if (id == 6) return "Midnight";
-        if (id == 7) return "Void";
-        if (id == 8) return "Yellow";
-        return "MAGENTA";
-    }
+    function exprName(uint8 id) public pure returns (string memory) { return _name(id); }
+    function eyeName(uint8 id) public pure returns (string memory) { return _name(10 + id); }
+    function hatName(uint8 id) public pure returns (string memory) { return _name(20 + id); }
+    function wearName(uint8 id) public pure returns (string memory) { return _name(30 + id); }
+    function itemName(uint8 id) public pure returns (string memory) { return _name(40 + id); }
+    function skinName(uint8 id) public pure returns (string memory) { return _name(50 + id); }
+    function irisName(uint8 id) public pure returns (string memory) { return _name(60 + id); }
+    function bgName(uint8 id) public pure returns (string memory) { return _name(70 + id); }
 
     // ───────────────────────── JSON + URI ─────────────────────────
 
