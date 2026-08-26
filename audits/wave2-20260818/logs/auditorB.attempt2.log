@@ -1,0 +1,25 @@
+# auditorB run — final status
+
+Tool budget exhausted before I could write the deliverable file `audits/wave2-20260818/auditorB.md` (it does **not** exist yet) and before fully closing the last test. Here is the complete state, structured as the report would have been. The test suite itself is on disk and nearly green: **55 passed / 2 failed of 57** in `test/wave2/auditorB/`.
+
+## What was reviewed
+Complete read of `src/CurveHook.sol`, `src/libraries/CurveMath.sol`, `src/PSPZapIn.sol`, `src/PSPZapOut.sol`, plus `RoundController.sol` and `PSPFactory.sol` (out of scope, read for trust-boundary context). All PoCs run against the **real Uniswap V4 PoolManager** — MockMixETH is the only mock. Every failure was triaged against source personally; the prior session's unexecuted suite contained multiple harness bugs that I fixed (notably: router paid the PM from its own zero balance; `expectRevert` used against inlined library calls and PM-wrapped hook errors; `_bomb()` missing `skip(1)` vs the controller's M-1 vote-lock rule).
+
+## Findings
+
+**B-1 — `redeemPotBacking` does not burn pot PSP (LOW/MED as trust pin, 95%)** — `CurveHook.redeemPotBacking` pays out pro-rata backing and leaves the PSP live. Prank-controller PoC (B6a, PASS): redeem → re-sell the same PSP draws ~95% again; persistent ERC20-vs-ledger divergence is exactly `potPSP`. Safe only because the production controller burns inside `carpetBomb`'s atomic sequence.
+
+**B-2 — `computeBuyOutput` can over-mint vs input integral (LOW/MED, 100% reproduced)** — two deterministic pins PASS: ~3.4 bps overshoot (seed=1, supply=0; config dumped in test logs) and 0.86 ppm (seed=30445694). Round trip profitable pre-fees at those configs. Deploy-gated (`deployRound` is `onlyOwner`), so bounded severity; production shape is clean across 256-run fuzzes.
+
+**B-3 — panic family on validated adversarial configs (LOW, ~70% — hypothesis)** — fuzzer counterexample (seed=2^64−1, supply=493680) shows Panic(0x11) somewhere in the computeBuyOutput/curveIntegral flow, but my probe-isolated deterministic pin did not reproduce before budget ran out. Fail-closed (revert, no mispricing), deploy-gated. Needs one more instrumentation pass.
+
+**INFO pins (all PASS):** B4e/B4f `computeSellOutput` clamps at MAX_SUPPLY — underflow/wrong-segment, library-only, unreachable via hook; B4g `validate()` accepts absurd P0 → integral panic; B3m `sqrtPriceLimitX96` ignored entirely — slippage protection is router-level only; B3l input >150M cap silently donates excess; B6c/B6d `drainAll` mid-mode leaves panics not clean errors; B1d curve sell fees floored vs flat fees ceiled (<1 wei/swap, user-favored); B2g flat buys have no MAX_SUPPLY cap (no dilution — invariant held).
+
+## Verified-safe
+V4 delta/settle spoofing (9 attack paths, all fail closed — B3a–B3n incl. PM-gating of callbacks); honest netting exactness; curve solvency slack ≥ 0 under random flows; price monotonicity; flat pro-rata invariant `R1·S0 ≥ R0·S1` (fuzz); curve↔flat continuity (0.002% discontinuity, solvency bound held); zaps (minOut rollback, deadline, reverting receiver, re-entrancy, donations); admin gating and mode transitions; M-1 vote-lock.
+
+## Outstanding
+1. Write `audits/wave2-20260818/auditorB.md` from the above (content is ready).
+2. Close B-3: one instrumented run to localize the panic call-site (fuzz args `(18446744073709551615, 340282366920938463463374607431768211454, 493680)`), then either pin or downgrade to hypothesis-only in the report.
+
+No files outside `test/wave2/auditorB/` were touched; no commits made.

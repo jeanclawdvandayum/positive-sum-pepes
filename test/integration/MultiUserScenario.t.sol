@@ -11,6 +11,7 @@ import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 
 import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
+import {PSPStaker} from "../../src/PSPStaker.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
 import {HookDeployer} from "../../src/HookDeployer.sol";
@@ -20,6 +21,8 @@ import {CurveMath} from "../../src/libraries/CurveMath.sol";
 import {MainnetConfig} from "./MainnetConfig.sol";
 import {V4SwapRouter} from "./V4SwapRouter.sol";
 import {MockMixETH} from "../mocks/MockMixETH.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title MultiUserScenarioTest
 /// @notice Full end-to-end fork tests with multiple users interacting simultaneously.
@@ -38,6 +41,7 @@ contract MultiUserScenarioTest is Test {
     // Current round
     PSPToken pspToken;
     RoundController controller;
+    PSPStaker public stakerV; // cached: single vm.prank must not be eaten by the staker() view call
     CurveHook hook;
     PoolKey poolKey;
 
@@ -61,7 +65,7 @@ contract MultiUserScenarioTest is Test {
         mockMix.depositETH{value: 100_000e18}();
         mixETH = IERC20(address(mockMix));
 
-        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), 0);
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), 0);
         router = new V4SwapRouter(poolManager);
 
         // Fund all users
@@ -183,7 +187,7 @@ contract MultiUserScenarioTest is Test {
         uint256 carolPSP = pspToken.balanceOf(carol);
         _lock(carol, carolPSP / 2);
 
-        uint256 totalLocked = controller.totalLocked();
+        uint256 totalLocked = stakerV.totalLocked();
         console.log("Total locked PSP:", totalLocked);
 
         // Multiple swaps generate fees (after all lockers joined)
@@ -196,18 +200,18 @@ contract MultiUserScenarioTest is Test {
         // Both Alice and Bob claim at the same time
         uint256 aliceBefore = mixETH.balanceOf(alice);
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 aliceFees = mixETH.balanceOf(alice) - aliceBefore;
 
         uint256 bobBefore = mixETH.balanceOf(bob);
         vm.prank(bob);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 bobFees = mixETH.balanceOf(bob) - bobBefore;
 
         // Carol claims
         uint256 carolBefore = mixETH.balanceOf(carol);
         vm.prank(carol);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 carolFees = mixETH.balanceOf(carol) - carolBefore;
 
         console.log("=== Fee Distribution ===");
@@ -293,7 +297,7 @@ contract MultiUserScenarioTest is Test {
 
             uint256 before = mixETH.balanceOf(alice);
             vm.prank(alice);
-            controller.claimFees();
+            stakerV.claimFees();
             uint256 earned = mixETH.balanceOf(alice) - before;
             totalEarned += earned;
 
@@ -348,7 +352,7 @@ contract MultiUserScenarioTest is Test {
         console.log("Reserve delta:", int256(reserveAfter) - int256(reserveBefore));
 
         // Protocol should have accumulated fees (alice locked, so accumulator advances)
-        assertGt(controller.accFeePerShareMixETH(), 0, "Accumulator increased");
+        assertGt(stakerV.accFeePerShareMixETH(), 0, "Accumulator increased");
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -515,13 +519,13 @@ contract MultiUserScenarioTest is Test {
         // Alice and Bob claim accumulated fees
         uint256 aliceBefore = mixETH.balanceOf(alice);
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 aliceEarned = mixETH.balanceOf(alice) - aliceBefore;
         console.log("Alice earned in fees:", aliceEarned);
 
         uint256 bobBefore = mixETH.balanceOf(bob);
         vm.prank(bob);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 bobEarned = mixETH.balanceOf(bob) - bobBefore;
         console.log("Bob earned in fees:", bobEarned);
 
@@ -672,6 +676,7 @@ contract MultiUserScenarioTest is Test {
         PSPFactory.Round memory round = factory.getRound(roundId);
         pspToken = round.token;
         controller = round.controller;
+        stakerV = controller.staker();
         hook = round.hook;
 
         Currency currency0 = Currency.wrap(address(mixETH));
@@ -703,7 +708,7 @@ contract MultiUserScenarioTest is Test {
     function _claim(address user) internal returns (uint256) {
         vm.prank(user);
         controller.claimPredepositPSP();
-        (uint256 amount,,,) = controller.locks(user);
+        uint256 amount = stakerV.lockedPSPOf(user);
         return amount;
     }
 
@@ -714,8 +719,8 @@ contract MultiUserScenarioTest is Test {
 
     function _lock(address user, uint256 amount) internal {
         vm.startPrank(user);
-        pspToken.approve(address(controller), amount);
-        controller.lock(amount);
+        pspToken.approve(address(stakerV), amount);
+        stakerV.lock(amount);
         vm.stopPrank();
     }
 

@@ -12,6 +12,7 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PSPToken} from "./PSPToken.sol";
 import {CurveHook} from "./CurveHook.sol";
 import {PSPStaker} from "./PSPStaker.sol";
+import {StakerDeployer} from "./StakerDeployer.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
 import {IRoundController} from "./interfaces/IRoundController.sol";
 
@@ -160,7 +161,9 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         PSPToken _pspToken,
         IERC20 _mixETH,
         CurveMath.CurveConfig memory _config,
-        address _factory
+        address _factory,
+        address _descriptor,
+        StakerDeployer _stakerDeployer
     ) Ownable(_factory) {
         // Packed profile decode — `_config.timings == 0` → mainnet defaults.
         // Branch form (not per-field fallbacks) keeps the creation code —
@@ -199,8 +202,10 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         predepositStartTime = block.timestamp;
         // Birth the staker: ERC-721 position ledger + fee accumulator. Born
         // here (not factory) so `staker` is immutable and the hook can cache
-        // it as stakerClaimant at its own construction.
-        staker = new PSPStaker(IERC20(address(_pspToken)), IRoundController(address(this)));
+        // it as stakerClaimant at its own construction. Deployed through the
+        // StakerDeployer vessel (EIP-170, 2026-08-23): PSPStaker's creation
+        // code no longer embeds in this contract's creation program.
+        staker = _stakerDeployer.deployStaker(IERC20(address(_pspToken)), IRoundController(address(this)), _descriptor);
     }
 
     // ─────────────── Modifiers ───────────────
@@ -564,8 +569,9 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // post-snapshot lock-capture vector (lock 2M after propose, outvote
         // a thin snapshot).
         // 2026-08-19: reads the staker's position ledger (positions moved to
-        // PSPStaker with the NFTs — lockTimeOf mirrors the old locks[].lockTime).
-        if (staker.lockTimeOf(msg.sender) >= currentProposal.proposeTime) revert VoteLockedAfterPropose();
+        // PSPStaker with the NFTs). lockTime via the public mapping getter.
+        (,, uint256 lockTime,) = staker.positions(msg.sender);
+        if (lockTime >= currentProposal.proposeTime) revert VoteLockedAfterPropose();
 
         if (support) {
             currentProposal.yesVotes += weight;

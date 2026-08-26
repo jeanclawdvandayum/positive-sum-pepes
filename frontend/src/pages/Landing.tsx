@@ -31,7 +31,7 @@ const mechanics = [
     icon: '♻️',
     title: 'positive sum',
     color: 'from-sky-400 to-emerald-400',
-    body: 'sell pressure feeds the stakers. when the round is bombed, every lock opens and the curve goes flat: stake exits at average backing, and only what goes unclaimed seeds the rebirth. the house take recycles instead of extracting.',
+    body: 'the whole reserve sits in mixETH, an ETH yield token, so the pot earns from outside the game — your backing compounds even when nobody trades. add fees that recycle to stakers instead of extracting, and the math tilts positive for everyone who stays.',
   },
   {
     icon: '🛡️',
@@ -87,10 +87,13 @@ export default function Landing() {
         <p className="mt-3 max-w-3xl text-slate-600">
           a memecoin with a mechanical soul. PSP mints and burns along a deterministic
           price curve denominated in mixETH — an ETH yield token. sells on the curve pay
-          a toll that accrues to everyone who stakes, and mixETH keeps farming underneath
-          the whole pot. when a round is dying, exits are toll-free at exact average
-          backing — nobody pays to leave a loser. there is no team allocation silently
-          diluting you: the only way new PSP exists is someone paying real reserves in.
+          a toll that accrues to everyone who stakes, and because the entire reserve
+          sits in mixETH, its yield keeps flowing into the pot from outside the game:
+          your backing compounds whether the chart is green or not. that outside yield
+          is what makes this positive sum — most memecoins recycle nothing. when a
+          round is dying, exits are toll-free at exact average backing — nobody pays to
+          leave a loser. and there is no team allocation silently diluting you: the
+          only way new PSP exists is someone paying real reserves in.
         </p>
       </section>
 
@@ -114,7 +117,7 @@ export default function Landing() {
 
       {/* lifecycle strip */}
       <section className="card mt-10 overflow-hidden">
-        <div className="bg-gradient-to-r from-sky-400 via-cyan-400 to-emerald-400 px-6 py-3 text-sm font-black uppercase tracking-wide text-white">
+        <div className="bg-gradient-to-r from-sky-400 via-cyan-400 to-emerald-400 px-6 py-3 text-sm font-black uppercase tracking-wide text-[#fff]">
           round lifecycle
         </div>
         <div className="grid grid-cols-1 divide-y divide-sky-50 sm:grid-cols-5 sm:divide-x sm:divide-y-0">

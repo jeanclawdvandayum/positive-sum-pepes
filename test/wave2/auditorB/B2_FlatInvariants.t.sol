@@ -138,20 +138,17 @@ contract B2_FlatInvariants is BBase {
         }
     }
 
-    // ── pot accrual in flat mode keeps pot backing consistent (R covers pot PSP) ──
-    // ── F-9 fix: flat trades accrue NO pot (zero-fee flat window) ──
-    function test_B2f_noFlatPotAccrual() public {
+    // ── F-9 fix: flat trades accrue NO fees (zero-fee flat window) ──
+    // ── v5.1 (2026-08-19): pot ledger removed with the pot — prove the
+    //    flat window pays no staker fees either (fee accumulator frozen)
+    function test_B2f_noFlatFeeAccrual() public {
         _flatState();
         uint256 out = _buy(carol, 10e18);
-        uint256 potBefore = controller.potPSPBalance();
+        uint256 accBefore = stakerV.accFeePerShareMixETH();
+        uint256 pendBefore = stakerV.pendingFeesMixETH();
         _sell(carol, out / 2);
-        uint256 potAfter = controller.potPSPBalance();
-        assertEq(potAfter, potBefore, "flat sell must not credit pot");
-        assertEq(potAfter, 0, "pot ledger stays clean through flat trades");
-
-        // pot PSP outstanding is backed (trivial at pot == 0, kept for shape)
-        uint256 potVal = (potAfter * hook.reserveMixETH()) / hook.totalSupplyPSP();
-        assertLe(potVal, hook.reserveMixETH(), "pot claim exceeds reserve");
+        assertEq(stakerV.accFeePerShareMixETH(), accBefore, "accumulator frozen in flat");
+        assertEq(stakerV.pendingFeesMixETH(), pendBefore, "no fees accrue in flat");
     }
 }
 

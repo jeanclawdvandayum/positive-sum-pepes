@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount, useReadContracts, useWriteContract } from 'wagmi'
-import { controllerAbi } from '../lib/abi'
+import { controllerAbi, stakerAbi } from '../lib/abi'
 import { useRound } from '../lib/useRound'
 import { fmtAmount, fmtCountdown } from '../lib/format'
 
@@ -24,7 +24,7 @@ export default function CarpetBombCard() {
     contracts: [
       { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'getCarpetBombState' },
       { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'currentProposal' },
-      { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'locks', args: [address ?? ZERO] },
+      { address: round.staker ?? ZERO, abi: stakerAbi, functionName: 'lockedPSPOf', args: [address ?? ZERO] },
       { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'VOTE_DURATION' },
       { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'QUORUM_BIPS' },
       { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'MAJORITY_BIPS' },
@@ -42,8 +42,8 @@ export default function CarpetBombCard() {
   const prop = propArr
     ? { proposer: propArr[0], proposeTime: propArr[1], yesVotes: propArr[2], noVotes: propArr[3], lockedAtPropose: propArr[4], executed: propArr[5] }
     : undefined
-  const lockArr = reads.data?.[2]?.result as [bigint, bigint, bigint, bigint] | undefined
-  const lock = lockArr ? { amount: lockArr[0] } : undefined
+  const lockAmount = reads.data?.[2]?.result as bigint | undefined
+  const lock = lockAmount !== undefined ? { amount: lockAmount } : undefined
   const voteDuration = Number(reads.data?.[3]?.result ?? 3n * 86400n)
   const quorumBips = Number(reads.data?.[4]?.result ?? 6900n)
   const majorityBips = Number(reads.data?.[5]?.result ?? 5001n)
@@ -104,8 +104,8 @@ export default function CarpetBombCard() {
   return (
     <div className="card overflow-hidden p-0">
       <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 px-5 py-3">
-        <h2 className="text-lg font-black text-white">💣 carpet bomb</h2>
-        <p className="text-xs font-bold text-white/80">
+        <h2 className="text-lg font-black text-[#fff]">💣 carpet bomb</h2>
+        <p className="text-xs font-bold text-[#fff]/80">
           stakers vote to end the round · treasury inherits into the next
         </p>
       </div>
@@ -118,13 +118,6 @@ export default function CarpetBombCard() {
               measured against max(total staked, total supply) at proposal time
               (69%), majority of cast votes (50%+), 3-day window.
             </div>
-            {round.potPSP !== undefined && round.potPSP > 0n && round.supply !== undefined && round.supply > 0n && round.reserve !== undefined && (
-              <div className="mt-2 rounded-2xl bg-amber-50/60 p-3 text-[11px] font-bold text-amber-600">
-                🫖 the side pot survives the bomb: {fmtAmount(round.potPSP)} PSP redeems at
-                average backing (~{fmtAmount((round.reserve * round.potPSP) / round.supply)}{' '}
-                mixETH) and thickens the next round's curve — cap-exempt, share-less, never locked.
-              </div>
-            )}
             <button
               className="btn-primary mt-4 w-full"
               disabled={!isConnected || !lock || lock.amount === 0n || busy}
@@ -195,14 +188,14 @@ export default function CarpetBombCard() {
               <>
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <button
-                    className="rounded-2xl bg-emerald-400 px-4 py-3 font-black text-white shadow-md shadow-emerald-200 transition active:scale-[0.98] disabled:opacity-40"
+                    className="rounded-2xl bg-emerald-400 px-4 py-3 font-black text-[#fff] shadow-md shadow-emerald-200 transition active:scale-[0.98] disabled:opacity-40"
                     disabled={!canVote || busy}
                     onClick={() => run('voteCarpetBomb', true)}
                   >
                     vote yes
                   </button>
                   <button
-                    className="rounded-2xl bg-rose-400 px-4 py-3 font-black text-white shadow-md shadow-rose-200 transition active:scale-[0.98] disabled:opacity-40"
+                    className="rounded-2xl bg-rose-400 px-4 py-3 font-black text-[#fff] shadow-md shadow-rose-200 transition active:scale-[0.98] disabled:opacity-40"
                     disabled={!canVote || busy}
                     onClick={() => run('voteCarpetBomb', false)}
                   >
@@ -231,13 +224,6 @@ export default function CarpetBombCard() {
 
             {derived.phase === 'executable' && (
               <>
-                {round.potPSP !== undefined && round.potPSP > 0n && round.supply !== undefined && round.supply > 0n && round.reserve !== undefined && (
-                  <div className="mt-3 text-[11px] font-bold text-amber-600">
-                    🫖 executing also redeems the side pot (~
-                    {fmtAmount((round.reserve * round.potPSP) / round.supply)} mixETH) into
-                    the next round's opening curve
-                  </div>
-                )}
                 <button className="btn-primary mt-4 w-full" disabled={busy} onClick={() => run('carpetBomb')}>
                   {busy ? 'confirm…' : '💥 execute carpet bomb'}
                 </button>
@@ -262,7 +248,7 @@ export default function CarpetBombCard() {
               mixETH per PSP).
             </div>
             {now < Number(round.flatTime) + 259_200 ? (
-              <div className="text-xs font-bold text-white/60">
+              <div className="text-xs font-bold text-[#fff]/60">
                 exit window open · finalize in{' '}
                 {fmtCountdown(Number(round.flatTime) + 259_200 - now)} · whatever remains seeds
                 round n+1

@@ -37,7 +37,7 @@ contract PSPZapOut {
         address pspToken;
         address to;
         address trader;   // referral attribution (0x0 = none)
-        address referrer;
+        uint256 referrerNftId;
     }
 
     constructor(IMixETH _mixETH, IPoolManager _poolManager) {
@@ -50,9 +50,9 @@ contract PSPZapOut {
     /// @param pspIn Amount of PSP to sell (caller must have approved this router)
     /// @param minMixOut Revert if the swap yields fewer mixETH shares
     /// @param deadline Revert if executed after this timestamp (0 = off)
-    /// @param referrer Optional referral attribution (0x0 = unattributed)
+    /// @param referrerNftId Optional referral attribution — staker position NFT ID (0 = unattributed)
     /// @return ethOut ETH forwarded to the caller
-    function zapOut(PoolKey calldata key, uint256 pspIn, uint256 minMixOut, uint256 deadline, address referrer)
+    function zapOut(PoolKey calldata key, uint256 pspIn, uint256 minMixOut, uint256 deadline, uint256 referrerNftId)
         external
         returns (uint256 ethOut)
     {
@@ -69,7 +69,7 @@ contract PSPZapOut {
         bytes memory result = poolManager.unlock(
             abi.encode(SellData({
                 key: key, pspIn: pspIn, pspToken: address(psp), to: msg.sender,
-                trader: msg.sender, referrer: referrer
+                trader: msg.sender, referrerNftId: referrerNftId
             }))
         );
         uint256 mixOut = abi.decode(result, (uint256));
@@ -89,9 +89,9 @@ contract PSPZapOut {
     /// @param pspIn Amount of PSP to sell (caller must have approved this router)
     /// @param minMixOut Revert if the swap yields fewer mixETH shares
     /// @param deadline Revert if executed after this timestamp (0 = off)
-    /// @param referrer Optional referral attribution (see zapOut)
+    /// @param referrerNftId Optional referral attribution — staker position NFT ID (0 = unattributed)
     /// @return mixOut mixETH sent to the caller
-    function sellToMix(PoolKey calldata key, uint256 pspIn, uint256 minMixOut, uint256 deadline, address referrer)
+    function sellToMix(PoolKey calldata key, uint256 pspIn, uint256 minMixOut, uint256 deadline, uint256 referrerNftId)
         external
         returns (uint256 mixOut)
     {
@@ -109,7 +109,7 @@ contract PSPZapOut {
         bytes memory result = poolManager.unlock(
             abi.encode(SellData({
                 key: key, pspIn: pspIn, pspToken: pspTokenAddr, to: msg.sender,
-                trader: msg.sender, referrer: referrer
+                trader: msg.sender, referrerNftId: referrerNftId
             }))
         );
         mixOut = abi.decode(result, (uint256));
@@ -132,7 +132,7 @@ contract PSPZapOut {
         poolManager.settle();
 
         // Sell: PSP -> mix. Price limit is the far bound in swap direction.
-        // hookData carries (trader, referrer) for the 50bps referral
+        // hookData carries (trader, referrerNftId) for the 50bps referral
         // carve-out; empty when unattributed (fees then all go to stakers).
         BalanceDelta delta = poolManager.swap(
             d.key,
@@ -143,7 +143,11 @@ contract PSPZapOut {
                     : TickMath.MIN_SQRT_PRICE + 1,
                 zeroForOne: !mixIsZero
             }),
-            d.referrer != address(0) ? abi.encode(d.trader, d.referrer) : new bytes(0)
+            // ALWAYS carry (trader, referrerNftId) — an already-attributed
+            // trader must keep paying their chain on every trade, including
+            // ones placed without a ref param (empty hookData made the hook
+            // see trader == 0 and skip payouts entirely; fixed 2026-08-19)
+            abi.encode(d.trader, d.referrerNftId)
         );
 
         // mix delta is positive (owed to us); take it here so we can redeem.

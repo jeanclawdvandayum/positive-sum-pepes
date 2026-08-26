@@ -16,7 +16,10 @@ import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {PSPToken} from "../../src/PSPToken.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {RoundController} from "../../src/RoundController.sol";
+import {PSPStaker} from "../../src/PSPStaker.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title NK24 — post-remediation proof suite (mainnet fork, real V4 PM).
 /// @notice Every test here is a pre-fix attack, re-run against the fixed
@@ -59,7 +62,7 @@ contract NK24Test is Test {
         vm.createSelectFork(vm.envString("MAINNET_RPC_URL"));
         mixETH = new HostileMixETH();
         mixETH.deposit{value: 2_000_000e18}();
-        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), 0);
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), 0);
         mixETH.transfer(alice, 50_000e18);
         mixETH.transfer(bob, 50_000e18);
         mixETH.transfer(carol, 50_000e18);
@@ -270,12 +273,11 @@ contract NK24Test is Test {
         uint256 carolFees = mixETH.balanceOf(carol) - carolBefore;
 
         // 60/40 split of the ~4.75e18 staker stream — no winner-take-all.
-        // (The other 0.25% of volume accrued to the side pot as PSP.)
+        // (Side pot removed 2026-08-19: no PSP cut on buys; unattributed
+        // trades route the full staker stream — no referrer in _buy here.)
         assertGt(aliceFees, 2.5e18, "alice (60% depositor) accrued her share");
         assertGt(carolFees, 1.6e18, "carol (40% depositor) accrued her share");
-        assertApproxEqAbs(aliceFees + carolFees, 4.75e18, 0.1e18, "full staker fee stream distributed");
-        (uint256 potBal,) = ctx.controller.potState();
-        assertGt(potBal, 0, "side pot accrued its PSP cut from the buy");
+        assertApproxEqAbs(aliceFees + carolFees, 5e18, 0.1e18, "full staker fee stream distributed");
         emit log_named_decimal_uint("alice accrued pre-claim", aliceFees, 18);
         emit log_named_decimal_uint("carol accrued pre-claim", carolFees, 18);
     }
@@ -290,14 +292,15 @@ contract NK24Test is Test {
 
     function test_P5_ThinLockBombBlocked_HonestBombStillWorks() public {
         skip(91 days);
+        PSPStaker _stk1 = r.controller.staker();
         vm.prank(alice);
-        r.controller.unlock(); // totalLocked -> 0, PSP back to alice
+        _stk1.unlock(); // totalLocked -> 0, PSP back to alice
 
         // attacker buys dust and locks it: 100% of LOCKED, ~1% of SUPPLY
         _buy(r, attacker, 1e18);
         vm.startPrank(attacker);
-        r.token.approve(address(r.controller), type(uint256).max);
-        r.controller.lock(r.token.balanceOf(attacker));
+        r.token.approve(address(r.controller.staker()), type(uint256).max);
+        r.controller.staker().lock(r.token.balanceOf(attacker));
         vm.stopPrank();
         skip(1);
 
@@ -315,8 +318,8 @@ contract NK24Test is Test {
         // honest path intact: the failed proposal expires, alice (the real
         // holder) locks her bag, proposes, votes, executes.
         vm.startPrank(alice);
-        r.token.approve(address(r.controller), type(uint256).max);
-        r.controller.lock(r.token.balanceOf(alice));
+        r.token.approve(address(r.controller.staker()), type(uint256).max);
+        r.controller.staker().lock(r.token.balanceOf(alice));
         vm.stopPrank();
         skip(1);
         vm.prank(alice);
@@ -431,13 +434,16 @@ contract NK24Test is Test {
 
         // late claim: PSP principal moves out of the genesis lock even
         // though the hook (and its fee surplus) is fully drained
-        (uint256 genesisBefore,,,) = ctx.controller.locks(address(ctx.controller));
+        // (2026-08-19: the lock ledger lives on the staker now; the genesis
+        // position is keyed to the staker contract itself)
+        address staker = address(ctx.controller.staker());
+        uint256 genesisBefore = ctx.controller.staker().lockedPSPOf(staker);
         assertGt(genesisBefore, 0, "carol's share still in genesis lock");
         vm.prank(carol);
         ctx.controller.claimPredepositPSP();
-        (uint256 carolLock,,,) = ctx.controller.locks(carol);
+        uint256 carolLock = ctx.controller.staker().lockedPSPOf(carol);
         assertGt(carolLock, 0, "principal claimable post-bomb");
-        (uint256 genesisAfter,,,) = ctx.controller.locks(address(ctx.controller));
+        uint256 genesisAfter = ctx.controller.staker().lockedPSPOf(staker);
         assertEq(genesisAfter, genesisBefore - carolLock, "genesis lock decremented exactly");
     }
 
@@ -464,8 +470,8 @@ contract NK24Test is Test {
         // bob buys on the curve, locks, proposes
         _buy(ctx, bob, 10e18);
         vm.startPrank(bob);
-        ctx.token.approve(address(ctx.controller), type(uint256).max);
-        ctx.controller.lock(ctx.token.balanceOf(bob));
+        ctx.token.approve(address(ctx.controller.staker()), type(uint256).max);
+        ctx.controller.staker().lock(ctx.token.balanceOf(bob));
         vm.stopPrank();
         skip(1);
         vm.prank(bob);
@@ -475,7 +481,7 @@ contract NK24Test is Test {
         // cannot vote) and enters her own lock with lockTime = NOW
         vm.prank(alice);
         ctx.controller.claimPredepositPSP();
-        (uint256 aliceLock,,,) = ctx.controller.locks(alice);
+        (uint256 aliceLock) = (ctx.controller.staker().lockedPSPOf(alice));
         assertGt(aliceLock, 0, "alice holds a lock");
 
         // she cannot vote on the live proposal: lockTime >= proposeTime

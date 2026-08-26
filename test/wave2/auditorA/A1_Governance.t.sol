@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {AuditorBase} from "./AuditorBase.sol";
 import {RoundController} from "../../../src/RoundController.sol";
+import {PSPStaker} from "../../../src/PSPStaker.sol";
 import {CurveHook} from "../../../src/CurveHook.sol";
 
 /// @title A1 — RoundController governance surface (carpet bomb voting)
@@ -83,10 +84,9 @@ contract A1_GovernanceTest is AuditorBase {
         _launch();
         _claim(alice); // alice = 100% of totalLocked == G
 
-        // inflate hook supply 2x (pot accrual / unburned supply)
-        uint256 g = controller.totalLocked();
-        vm.prank(address(audHook));
-        controller.mintPotPSP(g);
+        // inflate hook supply 2x (v5.1: no pot mint — curve supply alone;
+        //  the mock sets it directly, same denominator effect)
+        uint256 g = stakerV.totalLocked();
         audHook.setSupply(audHook.totalSupplyPSP() + g);
 
         vm.prank(alice);
@@ -117,16 +117,16 @@ contract A1_GovernanceTest is AuditorBase {
         // give eve liquid PSP via alice's expired lock (90d)
         vm.warp(block.timestamp + 90 days);
         vm.prank(alice);
-        controller.unlock();
+        stakerV.unlock();
         uint256 alicePSP = psp.balanceOf(alice);
         vm.prank(alice);
         psp.transfer(eve, alicePSP / 2);
 
         // eve locks at T, bob proposes at the SAME T afterwards
         vm.prank(eve);
-        psp.approve(address(controller), alicePSP / 2);
+        psp.approve(address(stakerV), alicePSP / 2);
         vm.prank(eve);
-        controller.lock(alicePSP / 2); // lockTime = now
+        stakerV.lock(alicePSP / 2); // lockTime = now
 
         vm.prank(bob);
         controller.proposeCarpetBomb(); // proposeTime == eve's lockTime
@@ -147,7 +147,7 @@ contract A1_GovernanceTest is AuditorBase {
         // open the relock window (last 7d of the 90d term)
         vm.warp(block.timestamp + 83 days);
         vm.prank(bob);
-        controller.relock(); // lockTime = now
+        stakerV.relock(); // lockTime = now
 
         vm.prank(alice);
         controller.proposeCarpetBomb(); // same timestamp, after relock
@@ -191,8 +191,8 @@ contract A1_GovernanceTest is AuditorBase {
         controller.voteCarpetBomb(true);
 
         vm.prank(alice);
-        vm.expectRevert(RoundController.LockNotExpired.selector);
-        controller.unlock();
+        vm.expectRevert(PSPStaker.LockNotExpired.selector);
+        stakerV.unlock();
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -294,7 +294,7 @@ contract A1_GovernanceTest is AuditorBase {
         controller.voteCarpetBomb(true);
 
         vm.prank(bob);
-        vm.expectRevert(RoundController.NotLocker.selector);
+        vm.expectRevert(PSPStaker.NotLocker.selector);
         controller.proposeCarpetBomb();
     }
 

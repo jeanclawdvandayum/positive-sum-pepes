@@ -7,6 +7,7 @@ import {CurveHook} from "../../../src/CurveHook.sol";
 import {RoundController} from "../../../src/RoundController.sol";
 import {PSPFactory} from "../../../src/PSPFactory.sol";
 import {PSPToken} from "../../../src/PSPToken.sol";
+import {StakerDeployer} from "../../../src/StakerDeployer.sol";
 import {CurveMath} from "../../../src/libraries/CurveMath.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -114,7 +115,7 @@ contract C3_Lifecycle is CBase {
 
         PSPToken fakeToken = new TokenDeployer().deployToken("Fake", "FK", rando);
         RoundController fakeController =
-            controllerDeployer.deployController(fakeToken, IERC20(address(mixETH)), _curve(), rando);
+            controllerDeployer.deployController(fakeToken, IERC20(address(mixETH)), _curve(), rando, address(0), new StakerDeployer());
 
         assertEq(factory.currentRoundId(), roundsBefore, "registry untouched");
         PSPFactory.Round memory r1 = factory.getRound(1);
@@ -124,10 +125,6 @@ contract C3_Lifecycle is CBase {
         vm.prank(address(fakeController));
         vm.expectRevert(PSPFactory.NotRoundController.selector);
         factory.markDestroyed(1);
-
-        vm.prank(address(fakeController));
-        vm.expectRevert(PSPFactory.NotRoundController.selector);
-        factory.creditSidePot(1);
     }
 
     /// deployRound is the only owner-gated entry; spawn/markDestroyed/credit

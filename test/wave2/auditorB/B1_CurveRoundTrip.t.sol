@@ -113,8 +113,9 @@ contract B1_CurveRoundTrip is BBase {
         for (uint256 i = 0; i < amounts.length; i++) {
             uint256 amt2 = amounts[i];
             _buy(bob, amt2);
-            // buy: staker fee = floor(in*500/10000) - floor(in*25/10000)
-            expectedFees += (amt2 * 500) / 10000 - (amt2 * 25) / 10000;
+            // buy (unattributed, v5.1): referral budget (50bps of volume) has
+            // no chain to pay -> falls through to stakers = FULL 5% of volume
+            expectedFees += (amt2 * 500) / 10000;
         }
 
         // one sell of half his balance
@@ -122,7 +123,7 @@ contract B1_CurveRoundTrip is BBase {
         uint256 pspIn = pspBal / 2;
         uint256 integral = hook.getSellOutput(pspIn);
         _sell(bob, pspIn);
-        expectedFees += (integral * 500) / 10000 - (integral * 25) / 10000;
+        expectedFees += (integral * 500) / 10000;
 
         assertEq(_feeLedger(), expectedFees, "fee ledger mismatch");
     }
@@ -152,7 +153,7 @@ contract B1_CurveRoundTrip is BBase {
         // but alice selling exactly her own balance works (pot PSP is not hers)
         _sell(alice, pspOut);
         assertGt(hook.totalSupplyPSP(), 0, "supply should retain pot floor");
-        assertGt(psp.balanceOf(address(controller)), 0, "pot PSP accrued");
+        // pot retired 2026-08-19: swap fees flow to the staker accumulator (B1e pins exact math)
     }
 
     // ── dust swaps rejected (C-1) ──

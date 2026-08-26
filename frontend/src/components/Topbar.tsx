@@ -1,5 +1,6 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { NavLink } from 'react-router-dom'
+import ThemeSwitcher from './ThemeSwitcher'
 
 const links = [
   { to: '/', label: 'home' },
@@ -25,7 +26,7 @@ export default function Topbar() {
               className={({ isActive }) =>
                 `rounded-full px-3 py-1.5 text-sm font-bold transition sm:px-4 ${
                   isActive
-                    ? 'bg-gradient-to-r from-sky-400 to-emerald-400 text-white shadow-md shadow-sky-200'
+                    ? 'bg-gradient-to-r from-sky-400 to-emerald-400 text-[#fff] shadow-md shadow-sky-200'
                     : 'text-slate-500 hover:bg-sky-50 hover:text-psp-deep'
                 }`
               }
@@ -34,8 +35,11 @@ export default function Topbar() {
             </NavLink>
           ))}
         </nav>
-        <div className="shrink-0 scale-90 sm:scale-100">
-          <ConnectButton showBalance={false} chainStatus="icon" />
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <ThemeSwitcher />
+          <div className="scale-90 sm:scale-100">
+            <ConnectButton showBalance={false} chainStatus="icon" />
+          </div>
         </div>
       </div>
     </header>

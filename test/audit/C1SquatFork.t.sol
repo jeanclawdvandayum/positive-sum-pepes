@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {AuditForkTest} from "./AuditFork.t.sol";
+import {PSPReferralRegistry} from "../../../src/PSPReferralRegistry.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
@@ -27,6 +28,20 @@ import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 ///         3. CI gas bound on the whole finalize->spawn path (mining loop
 ///            discipline: on-chain mining must stay block-executable).
 contract C1SquatForkTest is AuditForkTest {
+    /// v5.1 (2026-08-19): the registry rides INSIDE deployHook's mined
+    /// initCode, so candidate prediction needs the exact round-2 registry
+    /// address. spawnNextRound births it via hookDeployer.deployRegistry
+    /// (plain CREATE, nonce-keyed) BEFORE the hook → public pre-image.
+    /// deployHook's create2 never burns nonce, so this is stable pre-spawn.
+    /// 2026-08-20: attacker create2s through deployHook DO burn nonce — each
+    /// squat shifts the registry the spawn will birth. `offset` = number of
+    /// create2s (orphan squats) that will run through hookDeployer BEFORE the
+    /// spawn's deployRegistry; the attacker targets the POST-shift space.
+    function _predictedRegistry2(uint256 offset) internal returns (address) {
+        return vm.computeCreateAddress(
+            address(factory.hookDeployer()), vm.getNonce(address(factory.hookDeployer())) + offset
+        );
+    }
     uint160 constant FLAGS = uint160(
         Hooks.BEFORE_INITIALIZE_FLAG
             | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
@@ -48,11 +63,11 @@ contract C1SquatForkTest is AuditForkTest {
 
         vm.startPrank(bob);
         mixETH.approve(address(zapIn), type(uint256).max);
-        uint256 bobPSP = zapIn.buyWithMix(key, 20e18, 0, 0);
+        uint256 bobPSP = zapIn.buyWithMix(key, 20e18, 0, 0, 0);
         vm.stopPrank();
         vm.startPrank(bob);
-        psp.approve(address(controller), type(uint256).max);
-        controller.lock(bobPSP);
+        psp.approve(address(stakerV), type(uint256).max);
+        stakerV.lock(bobPSP);
         vm.stopPrank();
 
         skip(1);
@@ -79,14 +94,17 @@ contract C1SquatForkTest is AuditForkTest {
 
     /// Replicate deployHook's candidate derivation test-side: proves which
     /// candidate index the vessel picks and which address it skips to.
-    function _candidates(address ctrl2)
+    function _candidates(address ctrl2, address registry2)
         internal
         view
         returns (address[] memory addrs)
     {
         CurveMath.CurveConfig memory cfg =
             CurveMath.singleCurve(0.001e18, 1_000_000e18, 0.0000000046e18, 0.05e18); // == setUp config, inherited byte-exact
-        bytes memory initCode = bytes.concat(type(CurveHook).creationCode, abi.encode(poolManager, ctrl2, cfg));
+        // must mirror deployHook byte-for-byte: (pm, controller, registry, cfg)
+        bytes memory initCode = bytes.concat(
+            type(CurveHook).creationCode, abi.encode(poolManager, ctrl2, registry2, cfg)
+        );
         bytes32 entropy = keccak256(abi.encode(block.prevrandao, block.timestamp, block.number, ctrl2));
         addrs = new address[](4);
         uint256 scanFrom;
@@ -110,15 +128,15 @@ contract C1SquatForkTest is AuditForkTest {
         vm.roll(50_000_000);
 
         address predictedCtrl2 = _predictedCtrl2();
-        address[] memory cands = _candidates(predictedCtrl2);
-
-        // attacker (carol, no role, no capital) front-runs the finalize tx
-        // IN THE SAME BLOCK: identical entropy, so the vessel itself deploys
-        // the orphan at exactly candidate 0
+        // carol's single orphan create2 burns one hookDeployer nonce BEFORE
+        // the spawn's deployRegistry — the spawn births the POST-shift
+        // registry, so candidates are mined over THAT space.
+        address predictedRegistry2 = _predictedRegistry2(1);
+        address[] memory cands = _candidates(predictedCtrl2, predictedRegistry2);
         CurveMath.CurveConfig memory cfg2 =
             CurveMath.singleCurve(0.001e18, 1_000_000e18, 0.0000000046e18, 0.05e18);
         vm.prank(carol);
-        (address orphan,) = factory.hookDeployer().deployHook(poolManager, predictedCtrl2, cfg2);
+        (address orphan,) = factory.hookDeployer().deployHook(poolManager, predictedCtrl2, predictedRegistry2, cfg2);
         assertEq(orphan, cands[0], "vessel squat landed on predicted candidate 0");
 
         // finalize in the SAME block (same entropy): spawn skips the orphan
@@ -126,7 +144,13 @@ contract C1SquatForkTest is AuditForkTest {
         controller.finalizeCarpet();
         uint256 spent = g0 - gasleft();
 
+        // PERMANENT PINS (promoted from 2026-08-20 diagnostic): the spawn's
+        // round-2 addresses must land exactly on the publicly predicted
+        // (ctrl nonce, hookDeployer nonce + squat offset) pair — the C-1
+        // candidate math below is only meaningful if these hold.
         PSPFactory.Round memory r2 = factory.getRound(2);
+        assertEq(address(r2.controller), predictedCtrl2, "ctrl2 prediction drifted");
+        assertEq(factory.referralRegistryOf(2), predictedRegistry2, "registry2 prediction drifted");
         assertTrue(address(r2.controller) != address(0), "round 2 spawned - rebirth alive");
         assertEq(address(r2.hook), cands[1], "hook deployed at candidate 1 (skip worked)");
         assertTrue(address(r2.hook) != orphan, "hook dodged the squat");
@@ -148,14 +172,18 @@ contract C1SquatForkTest is AuditForkTest {
     function test_C1_FORK_AllCandidatesSquat_BlocksOneBlockOnly() public {
         _toFinalizable();
         address predictedCtrl2 = _predictedCtrl2();
-        address[] memory cands = _candidates(predictedCtrl2);
+        // carol's four squat create2s each burn a hookDeployer nonce; the
+        // spawn's registry lands at nonce+4, so ALL squats target THAT space
+        // (each falls through to the next free candidate of it).
+        address predictedRegistry2 = _predictedRegistry2(4);
+        address[] memory cands = _candidates(predictedCtrl2, predictedRegistry2);
 
         // attacker exhausts every candidate in this block's salt space
         CurveMath.CurveConfig memory cfg2 =
             CurveMath.singleCurve(0.001e18, 1_000_000e18, 0.0000000046e18, 0.05e18);
         for (uint256 i; i < 4; i++) {
             vm.prank(carol);
-            (address squatted,) = factory.hookDeployer().deployHook(poolManager, predictedCtrl2, cfg2);
+            (address squatted,) = factory.hookDeployer().deployHook(poolManager, predictedCtrl2, predictedRegistry2, cfg2);
             assertEq(squatted, cands[i], "sequential squats fill candidates in order");
         }
 

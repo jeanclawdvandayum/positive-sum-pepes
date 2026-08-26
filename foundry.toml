@@ -1,5 +1,8 @@
 [profile.default]
-fs_permissions = [{ access = "read", path = "./script/" }]
+fs_permissions = [
+    { access = "read", path = "./script/" },
+    { access = "write", path = "./out/" }
+]
 src = "src"
 out = "out"
 libs = ["lib"]

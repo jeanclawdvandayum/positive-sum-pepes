@@ -285,19 +285,16 @@ library CurveMath {
             uint256 segStart = S1 > z.startSupply ? S1 : z.startSupply;
             uint256 segEnd = S2 < z.endSupply ? S2 : z.endSupply;
 
-            // Price at segStart within this zone
-            uint256 pAtSegStart;
+            // Integrate within this zone.
+            // B4j FIX (2026-08-19, wave2b): BOTH zone kinds now use the
+            // telescoping antiderivative form — F evaluated at the segment
+            // endpoints, integral = F(segEnd) - F(segStart). F is a pure
+            // function of ABSOLUTE supply, so any partition of a span sums
+            // to the same integer (intermediate F terms cancel bit-exactly):
+            // a coarse bulk evaluation can no longer disagree with a chain
+            // of fine per-leg evaluations (the "rubber ruler" reserve drain).
             if (z.isExponential) {
-                pAtSegStart = _expPrice(price, z.rate, segStart - z.startSupply);
-            } else {
-                pAtSegStart = _logPrice(price, z.rate, segStart, z.startSupply);
-            }
-
-            // Integrate within this zone
-            // For exp: pass pAtSegStart (formula: (pStart/k)*(e^(k*delta)-1))
-            // For log: pass pZoneStart (= price var) directly for accuracy
-            if (z.isExponential) {
-                total += _integralExp(pAtSegStart, z.rate, segStart, segEnd);
+                total += _integralExp(price, z.rate, segStart, segEnd, z.startSupply);
             } else {
                 total += _integralLog(price, z.rate, segStart, segEnd, z.startSupply);
             }
@@ -316,11 +313,18 @@ library CurveMath {
     //  Zone Integrals
     // ═══════════════════════════════════════════════════════════════
 
-    /// @dev ∫ pStart * e^(k*(s - s_start)) ds from segStart to segEnd
-    ///    = (pStart / k) * (e^(k*(segEnd - s_start)) - e^(k*(segStart - s_start)))
-    /// But pStart is already the price at segStart, so:
-    ///    = (pStart / k) * (e^(k*(segEnd - segStart)) - 1)
-    function _integralExp(uint256 pStart, uint256 k, uint256 segStart, uint256 segEnd)
+    /// @dev ∫ pZoneStart * e^(k*(s - sZoneStart)) ds from segStart to segEnd
+    ///      Telescoping antiderivative (B4j FIX 2026-08-19):
+    ///      F(s) = (pZoneStart / k) * e^(k * (s - sZoneStart))
+    ///      Integral = F(segEnd) - F(segStart)
+    ///      F is a pure function of ABSOLUTE supply, so integrals over any
+    ///      partition of a span telescope bit-exactly — matching the shape
+    ///      _integralLog has always had. The old per-segment form
+    ///      (pAtSegStart/k)*(e^(k*delta)-1) floored k*delta per segment:
+    ///      a coarse (bulk) evaluation disagreed with a chain of fine
+    ///      (per-buy-leg) evaluations over the same span, letting a trader
+    ///      chop buys and bulk-sell to harvest the difference (B4j, HIGH).
+    function _integralExp(uint256 pZoneStart, uint256 k, uint256 segStart, uint256 segEnd, uint256 sZoneStart)
         internal
         pure
         returns (uint256)
@@ -329,23 +333,30 @@ library CurveMath {
         if (delta == 0) return 0;
 
         if (k == 0) {
-            // Flat price: pStart * delta
-            return FPML.mulWad(pStart, delta);
+            // Flat price. Kept in F-form for the same telescoping guarantee:
+            // F(s) = mulWad(pZoneStart, s); integral = F(end) - F(start).
+            return FPML.mulWad(pZoneStart, segEnd) - FPML.mulWad(pZoneStart, segStart);
         }
 
-        // e^(k * delta) - 1
-        uint256 expInput = FPML.mulWad(k, delta);
-        if (expInput > 135305999368893231588) {
-            expInput = 135305999368893231588;
-        }
-        int256 ePow = FPML.expWad(int256(expInput));
-        // ePow - WAD (since expWad returns 1e18 for e^0)
-        // ePow is always >= WAD for positive exponent
-        uint256 ePowMinus1 = uint256(ePow) - WAD;
+        // F(s) = mulWad(divWad(pZoneStart, k), expWad(mulWad(k, s - sZoneStart)))
+        // All floors live INSIDE F — identical at both endpoints, so they
+        // cancel in telescoping sums instead of accumulating per segment.
+        uint256 pOverK = FPML.divWad(pZoneStart, k);
 
-        // (pStart / k) * (e^(k*delta) - 1)
-        uint256 pStartOverK = FPML.divWad(pStart, k);
-        return FPML.mulWad(pStartOverK, ePowMinus1);
+        uint256 expEnd = FPML.mulWad(k, segEnd - sZoneStart);
+        if (expEnd > 135305999368893231588) {
+            expEnd = 135305999368893231588; // overflow guard; floors F — safe direction
+        }
+        uint256 expStart = FPML.mulWad(k, segStart - sZoneStart);
+        if (expStart > 135305999368893231588) {
+            expStart = 135305999368893231588;
+        }
+
+        uint256 fEnd = FPML.mulWad(pOverK, uint256(FPML.expWad(int256(expEnd))));
+        uint256 fStart = FPML.mulWad(pOverK, uint256(FPML.expWad(int256(expStart))));
+
+        if (fEnd <= fStart) return 0; // floors can tie on dust spans; pay 0 (against trader)
+        return fEnd - fStart;
     }
 
     /// @dev ∫ pZoneStart * (1 + k * ln(s / sZoneStart)) ds from segStart to segEnd

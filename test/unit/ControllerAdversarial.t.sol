@@ -6,14 +6,18 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
+import {PSPStaker} from "../../src/PSPStaker.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
 import {MockMixETH} from "../mocks/MockMixETH.sol";
 import {MockHook} from "../mocks/MockHook.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title ControllerAdversarial - Stress tests for fee accumulator, governance, access control
 contract ControllerAdversarial is Test {
     RoundController controller;
+    PSPStaker public stakerV; // cached: single vm.prank must not be eaten by the staker() view call
     MockMixETH mixETH;
     PSPToken pspToken;
 
@@ -36,7 +40,8 @@ contract ControllerAdversarial is Test {
         );
 
         pspToken = new PSPToken("Positive Sum Pepes", "PSP", address(this));
-        controller = new RoundController(pspToken, IERC20(address(mixETH)), params, factory);
+        controller = new RoundController(pspToken, IERC20(address(mixETH)), params, factory, address(0), new StakerDeployer());
+        stakerV = controller.staker();
         pspToken.setController(address(controller));
 
         vm.startPrank(address(controller));
@@ -49,7 +54,7 @@ contract ControllerAdversarial is Test {
         address[4] memory users = [alice, bob, carol, dave];
         for (uint256 i = 0; i < 4; i++) {
             vm.prank(users[i]);
-            pspToken.approve(address(controller), type(uint256).max);
+            pspToken.approve(address(stakerV), type(uint256).max);
         }
 
         mixETH.transfer(address(controller), 50_000e18);
@@ -68,9 +73,9 @@ contract ControllerAdversarial is Test {
 
     function test_Fee_ProportionalDistribution() public {
         vm.prank(alice);
-        controller.lock(3000e18);
+        stakerV.lock(3000e18);
         vm.prank(bob);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         MockHook hook = _setupHook();
 
@@ -78,11 +83,11 @@ contract ControllerAdversarial is Test {
         controller.addFees(100e18);
 
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 aliceBalance = mixETH.balanceOf(alice);
 
         vm.prank(bob);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 bobBalance = mixETH.balanceOf(bob);
 
         assertApproxEqRel(aliceBalance, bobBalance * 3, 0.01e18, "Alice ~3x Bob");
@@ -90,7 +95,7 @@ contract ControllerAdversarial is Test {
 
     function test_Fee_LateLockerGetsNoPastFees() public {
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         MockHook hook = _setupHook();
 
@@ -98,20 +103,20 @@ contract ControllerAdversarial is Test {
         controller.addFees(100e18);
 
         vm.prank(bob);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         assertTrue(mixETH.balanceOf(alice) > 0, "Alice gets fees");
 
         vm.prank(bob);
-        vm.expectRevert(RoundController.NothingToClaim.selector);
-        controller.claimFees();
+        vm.expectRevert(PSPStaker.NothingToClaim.selector);
+        stakerV.claimFees();
     }
 
     function test_Fee_DoubleClaimNothing() public {
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         MockHook hook = _setupHook();
 
@@ -119,26 +124,26 @@ contract ControllerAdversarial is Test {
         controller.addFees(100e18);
 
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 firstClaim = mixETH.balanceOf(alice);
         assertTrue(firstClaim > 0, "First claim has value");
 
         vm.prank(alice);
-        vm.expectRevert(RoundController.NothingToClaim.selector);
-        controller.claimFees();
+        vm.expectRevert(PSPStaker.NothingToClaim.selector);
+        stakerV.claimFees();
     }
 
     function test_Fee_IncrementalLock() public {
         MockHook hook = _setupHook();
 
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         vm.prank(address(hook));
         controller.addFees(50e18);
 
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         uint256 afterLock = mixETH.balanceOf(alice);
         assertTrue(afterLock > 0, "Claimed pending on re-lock");
@@ -147,17 +152,17 @@ contract ControllerAdversarial is Test {
         controller.addFees(50e18);
 
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         assertTrue(mixETH.balanceOf(alice) > afterLock, "More after second claim");
     }
 
     function test_Fee_ThreeLockerDistribution() public {
         vm.prank(alice);
-        controller.lock(5000e18);
+        stakerV.lock(5000e18);
         vm.prank(bob);
-        controller.lock(3000e18);
+        stakerV.lock(3000e18);
         vm.prank(carol);
-        controller.lock(2000e18);
+        stakerV.lock(2000e18);
 
         MockHook hook = _setupHook();
 
@@ -165,15 +170,15 @@ contract ControllerAdversarial is Test {
         controller.addFees(1000e18);
 
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 aliceAmt = mixETH.balanceOf(alice);
 
         vm.prank(bob);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 bobAmt = mixETH.balanceOf(bob);
 
         vm.prank(carol);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 carolAmt = mixETH.balanceOf(carol);
 
         assertApproxEqRel(aliceAmt, 500e18, 0.02e18, "Alice ~500");
@@ -185,7 +190,7 @@ contract ControllerAdversarial is Test {
 
     function test_Gov_DoubleProposalFails() public {
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
         vm.prank(alice);
         controller.proposeCarpetBomb();
         vm.prank(alice);
@@ -195,9 +200,9 @@ contract ControllerAdversarial is Test {
 
     function test_Gov_AllNoVotesFailsQuorum() public {
         vm.prank(alice);
-        controller.lock(5000e18);
+        stakerV.lock(5000e18);
         vm.prank(bob);
-        controller.lock(5000e18);
+        stakerV.lock(5000e18);
         vm.warp(block.timestamp + 1); // M-1: locks must predate the proposal
         vm.prank(alice);
         controller.proposeCarpetBomb();
@@ -212,9 +217,9 @@ contract ControllerAdversarial is Test {
 
     function test_Gov_SmallLockerLowVotingWeight() public {
         vm.prank(alice);
-        controller.lock(99_000e18);
+        stakerV.lock(99_000e18);
         vm.prank(dave);
-        controller.lock(1_000e18);
+        stakerV.lock(1_000e18);
         vm.warp(block.timestamp + 1); // M-1: locks must predate the proposal
         vm.prank(alice);
         controller.proposeCarpetBomb();
@@ -229,11 +234,11 @@ contract ControllerAdversarial is Test {
 
     function test_Gov_VoteAfterPeriodFails() public {
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
         vm.prank(alice);
         controller.proposeCarpetBomb();
         vm.prank(bob);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
         vm.warp(block.timestamp + 3 days + 1);
         vm.prank(bob);
         vm.expectRevert(RoundController.VotingEnded.selector);
@@ -243,9 +248,9 @@ contract ControllerAdversarial is Test {
     function test_Gov_ExactQuorumBoundary() public {
         // 69% quorum: 6900 of 10000 participate → passes quorum but majority fails
         vm.prank(alice);
-        controller.lock(7000e18);
+        stakerV.lock(7000e18);
         vm.prank(bob);
-        controller.lock(3000e18);
+        stakerV.lock(3000e18);
         vm.warp(block.timestamp + 1); // M-1: locks must predate the proposal
         vm.prank(alice);
         controller.proposeCarpetBomb();
@@ -262,9 +267,9 @@ contract ControllerAdversarial is Test {
     function test_Gov_QuorumFailsBelow69Percent() public {
         // 50% participation — would pass old 30% quorum but fails new 69%
         vm.prank(alice);
-        controller.lock(5000e18);
+        stakerV.lock(5000e18);
         vm.prank(bob);
-        controller.lock(5000e18);
+        stakerV.lock(5000e18);
         // Only alice votes (5000 of 10000 = 50%)
         vm.warp(block.timestamp + 1); // M-1: locks must predate the proposal
         vm.prank(alice);
@@ -284,9 +289,9 @@ contract ControllerAdversarial is Test {
         controller.setFactoryRoundId(1);
 
         vm.prank(alice);
-        controller.lock(6900e18);
+        stakerV.lock(6900e18);
         vm.prank(bob);
-        controller.lock(3100e18); // non-voter
+        stakerV.lock(3100e18); // non-voter
         vm.warp(block.timestamp + 1); // M-1: locks must predate the proposal
         vm.prank(alice);
         controller.proposeCarpetBomb();
@@ -302,13 +307,13 @@ contract ControllerAdversarial is Test {
 
     function test_Gov_AttackerCantPropose() public {
         vm.prank(attacker);
-        vm.expectRevert(RoundController.NotLocker.selector);
+        vm.expectRevert(PSPStaker.NotLocker.selector);
         controller.proposeCarpetBomb();
     }
 
     function test_Gov_AttackerCantForceExecute() public {
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
         vm.prank(alice);
         controller.proposeCarpetBomb();
         vm.warp(block.timestamp + 3 days + 1);
@@ -324,9 +329,9 @@ contract ControllerAdversarial is Test {
         bobLock = bound(bobLock, 1e18, 100_000e18);
 
         vm.prank(alice);
-        controller.lock(aliceLock);
+        stakerV.lock(aliceLock);
         vm.prank(bob);
-        controller.lock(bobLock);
+        stakerV.lock(bobLock);
 
         MockHook hook = _setupHook();
 
@@ -334,11 +339,11 @@ contract ControllerAdversarial is Test {
         controller.addFees(100e18);
 
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 aBal = mixETH.balanceOf(alice);
 
         vm.prank(bob);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 bBal = mixETH.balanceOf(bob);
 
         assertTrue(aBal > 0 && bBal > 0, "Both got fees");
@@ -361,20 +366,20 @@ contract ControllerAdversarial is Test {
         MockHook hook = _setupHook();
 
         vm.prank(alice);
-        controller.lock(lock1);
+        stakerV.lock(lock1);
 
         vm.prank(address(hook));
         controller.addFees(fee1);
 
         vm.prank(alice);
-        controller.lock(lock2);
+        stakerV.lock(lock2);
         uint256 firstClaim = mixETH.balanceOf(alice);
 
         vm.prank(address(hook));
         controller.addFees(fee2);
 
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 secondClaim = mixETH.balanceOf(alice) - firstClaim;
 
         assertTrue(firstClaim > 0, "First claim > 0");

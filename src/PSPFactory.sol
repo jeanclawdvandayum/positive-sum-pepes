@@ -19,6 +19,7 @@ import {RoundController} from "./RoundController.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
 import {HookDeployer} from "./HookDeployer.sol";
 import {ControllerDeployer, TokenDeployer} from "./ControllerDeployer.sol";
+import {StakerDeployer} from "./StakerDeployer.sol";
 import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
 
 /// @title PSPFactory — Deploys and manages PSP rounds
@@ -63,6 +64,21 @@ contract PSPFactory is Ownable2Step {
     /// @dev EIP-170: holds RoundController's + PSPToken's creation code
     ControllerDeployer public immutable controllerDeployer;
 
+    /// @dev EIP-170 vessel (2026-08-23): carries PSPStaker's creation code
+    ///      so RoundController's creation program (embedded in the
+    ///      ControllerDeployer above) stays lean.
+    StakerDeployer public immutable stakerDeployer;
+
+    /// @dev Global pepe-art descriptor wired into every round's staker at
+    ///      construction (DNA → SVG + metadata). Zero until the factory
+    ///      owner sets it; rounds deployed before then carry no art.
+    address public descriptor;
+
+    /// @notice Wire the generative-art renderer for all future rounds.
+    function setDescriptor(address descriptor_) external onlyOwner {
+        descriptor = descriptor_;
+    }
+
     uint256 public currentRoundId;
     mapping(uint256 => Round) public rounds;
     int24 public constant tickSpacing = 60;
@@ -76,7 +92,7 @@ contract PSPFactory is Ownable2Step {
     ///      spawned round wires into the SAME social graph: the factory
     ///      points it at each new round's staker (min-stake oracle) and
     ///      authorizes each new hook as a lazy recorder.
-    PSPReferralRegistry public immutable referralRegistry;
+    mapping(uint256 => address) public referralRegistryOf;
 
     /// @dev Minimum locked PSP to qualify as a referrer (skin in the game).
     uint256 public constant REFERRAL_MIN_STAKE = 1000e18;
@@ -97,21 +113,20 @@ contract PSPFactory is Ownable2Step {
 
     /// @dev `_timings == 0` → mainnet defaults, forwarded to every round's
     ///      RoundController. See RoundController "Timing profile".
-    constructor(IPoolManager _poolManager, IERC20 _mixETH, HookDeployer _hookDeployer, ControllerDeployer _controllerDeployer, uint256 _timings)
+    constructor(IPoolManager _poolManager, IERC20 _mixETH, HookDeployer _hookDeployer, ControllerDeployer _controllerDeployer, StakerDeployer _stakerDeployer, uint256 _timings)
         Ownable(msg.sender)
     {
         if (address(_poolManager) == address(0)) revert ZeroAddress();
         if (address(_mixETH) == address(0)) revert ZeroAddress();
         if (address(_hookDeployer) == address(0)) revert ZeroAddress();
         if (address(_controllerDeployer) == address(0)) revert ZeroAddress();
+        if (address(_stakerDeployer) == address(0)) revert ZeroAddress();
         poolManager = _poolManager;
         mixETH = _mixETH;
         hookDeployer = _hookDeployer;
         controllerDeployer = _controllerDeployer;
+        stakerDeployer = _stakerDeployer;
         roundTimings = _timings;
-        // The social graph outlives every round. Owner = this factory: only
-        // _deployRound wires it (setStaker/setRecorder per round).
-        referralRegistry = new PSPReferralRegistry(REFERRAL_MIN_STAKE);
     }
 
     uint256 public immutable roundTimings;
@@ -154,29 +169,37 @@ contract PSPFactory is Ownable2Step {
 
         // 2. Deploy RoundController — via ControllerDeployer (EIP-170).
         //    Timings ride inside the config (see CurveMath.CurveConfig).
+        //    The pepe-art descriptor rides along (global, factory-owned).
         params.curveConfig.timings = roundTimings;
         RoundController controller = controllerDeployer.deployController(
-            token, mixETH, params.curveConfig, address(this)
+            token, mixETH, params.curveConfig, address(this), descriptor, stakerDeployer
         );
 
         // 3. Wire controller as token's controller
         token.setController(address(controller));
+
+        // 3b. Birth THIS round's referral registry (v5.1 2026-08-19): the
+        //     graph resets at round boundaries and attribution is keyed by
+        //     staker position NFT ID (?ref=<tokenId>). Via HookDeployer
+        //     (EIP-170: keeps the creation code out of this contract).
+        address registry = hookDeployer.deployRegistry(
+            address(this), controller.stakerAddress(), REFERRAL_MIN_STAKE
+        );
+        referralRegistryOf[roundId] = registry;
 
         // 4. Mine + deploy hook via the dedicated deployer
         //    (EIP-170: keeps CurveHook's creation code out of this contract —
         //    the factory was 41KB with it embedded twice. The deployer holds
         //    the literal once and verifies the mined address on-chain.)
         (address hookAddress,) = hookDeployer.deployHook(
-            poolManager, address(controller), address(referralRegistry), params.curveConfig
+            poolManager, address(controller), registry, params.curveConfig
         );
         CurveHook hook = CurveHook(hookAddress);
         hookAddr = hookAddress;
 
-        // 5. Wire the referral graph into this round: the new staker becomes
-        //    the min-stake oracle; the new hook becomes a lazy recorder
-        //    (hookData attribution). Registry owner = this factory.
-        referralRegistry.setStaker(controller.stakerAddress());
-        referralRegistry.setRecorder(hookAddress, true);
+        // 5. Wire the round's registry: the hook becomes its lazy recorder
+        //    (hookData attribution). Staker was bound immutably at birth.
+        PSPReferralRegistry(registry).setRecorder(hookAddress, true);
 
         // 6. Wire hook to controller
         controller.setHook(hook);

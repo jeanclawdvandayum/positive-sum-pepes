@@ -20,6 +20,7 @@ import {CurveMath} from "../../../src/libraries/CurveMath.sol";
 
 import {MockMixETH} from "../../mocks/MockMixETH.sol";
 import {MockPoolManager} from "../../mocks/MockPoolManager.sol";
+import {StakerDeployer} from "../../../src/StakerDeployer.sol";
 
 /// @dev Auditor C harness: the REAL PSPFactory + both deployer vessels + the
 ///      REAL CurveHook flow against the functional MockPoolManager. No source
@@ -50,7 +51,7 @@ contract CBase is Test {
         hookDeployer = new HookDeployer();
         controllerDeployer = new ControllerDeployer();
         factory =
-            new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), hookDeployer, controllerDeployer, 0);
+            new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), hookDeployer, controllerDeployer, new StakerDeployer(), 0);
         swapper = new CSwapper(IPoolManager(address(poolManager)), IERC20(address(mixETH)));
 
         _deployRound1();

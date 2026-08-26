@@ -162,24 +162,11 @@ export default function StatsPanel() {
           <span className="ml-1 text-sm font-bold text-slate-400">mixETH</span>
         </div>
         <div className="mt-2 text-xs font-bold text-slate-400">
-          4.75% → stakers on every trade · 0.25% → side pot
+          4.5% → stakers on every trade · 0.5% → referrals
         </div>
         {round.totalLocked !== undefined && round.totalLocked > 0n && (
           <div className="mt-3 text-[11px] font-bold text-emerald-600">
             💎 {fmtAmount(round.totalLocked)} PSP staked and earning
-          </div>
-        )}
-        {round.potPSP !== undefined && round.potPSP > 0n && (
-          <div className="mt-2 text-[11px] font-bold text-amber-600">
-            🫖 side pot {fmtAmount(round.potPSP)} PSP
-            {round.reserve !== undefined && round.supply !== undefined && round.supply > 0n && (
-              <> ≈ {fmtAmount((round.reserve * round.potPSP) / round.supply)} mixETH rebirth</>
-            )}
-          </div>
-        )}
-        {round.mode === 0 && round.potMix !== undefined && round.potMix > 0n && (
-          <div className="mt-2 text-[11px] font-bold text-amber-600">
-            🫖 {fmtAmount(round.potMix)} mixETH pot funds this launch (cap-exempt)
           </div>
         )}
       </div>

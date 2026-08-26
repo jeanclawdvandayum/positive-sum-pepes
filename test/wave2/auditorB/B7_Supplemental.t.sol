@@ -11,7 +11,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Currency, PoolKey, IHooks} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {MockMixETH} from "../../mocks/MockMixETH.sol";
 import {IPoolManager, SwapParams} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
-import {console2} from "forge-std/console2.sol";
 
 /// @title B7 — auditorB supplemental coverage: multi-zone end-to-end through
 ///        the real pool, deploy-gate impact of the B-3 config family, pool-init
@@ -151,10 +150,18 @@ contract B7_Supplemental is BBase {
         assertTrue(_contains(d2, abi.encodeWithSelector(CurveHook.WrongPoolParams.selector)), "wrong error: tickSpacing");
 
         // foreign currency pair (mixETH + attacker token)
+        // (2026-08-19) V4 requires currency0 < currency1; the freshly
+        // deployed mock can land on either side of the round's mixETH
+        // address, and an unsorted key makes PoolManager revert with its own
+        // CurrenciesOutOfOrderOrEqual BEFORE the hook's gate ever runs. Build
+        // the key sorted at runtime so the assertion actually exercises the
+        // hook's WrongPoolCurrencies gate.
         MockMixETH foreign = new MockMixETH();
+        address mixAddr = address(mixETH);
+        address f = address(foreign);
         PoolKey memory kCur = PoolKey({
-            currency0: key.currency0,
-            currency1: Currency.wrap(address(foreign)),
+            currency0: Currency.wrap(f < mixAddr ? f : mixAddr),
+            currency1: Currency.wrap(f < mixAddr ? mixAddr : f),
             fee: 0x800000,
             tickSpacing: 60,
             hooks: IHooks(address(hook))
@@ -193,16 +200,22 @@ contract B7_Supplemental is BBase {
         _buy(bob, 1e18); // unrelated swaps must not absorb it
         _sell(bob, 1e18, bob); // sells must not burn it
         assertGe(psp.balanceOf(address(hook)), hookPSP, "donated PSP was consumed");
-        // Reconcile ERC20 supply vs the hook ledger exactly: the only gaps are
-        // the donated PSP sitting at the hook and the controller's PHANTOM pot
-        // credit (ledger counts pot PSP that was never ERC20-minted at genesis).
-        //   phantom = potPSPBalance − (psp at controller − totalLocked)
-        uint256 realPot = psp.balanceOf(address(controller)) - controller.totalLocked();
-        uint256 phantom = controller.potPSPBalance() - realPot;
+        // Reconcile ERC20 supply vs the hook ledger exactly.
+        // (2026-08-19) The pot-era gap terms died with the pot: buys mint
+        // and sells burn ERC20 in lockstep with the hook ledger, so the
+        // exact invariant is supply == ledger. A donated PSP balance at the
+        // hook is a plain transfer of ALREADY-LIVE supply (it was bought on
+        // the curve) — adding it back double-counts, which is why the old
+        // +donated+stray form overstated by exactly the donated amount.
+        // Custody hygiene stays pinned separately: PSP at the
+        // controller/staker beyond locked positions must be zero.
+        uint256 strayCustody = psp.balanceOf(address(controller))
+            + psp.balanceOf(address(stakerV)) - stakerV.totalLocked();
+        assertEq(strayCustody, 0, "stray PSP parked in custody contracts");
         assertEq(
             PSPToken(address(psp)).totalSupply(),
-            hook.totalSupplyPSP() + hookPSP - phantom,
-            "ERC20 == ledger + donated - phantomPot"
+            hook.totalSupplyPSP(),
+            "ERC20 == ledger"
         );
         // INFO: no recovery path exists for the donated PSP — it is locked
     }

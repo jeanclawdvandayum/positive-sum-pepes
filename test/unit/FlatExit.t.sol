@@ -10,6 +10,7 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IMixETH} from "../../src/interfaces/IMixETH.sol";
 
 import {PSPFactory} from "../../src/PSPFactory.sol";
+import {PSPStaker} from "../../src/PSPStaker.sol";
 import {HookDeployer} from "../../src/HookDeployer.sol";
 import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
@@ -24,24 +25,25 @@ import {MockPoolManager} from "../mocks/MockPoolManager.sol";
 ///        immediately (no 90-day wait), and pays average backing on exit.
 ///        Stakers feed themselves; only what they leave behind inherits to
 ///        round 2 at finalizeCarpet().
+import {PSPStaker} from "../../src/PSPStaker.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
+
 interface RoundControllerLike {
     function predeposit(uint256 mixAmount) external;
     function launchPooledBuy() external;
     function claimPredepositPSP() external;
-    function lock(uint256 amount) external;
-    function unlock() external;
-    function relock() external;
+    function staker() external view returns (PSPStaker);
     function proposeCarpetBomb() external;
     function voteCarpetBomb(bool support) external;
     function carpetBomb() external;
     function finalizeCarpet() external;
     function flatTime() external view returns (uint256);
-    function potState() external view returns (uint256, uint256);
     function locks(address) external view returns (uint256, uint256, uint256, uint256);
 }
 
 contract FlatExitTest is Test {
-    event CarpetBombExecuted(uint256 potRedemption);
+    event CarpetBombExecuted();
 
     MockMixETH mixETH;
     MockPoolManager poolManager;
@@ -50,6 +52,7 @@ contract FlatExitTest is Test {
     PSPZapOut zapOut;
     IERC20 pspToken;
     RoundControllerLike controller;
+    PSPStaker stakerV; // cached staker (prank-eaten-view fix)
     CurveHook hook;
 
     address alice = makeAddr("alice"); // staker
@@ -59,7 +62,7 @@ contract FlatExitTest is Test {
         mixETH.depositETH{value: 100_000e18}();
         poolManager = new MockPoolManager();
         factory = new PSPFactory(
-            IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer()
+            IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer()
         , 0);
 
         PSPFactory.RoundParams memory params = PSPFactory.RoundParams({
@@ -71,6 +74,7 @@ contract FlatExitTest is Test {
         PSPFactory.Round memory r = factory.getRound(roundId);
         pspToken = r.token;
         controller = RoundControllerLike(address(r.controller));
+        stakerV = r.controller.staker();
         hook = CurveHook(address(r.hook));
 
         zapIn = new PSPZapIn(IMixETH(address(mixETH)), IPoolManager(address(poolManager)));
@@ -108,9 +112,9 @@ contract FlatExitTest is Test {
         // bob buys on the curve and locks too, so quorum is honest
         vm.startPrank(bob);
         mixETH.approve(address(zapIn), type(uint256).max);
-        uint256 bobPSP = zapIn.buyWithMix(_poolKey(), 20e18, 0, 0);
-        pspToken.approve(address(controller), type(uint256).max);
-        controller.lock(bobPSP);
+        uint256 bobPSP = zapIn.buyWithMix(_poolKey(), 20e18, 0, 0, 0);
+        pspToken.approve(address(controller.staker()), type(uint256).max);
+        stakerV.lock(bobPSP);
         vm.stopPrank();
     }
 
@@ -127,18 +131,16 @@ contract FlatExitTest is Test {
         controller.voteCarpetBomb(true);
         skip(3 days + 1);
 
-        // capture pre-bomb state to prove the side pot auto-sells at the
-        // flat rate (average backing), same formula as _handleFlatSell
-        (uint256 potPSPBefore,) = controller.potState();
+        // capture pre-bomb state — v5.1 (2026-08-19): the side pot is dead;
+        // the bomb flattens WITHOUT redeeming anything (no pot burn, no
+        // factory ring-fence — the whole reserve backs live supply only)
         uint256 reserveBefore = hook.reserveMixETH();
         uint256 supplyBefore = hook.totalSupplyPSP();
         uint256 factoryMixBefore = mixETH.balanceOf(address(factory));
-        assertGt(potPSPBefore, 0, "fees accrued to pot during buys");
-        uint256 expectedPotMix = (reserveBefore * potPSPBefore) / supplyBefore;
 
-        // the bomb reports exactly the average-backing redemption
+        // the bomb reports the flattening, nothing else
         vm.expectEmit(true, true, true, true);
-        emit CarpetBombExecuted(expectedPotMix);
+        emit CarpetBombExecuted();
         controller.carpetBomb();
 
         // ── the bomb flattens, it does not destroy ──
@@ -146,31 +148,26 @@ contract FlatExitTest is Test {
         assertEq(factory.currentRoundId(), 1, "round 2 waits for finalize");
         assertTrue(controller.flatTime() > 0, "flatTime set");
 
-        // ── side pot redeemed at the flat rate: reserve/supply per PSP ──
-        assertEq(hook.totalSupplyPSP(), supplyBefore - potPSPBefore, "pot PSP burned");
-        assertEq(hook.reserveMixETH(), reserveBefore - expectedPotMix, "proportional reserve out");
+        // ── the bomb touched nothing: reserve and supply ride into the
+        // flat window intact (v5.1: no pot redemption leg)
+        assertEq(hook.totalSupplyPSP(), supplyBefore, "supply unchanged by bomb");
+        assertEq(hook.reserveMixETH(), reserveBefore, "reserve unchanged by bomb");
         assertEq(
             mixETH.balanceOf(address(factory)),
-            factoryMixBefore + expectedPotMix,
-            "redemption ring-fenced in factory side pot"
-        );
-        // redemption at the average is ratio-preserving: the flat rate is
-        // unchanged by the pot's own exit (floor-rounding aside)
-        assertApproxEqAbs(
-            (hook.reserveMixETH() * supplyBefore) / hook.totalSupplyPSP(),
-            reserveBefore,
-            5,
-            "flat rate unchanged by pot redemption"
+            factoryMixBefore,
+            "no redemption ring-fenced in factory"
         );
 
         // ── THE PROOF: staker unlocks with 90 days still on the clock ──
-        (uint256 lockedAmount,, uint256 lockTime, uint256 unlockTime) = controller.locks(alice);
+        uint256 lockedAmount = stakerV.lockedPSPOf(alice);
+        (,, uint256 lockTime, ) = stakerV.positions(alice);
+        (,, , uint256 unlockTime) = stakerV.positions(alice);
         assertGt(lockedAmount, 0, "alice staked");
         assertGt(unlockTime, block.timestamp + 80 days, "lock has ~90d left");
 
         uint256 mixBefore = mixETH.balanceOf(alice);
         vm.prank(alice);
-        controller.unlock(); // bypasses LockNotExpired — flat round
+        stakerV.unlock(); // bypasses LockNotExpired — flat round
         uint256 alicePSP = pspToken.balanceOf(alice);
         assertEq(alicePSP, lockedAmount, "full principal returned");
 
@@ -181,7 +178,7 @@ contract FlatExitTest is Test {
 
         vm.startPrank(alice);
         pspToken.approve(address(zapOut), type(uint256).max);
-        uint256 mixOut = zapOut.sellToMix(_poolKey(), alicePSP, 0, 0);
+        uint256 mixOut = zapOut.sellToMix(_poolKey(), alicePSP, 0, 0, 0);
         vm.stopPrank();
 
         assertEq(mixOut, expectedNet, "sold at exactly average backing (zero flat toll)");
@@ -196,9 +193,9 @@ contract FlatExitTest is Test {
         // ── no new stakes, no relocks on a flat round ──
         vm.prank(alice);
         vm.expectRevert();
-        controller.relock();
+        stakerV.relock();
         vm.expectRevert();
-        controller.lock(1e18);
+        stakerV.lock(1e18);
 
         // ── finalize after the window: destroy, carry, rebirth ──
         skip(3 days + 1);

@@ -1,8 +1,9 @@
 import { WagmiProvider } from 'wagmi'
-import { RainbowKitProvider, lightTheme } from '@rainbow-me/rainbowkit'
+import { RainbowKitProvider, lightTheme, darkTheme } from '@rainbow-me/rainbowkit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HashRouter, Routes, Route } from 'react-router-dom'
 import { wagmiConfig } from './lib/config'
+import { ThemeProvider, useTheme } from './lib/theme'
 import Topbar from './components/Topbar'
 import Landing from './pages/Landing'
 import Trade from './pages/Trade'
@@ -10,17 +11,28 @@ import Stake from './pages/Stake'
 
 const queryClient = new QueryClient()
 
-export default function App() {
+function Shell() {
+  const { resolved } = useTheme()
+
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
-          theme={lightTheme({
-            accentColor: '#38bdf8',
-            accentColorForeground: 'white',
-            borderRadius: 'large',
-            overlayBlur: 'small',
-          })}
+          theme={
+            resolved === 'dark'
+              ? darkTheme({
+                  accentColor: '#38bdf8',
+                  accentColorForeground: '#06101d',
+                  borderRadius: 'large',
+                  overlayBlur: 'small',
+                })
+              : lightTheme({
+                  accentColor: '#38bdf8',
+                  accentColorForeground: 'white',
+                  borderRadius: 'large',
+                  overlayBlur: 'small',
+                })
+          }
           modalSize="compact"
         >
           <HashRouter>
@@ -41,5 +53,13 @@ export default function App() {
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
+  )
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <Shell />
+    </ThemeProvider>
   )
 }

@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {AuditorBase} from "./AuditorBase.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {RoundController} from "../../../src/RoundController.sol";
+import {PSPStaker} from "../../../src/PSPStaker.sol";
 import {CurveHook} from "../../../src/CurveHook.sol";
 import {CurveMath} from "../../../src/libraries/CurveMath.sol";
 import {PSPToken} from "../../../src/PSPToken.sol";
@@ -12,6 +13,8 @@ import {AuditorHook} from "./AuditorMocks.sol";
 import {HostileMixETH} from "./AuditorMocks.sol";
 import {ReentryAttacker} from "./AuditorMocks.sol";
 import {console2} from "forge-std/console2.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title A2 — RoundController accounting: fee accumulator, genesis split,
 ///        PSP custody invariant, claim gating, reentrancy, sweep protection.
@@ -27,7 +30,7 @@ contract A2_AccountingTest is AuditorBase {
         _deposit(alice, 100e18);
         _launch();
         _claim(alice); // sole depositor: totalLocked == initialPSP == G
-        uint256 g = controller.totalLocked();
+        uint256 g = stakerV.totalLocked();
         assertGt(g, 2e18, "precondition: large G");
 
         vm.startPrank(address(audHook));
@@ -35,12 +38,12 @@ contract A2_AccountingTest is AuditorBase {
         controller.addFees(3);
         vm.stopPrank();
 
-        assertEq(controller.accFeePerShareMixETH(), 0, "acc should still be 0");
-        assertEq(controller.pendingFeesMixETH(), 0, "pending zeroed despite 5 wei added");
+        assertEq(stakerV.accFeePerShareMixETH(), 0, "acc should still be 0");
+        assertEq(stakerV.pendingFeesMixETH(), 0, "pending zeroed despite 5 wei added");
 
         vm.prank(alice);
-        vm.expectRevert(RoundController.NothingToClaim.selector);
-        controller.claimFees();
+        vm.expectRevert(PSPStaker.NothingToClaim.selector);
+        stakerV.claimFees();
 
         console2.log("wei of fees permanently unclaimable: 5");
     }
@@ -64,13 +67,13 @@ contract A2_AccountingTest is AuditorBase {
         uint256 aliceMixBefore = mixETH.balanceOf(alice);
         uint256 bobMixBefore = mixETH.balanceOf(bob);
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         vm.prank(bob);
-        controller.claimFees();
+        stakerV.claimFees();
 
         uint256 paid = (mixETH.balanceOf(alice) - aliceMixBefore)
             + (mixETH.balanceOf(bob) - bobMixBefore);
-        uint256 l = controller.totalLocked();
+        uint256 l = stakerV.totalLocked();
         assertLe(paid, 1e18, "over-distribution");
         // masterchef-style double floor: up to ~L/1e18 wei per claim
         assertLe(1e18 - paid, 2 * (l / 1e18) + 10, "lost more than double-floor dust");
@@ -92,7 +95,7 @@ contract A2_AccountingTest is AuditorBase {
         _claim(alice);
 
         uint256 received = mixETH.balanceOf(alice) - before;
-        uint256 l = controller.totalLocked();
+        uint256 l = stakerV.totalLocked();
         assertApproxEqAbs(received, 1e18, l / 1e18 + 2, "fees on share not paid at claim");
         assertLe(received, 1e18, "over-paid");
     }
@@ -109,13 +112,13 @@ contract A2_AccountingTest is AuditorBase {
 
         vm.prank(alice);
         vm.expectRevert(AuditorHook.InsufficientFees.selector);
-        controller.claimFees();
+        stakerV.claimFees();
 
         vm.warp(block.timestamp + 90 days);
-        vm.expectEmit(true, true, true, true, address(controller));
-        emit RoundController.Unlocked(alice, controller.totalLocked());
+        vm.expectEmit(true, true, true, true, address(stakerV)); // (2026-08-19) Unlocked emits from the staker
+        emit PSPStaker.Unlocked(alice, stakerV.totalLocked());
         vm.prank(alice);
-        controller.unlock();
+        stakerV.unlock();
         assertEq(psp.balanceOf(alice), controller.genesisPSPSnapshot(), "principal released");
         _assertPspInvariant("after forfeit-unlock");
     }
@@ -129,31 +132,21 @@ contract A2_AccountingTest is AuditorBase {
         _launch();
         _claim(alice);
         _assertPspInvariant("post-launch");
-        uint256 g = controller.totalLocked();
 
-        // buy-path pot mint (real PSP to controller)
-        vm.prank(address(audHook));
-        controller.mintPotPSP(123e18);
-        assertEq(controller.potPSPBalance(), 123e18);
-        _assertPspInvariant("post mintPotPSP");
+        // (2026-08-19) pot mint/credit paths removed with the side pot —
+        // the only PSP movements are lock/unlock through the staker now
 
-        // sell-path pot credit (hook transfers real PSP, then ledger credit)
-        vm.startPrank(address(audHook));
-        controller.mintPSPForSwap(456e18); // PSP held by hook
-        psp.transfer(address(controller), 456e18);
-        controller.creditPotPSP(456e18);
-        vm.stopPrank();
-        assertEq(controller.potPSPBalance(), 123e18 + 456e18);
-        _assertPspInvariant("post creditPotPSP");
+        // a second locker joins: custody tracks both
+        // (covered in depth by Referral.t.sol R7)
 
-        // unlock drains the lock leg only
+        // unlock drains the staker's lock leg back to the user
         vm.warp(block.timestamp + 90 days);
         vm.prank(alice);
-        controller.unlock();
-        assertEq(controller.totalLocked(), 0);
-        assertEq(psp.balanceOf(address(controller)), 123e18 + 456e18);
+        stakerV.unlock();
+        assertEq(stakerV.totalLocked(), 0);
+        assertEq(psp.balanceOf(address(controller)), 0);
         _assertPspInvariant("post unlock");
-        assertGt(psp.balanceOf(address(controller)), controller.totalLocked(), "pot weight");
+        assertGe(psp.balanceOf(address(stakerV)), stakerV.totalLocked(), "staker custody covers all locks");
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -185,7 +178,7 @@ contract A2_AccountingTest is AuditorBase {
             CurveMath.singleCurve(1e18, 100_000_000e18, 0.000000046e18, 0.1e18);
         PSPToken psp2 = new PSPToken("P2", "P2", address(audFactory));
         RoundController controller2 =
-            new RoundController(psp2, mixETH, curve2, address(audFactory));
+            new RoundController(psp2, mixETH, curve2, address(audFactory), address(0), new StakerDeployer());
         vm.startPrank(address(audFactory));
         psp2.setController(address(controller2));
         controller2.setHook(CurveHook(payable(address(audHook))));

@@ -1,0 +1,18 @@
+Audit complete. Re-read the deliverable to confirm all four required sections are present and consistent with the final test state (18/18 passing).
+
+Summary of the run:
+
+Deliverable: /Users/clawdbot/clawd/positive-sum-pepes/audits/wave2-20260818/auditorC.md
+PoCs: /Users/clawdbot/clawd/positive-sum-pepes/test/wave2/auditorC/ (7 files, 18 tests, all green)
+
+Findings (all with reproducing PoCs):
+
+C-1 HIGH (95%) - Deterministic hook-address squatting. The next round's hook address is fully computable from public state (vessel nonce -> controller address; gameCurve() + getCurveZones() -> exact initCode; HookMiner first-salt determinism -> exact salt). HookDeployer.deployHook is permissionless, so anyone can pre-deploy an orphan at the future address for ~5M gas. The H-2 fix removed the occupied-address probe from HookMiner.find, so the factory's create2 fails deterministically forever: finalizeCarpet reverts FactorySpawnFailed at every attempt, the dying round's reserve (backing of unredeemed PSP) is permanently locked, and the rebirth chain dies. Attack PoC walks a full round through governance and proves the brick + atomicity + retries; control test proves the prediction math; the orphan is provably inert (no theft path). Fix direction in the report: probe extcodesize only at flag-hit candidates (once, ~2600 gas) and continue mining past occupied addresses.
+
+C-2 MEDIUM (90%) - Owner deployRound mid-life permanently orphans a dying round (NotLatestRound -> FactorySpawnFailed forever, no reconciliation path). Reproduced.
+
+C-3 INFO (70%) - Spawn re-mines the hook address every round; post-squat retries burned 2.9B-48.4B gas in revm before reverting (unexecutable on mainnet). Gas-semantics caveat disclosed honestly in Could-not-verify: an inline replica of the identical create2 fails in 40k, and I could not reconcile the three measurements — flagged rather than hidden; the brick itself is gas-independent.
+
+Verified-safe (11 items, each backed by a passing test): carry/pot handoff exactness to the wei, no double-spawn/zombies, finalize atomicity, pot ledger guards, token authority single-shot handoff, vessels permissionless-but-inert, selector constants, curve inheritance, EIP-170 sizes (note: ControllerDeployer at 23,947 bytes has only 629 bytes of headroom), pool-initialize front-run impossibility.
+
+Notes: auditor B's directory currently doesn't compile (their WIP), so my run command uses --skip; my suite is self-contained. Nothing outside test/wave2/auditorC/ and the report was modified.

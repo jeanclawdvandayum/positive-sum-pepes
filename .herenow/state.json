@@ -1,0 +1,10 @@
+{
+  "publishes": {
+    "tidal-muse-cn8e": {
+      "siteUrl": "https://tidal-muse-cn8e.here.now/",
+      "claimToken": "KIAmQCLVu1Fip7-b",
+      "claimUrl": "https://here.now/c/KIAmQCLVu1Fip7-b",
+      "expiresAt": "2026-08-25T10:27:10.303Z"
+    }
+  }
+}

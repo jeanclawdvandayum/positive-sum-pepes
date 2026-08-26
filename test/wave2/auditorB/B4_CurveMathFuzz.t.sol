@@ -146,9 +146,13 @@ contract B4_CurveMathFuzz is Test {
 
     // FINDING B-2, second regime (fuzzer counterexample, deterministic pin):
     // sub-bps over-mint at seed=30445694, input=4379748521903523,
-    // supply=156724337002682 — the same invariant break in a different
-    // (config, supply, input) corner: 4379752303149477 > 4379748521903523.
-    function test_B4b_FINDING_subBpsOverMint_deterministic() public {
+    // supply=156724337002682. Pre-B4j-fix this regime measured
+    // spent=4379752303149477 > input (over-mint) — but that measurement
+    // itself used the coarse per-segment _integralExp ruler (B4j). With the
+    // telescoping fix (2026-08-19) the same (config, supply, input) is now
+    // CONSERVATIVE: spent=4379128406120199 <= input. Re-pinned as a post-fix
+    // sentinel: this regime must stay at-or-under the input bound.
+    function test_B4b_FIXED_subBpsRegimeNowConservative() public {
         CurveMath.CurveConfig memory c = _randCfg(30445694);
         uint256 input = 4379748521903523;
         uint256 supply = 156724337002682;
@@ -156,9 +160,7 @@ contract B4_CurveMathFuzz is Test {
         uint256 spent = CurveMath.curveIntegral(supply, supply + out, c);
         console2.log("out minted:", out);
         console2.log("integral(supply, supply+out):", spent);
-        assertGt(spent, input, "FINDING no longer reproduces");
-        // and the magnitude is sub-bps here:
-        assertLt((spent - input) * 10000, input, "overshoot >= 1bp in this regime?");
+        assertLe(spent, input, "B4b regression: sub-bps over-mint returned");
     }
 
     // ─────────────── P2: round-trip at same supply never profitable ───────────────
@@ -310,5 +312,93 @@ contract B4_CurveMathFuzz is Test {
         uint256 back = CurveMath.computeSellOutput(owned, S, c);
         uint256 userBack = back - (back * 500) / 10000;
         assertLe(userBack, (totalIn * 9500) / 10000, "multi-oscillation round trip beat fees");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // B4j ADJUDICATION (seed 15091685722, 2026-08-19) — verdict: REAL
+    // Root cause: CurveMath._integralExp was evaluated per-segment with a
+    // floored exponent term — a "staircase ruler". Buys were charged with a
+    // fine-grained ruler (per-leg Newton + haircuts), sells/bulk integrals
+    // with a coarse one: over an exact partition of the same supply range,
+    // bulk integral != sum(leg integrals). Chopped buys just under a tread
+    // + one bulk sell across it extracted the tread step from the reserve
+    // (pre-fix repro: +611% ROI/cycle on a VALIDATED near-flat exp config).
+    // FIXED (2026-08-19): _integralExp now uses the telescoping
+    // antiderivative F(end) - F(start), matching _integralLog — any
+    // partition of a span sums bit-exactly. The two tests below are the
+    // post-fix sentinels (renamed from *_FINDING_*).
+    // ═══════════════════════════════════════════════════════════════════
+    function test_B4j_FIXED_segmentationTelescopesExactly() public {
+        CurveMath.CurveConfig memory c = _randCfg(15091685722);
+        assertEq(c.zones[0].rate, 171054601, "counterexample config pin");
+
+        uint256 baseOut = CurveMath.computeBuyOutput(1e20, 0, c);
+        uint256 S = baseOut;
+        uint256 S0 = S;
+        uint256 totalIn;
+        uint256 owned;
+        uint256 legSum;
+        for (uint8 i = 0; i < 4; i++) {
+            uint256 amt = 1e18 + i * 5e17;
+            uint256 out = CurveMath.computeBuyOutput(amt, S, c);
+            uint256 legInt = CurveMath.curveIntegral(S, S + out, c);
+            // every buy leg is INDIVIDUALLY conservative (no B-2 over-mint)
+            assertLe(legInt, amt, "leg over-mint");
+            S += out;
+            owned += out;
+            totalIn += amt;
+            legSum += legInt;
+        }
+
+        uint256 back = CurveMath.computeSellOutput(owned, S, c);
+        uint256 bulkInt = CurveMath.curveIntegral(S0, S, c);
+
+        // B4j FIXED: the rubber ruler is dead — the coarse bulk integral
+        // over the exact partition equals the sum of per-leg integrals
+        // BIT-EXACTLY (integer telescoping of F).
+        assertEq(bulkInt, legSum, "segmentation inconsistent (B4j regression?)");
+
+        // and the one-fee-leg round trip is back under the 95% bound
+        uint256 userBack = back - (back * 500) / 10000;
+        assertLe(userBack, (totalIn * 9500) / 10000, "round trip beat fees (B4j regression?)");
+    }
+
+    // Execution-mode sentinel: the pre-fix extraction loop (chopped buys
+    // across one exponent tread + bulk sell, CurveHook's REAL fee semantics
+    // on BOTH legs) must now LOSE the two fee legs. State restoration is
+    // still asserted — the loop shape is repeatable, which is exactly why
+    // unprofitability must hold bit-tight.
+    function test_B4j_FIXED_chopBuyBulkSellLosesFees() public {
+        CurveMath.CurveConfig memory c = _randCfg(15091685722);
+        uint256 baseOut = CurveMath.computeBuyOutput(1e20, 0, c);
+
+        uint256 D = 1e14;      // mixETH per chop (100x CurveHook MIN_SWAP_INPUT)
+        uint256 N = 3;         // chops per cycle
+        uint256 totalLoss;
+
+        for (uint8 cyc = 0; cyc < 3; cyc++) {
+            uint256 S = baseOut;
+            uint256 owned;
+            for (uint8 i = 0; i < N; i++) {
+                uint256 curveIn = (D * 9500) / 10000;       // buy-side 5% fee
+                uint256 out = CurveMath.computeBuyOutput(curveIn, S, c);
+                assertGt(out, 0, "chop output");
+                S += out;
+                owned += out;
+            }
+
+            uint256 back = CurveMath.computeSellOutput(owned, S, c);
+            uint256 userBack = back - (back * 500) / 10000; // sell-side 5% fee
+            uint256 spent = D * N;
+
+            // B4j FIXED: the tread is no longer harvestable — the cycle
+            // pays both fee legs and nets NEGATIVE.
+            assertLe(userBack, spent, "extraction profitable (B4j regression?)");
+
+            // cycle is still state-restoring; assert it stays that way
+            assertEq(S - owned, baseOut, "state not restored");
+            totalLoss += spent - userBack;
+        }
+        assertGt(totalLoss, 0, "churn should pay both fee legs");
     }
 }

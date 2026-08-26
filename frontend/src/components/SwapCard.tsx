@@ -395,7 +395,7 @@ export default function SwapCard() {
               key={s}
               onClick={() => setSlippage(s)}
               className={`rounded-lg px-2 py-1 font-bold transition ${
-                slippage === s ? 'bg-sky-400 text-white' : 'bg-sky-50 text-slate-500'
+                slippage === s ? 'bg-sky-400 text-[#fff]' : 'bg-sky-50 text-slate-500'
               }`}
             >
               {s * 100}%
@@ -447,7 +447,7 @@ function TokenPicker({
           key={o}
           onClick={() => onChange(o)}
           className={`rounded-xl px-3 py-2 text-sm font-black transition ${
-            value === o ? 'bg-gradient-to-r from-sky-400 to-emerald-400 text-white' : 'text-slate-400'
+            value === o ? 'bg-gradient-to-r from-sky-400 to-emerald-400 text-[#fff]' : 'text-slate-400'
           }`}
         >
           {o === 'MIX' ? '🌊 mix' : 'Ξ ETH'}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
-import { factoryAbi, controllerAbi, hookAbi, erc20Abi } from './abi'
+import { factoryAbi, controllerAbi, hookAbi, erc20Abi, stakerAbi } from './abi'
 import { ADDRESSES } from './config'
 import { rpcCall } from './rpc'
 import type { CurveConfig, Zone } from './curve'
@@ -9,6 +9,7 @@ export interface RoundInfo {
   id: bigint
   token: `0x${string}` | undefined
   controller: `0x${string}` | undefined
+  staker: `0x${string}` | undefined
   hook: `0x${string}` | undefined
   mix: `0x${string}` | undefined
   mode: number | undefined // 0 Predeposit, 1 Active, 2 Flat, 3 Destroyed
@@ -17,8 +18,6 @@ export interface RoundInfo {
   marginalPrice: bigint | undefined
   totalLocked: bigint | undefined
   flatTime: bigint | undefined // bomb timestamp — nonzero = flat, locks open
-  potPSP: bigint | undefined // side pot PSP held (25bps of fees, never locked)
-  potMix: bigint | undefined // side pot mixETH funded pre-launch (rebirth carry)
   predepositClosed: boolean | undefined
   totalPredeposit: bigint | undefined
   predepositCap: bigint | undefined
@@ -26,9 +25,9 @@ export interface RoundInfo {
 }
 
 const EMPTY: RoundInfo = {
-  id: 0n, token: undefined, controller: undefined, hook: undefined, mix: undefined,
+  id: 0n, token: undefined, controller: undefined, staker: undefined, hook: undefined, mix: undefined,
   mode: undefined, reserve: undefined, supply: undefined, marginalPrice: undefined,
-  totalLocked: undefined, potPSP: undefined, potMix: undefined, predepositClosed: undefined, totalPredeposit: undefined,
+  totalLocked: undefined, predepositClosed: undefined, totalPredeposit: undefined,
   predepositCap: undefined, curve: undefined, flatTime: undefined,
 }
 
@@ -49,25 +48,26 @@ export function useRound(): RoundInfo {
         const [rToken, rController, rHook] = (await rpcCall(F, factoryAbi, 'rounds', [id])) as [
           `0x${string}`, `0x${string}`, `0x${string}`,
         ]
-        const [mode, reserve, supply, mp, cfg, zones, totalLocked, pot, pdClosed, totalPd, cap, flatTime] = await Promise.all([
+        const rStaker = (await rpcCall(rController, controllerAbi, 'staker')) as `0x${string}`
+        const [mode, reserve, supply, mp, cfg, zones, totalLocked, pd, flatTime] = await Promise.all([
           rpcCall(rHook, hookAbi, 'mode') as Promise<bigint>,
           rpcCall(rHook, hookAbi, 'reserveMixETH') as Promise<bigint>,
           rpcCall(rHook, hookAbi, 'totalSupplyPSP') as Promise<bigint>,
           rpcCall(rHook, hookAbi, 'getMarginalPrice') as Promise<bigint>,
           rpcCall(rHook, hookAbi, 'curveConfig') as Promise<bigint>,
           rpcCall(rHook, hookAbi, 'getCurveZones') as Promise<Zone[]>,
-          rpcCall(rController, controllerAbi, 'totalLocked') as Promise<bigint>,
-          rpcCall(rController, controllerAbi, 'potState') as Promise<[bigint, bigint]>,
-          rpcCall(rController, controllerAbi, 'predepositClosed') as Promise<boolean>,
-          rpcCall(rController, controllerAbi, 'totalPredepositMixETH') as Promise<bigint>,
-          rpcCall(rController, controllerAbi, 'PREDEPOSIT_CAP') as Promise<bigint>,
+          rpcCall(rStaker, stakerAbi, 'totalLocked') as Promise<bigint>,
+          rpcCall(rController, controllerAbi, 'predepositState') as Promise<
+            [bigint, bigint, bigint, boolean, boolean, boolean, boolean]
+          >,
           rpcCall(rController, controllerAbi, 'flatTime') as Promise<bigint>,
         ])
         if (dead || !rHook || !rController) return
         setInfo({
-          id, token: rToken, controller: rController, hook: rHook, mix,
+          id, token: rToken, controller: rController, staker: rStaker, hook: rHook, mix,
           mode: Number(mode), reserve, supply, marginalPrice: mp,
-          totalLocked, potPSP: pot[0], potMix: pot[1], predepositClosed: pdClosed, totalPredeposit: totalPd, predepositCap: cap,
+          totalLocked,
+          predepositClosed: pd[3], totalPredeposit: pd[0], predepositCap: pd[1],
           flatTime,
           curve: { p0: cfg, zones: zones.map((z) => ({ ...z })) },
         })

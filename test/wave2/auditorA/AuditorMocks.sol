@@ -178,10 +178,10 @@ contract ReentryAttacker {
 
     function pwn() external {
         attempts++;
-        try victim.claimFees() {
+        try victim.staker().claimFees() {
             successes++;
         } catch {}
-        try victim.unlock() {
+        try victim.staker().unlock() {
             successes++;
         } catch {}
     }
@@ -195,10 +195,10 @@ contract ReentryAttacker {
     }
 
     function doClaimFees() external {
-        victim.claimFees();
+        victim.staker().claimFees();
     }
 
     function doUnlock() external {
-        victim.unlock();
+        victim.staker().unlock();
     }
 }

@@ -6,11 +6,14 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {PSPToken} from "../../../src/PSPToken.sol";
 import {RoundController} from "../../../src/RoundController.sol";
+import {PSPStaker} from "../../../src/PSPStaker.sol";
 import {CurveHook} from "../../../src/CurveHook.sol";
 import {CurveMath} from "../../../src/libraries/CurveMath.sol";
 import {MockMixETH} from "../../mocks/MockMixETH.sol";
 import {AuditorFactory} from "./AuditorMocks.sol";
 import {AuditorHook} from "./AuditorMocks.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @dev Shared harness: controller deployed with AuditorFactory as owner and
 ///      AuditorHook wired. Governance ops driven via pranks on the factory.
@@ -20,6 +23,7 @@ contract AuditorBase is Test {
     AuditorFactory audFactory;
     AuditorHook audHook;
     RoundController controller;
+    PSPStaker public stakerV; // cached: single vm.prank must not be eaten by the staker() view call
 
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
@@ -37,7 +41,8 @@ contract AuditorBase is Test {
 
         audFactory = new AuditorFactory();
         psp = new PSPToken("PSP", "PSP", address(audFactory));
-        controller = new RoundController(psp, IERC20(address(mixETH)), curve, address(audFactory));
+        controller = new RoundController(psp, IERC20(address(mixETH)), curve, address(audFactory), address(0), new StakerDeployer());
+        stakerV = controller.staker();
 
         audHook = new AuditorHook(IERC20(address(mixETH)));
 
@@ -105,12 +110,14 @@ contract AuditorBase is Test {
         vm.warp(c.flatTime() + c.FLAT_EXIT_WINDOW() + 1);
     }
 
-    /// @dev H-1 custody: every PSP at the controller is accounted for
+    /// @dev H-1 custody (2026-08-19): locked PSP lives at the staker, the
+    ///      controller holds none. The pot no longer exists.
     function _assertPspInvariant(string memory tag) internal view {
+        assertEq(psp.balanceOf(address(controller)), 0, tag);
         assertEq(
-            psp.balanceOf(address(controller)),
-            controller.totalLocked() + controller.potPSPBalance(),
-            tag
+            psp.balanceOf(address(controller.staker())),
+            stakerV.totalLocked(),
+            string.concat(tag, ": staker custody")
         );
     }
 }

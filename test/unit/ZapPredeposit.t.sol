@@ -18,6 +18,8 @@ import {IMixETH} from "../../src/interfaces/IMixETH.sol";
 
 import {MockMixETH} from "../mocks/MockMixETH.sol";
 import {MockPoolManager} from "../mocks/MockPoolManager.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title ZapPredepositTest — the ETH wrap + predeposit path needs no chain
 ///        state, so this is pure unit: real MockMixETH vault math, real
@@ -39,7 +41,7 @@ contract ZapPredepositTest is Test {
         mixETH.depositETH{value: 100_000e18}();
         poolManager = new MockPoolManager();
         factory = new PSPFactory(
-            IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer()
+            IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer()
         , 0);
         zapIn = new PSPZapIn(IMixETH(address(mixETH)), IPoolManager(address(poolManager)));
 

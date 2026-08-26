@@ -5,12 +5,15 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {AuditorBase} from "./AuditorBase.sol";
 import {RoundController} from "../../../src/RoundController.sol";
+import {PSPStaker} from "../../../src/PSPStaker.sol";
 import {CurveHook} from "../../../src/CurveHook.sol";
 import {PSPToken} from "../../../src/PSPToken.sol";
 import {AuditorFactory} from "./AuditorMocks.sol";
 import {AuditorHook} from "./AuditorMocks.sol";
 import {FailFactory} from "./AuditorMocks.sol";
 import {console2} from "forge-std/console2.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title A3 — lifecycle & phase-guard findings: post-launch carry/pot
 ///        seeding, flat-window pot stranding, finalize fee sweep, relock.
@@ -37,14 +40,14 @@ contract A3_LifecycleTest is AuditorBase {
 
         uint256 g = controller.genesisPSPSnapshot();
         _claim(alice);
-        (uint256 aliceAmt,,,) = controller.locks(alice);
+        uint256 aliceAmt = stakerV.lockedPSPOf(alice);
         assertApproxEqAbs(aliceAmt, (g * 100e18) / 200e18, 2, "alice's half-diluted share");
         assertLt(aliceAmt, g, "dilution: alice receives < her boot share");
 
         // factory claims the other half — and gains a governance lock
         vm.prank(address(audFactory));
         controller.claimPredepositPSP();
-        (uint256 fAmt,,,) = controller.locks(address(audFactory));
+        uint256 fAmt = stakerV.lockedPSPOf(address(audFactory));
         assertApproxEqAbs(fAmt, aliceAmt, 2, "factory captured half of genesis PSP");
 
         // conservation: no PSP created/lost, but 50% of alice's boot value
@@ -70,101 +73,11 @@ contract A3_LifecycleTest is AuditorBase {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // F-1b: potDeposit() post-launch — funds sit as "stray" mixETH and are
-    //       owner-sweepable; totalPotMixETH ledger drifts.
+    // v5.1 (2026-08-19): F-1b / F-2 / pot-redemption-happy-path were
+    // DELETED — their surface (potDeposit, mintPotPSP, creditPotPSP,
+    // totalPotMixETH) was removed with the side pot. The findings died
+    // with the mechanism.
     // ─────────────────────────────────────────────────────────────
-    function test_F1b_post_launch_potDeposit_then_owner_sweep() public {
-        _deposit(alice, 100e18);
-        _launch();
-
-        mixETH.transfer(address(audFactory), 50e18);
-        vm.startPrank(address(audFactory));
-        mixETH.approve(address(controller), 50e18);
-        controller.potDeposit(50e18); // accepted post-launch
-        vm.stopPrank();
-
-        assertEq(controller.totalPotMixETH(), 50e18, "ledger records pot funding");
-        assertEq(mixETH.balanceOf(address(controller)), 50e18, "mixETH idle at controller");
-        assertEq(controller.potPSPBalance(), 0, "no pot PSP backs it");
-
-        // post-launch mixETH is sweepable by the owner (I-1 stray-rescue)
-        uint256 fBefore = mixETH.balanceOf(address(audFactory));
-        vm.prank(address(audFactory));
-        controller.sweep(address(mixETH));
-        assertEq(mixETH.balanceOf(address(audFactory)), fBefore + 50e18, "pot funds swept");
-        assertEq(controller.totalPotMixETH(), 50e18, "ledger still claims a pot");
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // F-2: pot PSP accrued DURING the flat window can never be redeemed —
-    //       carpetBomb already executed, finalizeCarpet ignores it.
-    // ─────────────────────────────────────────────────────────────
-    function test_F2_flat_window_pot_accrual_stranded_forever() public {
-        _deposit(alice, 100e18);
-        _launch();
-        _claim(alice);
-        _bomb(alice); // pot was 0 at bomb time
-        assertEq(controller.potPSPBalance(), 0);
-
-        // flat-window buy accrues pot (mintPotPSP — real PSP to controller)
-        vm.prank(address(audHook));
-        controller.mintPotPSP(1e21);
-        // flat-window sell accrues pot (real PSP transfer + ledger credit)
-        vm.startPrank(address(audHook));
-        controller.mintPSPForSwap(1e20);
-        psp.transfer(address(controller), 1e20);
-        controller.creditPotPSP(1e20);
-        vm.stopPrank();
-
-        assertEq(controller.potPSPBalance(), 11e20);
-        _assertPspInvariant("post flat trades");
-
-        _warpPastFlatWindow();
-        controller.finalizeCarpet();
-
-        // F-2 core: nothing credited to the ring-fenced side pot
-        assertEq(audFactory.sidePot(), 0, "flat-window pot never reached factory");
-        assertEq(controller.potPSPBalance(), 11e20, "pot PSP stranded at controller");
-        _assertPspInvariant("post finalize");
-        assertEq(mixETH.balanceOf(address(audHook)), 0, "hook drained");
-        assertEq(audFactory.spawnCount(), 1, "next round spawned");
-
-        // no exit remains for the stranded pot
-        vm.expectRevert(RoundController.AlreadyExecuted.selector);
-        controller.carpetBomb();
-        vm.prank(address(audFactory));
-        vm.expectRevert(RoundController.ProtectedToken.selector);
-        controller.sweep(address(psp));
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Verified-safe: pre-launch potDeposit + bomb-time redemption works
-    // ─────────────────────────────────────────────────────────────
-    function test_pot_redemption_happy_path() public {
-        _deposit(alice, 100e18);
-        mixETH.transfer(address(audFactory), 20e18);
-        vm.startPrank(address(audFactory));
-        mixETH.approve(address(controller), 20e18);
-        controller.potDeposit(20e18); // PRE-launch — the intended path
-        vm.stopPrank();
-
-        _launch();
-        uint256 initialPSP = audHook.totalSupplyPSP();
-        uint256 expectedPotShare = (initialPSP * 20e18) / 120e18;
-        _claim(alice);
-
-        _bomb(alice);
-
-        uint256 out = audFactory.sidePot();
-        assertGt(out, 0, "pot redemption credited");
-        assertEq(mixETH.balanceOf(address(audFactory)), out, "funds at factory");
-        assertEq(controller.potPSPBalance(), 0, "pot ledger cleared");
-        assertLt(audHook.totalSupplyPSP(), initialPSP, "hook supply reduced");
-        assertApproxEqAbs(
-            initialPSP - audHook.totalSupplyPSP(), expectedPotShare, 1, "burned ~ pot share"
-        );
-        _assertPspInvariant("post pot redemption");
-    }
 
     // ─────────────────────────────────────────────────────────────
     // F-4: finalize drains unclaimed staker fees into the carry
@@ -175,7 +88,7 @@ contract A3_LifecycleTest is AuditorBase {
         _launch();
         _claim(alice);
         _claim(bob);
-        (uint256 bobShare,,,) = controller.locks(bob);
+        uint256 bobShare = stakerV.lockedPSPOf(bob);
 
         mixETH.transfer(address(audHook), 100e18);
         vm.prank(address(audHook));
@@ -184,7 +97,7 @@ contract A3_LifecycleTest is AuditorBase {
         // alice claims hers in time
         uint256 aBefore = mixETH.balanceOf(alice);
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         assertApproxEqRel(mixETH.balanceOf(alice) - aBefore, 60e18, 1e15);
 
         // both lockers vote yes → 100% cast, quorum passes
@@ -207,12 +120,12 @@ contract A3_LifecycleTest is AuditorBase {
         // bob's strict claim path is bricked; principal still exits
         vm.prank(bob);
         vm.expectRevert(AuditorHook.InsufficientFees.selector);
-        controller.claimFees();
+        stakerV.claimFees();
 
-        vm.expectEmit(true, true, false, false, address(controller));
-        emit RoundController.FeesForfeited(bob, 0);
+        vm.expectEmit(true, true, false, false, address(stakerV));
+        emit PSPStaker.FeesForfeited(bob, 0);
         vm.prank(bob);
-        controller.unlock();
+        stakerV.unlock();
         assertEq(psp.balanceOf(bob), bobShare, "principal released");
     }
 
@@ -228,12 +141,12 @@ contract A3_LifecycleTest is AuditorBase {
 
         vm.warp(block.timestamp + 84 days); // inside the last-7d window
         vm.prank(bob);
-        controller.relock(); // documented behavior
+        stakerV.relock(); // documented behavior
 
         vm.warp(block.timestamp + 11 days); // 5 days past expiry, window closed
         vm.prank(alice);
-        controller.relock(); // still succeeds — natspec says window-only
-        (,,, uint256 ut) = controller.locks(alice);
+        stakerV.relock(); // still succeeds — natspec says window-only
+        (,, , uint256 ut) = stakerV.positions(alice);
         assertEq(ut, block.timestamp + 90 days, "lock silently extended 90d");
     }
 
@@ -249,13 +162,13 @@ contract A3_LifecycleTest is AuditorBase {
         _bomb(alice); // flat: locks open immediately
 
         vm.prank(alice);
-        controller.unlock(); // NOT 90 days old yet
+        stakerV.unlock(); // NOT 90 days old yet
         assertEq(psp.balanceOf(alice), g, "flat exit delivered principal");
 
         vm.startPrank(alice);
-        psp.approve(address(controller), g);
-        vm.expectRevert(RoundController.RoundDestroyed.selector);
-        controller.lock(g);
+        psp.approve(address(stakerV), g);
+        vm.expectRevert(PSPStaker.RoundDead.selector); // staker guards dead rounds
+        stakerV.lock(g);
         vm.stopPrank();
     }
 
@@ -266,7 +179,7 @@ contract A3_LifecycleTest is AuditorBase {
         FailFactory ff = new FailFactory();
         PSPToken psp2 = new PSPToken("T", "T", address(ff));
         RoundController c2 =
-            new RoundController(psp2, IERC20(address(mixETH)), curve, address(ff));
+            new RoundController(psp2, IERC20(address(mixETH)), curve, address(ff), address(0), new StakerDeployer());
         AuditorHook h2 = new AuditorHook(IERC20(address(mixETH)));
         vm.startPrank(address(ff));
         psp2.setController(address(c2));

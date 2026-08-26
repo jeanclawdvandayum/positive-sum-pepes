@@ -7,6 +7,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ICurveHook} from "./interfaces/ICurveHook.sol";
 import {IRoundController} from "./interfaces/IRoundController.sol";
 
+/// @dev Minimal descriptor slice (EIP-170 budget): metadata + SVG from DNA.
+interface IPepeDescriptor {
+    function tokenURI(uint256 dna) external pure returns (string memory);
+}
+
 /// @title PSPStaker — ERC-721 staking positions (vlCVX-style, tradeable)
 /// @notice Every locked position is an NFT. One position per address (amounts
 ///         merge on top-up, timer resets — same semantics as the old ledger).
@@ -20,6 +25,12 @@ import {IRoundController} from "./interfaces/IRoundController.sol";
 ///
 ///         Genesis lock: the predeposit pool's virtual position lives at this
 ///         contract's own address, never minted as an NFT, never transferable.
+///
+///         Pepe art (2026-08-22): each NFT carries deterministic DNA
+///         (keccak(tokenId)) rendered by PepeDescriptor. lock(0) mints the
+///         NFT with no stake — the pepe-first onboarding path. unlock() keeps
+///         the NFT (a "husk"): the pepe remains with its owner forever as
+///         proof of participation; re-locking revives the husk.
 contract PSPStaker {
     using SafeERC20 for IERC20;
 
@@ -37,6 +48,8 @@ contract PSPStaker {
     error ZeroAddress();
     error NotController();
     error BadNftTransfer();
+    error BadPepeId();      // chosen-id path: zero or already claimed
+    error PepeAlreadyOwned(); // lockWithPepe with an existing NFT — top up via lock()
 
     // ─────────────── Events (ERC-721) ───────────────
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
@@ -74,14 +87,19 @@ contract PSPStaker {
     uint256 public nextTokenId = 1;
     mapping(uint256 => address) private _ownerOf;
     mapping(address => uint256) private _tokenOf; // 0 = none
-    mapping(uint256 => address) private _approved;
     mapping(address => mapping(address => bool)) private _operator;
 
-    constructor(IERC20 _psp, IRoundController _controller) {
+    // ─────────────── Pepe art state ───────────────
+    /// @dev PepeDescriptor (SVG + metadata), wired at construction via the
+    ///      factory. Zero = this round carries no art (tokenURI is empty).
+    address public immutable descriptor;
+
+    constructor(IERC20 _psp, IRoundController _controller, address descriptor_) {
         if (address(_psp) == address(0)) revert ZeroAddress();
         if (address(_controller) == address(0)) revert ZeroAddress();
         psp = _psp;
         controller = _controller;
+        descriptor = descriptor_;
     }
 
     // ─────────────── ERC-165 / ERC-721 surface ───────────────
@@ -104,20 +122,39 @@ contract PSPStaker {
         return _tokenOf[owner];
     }
 
-    /// @dev Art lands next session (TODO.md) — stub for now.
+    /// @notice deterministic per-token generative DNA (full word; the
+    ///         descriptor clamps every axis — any dna renders). Pure view:
+    ///         every conceivable tokenId has a dna, live or not.
+    ///         encodePacked(uint) is byte-identical to encode(uint) —
+    ///         minus the 32-byte offsets head — so the dna is unchanged.
+    function dnaOf(uint256 tokenId) public pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(tokenId)));
+    }
+
+    /// @dev Raw mint with a specific id — validation is the CALLER's job
+    ///      (sequential ids are skip-loop-fresh; lockWithPepe guards its own).
+    function _mint(address to, uint256 id) internal {
+        _ownerOf[id] = to;
+        _tokenOf[to] = id;
+        emit Transfer(address(0), to, id);
+    }
+
+    /// @dev Mint with the next free sequential id (skips user-chosen ids).
+    function _mintSequential(address to) internal {
+        while (_ownerOf[nextTokenId] != address(0)) ++nextTokenId;
+        _mint(to, nextTokenId++);
+    }
+
+    /// @notice token metadata: the pepe rendered from this token's DNA.
+    ///         Reverts on a round deployed without art (descriptor == 0).
     function tokenURI(uint256 tokenId) external view returns (string memory) {
         if (_ownerOf[tokenId] == address(0)) revert NotNftOwner();
-        return "";
+        return IPepeDescriptor(descriptor).tokenURI(dnaOf(tokenId));
     }
 
-    function approve(address to, uint256 tokenId) external {
-        address o = _ownerOf[tokenId];
-        if (o == address(0)) revert NotNftOwner();
-        if (msg.sender != o && !_operator[o][msg.sender]) revert NotAuthorizedNft();
-        _approved[tokenId] = to;
-        emit Approval(o, to, tokenId);
-    }
-
+    /// @dev per-token approvals dropped (EIP-170, 2026-08-22): operator
+    ///      approvals (setApprovalForAll) remain — that's the only path
+    ///      marketplaces (Seaport) use.
     function setApprovalForAll(address operator, bool approved) external {
         _operator[msg.sender][operator] = approved;
         emit ApprovalForAll(msg.sender, operator, approved);
@@ -137,13 +174,16 @@ contract PSPStaker {
         if (to == address(0) || to == address(this)) revert BadNftTransfer();
         address o = _ownerOf[tokenId];
         if (o == address(0) || o != from) revert NotNftOwner();
-        if (msg.sender != from && msg.sender != _approved[tokenId] && !_operator[from][msg.sender]) {
+        if (msg.sender != from && !_operator[from][msg.sender]) {
             revert NotAuthorizedNft();
         }
         // D9: positions are address-keyed; a recipient with an existing
-        // position cannot merge on-chain — they unlock first (or transfer to
-        // a fresh address).
-        if (_tokenOf[to] != 0) revert RecipientHasPosition();
+        // LIVE position cannot merge on-chain — they unlock first (or
+        // transfer to a fresh address). A husk holder (unlocked, NFT kept)
+        // CAN receive: the position merges onto their surviving NFT and the
+        // sender's NFT burns.
+        bool recipientHusk = _tokenOf[to] != 0 && positions[to].amount == 0;
+        if (_tokenOf[to] != 0 && !recipientHusk) revert RecipientHasPosition();
 
         // Move the whole position — rewardDebt rides, so accrued fees pay to
         // the NEW owner on their next claim. (User spec: transfer moves lock
@@ -151,12 +191,17 @@ contract PSPStaker {
         positions[to] = positions[from];
         delete positions[from];
 
-        _ownerOf[tokenId] = to;
-        _tokenOf[from] = 0;
-        _tokenOf[to] = tokenId;
-        delete _approved[tokenId];
-
-        emit Transfer(from, to, tokenId);
+        if (recipientHusk) {
+            // Position rides the recipient's husk; sender's NFT retires.
+            _ownerOf[tokenId] = address(0);
+            _tokenOf[from] = 0;
+            emit Transfer(from, address(0), tokenId);
+        } else {
+            _ownerOf[tokenId] = to;
+            _tokenOf[from] = 0;
+            _tokenOf[to] = tokenId;
+            emit Transfer(from, to, tokenId);
+        }
     }
 
     // ─────────────── Staking ───────────────
@@ -165,18 +210,36 @@ contract PSPStaker {
     function _requireAlive() internal view {
         if (controller.flatTime() != 0) revert RoundDead();
         address hook = controller.hookAddress();
-        if (hook != address(0)) {
-            ICurveHook.Mode m = ICurveHook(hook).mode();
-            if (m == ICurveHook.Mode.Flat || m == ICurveHook.Mode.Destroyed) revert RoundDead();
-        }
+        // Mode order: Predeposit < Active < Flat < Destroyed — the two
+        // dead modes are exactly mode() >= Flat.
+        if (hook != address(0) && ICurveHook(hook).mode() >= ICurveHook.Mode.Flat) revert RoundDead();
     }
 
     /// @notice Lock PSP — mints a position NFT on first lock, tops up
     ///         (claiming fees, resetting the clock) afterwards.
+    ///         amount == 0 mints the NFT with NO stake (pepe-first path:
+    ///         arrive, get your pepe, stake when ready). Never resets a clock.
     function lock(uint256 amount) external {
-        if (amount == 0) revert ZeroAmount();
         _requireAlive();
+        if (amount != 0) _stake(amount);
+        if (_tokenOf[msg.sender] == 0) _mintSequential(msg.sender);
+    }
 
+    /// @notice Lock with a CHOSEN pepe — the art-selection path. A pepe's
+    ///         dna is keccak(pepeId), so pick your art off-chain (renderSVG
+    ///         on candidate ids) and commit the one you love. amount == 0
+    ///         hatches the pepe with no stake. Caller must hold no pepe
+    ///         yet — top up an existing one via lock().
+    function lockWithPepe(uint256 amount, uint256 pepeId) external {
+        _requireAlive();
+        if (_tokenOf[msg.sender] != 0) revert PepeAlreadyOwned();
+        if (pepeId == 0 || _ownerOf[pepeId] != address(0)) revert BadPepeId();
+        if (amount != 0) _stake(amount);
+        _mint(msg.sender, pepeId);
+    }
+
+    /// @dev shared stake body for lock()/lockWithPepe().
+    function _stake(uint256 amount) internal {
         _updateAccumulator();
         Position storage pos = positions[msg.sender];
         if (pos.amount > 0) {
@@ -191,19 +254,12 @@ contract PSPStaker {
         pos.unlockTime = block.timestamp + controller.LOCK_DURATION();
         totalLocked += amount;
 
-        if (_tokenOf[msg.sender] == 0) {
-            uint256 id = nextTokenId++;
-            _ownerOf[id] = msg.sender;
-            _tokenOf[msg.sender] = id;
-            emit Transfer(address(0), msg.sender, id);
-        }
-
         emit Locked(msg.sender, amount);
     }
 
     /// @notice Withdraw after expiry (or any time once the round is flat).
-    ///         Burns the NFT — the position, not the art, is the asset
-    ///         (D8 dial: keep-as-husk alternative in the design doc).
+    ///         The NFT SURVIVES as a husk — the pepe stays with its owner
+    ///         forever, proof they participated. Re-locking revives it.
     function unlock() external {
         Position storage pos = positions[msg.sender];
         if (pos.amount == 0) revert NotLocker();
@@ -214,15 +270,11 @@ contract PSPStaker {
 
         uint256 amount = pos.amount;
         totalLocked -= amount;
-        uint256 id = _tokenOf[msg.sender];
+        // Position goes; NFT + DNA stay (proof of participation).
         delete positions[msg.sender];
-        delete _ownerOf[id];
-        delete _approved[id];
-        _tokenOf[msg.sender] = 0;
 
         psp.safeTransfer(msg.sender, amount);
 
-        emit Transfer(msg.sender, address(0), id);
         emit Unlocked(msg.sender, amount);
     }
 
@@ -299,12 +351,7 @@ contract PSPStaker {
         pos.unlockTime = block.timestamp + controller.LOCK_DURATION();
         // totalLocked unchanged: share moves between positions
 
-        if (_tokenOf[user] == 0) {
-            uint256 id = nextTokenId++;
-            _ownerOf[id] = user;
-            _tokenOf[user] = id;
-            emit Transfer(address(0), user, id);
-        }
+        if (_tokenOf[user] == 0) _mintSequential(user);
 
         emit Locked(user, share);
     }
@@ -356,8 +403,6 @@ contract PSPStaker {
     function lockedPSPOf(address user) external view returns (uint256) {
         return positions[user].amount;
     }
-
-    function lockTimeOf(address user) external view returns (uint256) {
-        return positions[user].lockTime;
-    }
+    // (lockTime/unlockTime read via positions(user) — EIP-170 budget,
+    //  the aliases were dropped 2026-08-22)
 }

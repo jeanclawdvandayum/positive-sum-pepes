@@ -10,6 +10,7 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IMixETH} from "../../src/interfaces/IMixETH.sol";
 
 import {PSPFactory} from "../../src/PSPFactory.sol";
+import {PSPStaker} from "../../src/PSPStaker.sol";
 import {HookDeployer} from "../../src/HookDeployer.sol";
 import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
@@ -17,26 +18,22 @@ import {CurveMath} from "../../src/libraries/CurveMath.sol";
 import {PSPZapIn} from "../../src/PSPZapIn.sol";
 import {PSPZapOut} from "../../src/PSPZapOut.sol";
 import {RoundController} from "../../src/RoundController.sol";
+import {PSPStaker} from "../../src/PSPStaker.sol";
 import {MockMixETH} from "../mocks/MockMixETH.sol";
 import {MockPoolManager} from "../mocks/MockPoolManager.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 interface ControllerLike {
     function predeposit(uint256 mixAmount) external;
     function launchPooledBuy() external;
     function claimPredepositPSP() external;
-    function lock(uint256 amount) external;
-    function potPSPBalance() external view returns (uint256);
-    function totalLocked() external view returns (uint256);
-    function unlock() external;
-    function relock() external;
     function proposeCarpetBomb() external;
     function voteCarpetBomb(bool support) external;
     function carpetBomb() external;
     function finalizeCarpet() external;
     function flatTime() external view returns (uint256);
-    function potState() external view returns (uint256, uint256);
-    function locks(address) external view returns (uint256, uint256, uint256, uint256);
-    function claimFees() external;
+    function staker() external view returns (PSPStaker);
 }
 
 /// @title AuditB — fresh-eyes lifecycle/governance/pot battery
@@ -48,6 +45,7 @@ contract AuditLifecycleTest is Test {
     PSPZapOut zapOut;
     IERC20 psp;
     ControllerLike controller;
+    PSPStaker stakerV; // cached staker (prank-eaten-view fix)
     CurveHook hook;
 
     address alice = makeAddr("alice"); // staker
@@ -62,7 +60,7 @@ contract AuditLifecycleTest is Test {
             IPoolManager(address(poolManager)),
             IERC20(address(mixETH)),
             new HookDeployer(),
-            new ControllerDeployer()
+            new ControllerDeployer(), new StakerDeployer()
         , 0);
 
         PSPFactory.RoundParams memory params = PSPFactory.RoundParams({
@@ -75,6 +73,7 @@ contract AuditLifecycleTest is Test {
         PSPFactory.Round memory r = factory.getRound(roundId);
         psp = r.token;
         controller = ControllerLike(address(r.controller));
+        stakerV = r.controller.staker();
         hook = CurveHook(address(r.hook));
 
         zapIn = new PSPZapIn(IMixETH(address(mixETH)), IPoolManager(address(poolManager)));
@@ -113,9 +112,9 @@ contract AuditLifecycleTest is Test {
 
         vm.startPrank(bob);
         mixETH.approve(address(zapIn), type(uint256).max);
-        uint256 bobPSP = zapIn.buyWithMix(_key(), 20e18, 0, 0);
-        psp.approve(address(controller), type(uint256).max);
-        controller.lock(bobPSP);
+        uint256 bobPSP = zapIn.buyWithMix(_key(), 20e18, 0, 0, 0);
+        psp.approve(address(stakerV), type(uint256).max);
+        stakerV.lock(bobPSP);
         vm.stopPrank();
     }
 
@@ -151,7 +150,7 @@ contract AuditLifecycleTest is Test {
         controller.proposeCarpetBomb();
         vm.prank(alice);
         vm.expectRevert();
-        controller.unlock();
+        stakerV.unlock();
     }
 
     // B1b: non-staker cannot propose (no locked PSP)
@@ -168,8 +167,8 @@ contract AuditLifecycleTest is Test {
         // carol buys a BIG bag and locks → NO majority outweighs alice+bob
         uint256 carolPSP = _buy(carol, 300e18);
         vm.startPrank(carol);
-        psp.approve(address(controller), type(uint256).max);
-        controller.lock(carolPSP);
+        psp.approve(address(stakerV), type(uint256).max);
+        stakerV.lock(carolPSP);
         vm.stopPrank();
 
         skip(1);
@@ -279,7 +278,7 @@ contract AuditLifecycleTest is Test {
         vm.startPrank(carol);
         psp.approve(address(zapOut), type(uint256).max);
         vm.expectRevert();
-        zapOut.sellToMix(_key(), out, 0, 0);
+        zapOut.sellToMix(_key(), out, 0, 0, 0);
         vm.stopPrank();
         assertEq(uint8(hook.mode()), uint8(CurveHook.Mode.Destroyed));
     }
@@ -293,10 +292,9 @@ contract AuditLifecycleTest is Test {
 
         // ── instrument: who holds what post-bomb ──
         console2.log("controller PSP bal:", psp.balanceOf(address(controller)));
-        console2.log("potPSPBalance:", controller.potPSPBalance());
-        console2.log("totalLocked:", controller.totalLocked());
-        (uint256 aAmt,,, ) = controller.locks(alice);
-        (uint256 bAmt,,, ) = controller.locks(bob);
+        console2.log("totalLocked:", stakerV.totalLocked());
+        uint256 aAmt = stakerV.lockedPSPOf(alice);
+        uint256 bAmt = stakerV.lockedPSPOf(bob);
         console2.log("alice lock:", aAmt);
         console2.log("bob lock:", bAmt);
         console2.log("hook PSP bal:", psp.balanceOf(address(hook)));
@@ -304,10 +302,10 @@ contract AuditLifecycleTest is Test {
 
         // stakers must unlock() first (flat opens all locks immediately)
         vm.prank(alice);
-        controller.unlock();
+        stakerV.unlock();
         console2.log("after alice unlock, controller bal:", psp.balanceOf(address(controller)));
         vm.prank(bob);
-        controller.unlock();
+        stakerV.unlock();
 
         uint256 alicePSP = psp.balanceOf(alice);
         uint256 a1 = _sell(alice, alicePSP / 2);
@@ -330,45 +328,10 @@ contract AuditLifecycleTest is Test {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  B3 — pot accounting through bomb/finalize
+    //  B3 — (pot accounting removed 2026-08-19 with the side pot;
+    //  flat-window zero-fee is guarded by F9FlatWindowPot, staker fee
+    //  flow by B4a and NK24 P4)
     // ═══════════════════════════════════════════════════════════
-
-    // B3a: fees accrue pre-bomb; bomb redeems pot at flat rate, ring-fenced
-    function test_B3a_PotFlowThroughBomb() public {
-        _launchAndStake();
-        _buy(carol, 5e18); // fee-generating trade
-
-        (uint256 potPSP,) = controller.potState();
-        assertGt(potPSP, 0, "B3a: no pot PSP");
-
-        uint256 expMix =
-            (hook.reserveMixETH() * potPSP) / hook.totalSupplyPSP();
-        uint256 fBefore = mixETH.balanceOf(address(factory));
-
-        _bomb();
-
-        (uint256 potPSP2,) = controller.potState();
-        assertEq(potPSP2, 0, "B3a: pot PSP not cleared");
-        assertApproxEqAbs(
-            mixETH.balanceOf(address(factory)) - fBefore,
-            expMix,
-            5,
-            "B3a: pot redemption mismatch"
-        );
-        _solvent("B3a");
-    }
-
-    // B3b: FLIPPED by F-9 fix — zero-fee flat window: late trades accrue
-    // NOTHING to the pot (flat-window pot PSP was never redeemed at
-    // finalize; the fee is now killed at the source instead)
-    function test_B3b_NoPotAccrualDuringFlat() public {
-        _launchAndStake();
-        _bomb();
-        (uint256 potPSP0,) = controller.potState();
-        _buy(carol, 1e18);
-        (uint256 potPSP1,) = controller.potState();
-        assertEq(potPSP1, potPSP0, "B3b: flat trades must not accrue pot");
-    }
 
     // ═══════════════════════════════════════════════════════════
     //  B4 — staker fee claims
@@ -380,10 +343,10 @@ contract AuditLifecycleTest is Test {
         _buy(carol, 5e18);
 
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         vm.prank(alice);
         vm.expectRevert(); // NothingToClaim — ledger drained
-        controller.claimFees();
+        stakerV.claimFees();
         // solvency after claims
         _solvent("B4a");
     }
@@ -393,7 +356,7 @@ contract AuditLifecycleTest is Test {
         _launchAndStake();
         vm.prank(alice);
         vm.expectRevert(); // LockNotExpired
-        controller.unlock();
+        stakerV.unlock();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -435,7 +398,7 @@ contract AuditLifecycleTest is Test {
         _buy(bob, 1e18); // bob has more PSP now
         vm.startPrank(bob);
         psp.approve(address(zapOut), type(uint256).max);
-        try zapOut.sellToMix(_key(), 1, 0, 0) {
+        try zapOut.sellToMix(_key(), 1, 0, 0, 0) {
             emit log("wei sell succeeded (paid something)");
         } catch {
             emit log("wei sell reverted (guard)");
@@ -450,7 +413,7 @@ contract AuditLifecycleTest is Test {
         _launchAndStake();
         vm.startPrank(carol);
         mixETH.approve(address(zapIn), type(uint256).max);
-        try zapIn.buyWithMix(_key(), 1, 0, 0) {
+        try zapIn.buyWithMix(_key(), 1, 0, 0, 0) {
             emit log("1-wei buy succeeded");
         } catch {
             emit log("1-wei buy reverted (guard)");
@@ -500,7 +463,7 @@ contract AuditLifecycleTest is Test {
         vm.startPrank(carol);
         mixETH.approve(address(zapIn), type(uint256).max);
         vm.expectRevert();
-        zapIn.buyWithMix(_key(), 1e18, type(uint256).max, 0); // impossible min
+        zapIn.buyWithMix(_key(), 1e18, type(uint256).max, 0, 0); // impossible min
         vm.stopPrank();
     }
 
@@ -526,7 +489,7 @@ contract AuditLifecycleTest is Test {
     function _buy(address who, uint256 amt) internal returns (uint256) {
         vm.startPrank(who);
         mixETH.approve(address(zapIn), type(uint256).max);
-        uint256 out = zapIn.buyWithMix(_key(), amt, 0, 0);
+        uint256 out = zapIn.buyWithMix(_key(), amt, 0, 0, 0);
         vm.stopPrank();
         return out;
     }
@@ -534,7 +497,7 @@ contract AuditLifecycleTest is Test {
     function _sell(address who, uint256 amt) internal returns (uint256) {
         vm.startPrank(who);
         psp.approve(address(zapOut), type(uint256).max);
-        uint256 out = zapOut.sellToMix(_key(), amt, 0, 0);
+        uint256 out = zapOut.sellToMix(_key(), amt, 0, 0, 0);
         vm.stopPrank();
         return out;
     }
@@ -547,6 +510,6 @@ contract RevertingReceiver {
 
     function attack(address payable zapOut, PoolKey calldata key, uint256 pspAmt) external {
         IERC20(address(Currency.unwrap(key.currency1))).approve(zapOut, type(uint256).max);
-        PSPZapOut(zapOut).zapOut(key, pspAmt, 0, 0);
+        PSPZapOut(zapOut).zapOut(key, pspAmt, 0, 0, 0);
     }
 }

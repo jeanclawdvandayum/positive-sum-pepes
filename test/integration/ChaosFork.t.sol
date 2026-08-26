@@ -14,6 +14,7 @@ import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 
 import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
+import {PSPStaker} from "../../src/PSPStaker.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
 import {HookDeployer} from "../../src/HookDeployer.sol";
@@ -22,6 +23,8 @@ import {CurveMath} from "../../src/libraries/CurveMath.sol";
 
 import {MainnetConfig} from "./MainnetConfig.sol";
 import {MockMixETH} from "../mocks/MockMixETH.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title ChaosForkTest — End-to-end adversarial scenarios on the real V4 stack
 /// @notice Zombie rounds, concurrent pools, atomic MEV churn, cross-round pollution.
@@ -55,7 +58,7 @@ contract ChaosForkTest is Test {
         mixETH = new MockMixETH();
         mixETH.depositETH{value: 1_000_000e18}();
 
-        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), 0);
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), 0);
 
         mixETH.transfer(alice, 50_000e18);
         mixETH.transfer(bob, 50_000e18);
@@ -115,13 +118,74 @@ contract ChaosForkTest is Test {
 
         // Bob tries to lock his PSP into the dead round → rejected
         vm.prank(bob);
-        r1.token.approve(address(r1.controller), 10e18);
+        r1.token.approve(address(r1.controller.staker()), 10e18);
         vm.prank(bob);
-        vm.expectRevert(RoundController.RoundDestroyed.selector);
-        r1.controller.lock(10e18);
+        PSPStaker _stk3 = r1.controller.staker();
+        vm.expectRevert(PSPStaker.RoundDead.selector); // (2026-08-19) lock gates live in the staker now
+        _stk3.lock(10e18);
 
-        (uint256 amt,,,) = r1.controller.locks(bob);
+        uint256 amt = r1.controller.staker().lockedPSPOf(bob);
         assertEq(amt, 0, "no zombie lock created");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  TEST: B4j fork PoC — chop-buy/bulk-sell through the REAL V4 stack
+    //  (2026-08-19, wave2b) Pre-fix, a near-flat exp zone made the coarse
+    //  bulk integral disagree with the chain of fine buy legs; the
+    //  pre-fix library repro netted +611%/cycle. Post-fix
+    //  (telescoping _integralExp) the same loop must PAY both fee legs.
+    // ═══════════════════════════════════════════════════════════════
+
+    function test_Fork_B4j_ChopBuyBulkSellPaysFees() public {
+        // Dangerous-but-VALIDATED shape: near-flat exp zone, k=1.71e8
+        // (mulWad(k,width)=1.71e15 << 7 WAD cap) — the pre-fix tread
+        // height P/k ≈ 2.2e15 mixETH-wei was harvestable at chop size
+        // 1e14 (100x MIN_SWAP_INPUT).
+        CurveMath.CurveConfig memory danger = CurveMath.singleCurve(
+            384044371137762675096966, 10e24, 171054601, 0.5e18
+        );
+        RoundCtx memory rx = _deployRoundWith(danger);
+        _launchRound(rx, alice, 100e18);
+
+        uint256 D = 1.5e18; // on-chain sizing: P0≈384k mixETH/PSP makes each
+        // 1e14 library chop mint ~2.6e8 PSP-wei — under MIN_SWAP_INPUT (1e12)
+        // on the sell leg. Post-fee curve input (95%) × 3 chops at this size
+        // mints ~1.1e13 PSP-wei, 11x over the dust gate; cycle economics
+        // unchanged (fees ~9.75% round trip).
+        uint256 bobMixBefore = mixETH.balanceOf(bob);
+        uint256 reserveBefore = rx.hook.reserveMixETH();
+
+        // three chopped buys across the tread boundary
+        for (uint8 i; i < 3; i++) {
+            _buy(rx, bob, D);
+            assertGt(rx.token.balanceOf(bob), 0, "chop minted nothing");
+        }
+
+        // one bulk sell of everything bought
+        uint256 owned = rx.token.balanceOf(bob);
+        assertGt(owned, 0);
+        _sell(rx, bob, owned);
+
+        // POST-FIX invariant: the cycle loses both fee legs (~9.75%)
+        uint256 spent = bobMixBefore - mixETH.balanceOf(bob);
+        uint256 userBack = mixETH.balanceOf(bob) - (bobMixBefore - spent);
+        assertLt(userBack, spent, "B4j regression: chop/bulk beat fees on fork");
+
+        // the hook's reserve must have GROWN (fees + spread stay in backing)
+        assertGt(
+            rx.hook.reserveMixETH(), reserveBefore, "B4j regression: reserve drained"
+        );
+        _assertPoolSolvent(rx);
+    }
+
+    function _deployRoundWith(CurveMath.CurveConfig memory cfg)
+        internal
+        returns (RoundCtx memory ctx)
+    {
+        PSPFactory.RoundParams memory params =
+            PSPFactory.RoundParams({name: "Positive Sum Pepes", symbol: "PSP", curveConfig: cfg});
+        (uint256 roundId,) = factory.deployRound(params);
+        return _ctx(roundId);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -153,9 +217,9 @@ contract ChaosForkTest is Test {
         assertEq(r2.hook.totalSupplyPSP(), r2SupplyBefore, "r2 polluted by r1 sell");
 
         // Carol's predeposit claim auto-locked during launch — verify
-        (uint256 carolAmt,,,) = r2.controller.locks(carol);
+        uint256 carolAmt = r2.controller.staker().lockedPSPOf(carol);
         assertGt(carolAmt, 0);
-        (uint256 aliceAmt,,,) = r1.controller.locks(alice);
+        uint256 aliceAmt = r1.controller.staker().lockedPSPOf(alice);
         assertGt(aliceAmt, 0, "r1 lock vanished");
     }
 
@@ -342,9 +406,9 @@ contract ChaosForkTest is Test {
 
     function test_Fork_SoleLockerCapturesAllSwapFees() public {
         // Alice predeposit-claimed → she's the sole locker
-        (uint256 aliceLock,,,) = r1.controller.locks(alice);
+        uint256 aliceLock = r1.controller.staker().lockedPSPOf(alice);
         assertGt(aliceLock, 0);
-        assertEq(r1.controller.totalLocked(), aliceLock, "alice is sole locker");
+        assertEq(r1.controller.staker().totalLocked(), aliceLock, "alice is sole locker");
 
         // Bob churns: every buy pays 5% to the accumulator
         uint256 aliceMixBefore = mixETH.balanceOf(alice);
@@ -352,12 +416,15 @@ contract ChaosForkTest is Test {
         _buy(r1, bob, 10e18);
         _buy(r1, bob, 10e18);
 
+        PSPStaker _stk4 = r1.controller.staker();
         vm.prank(alice);
-        r1.controller.claimFees();
+        _stk4.claimFees();
         uint256 aliceFees = mixETH.balanceOf(alice) - aliceMixBefore;
 
         // ~5% of 30 ETH = 1.5 ETH to the sole locker
-        assertApproxEqRel(aliceFees, 1.425e18, 1e16, "sole locker rebate mismatch");
+        // (2026-08-19) bob's churn is unattributed → stakers take the full
+        // 500bps; the old 1.425e18 assumed the dead 450bps full-chain carve
+        assertApproxEqRel(aliceFees, 1.5e18, 1e16, "sole locker rebate mismatch");
         console.log("sole locker extracted from bob's churn:", aliceFees);
     }
 

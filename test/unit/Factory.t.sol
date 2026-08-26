@@ -23,6 +23,8 @@ import {IMixETH} from "../../src/interfaces/IMixETH.sol";
 
 import {MockMixETH} from "../mocks/MockMixETH.sol";
 import {MockPoolManager} from "../mocks/MockPoolManager.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title FactoryTest — PSPFactory unit tests (no fork, no real V4 state)
 /// @notice Covers the L-1 (carryToNextRound access), L-2 (pool-key gate) and
@@ -50,7 +52,7 @@ contract FactoryTest is Test {
         mixETH = new MockMixETH();
         mixETH.depositETH{value: 100_000e18}();
         poolManager = new MockPoolManager();
-        factory = new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), 0);
+        factory = new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), 0);
 
         _deployRound1();
     }
@@ -87,19 +89,22 @@ contract FactoryTest is Test {
     //  must fit far below a mainnet block gas limit
     // ═══════════════════════════════════════════════════════════════
 
-    function test_Gas_DeployRoundUnder10M() public {
+    function test_Gas_DeployRoundUnder12M() public {
         // The mining loop's iteration count is a geometric draw (1/16384 per
         // candidate for the 14 permission bits), so a single deployRound gas
         // number is a random variable — it cannot be bounded deterministically.
         // We bound a quantile instead: the CHEAPEST of 4 independent draws
         // (distinct round names -> distinct constructor args -> distinct
         // codeHashes) estimates the 25th percentile.
-        //  - Fixed deploy cost is ~4M; median mining is ~2.5M (155 gas/iter x
-        //    16384), so a typical draw lands ~6.5M total. P(all 4 draws > 10M)
-        //    ~ 0.008% — effectively never.
-        //  - With the H-2 regression (per-iteration cold EXTCODESIZE at 2600
-        //    gas, or worse, re-hashing ~13.5KB of creation code at 8.3k
-        //    gas/iter), even the MIN of 4 draws exceeds 35M -> hard fail.
+        //  - RECALIBRATED 2026-08-20 (wave2b): v5.1 moved the referral
+        //    registry birth into _deployRound (deployRegistry + setRecorder)
+        //    and the game curve grew — fixed cost measured ~8M, median
+        //    mining ~2.5M (148 gas/iter x 16384, HookMiner Yul rewrite), so
+        //    a typical draw lands ~10.5M. Observed min-of-4: 10.57M
+        //    (log in Run-5 evidence). P(all 4 draws > 12M) stays ~0.1%.
+        //  - With the H-2 regression class (per-iteration cold EXTCODESIZE
+        //    at 2600 gas, or re-hashing ~13.5KB of creation code at 8.3k
+        //    gas/iter), even the MIN of 4 draws exceeds 20M -> hard fail.
         // Additionally, every individual draw must fit under 30M: worst-case
         // MAX_LOOP mining (~25M) + fixed cost stays inside a mainnet block.
         string[4] memory names = ["Alpha Round", "Bravo Round", "Charlie Round", "Delta Round"];
@@ -119,7 +124,7 @@ contract FactoryTest is Test {
         }
         // H-2 regression bound: a typical mining draw must keep total
         // deployment well under 10M (mainnet block limit is ~30-36M).
-        assertLt(minGas, 10_000_000, "deployRound gas must stay under 10M");
+        assertLt(minGas, 12_000_000, "deployRound gas must stay under 12M");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -318,6 +323,18 @@ contract FactoryTest is Test {
             address(cd).code.length,
             24_000,
             "ControllerDeployer headroom < ~0.5KB; shrink before adding code"
+        );
+    }
+
+    function test_EIP170_StakerDeployerHeadroom() public {
+        // 2026-08-23: PSPStaker's creation code moved here out of
+        // RoundController's creation program (lockWithPepe growth pushed
+        // the ControllerDeployer stack past budget). Same vessel rules.
+        StakerDeployer sd = new StakerDeployer();
+        assertLt(
+            address(sd).code.length,
+            24_000,
+            "StakerDeployer headroom < ~0.5KB; shrink before adding code"
         );
     }
 }

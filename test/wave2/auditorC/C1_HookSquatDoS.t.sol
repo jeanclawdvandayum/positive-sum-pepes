@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {CBase} from "./CBase.sol";
+import {PSPReferralRegistry} from "../../../src/PSPReferralRegistry.sol";
 import {CurveHook} from "../../../src/CurveHook.sol";
 import {RoundController} from "../../../src/RoundController.sol";
 import {PSPFactory} from "../../../src/PSPFactory.sol";
@@ -43,6 +44,12 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 ///      was removed by the H-2 gas fix). finalizeCarpet reverted
 ///      FactorySpawnFailed and the dying round's reserve was locked.
 contract C1_HookSquatDoS is CBase {
+
+    /// v5.1: registries are per-round — orphan deploys only need SOME
+    /// registry address for the ctor arg; a throwaway is fine.
+    function _dummyRegistry() internal returns (address) {
+        return address(new PSPReferralRegistry(address(1), address(2), 1000e18));
+    }
     /// Control: the nonce-based prediction is exact. A clean finalize spawns
     /// round 2 at precisely the predicted controller address.
     function test_C1_control_PredictionIsExact_CleanSpawnWorks() public {
@@ -78,7 +85,7 @@ contract C1_HookSquatDoS is CBase {
 
         vm.prank(attacker);
         (address orphan,) =
-            hookDeployer.deployHook(IPoolManager(address(poolManager)), predictedController, _gameCurveFromPublicState());
+            hookDeployer.deployHook(IPoolManager(address(poolManager)), predictedController, _dummyRegistry(), _gameCurveFromPublicState());
         assertTrue(orphan.code.length > 0, "orphan hook deployed (into the squat block's salt space)");
 
         // ---- honest round life: predeposit, launch, a real buy ----
@@ -115,7 +122,7 @@ contract C1_HookSquatDoS is CBase {
         address predictedController = vm.computeCreateAddress(address(controllerDeployer), vesselNonce + 1);
         vm.prank(attacker);
         (address orphan,) = hookDeployer.deployHook(
-            IPoolManager(address(poolManager)), predictedController, _gameCurveFromPublicState()
+            IPoolManager(address(poolManager)), predictedController, _dummyRegistry(), _gameCurveFromPublicState()
         );
         // nobody can drive the orphan: the controller address has no code
         // (no owner exists to call setHook/setFactoryRoundId), and setMode

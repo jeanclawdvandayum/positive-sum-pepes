@@ -56,7 +56,9 @@ contract CurveHook is BaseHook {
     /// @dev Cached at construction (staker is born in the controller's
     ///      constructor, so it exists before this hook does). sendFees is
     ///      callable by the controller and the staker it birthed.
-    address public immutable stakerClaimant;
+    /// @dev lazy cache — the hook may be deployed against a PREDICTED
+    /// (still codeless) controller, so the constructor must never call it
+    address public stakerClaimant;
     uint24 public constant SWAP_FEE_BIPS = 500; // 5% total swap fee
     /// @dev Referral carve-out of the swap fee (2026-08-19, replaces the
     ///      side pot): paid LIVE in mixETH to the trader's attribution chain
@@ -64,7 +66,7 @@ contract CurveHook is BaseHook {
     ///      tier weight left on the table by a short chain — fall through to
     ///      the staker accumulator by subtraction. Stakers take 500bps
     ///      unattributed, 450bps under a full chain.
-    uint24 public constant REFERRAL_FEE_BIPS = 50; // 0.50%
+    uint24 public constant REFERRAL_FEE_BIPS = 50; // 0.50% OF TRADE VOLUME (spec fix 2026-08-19: was computed on the fee slice — 2.5bps of volume — economically negligible)
     /// @dev Canonical V4 pool parameters — the only pool this hook serves.
     ///      0x800000 = dynamic-fee flag (hook-priced; fee field unused).
     uint24 public constant CANONICAL_FEE = 0x800000;
@@ -98,7 +100,14 @@ contract CurveHook is BaseHook {
         controller = _controller;
         curveConfig = _config;
         referralRegistry = _referralRegistry;
-        stakerClaimant = _controller.stakerAddress();
+    }
+
+    /// @dev resolves the staker on first privileged use; cached thereafter
+    function _stakerClaimant() internal returns (address) {
+        if (stakerClaimant == address(0)) {
+            stakerClaimant = controller.stakerAddress();
+        }
+        return stakerClaimant;
     }
 
     // ─────────────── Settlement Helpers ───────────────
@@ -207,20 +216,22 @@ contract CurveHook is BaseHook {
         // fixed-point precision can make round-trips profitable (in wei terms)
         if (inputAmount < MIN_SWAP_INPUT) revert SwapTooSmall();
 
-        // Referral identity (2026-08-19): canonical zaps forward
-        // (trader, referrer) through hookData. Exactly 64 bytes decodes;
-        // anything else (router-direct swaps, empty) trades unattributed —
-        // the 50bps carve-out then lands entirely with stakers (D6).
+        // Referral identity (v5.1 2026-08-19): canonical zaps forward
+        // (trader, referrerNftId) through hookData — attribution targets a
+        // staker position NFT, not an address, and resets each round.
+        // Exactly 64 bytes decodes; anything else (router-direct swaps,
+        // empty) trades unattributed — the 50bps carve-out then lands
+        // entirely with stakers (D6).
         address refTrader;
-        address referrer;
+        uint256 referrerNftId;
         if (hookData.length == 64) {
-            (refTrader, referrer) = abi.decode(hookData, (address, address));
+            (refTrader, referrerNftId) = abi.decode(hookData, (address, uint256));
         }
 
         if (isBuy) {
-            return _handleBuy(key, params, inputAmount, mixETH, psp, refTrader, referrer);
+            return _handleBuy(key, params, inputAmount, mixETH, psp, refTrader, referrerNftId);
         } else {
-            return _handleSell(key, params, inputAmount, mixETH, psp, refTrader, referrer);
+            return _handleSell(key, params, inputAmount, mixETH, psp, refTrader, referrerNftId);
         }
     }
 
@@ -232,20 +243,26 @@ contract CurveHook is BaseHook {
     ///      unpaid tier weight always land with stakers, never vanish).
     ///      A bad/expired referral link NEVER reverts the trade: record
     ///      failures are swallowed and payoutFor simply returns what exists.
-    function _payReferrals(address trader, address referrer, uint256 feeMixETH, Currency mixETH)
+    function _payReferrals(
+        address trader,
+        uint256 referrerNftId,
+        uint256 tradeVolumeMixETH,
+        Currency mixETH
+    )
         internal
         returns (uint256 paid)
     {
         if (trader == address(0)) return 0;
         PSPReferralRegistry reg = referralRegistry;
-        if (address(reg) == address(0)) return 0;
 
-        if (referrer != address(0) && reg.referrerOf(trader) == address(0)) {
-            try reg.recordFor(trader, referrer) {} catch {}
+        if (referrerNftId != 0 && !reg.attributed(trader)) {
+            try reg.recordFor(trader, referrerNftId) {} catch {}
         }
 
         (address[5] memory who, uint24[5] memory bps) = reg.payoutFor(trader);
-        uint256 budget = (feeMixETH * REFERRAL_FEE_BIPS) / 10000;
+        // 50bps of TRADE VOLUME (one tenth of the 5% fee). Unpaid tier
+        // weight stays in the fee slice → stakers.
+        uint256 budget = (tradeVolumeMixETH * REFERRAL_FEE_BIPS) / 10000;
         IERC20 mix = IERC20(Currency.unwrap(mixETH));
         for (uint256 i = 0; i < 5; i++) {
             if (who[i] == address(0)) break;
@@ -261,7 +278,7 @@ contract CurveHook is BaseHook {
     // ─────────────── Buy Logic ───────────────
 
     function _handleBuy(PoolKey calldata key, SwapParams calldata params, uint256 mixETHInput,
-        Currency mixETH, Currency psp, address refTrader, address referrer)
+        Currency mixETH, Currency psp, address refTrader, uint256 referrerNftId)
         internal returns (bytes4, BeforeSwapDelta, uint24)
     {
         if (mode == Mode.Flat) {
@@ -294,7 +311,7 @@ contract CurveHook is BaseHook {
 
         // Referral cuts leave custody immediately; staker fee joins the
         // claimable surplus. paid <= feeMixETH always (subtraction is exact).
-        uint256 refPaid = _payReferrals(refTrader, referrer, feeMixETH, mixETH);
+        uint256 refPaid = _payReferrals(refTrader, referrerNftId, mixETHInput, mixETH);
         uint256 stakerFeeMixETH = feeMixETH - refPaid;
         if (stakerFeeMixETH > 0) {
             controller.addFees(stakerFeeMixETH);
@@ -317,7 +334,7 @@ contract CurveHook is BaseHook {
     // ─────────────── Sell Logic ───────────────
 
     function _handleSell(PoolKey calldata key, SwapParams calldata params, uint256 pspInputAmount,
-        Currency mixETH, Currency psp, address refTrader, address referrer)
+        Currency mixETH, Currency psp, address refTrader, uint256 referrerNftId)
         internal returns (bytes4, BeforeSwapDelta, uint24)
     {
         if (pspInputAmount == 0) revert BuyZeroAmount();
@@ -337,8 +354,9 @@ contract CurveHook is BaseHook {
         uint256 mixETHOut = CurveMath.computeSellOutput(pspInputAmount, totalSupplyPSP, curveConfig);
 
         // Fee split (2026-08-19, side pot retired): 5% of the out-value.
-        // 50bps referral carve-out paid live in mixETH; remainder to stakers.
-        // The ENTIRE sold PSP is burned — no pot skim, backing stays clean.
+        // Referral carve-out = 50bps OF THE OUT-VALUE, paid live in mixETH;
+        // remainder of the 5% to stakers. The ENTIRE sold PSP is burned —
+        // no pot skim, backing stays clean.
         uint256 feeMixETH = (mixETHOut * SWAP_FEE_BIPS) / 10000;
         uint256 mixETHToUser = mixETHOut - feeMixETH;
         if (mixETHToUser == 0) revert ZeroOutput();
@@ -359,8 +377,8 @@ contract CurveHook is BaseHook {
         // Send mixETH to user via PoolManager
         _settleCurrency(mixETH, mixETHToUser);
 
-        // Referral cuts from the fee slice; remainder to stakers
-        uint256 refPaid = _payReferrals(refTrader, referrer, feeMixETH, mixETH);
+        // Referral cuts (50bps of the out-value); remainder to stakers
+        uint256 refPaid = _payReferrals(refTrader, referrerNftId, mixETHOut, mixETH);
         uint256 stakerFeeMixETH = feeMixETH - refPaid;
         if (stakerFeeMixETH > 0) {
             controller.addFees(stakerFeeMixETH);
@@ -469,7 +487,7 @@ contract CurveHook is BaseHook {
         // 2026-08-19: fee claims moved to PSPStaker — it pulls payouts for
         // its positions directly. Controller retains access (genesis share
         // payouts ride the same path).
-        if (msg.sender != address(controller) && msg.sender != stakerClaimant) revert NotController();
+        if (msg.sender != address(controller) && msg.sender != _stakerClaimant()) revert NotController();
 
         address mixETHAddr = Currency.unwrap(controller.getMixETH());
         uint256 balance = IERC20(mixETHAddr).balanceOf(address(this));
@@ -552,7 +570,14 @@ contract CurveHook is BaseHook {
     /// @param mixETHInput mixETH to spend on the curve
     /// @return PSP output for a mixETH input (curve unit of account)
     function getBuyOutput(uint256 mixETHInput) external view returns (uint256) {
-        return CurveMath.computeBuyOutput(mixETHInput, totalSupplyPSP, curveConfig);
+        // B7b catch (2026-08-19): the view must mirror execution. In curve
+        // mode the curve only ever sees the POST-FEE input (95%); quoting the
+        // raw input overstated output by ~5%. Flat mode is fee-free pro-rata.
+        if (mode == Mode.Flat) {
+            return (mixETHInput * totalSupplyPSP) / reserveMixETH;
+        }
+        uint256 fee = (mixETHInput * SWAP_FEE_BIPS) / 10000;
+        return CurveMath.computeBuyOutput(mixETHInput - fee, totalSupplyPSP, curveConfig);
     }
 
     /// @return mixETH output for a PSP sell (curve unit of account)

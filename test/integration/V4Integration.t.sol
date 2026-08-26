@@ -14,6 +14,7 @@ import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 
 import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
+import {PSPStaker} from "../../src/PSPStaker.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
 import {HookDeployer} from "../../src/HookDeployer.sol";
@@ -23,6 +24,8 @@ import {CurveMath} from "../../src/libraries/CurveMath.sol";
 import {MainnetConfig} from "./MainnetConfig.sol";
 import {V4SwapRouter} from "./V4SwapRouter.sol";
 import {MockMixETH} from "../mocks/MockMixETH.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title V4IntegrationTest
 /// @notice End-to-end fork test: deploy PSP against real V4 PoolManager,
@@ -45,6 +48,7 @@ contract V4IntegrationTest is Test {
     // Current round
     PSPToken pspToken;
     RoundController controller;
+    PSPStaker public stakerV; // cached: single vm.prank must not be eaten by the staker() view call
     CurveHook hook;
     PoolKey poolKey;
 
@@ -73,7 +77,7 @@ contract V4IntegrationTest is Test {
         mixETH = IERC20(address(mockMix));
 
         // Deploy PSPFactory with real PoolManager
-        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), 0);
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), 0);
 
         // Deploy V4 swap router (handles unlock/callback + pre-settle pattern)
         router = new V4SwapRouter(poolManager);
@@ -131,7 +135,7 @@ contract V4IntegrationTest is Test {
         controller.claimPredepositPSP();
 
         // Verify auto-lock (predeposit PSP is locked, not free balance)
-        (uint256 aliceLocked,,,) = controller.locks(alice);
+        uint256 aliceLocked = stakerV.lockedPSPOf(alice);
         assertGt(aliceLocked, 0, "Alice locked PSP from predeposit");
 
         // Now do a real V4 swap: mixETH -> PSP via router
@@ -241,7 +245,7 @@ contract V4IntegrationTest is Test {
         // Alice claims fees
         uint256 mixBefore = mixETH.balanceOf(alice);
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 mixGained = mixETH.balanceOf(alice) - mixBefore;
 
         assertGt(mixGained, 0, "Alice earned fees from Bob's swap");
@@ -271,6 +275,7 @@ contract V4IntegrationTest is Test {
         PSPFactory.Round memory round = factory.getRound(roundId);
         pspToken = round.token;
         controller = round.controller;
+        stakerV = controller.staker();
         hook = round.hook;
 
         // Construct pool key (same as factory does internally)

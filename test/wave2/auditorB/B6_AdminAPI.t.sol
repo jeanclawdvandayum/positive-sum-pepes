@@ -13,72 +13,8 @@ import {console2} from "forge-std/console2.sol";
 ///        surface should be safe-by-construction where cheap. These tests pin
 ///        exactly which safety properties rest on the caller's behavior.
 contract B6_AdminAPI is BBase {
-    function _flatWithPotAccrued() internal {
-        _launch(100e18);
-        _bobBuysAndLocks(20e18);
-        _bomb(); // pot from curve-phase swaps redeemed + burned here
-        assertEq(controller.potPSPBalance(), 0, "bomb should zero the pot");
-
-        // F-9 fix: flat-window swaps no longer accrue pot PSP (fee killed at
-        // the source). Seed the pre-fix state through the onlyHook credit
-        // path — pranking AS the hook — plus the matching physical tokens
-        // (carol funds), so the redeemPotBacking guard below still has a
-        // nonzero pot to defend. The guard protects against caller mistakes
-        // regardless of how the pot balance arose.
-        vm.prank(address(hook));
-        controller.creditPotPSP(1e18);
-        _buy(carol, 10e18);
-        _buy(bob, 5e18);
-        vm.prank(carol);
-        psp.transfer(address(controller), 1e18);
-        assertEq(controller.potPSPBalance(), 1e18, "seeded pot ledger");
-    }
-
-    // ── F-B6a: redeemPotBacking does NOT burn the pot's PSP.
-    //    If the caller ever fails to burn, the still-outstanding PSP can be
-    //    re-sold for a second pro-rata draw → ledger supply < ERC20 supply,
-    //    stranding the last holders' backing.
-    function test_B6a_redeemPotBackingWithoutBurnDoubleDraws() public {
-        _flatWithPotAccrued();
-
-        uint256 potPSP = controller.potPSPBalance();
-        uint256 R = hook.reserveMixETH();
-        uint256 S = hook.totalSupplyPSP();
-        uint256 entitlement = (potPSP * R) / S; // single legit redemption value
-
-        // 1) controller redeems the pot backing — prank skips carpetBomb's burn
-        // NOTE: the controller wallet also escrows users' locked PSP, so pin
-        // "nothing burned" as a balance DELTA across the redeem, not absolutes.
-        uint256 walletPSPBefore = psp.balanceOf(address(controller));
-        vm.prank(address(controller));
-        uint256 redeemed = hook.redeemPotBacking(potPSP);
-        assertEq(redeemed, entitlement);
-        assertEq(
-            psp.balanceOf(address(controller)), walletPSPBefore, "pot PSP burned by redeem (it is not)"
-        );
-
-        // 2) controller SELLS the same PSP through the pool — second draw
-        uint256 secondDraw = _sell(address(controller), potPSP, address(controller));
-
-        console2.log("single entitlement (wei mix):", entitlement);
-        console2.log("second draw via re-sale  (wei):", secondDraw);
-        assertGt(secondDraw, entitlement * 9 / 10, "second draw should recover ~95% again");
-
-        // ledger now lies: ERC20 totalSupply exceeds hook supply
-        uint256 erc20Supply = PSPToken(address(psp)).totalSupply();
-        uint256 ledgerSupply = hook.totalSupplyPSP();
-        console2.log("ERC20 supply - ledger supply:", erc20Supply - ledgerSupply);
-        assertGt(erc20Supply, ledgerSupply, "ledger undercounts outstanding PSP");
-
-        // exact overhang: redeemPotBacking decremented the ledger by potPSP but
-        // burned nothing; the re-sale then decrements BOTH supplies by
-        // (potPSP - potCut) equally. Persistent divergence = potPSP exactly —
-        // the unburned pot PSP remains outstanding in ERC20 terms with its
-        // backing already extracted twice (once by the redemption, ~95% again
-        // by the re-sale), and it can never be sold down (SellExceedsSupply
-        // uses the ledger).
-        assertEq(erc20Supply - ledgerSupply, potPSP, "overhang != unburned pot PSP");
-    }
+    // (2026-08-19) _flatWithPotAccrued + F-B6a (redeemPotBacking double-draw)
+    // removed with the side pot — the function no longer exists.
 
     // ── F-B6b: initializeCurve is one-shot — re-arming accounting after launch
     //    is impossible (verified: the earlier hypothesis of a mid-flight reset
@@ -168,8 +104,6 @@ contract B6_AdminAPI is BBase {
         vm.startPrank(carol);
         vm.expectRevert(CurveHook.NotController.selector);
         hook.sendFees(carol, 1);
-        vm.expectRevert(CurveHook.NotController.selector);
-        hook.redeemPotBacking(1);
         vm.expectRevert(CurveHook.NotController.selector);
         hook.drainAll(carol);
         vm.expectRevert(CurveHook.NotController.selector);

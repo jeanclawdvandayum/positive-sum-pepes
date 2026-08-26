@@ -47,13 +47,15 @@ contract AdjudicateB7b is BBase {
         emit log_named_uint("executed got    ", got);
         emit log_named_uint("supplyDelta     ", supplyDelta);
 
-        // ── adjudication asserts ──
+        // ── adjudication asserts (updated 2026-08-19) ──
         // (1) execution matches source-correct fee-adjusted math → no protocol bug
         assertEq(got, feeAdj, "user output != f(0.95x)");
-        // (2) supply delta == user + pot
-        assertEq(supplyDelta, feeAdj + potSlice, "supply delta != user + pot");
-        // (3) the view is fee-exclusive BY DESIGN (docs say curve unit of account)
-        assertGt(quoteFull, feeAdj, "view must exceed fee-adjusted execution");
+        // (2) v5.1: the pot is retired — every minted PSP belongs to the buyer,
+        //     so the ledger delta is EXACTLY the user slice
+        assertEq(supplyDelta, got, "supply delta != user output");
+        // (3) B7b catch: the view now MIRRORS execution (f(0.95x)) instead of
+        //     overstating by the 5% fee — quotes are exact
+        assertEq(quoteFull, feeAdj, "view must mirror execution exactly");
     }
 
     /// B7d adjudication: log the ACTUAL revert data for the foreign-currency key

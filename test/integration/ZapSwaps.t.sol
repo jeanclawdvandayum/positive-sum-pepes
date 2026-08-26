@@ -21,6 +21,8 @@ import {IMixETH} from "../../src/interfaces/IMixETH.sol";
 
 import {MainnetConfig} from "./MainnetConfig.sol";
 import {MockMixETH} from "../mocks/MockMixETH.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title ZapSwapsTest — the ETH <-> PSP round trip on a real V4
 ///        PoolManager with real curve pricing. Alice never holds mixETH:
@@ -53,7 +55,7 @@ contract ZapSwapsTest is Test {
         mixETH.depositETH{value: 100_000e18}();
 
         factory = new PSPFactory(
-            poolManager, IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer()
+            poolManager, IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer()
         , 0);
         zapIn = new PSPZapIn(IMixETH(address(mixETH)), poolManager);
         zapOut = new PSPZapOut(IMixETH(address(mixETH)), poolManager);
@@ -94,7 +96,7 @@ contract ZapSwapsTest is Test {
     function test_Fork_ZapInBuyETHToPSP() public {
         vm.deal(alice, 5e18);
         vm.prank(alice);
-        uint256 pspOut = zapIn.zapInBuy{value: 5e18}(poolKey, 1, 0);
+        uint256 pspOut = zapIn.zapInBuy{value: 5e18}(poolKey, 1, 0, 0);
 
         assertGt(pspOut, 0, "PSP out");
         assertEq(pspToken.balanceOf(alice), pspOut, "alice holds the PSP");
@@ -107,7 +109,7 @@ contract ZapSwapsTest is Test {
         vm.deal(alice, 5e18);
         vm.prank(alice);
         vm.expectRevert(PSPZapIn.InsufficientOutput.selector);
-        zapIn.zapInBuy{value: 5e18}(poolKey, type(uint256).max, 0);
+        zapIn.zapInBuy{value: 5e18}(poolKey, type(uint256).max, 0, 0);
     }
 
     function test_Fork_ZapInBuyDeadlineReverts() public {
@@ -115,7 +117,7 @@ contract ZapSwapsTest is Test {
         vm.warp(block.timestamp + 1);
         vm.prank(alice);
         vm.expectRevert(PSPZapIn.Expired.selector);
-        zapIn.zapInBuy{value: 5e18}(poolKey, 1, block.timestamp - 1);
+        zapIn.zapInBuy{value: 5e18}(poolKey, 1, block.timestamp - 1, 0);
     }
 
     function test_Fork_ZapInBuyBadPoolReverts() public {
@@ -130,7 +132,7 @@ contract ZapSwapsTest is Test {
         vm.deal(alice, 1e18);
         vm.prank(alice);
         vm.expectRevert(PSPZapIn.BadPool.selector);
-        zapIn.zapInBuy{value: 1e18}(bad, 1, 0);
+        zapIn.zapInBuy{value: 1e18}(bad, 1, 0, 0);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -141,13 +143,13 @@ contract ZapSwapsTest is Test {
         // Alice enters with ETH...
         vm.deal(alice, 5e18);
         vm.prank(alice);
-        uint256 pspOut = zapIn.zapInBuy{value: 5e18}(poolKey, 1, 0);
+        uint256 pspOut = zapIn.zapInBuy{value: 5e18}(poolKey, 1, 0, 0);
         assertGt(pspOut, 0, "setup: bought PSP");
 
         // ...and exits to ETH in one call
         vm.startPrank(alice);
         pspToken.approve(address(zapOut), pspOut);
-        uint256 ethOut = zapOut.zapOut(poolKey, pspOut, 1, 0);
+        uint256 ethOut = zapOut.zapOut(poolKey, pspOut, 1, 0, 0);
         vm.stopPrank();
 
         assertGt(ethOut, 0, "ETH out");
@@ -161,12 +163,12 @@ contract ZapSwapsTest is Test {
     function test_Fork_ZapOutSlippageReverts() public {
         vm.deal(alice, 5e18);
         vm.prank(alice);
-        uint256 pspOut = zapIn.zapInBuy{value: 5e18}(poolKey, 1, 0);
+        uint256 pspOut = zapIn.zapInBuy{value: 5e18}(poolKey, 1, 0, 0);
 
         vm.startPrank(alice);
         pspToken.approve(address(zapOut), pspOut);
         vm.expectRevert(PSPZapOut.InsufficientOutput.selector);
-        zapOut.zapOut(poolKey, pspOut, type(uint256).max, 0);
+        zapOut.zapOut(poolKey, pspOut, type(uint256).max, 0, 0);
         vm.stopPrank();
 
         // Reverted call rolled the whole tx back: alice keeps her PSP,
@@ -179,13 +181,13 @@ contract ZapSwapsTest is Test {
     function test_Fork_ZapOutDeadlineReverts() public {
         vm.deal(alice, 5e18);
         vm.prank(alice);
-        uint256 pspOut = zapIn.zapInBuy{value: 5e18}(poolKey, 1, 0);
+        uint256 pspOut = zapIn.zapInBuy{value: 5e18}(poolKey, 1, 0, 0);
 
         vm.warp(block.timestamp + 1);
         vm.startPrank(alice);
         pspToken.approve(address(zapOut), pspOut);
         vm.expectRevert(PSPZapOut.Expired.selector);
-        zapOut.zapOut(poolKey, pspOut, 1, block.timestamp - 1);
+        zapOut.zapOut(poolKey, pspOut, 1, block.timestamp - 1, 0);
         vm.stopPrank();
     }
 
@@ -200,7 +202,7 @@ contract ZapSwapsTest is Test {
         // bob buys PSP straight from his mixETH balance
         vm.startPrank(bob);
         mixETH.approve(address(zapIn), 5e18);
-        uint256 pspOut = zapIn.buyWithMix(poolKey, 5e18, 1, 0);
+        uint256 pspOut = zapIn.buyWithMix(poolKey, 5e18, 1, 0, 0);
         vm.stopPrank();
 
         assertGt(pspOut, 0, "bob got PSP");
@@ -211,7 +213,7 @@ contract ZapSwapsTest is Test {
         // ...and sells it back to mixETH in one call
         vm.startPrank(bob);
         pspToken.approve(address(zapOut), pspOut);
-        uint256 mixOut = zapOut.sellToMix(poolKey, pspOut, 1, 0);
+        uint256 mixOut = zapOut.sellToMix(poolKey, pspOut, 1, 0, 0);
         vm.stopPrank();
 
         assertGt(mixOut, 0, "mix out");
@@ -225,11 +227,11 @@ contract ZapSwapsTest is Test {
         mixETH.transfer(bob, 10e18);
         vm.startPrank(bob);
         mixETH.approve(address(zapIn), 5e18);
-        uint256 pspOut = zapIn.buyWithMix(poolKey, 5e18, 1, 0);
+        uint256 pspOut = zapIn.buyWithMix(poolKey, 5e18, 1, 0, 0);
 
         pspToken.approve(address(zapOut), pspOut);
         vm.expectRevert(PSPZapOut.InsufficientOutput.selector);
-        zapOut.sellToMix(poolKey, pspOut, type(uint256).max, 0);
+        zapOut.sellToMix(poolKey, pspOut, type(uint256).max, 0, 0);
         vm.stopPrank();
 
         // revert rolled everything back

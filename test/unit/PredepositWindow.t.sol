@@ -16,6 +16,8 @@ import {CurveMath} from "../../src/libraries/CurveMath.sol";
 
 import {MockMixETH} from "../mocks/MockMixETH.sol";
 import {MockPoolManager} from "../mocks/MockPoolManager.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title PredepositWindowTest — 1-week window, 500 mixETH cap, permissionless launch
 /// @notice Covers the rebirth flow added to RoundController/PSPFactory:
@@ -41,7 +43,7 @@ contract PredepositWindowTest is Test {
         mixETH = new MockMixETH();
         mixETH.depositETH{value: 100_000e18}();
         poolManager = new MockPoolManager();
-        factory = new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), 0);
+        factory = new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), 0);
 
         PSPFactory.RoundParams memory params = PSPFactory.RoundParams({
             name: "Positive Sum Pepes",

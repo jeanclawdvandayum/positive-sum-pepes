@@ -22,6 +22,19 @@ import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
 contract HookDeployer {
     error DeployFailed();
 
+    /// @dev Per-round referral registry (v5.1 2026-08-19: the graph resets
+    ///      at every round boundary — a fresh registry is born beside each
+    ///      hook, keyed by staker position NFT IDs). Deployed here for the
+    ///      same EIP-170 reasons as the hook. Owner = the factory (it alone
+    ///      wires setRecorder); no mining needed — the registry has no
+    ///      permissioned surface worth squatting.
+    function deployRegistry(address owner, address staker, uint256 minStakePSP)
+        external
+        returns (address registry)
+    {
+        registry = address(new PSPReferralRegistry(owner, staker, minStakePSP));
+    }
+
     /// @dev C-1 remediation: how many mined salt candidates deployHook will
     ///      fall through before giving up. Each squatted candidate costs the
     ///      spawn one extra ~2^14 mining pass (~2-3M gas); 4 candidates cap

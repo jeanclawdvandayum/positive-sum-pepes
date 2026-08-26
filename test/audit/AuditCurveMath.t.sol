@@ -104,24 +104,22 @@ contract AuditCurveMathTest is Test {
         uint256 flatPrice = (R * 1e18) / S;
         vm.assume(flatPrice > 0); // hook reverts otherwise (div by zero)
 
-        // ── buy leg (exact mirror of _handleFlatBuy) ──
-        uint256 fee = (i * 500) / 10000;
-        uint256 potMix = (i * 25) / 10000;
-        uint256 buyMix = i - fee;
-        uint256 pspOut = (buyMix * 1e18) / flatPrice;
-        uint256 potPSP = (potMix * 1e18) / flatPrice;
+        // ── buy leg (exact mirror of _handleFlatBuy, F-9: zero fee) ──
+        // 2026-08-19: the hook mints by DIRECT pro-rata (i*S/R), not via a
+        // floored flatPrice — the two-step floor was A6's over-mint source
+        uint256 buyMix = i;
+        uint256 pspOut = (buyMix * S) / R;
         if (pspOut == 0) return; // hook reverts ZeroOutput
 
-        uint256 R1 = R + buyMix + potMix;
-        uint256 S1 = S + pspOut + potPSP;
+        uint256 R1 = R + buyMix;
+        uint256 S1 = S + pspOut;
 
-        // ── sell leg (exact mirror of _handleFlatSell) ──
+        // ── sell leg (exact mirror of _handleFlatSell, F-9: zero fee) ──
         uint256 totalOut = (pspOut * R1) / S1;
-        uint256 sFee = (totalOut * 500) / 10000;
-        uint256 toUser = totalOut - sFee;
+        uint256 toUser = totalOut;
         if (toUser == 0) return; // hook reverts ZeroOutput
 
-        assertLt(toUser, i, "A5: FLAT round trip profitable");
+        assertLe(toUser, i, "A5: FLAT round trip profitable");
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -144,15 +142,13 @@ contract AuditCurveMathTest is Test {
         i = bound(i, 1e12, 1000e18);
 
         // L-3 fixed model: direct pro-rata (x * S) / R, mirroring the contract
-        uint256 fee = (i * 500) / 10000;
-        uint256 potMix = (i * 25) / 10000;
-        uint256 buyMix = i - fee;
+        // (F-9: zero fee in Flat — no fee/pot slices in the model)
+        uint256 buyMix = i;
         uint256 pspOut = (buyMix * S) / R;
-        uint256 potPSP = (potMix * S) / R;
         if (pspOut == 0) return;
 
-        uint256 R1 = R + buyMix + potMix;
-        uint256 S1 = S + pspOut + potPSP;
+        uint256 R1 = R + buyMix;
+        uint256 S1 = S + pspOut;
 
         // STRICT: floored mints mean R*(S1) <= R1*S always — no slack needed
         assertGe(R1 * S, R * S1, "A6: flat buy diluted backing");
@@ -171,16 +167,12 @@ contract AuditCurveMathTest is Test {
         R = bound(R, 1, 10_000_000e18);
         psp = bound(psp, 1e12, S / 2); // sells must be < supply
 
+        // (F-9: zero fee in Flat — out = floor(psp * R) / S, full burn)
         uint256 totalOut = (psp * R) / S;
-        uint256 fee = ((totalOut * 500) + 9999) / 10000; // ceil, mirrors contract
-        uint256 potMix = ((totalOut * 25) + 9999) / 10000; // A7 fix: ceil, mirrors contract
-        if (potMix > fee) potMix = fee; // dust guard
-        uint256 potCut = (psp * 25) / 10000;
-        uint256 burn = psp - potCut;
-        if (burn == 0) return;
+        if (totalOut == 0) return;
 
-        uint256 R1 = R - (totalOut - potMix);
-        uint256 S1 = S - burn;
+        uint256 R1 = R - totalOut;
+        uint256 S1 = S - psp;
 
         assertGe(R1 * S, R * S1, "A7: flat sell diluted backing");
     }

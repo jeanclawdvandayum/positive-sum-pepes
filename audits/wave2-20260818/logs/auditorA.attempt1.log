@@ -1,0 +1,53 @@
+Audit complete. Deliverable re-read and verified complete; final run **40/40 PoCs green**.
+
+DELIVERABLE
+/Users/clawdbot/clawd/positive-sum-pepes/audits/wave2-20260818/auditorA.md
+
+POCs (all under test/wave2/auditorA/, nothing else touched, no commits)
+  AuditorMocks.sol / AuditorBase.sol (harness + hostile-token reentrancy rig)
+  A1_Governance.t.sol (15)  A2_Accounting.t.sol (14)
+  A3_Lifecycle.t.sol (9)    A4_E2E.t.sol (2 — real PSPFactory/CurveHook/zaps)
+
+FINDINGS (all reproduced; no HIGH/CRIT in scope)
+
+  A-F2  MED  98%  Flat-window side-pot accrual is stranded forever.
+        carpetBomb redeems the pot at bomb time only (RoundController.sol:777-791);
+        the hook keeps accruing pot PSP on flat buys/sells (CurveHook.sol:371, 426-429);
+        finalizeCarpet (:813-837) never touches potPSPBalance. PSP is unexitable
+        (AlreadyExecuted / PSP sweep-protected); its backing silently re-routes to
+        generic carry instead of the ring-fenced sidePot. Real-stack E2E measured
+        ~87.5e18 PSP stranded in one simulated round. Fix: redeem+forward inside
+        finalizeCarpet, or stop pot accrual in Flat mode.
+
+  A-F1  MED  95%  seedCarry() lacks a predepositClosed guard (:312-324).
+        Post-launch call (factory-only, trusted) doubles totalPredepositMixETH,
+        halves every depositor's genesis claim, and hands the factory a fresh
+        90-day voting lock. Sub-finding A-F1b: factory's own late claim then
+        panics 0x11 on the exhausted genesis lock.
+
+  A-F3  LOW  95%  Fee accumulator discards the floor remainder (:657-660) —
+        sub-share dust permanently unclaimable (5-wei repro); rides to carry.
+
+  A-F4  LOW  90%  finalize drains accrued-but-unclaimed staker fees into the
+        round-2 carry; strict claim path reverts post-drain, unlock forfeits
+        (principal always exits). Likely intended; needs a UI deadline warning.
+
+  A-I1..A-I4  INFO  relock() unbounded past expiry (natspec says 7d window only);
+        ZeroShare claim never marks claimed (no refund path); raw precomputed
+        factory selectors (verified vs cast sig today — ABI-drift risk);
+        double-floored per-claim rounding (707,058 wei on 1e18, protocol-favoring).
+
+VERIFIED-SAFE (attacked, held): NK24 supply-floor quorum denominator; M-1 vote
+snapshot (lock/relock/claim-after-propose all disenfranchised); G-1..G-4
+proposal lifecycle incl. no front-run replacement; quorum/tie math; H-1 custody
+invariant psp.balanceOf(controller)==totalLocked+pot on mocks AND real stack;
+reentrancy (hostile ERC20 callbacks on both payout legs — zero successes, single
+payout); finalize atomicity on factory-spawn failure; launch/cap/window gates;
+sweep protections; flat-window unlock bypass; pot redemption happy path.
+
+Could-not-verify: real v4 PoolManager deltas (MockPoolManager executes the
+genuine hook flow, but no mainnet fork was run), fee-on-transfer mixETH fuzzing,
+CurveMath zone-boundary rounding, vote-buying game-theoretic equilibrium,
+hook-mining gas under mempool contention — all detailed in §4, including the
+forge expectRevert/warp timestamp quirk that bit my harness (documented so other
+auditors don't chase that ghost).

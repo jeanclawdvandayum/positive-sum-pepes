@@ -15,24 +15,20 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 /// Attacks: lost or duplicated carry/pot, phantom pot credits, double spawn,
 /// zombie rounds. Expectation: the handoff is exact, guarded, and single-shot.
 contract C2_Handoff is CBase {
-    function test_C2_CarryAndPotForwardedExactly() public {
+    function test_C2_CarryForwardedExactly() public {
         _launchRound1();
 
-        // Real buy flow through the mock PM - side pot accrues as PSP
+        // Real buy flow through the mock PM (fees accrue to stakers now,
+        // not to any pot — v5.1 killed it)
         vm.startPrank(alice);
         mixETH.approve(address(swapper), 10e18);
         swapper.buy(_key(), 10e18, alice);
         vm.stopPrank();
-        (uint256 potPSP,) = controller1.potState();
-        assertGt(potPSP, 0, "buy accrued pot PSP");
 
         _bombRound1();
 
-        // Bomb redeemed the pot at average backing - ring-fenced at factory
-        uint256 pot = factory.sidePot();
-        assertGt(pot, 0, "pot credited at factory");
-        assertEq(mixETH.balanceOf(address(factory)), pot, "factory holds only the pot so far");
-        assertEq(controller1.potPSPBalance(), 0, "pot PSP burned");
+        // v5.1: bomb flattens only — nothing redeemed, nothing ring-fenced
+        assertEq(mixETH.balanceOf(address(factory)), 0, "factory holds nothing post-bomb");
 
         _warpPastFlatWindow();
 
@@ -45,13 +41,18 @@ contract C2_Handoff is CBase {
         // ── conservation: everything left the factory into round 2 ──
         assertEq(factory.currentRoundId(), 2);
         assertEq(mixETH.balanceOf(address(factory)), 0, "no mixETH stranded at factory");
-        assertEq(factory.sidePot(), 0, "side pot ledger emptied");
 
         PSPFactory.Round memory r2 = factory.getRound(2);
         assertEq(r2.controller.totalPredepositMixETH(), carry, "carry - round-2 predeposit, exact");
         (uint256 factoryDeposit,) = r2.controller.predeposits(address(factory));
         assertEq(factoryDeposit, carry, "earmarked to factory");
-        assertEq(r2.controller.totalPotMixETH(), pot, "pot - round-2 pot depth, exact");
+
+        // v5.1: the referral graph resets — round 2 runs a FRESH registry
+        assertTrue(
+            factory.referralRegistryOf(2) != address(0)
+                && factory.referralRegistryOf(2) != factory.referralRegistryOf(1),
+            "per-round registry reborn"
+        );
         assertTrue(factory.getRound(1).destroyed, "round 1 marked destroyed");
         assertFalse(r2.destroyed, "round 2 live");
         assertFalse(r2.controller.predepositClosed(), "round 2 open for public predeposit");
@@ -71,35 +72,23 @@ contract C2_Handoff is CBase {
         factory.spawnNextRound(99);
     }
 
-    /// Zero-pot branch: no buys - side pot stays empty - spawn forwards carry
-    /// only, potDeposit path skipped entirely.
-    function test_C2_ZeroPotBranch() public {
+    /// No-buy branch: no swap flow at all — spawn forwards the whole
+    /// reserve as carry (v5.1: there is no pot branch anymore).
+    function test_C2_NoBuyBranch() public {
         _launchRound1();
         _bombRound1();
-        assertEq(factory.sidePot(), 0, "no pot without swap flow");
         _warpPastFlatWindow();
         uint256 carry = mixETH.balanceOf(address(hook1));
         controller1.finalizeCarpet();
 
         PSPFactory.Round memory r2 = factory.getRound(2);
         assertEq(r2.controller.totalPredepositMixETH(), carry);
-        assertEq(r2.controller.totalPotMixETH(), 0);
         assertEq(mixETH.balanceOf(address(factory)), 0);
     }
 
-    /// Guards on the ledger credit: only the CURRENT round's controller, and
-    /// never beyond the tokens actually held.
-    function test_C2_CreditSidePotGuards() public {
-        // rando is not a round controller
-        vm.prank(rando);
-        vm.expectRevert(PSPFactory.NotRoundController.selector);
-        factory.creditSidePot(1);
-
-        // round-1 controller is current but factory balance is zero
-        vm.prank(address(controller1));
-        vm.expectRevert(PSPFactory.SidePotOverdrawn.selector);
-        factory.creditSidePot(1);
-
+    /// Guards on the destroy flag: only a round's own controller flips it.
+    /// (v5.1: the side-pot credit path was deleted with the pot.)
+    function test_C2_DestroyFlagGuards() public {
         // markDestroyed from a non-controller
         vm.prank(rando);
         vm.expectRevert(PSPFactory.NotRoundController.selector);
@@ -114,30 +103,22 @@ contract C2_Handoff is CBase {
         assertTrue(factory.getRound(1).destroyed);
     }
 
-    /// Donation accounting: mixETH airdropped straight to the factory cannot
-    /// be earmarked as pot by anyone but the current controller (and the only
-    /// code path a real controller has is carpetBomb's exact redemption). It
-    /// rides the generic carry into the next round instead.
+    /// Donation accounting: mixETH airdropped straight to the factory rides
+    /// the generic carry into the next round (v5.1: no pot earmark path
+    /// exists anymore — the credit surface was deleted).
     function test_C2_DonationsRideTheCarry() public {
         _launchRound1();
         _bombRound1();
         uint256 donated = 7e18;
         mixETH.transfer(address(factory), donated);
 
-        // rando cannot earmark
-        vm.prank(rando);
-        vm.expectRevert(PSPFactory.NotRoundController.selector);
-        factory.creditSidePot(donated);
-
         _warpPastFlatWindow();
         uint256 reserve = mixETH.balanceOf(address(hook1));
-        uint256 pot = factory.sidePot();
         controller1.finalizeCarpet();
 
-        // donated + reserve all became round-2 predeposit carry; pot separate
+        // donated + reserve all became round-2 predeposit carry
         PSPFactory.Round memory r2 = factory.getRound(2);
         assertEq(r2.controller.totalPredepositMixETH(), reserve + donated, "donation joined the carry");
-        assertEq(r2.controller.totalPotMixETH(), pot);
         assertEq(mixETH.balanceOf(address(factory)), 0);
     }
 

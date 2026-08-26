@@ -11,22 +11,10 @@ export const factoryAbi = parseAbi([
 ])
 
 export const controllerAbi = parseAbi([
-  'function locks(address) view returns (uint256 amount, uint256 rewardDebt, uint256 lockTime, uint256 unlockTime)',
-  'function potState() view returns (uint256 pspBalance, uint256 mixETHFunded)',
-  'function totalLocked() view returns (uint256)',
-  'function accFeePerShareMixETH() view returns (uint256)',
-  'function pendingFeesMixETH() view returns (uint256)',
-  'function totalInitialPSP() view returns (uint256)',
-  'function totalPredepositMixETH() view returns (uint256)',
-  'function PREDEPOSIT_CAP() view returns (uint256)',
-  'function predepositClosed() view returns (bool)',
-  'function predeposits(address) view returns (uint256 mixETHAmount, bool claimed)',
+  'function staker() view returns (address)',
+  'function predepositState() view returns (uint256 total, uint256 cap, uint256 startTime, bool closed, bool capReached, bool windowOver, bool launchable)',
   'function claimPredepositPSP()',
   'function predeposit(uint256)',
-  'function lock(uint256)',
-  'function unlock()',
-  'function relock()',
-  'function claimFees()',
   'function proposeCarpetBomb()',
   'function voteCarpetBomb(bool support)',
   'function carpetBomb()',
@@ -40,11 +28,40 @@ export const controllerAbi = parseAbi([
   'function QUORUM_BIPS() view returns (uint256)',
   'function MAJORITY_BIPS() view returns (uint256)',
   'function RELOCK_WINDOW() view returns (uint256)',
-  'event FeesAdded(uint256 mixETHAmount)',
-  'event Locked(address indexed user, uint256 amount)',
   'event CarpetBombProposed(address indexed proposer)',
   'event Voted(address indexed voter, bool support, uint256 weight)',
   'event CarpetBombExecuted(uint256 mixETHCarried)',
+])
+
+/// PSPStaker — ERC-721 staking positions + pepe art (2026-08-22).
+export const stakerAbi = parseAbi([
+  'function positions(address) view returns (uint256 amount, uint256 rewardDebt, uint256 lockTime, uint256 unlockTime)',
+  'function lockedPSPOf(address) view returns (uint256)',
+  'function pendingFeesOf(address) view returns (uint256)',
+  'function totalLocked() view returns (uint256)',
+  'function accFeePerShareMixETH() view returns (uint256)',
+  'function tokenOf(address) view returns (uint256)',
+  'function ownerOf(uint256) view returns (address)',
+  'function dnaOf(uint256) view returns (uint256)',
+  'function descriptor() view returns (address)',
+  'function name() view returns (string)',
+  'function symbol() view returns (string)',
+  'function lock(uint256 amount)',
+  'function lockWithPepe(uint256 amount, uint256 pepeId)',
+  'function relock()',
+  'function unlock()',
+  'function claimFees()',
+  'function transferFrom(address from, address to, uint256 tokenId)',
+  'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
+  'event Locked(address indexed user, uint256 amount)',
+  'event Unlocked(address indexed user, uint256 amount)',
+  'event FeesClaimed(address indexed user, uint256 amount)',
+])
+
+/// PepeDescriptor — on-chain SVG art (eth_call-able, pure).
+export const descriptorAbi = parseAbi([
+  'function renderSVG(uint256 dna) view returns (string)',
+  'function tokenURI(uint256 dna) view returns (string)',
 ])
 
 export const hookAbi = parseAbi([

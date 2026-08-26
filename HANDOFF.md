@@ -1,5 +1,79 @@
 # PSP session state — 2026-08-17
 
+## UPDATE 2026-08-24 (c): DARK/NIGHT THEME + system/light/dark switcher
+
+**what shipped:** full dark theme via Tailwind v4 variable remap — zero changes
+to component markup for surfaces/borders/text. `frontend/src/lib/theme.tsx`
+(ThemeProvider: mode = system|light|dark, localStorage key `psp-theme`,
+matchMedia listener while in system mode, toggles `.dark` on `<html>`).
+`index.css` `.dark {}` block remaps `--color-white/sky-*/emerald-*/slate-*` to a
+deep-navy night palette; `--color-psp-deep` → `#53c2ff`. Chart SVG hexes
+replaced with `--chart-*` vars (grid/minor/panel/border/live/hover-dash).
+**10 `text-white` uses on accent surfaces pinned to `text-[#fff]`** so the
+white-var remap only hits backgrounds. FOUC guard script in `index.html` applies
+saved theme pre-paint. RainbowKit theme follows resolved mode (App.tsx Shell).
+Switcher: `components/ThemeSwitcher.tsx` — 3 SVG-icon segmented pill in Topbar.
+Live-verified on ebony-grace-drd5.here.now: dark bg #0b1424, chart gridlines
+resolve #16233c, persistence across reload, all three modes, light unchanged.
+
+## UPDATE 2026-08-20: TRAIT STUDIO SHIPPED + QA'D — wave-2 fully closed
+
+**what shipped:** a single-file, zero-dependency GUI (Trait Studio) replacing
+hand-editing of ASCII trait files. 48×48 pixel-grid editor with real palette
+colors, live pepe preview, and one-click compile to `PepeArtData.sol`.
+**local `studio/dist/trait-studio.html` is the current canonical build** (works
+via file:// double-click).
+
+**repo map (studio/):**
+- `compiler.js` — JS UMD port of `script/gen_pepe_art.py`, proven BYTE-IDENTICAL
+  to the python: compiled output === golden `src/PepeArtData.sol` (8303 bytes,
+  sha256 `963b1862…8ce72d`; an earlier "8299" quote was wrong — sha was always right)
+- `test_compiler.mjs` — referee test: grid round-trips ×26 traits, byte-exact
+  re-serialization ×5 trait files, output ≡ golden. run: `node studio/test_compiler.mjs`
+- `spec/COMPILER_SPEC.md` (compiler API contract), `spec/APP_SPEC.md`, `README.md`
+- `qa/QA_REPORT.md` — fresh-eyes QA report (80+ checks)
+- gotcha: repo `package.json` is `type: module` → UMD attaches to
+  `globalThis.PSPCompiler` under node ESM, not `module.exports`
+
+**features:** pencil/eraser/fill/line/rect/eyedropper, mirror-X, ghost underlay,
+cell-size slider · trait add/rename/delete/move with DNA-shift warnings · palette
+dock · live preview with skin/iris/bg + RANDOM + PNG export · compile modal with
+sha256 + "identical to repo build ✓" banner · import/export files · localStorage
+persistence · built-in self-test.
+
+**how it was built (3 agents, fresh eyes):** A ported the compiler (byte-identical
+proof), B built the GUI (attempt 1 died silently mid-gen; attempt 2 landed as 5
+modules — B also caught a real bug: NEUTRAL expression wasn't overlaying the base
+head, fixed), C ran fresh-eyes QA.
+
+**post-QA fixes (applied AFTER qa/QA_REPORT.md was written — report predates them):**
+- **P1:** modal buttons (delete/rename/move confirms) never dismissed — promise
+  wrappers never called `close()`; a stale dialog could lock keyboard shortcuts.
+  patched all 3 modal helpers; browser-verified (delete → modal closes, no lockout).
+- **P2:** dirty-dot tooltip went stale after painting — patched, title flips with state.
+
+**gates at close:** referee test ALL CHECKS PASSED · full `forge test` 571/571
+green (08-20 overnight run; supersedes the 08-19 "542 green + 4 knowns" count
+below) · browser: self-test pass, zero console errors, paint→preview updates,
+undo works, compile modal reports identical-to-repo ✓
+
+**deployment state:** https://oaken-marvel-3e24.here.now is STALE (published
+pre-QA-fix) and was a 24h anon deploy anyway. claim (permanent):
+https://here.now/c/CBLKnsishm6RbdXj. NOTE: this is the *studio* site — separate
+from the protocol frontend demo at rosy-palm-vzxv (08-18 section below).
+
+**edit flow going forward:** paint in studio → Compile → drop `PepeArtData.sol`
+into `src/`, OR Export Files → `script/traits/`. both doors are byte-exact.
+
+**next-session checklist:**
+1. republish studio from `studio/dist/` (bash
+   `~/.hermes/skills/here-now/scripts/publish.sh <dir> --client hermes`; publish.sh
+   patched 2026-08-19 to not clobber claimToken; first publish NO --slug, updates
+   WITH --slug) — then verify modal-fix behavior on the live URL
+2. QA round 2 corners: compiled-download byte-compare vs golden, reload
+   persistence, 375px viewport, palettes-tab editing
+3. kill stray local http.servers if still up: ports 8791, 8792 (pid 47140)
+
 ## UPDATE 2026-08-19: ALL AUDIT FINDINGS RESOLVED — C-1 AND F-9 BOTH FIXED
 
 **C-1 hook-squat FIXED (fork-verified):** entropy-keyed salts
@@ -123,3 +197,140 @@ new `test/unit/FlatExit.t.sol`:
   CarpetBombExecuted event data or factory mixETH balance delta.
 - key0 = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266, pk
   0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 (anvil default).
+
+## DECIDED 2026-08-23: curve1 (sawtooth) is THE curve
+- scoopy picked curve1 from the tooth iteration (12 teeth: exp ramp -> flip ->
+  log tread; beta=0.35, k2=0.5). DeployPSP PSP_CURVE defaults to 1 = curve1.
+- curve2 (sharkfin) + curve3 (switchback) stay in the gallery as alternates.
+- graphs default LINEAR now (log toggle kept) — teeth read literally.
+
+## 2026-08-23 (later): chosen-art staking + StakerDeployer vessel
+- lockWithPepe(amount, pepeId): user-chosen pepe id, dna = keccak(id) — UI rolls
+  6 candidates (renderSVG via eth_call), user picks, stake commits that exact art.
+  BadPepeId (zero/taken) + PepeAlreadyOwned guards; sequential lock() skips
+  claimed ids via skip-loop; plain lock() remains the top-up path.
+- PSPStaker creation code moved to StakerDeployer vessel (EIP-170):
+  lockWithPepe growth pushed ControllerDeployer 24,291B > 24,000 guard →
+  now 16,989B. Vessel wired: RC ctor arg (trailing), deployController param
+  (type-identical passthrough preserved), PSPFactory ctor + immutable.
+- UI: PepePicker (6-up randomizer + refresh) above the amount form on /stake
+  when wallet holds no pepe; submit gates on selection. Linear chart window =
+  max(reserves + 1000, reserves * 1.1). Curves tab removed.
+- 603/603 green (595 + 7 chosen-art + 1 vessel headroom).
+
+## 2026-08-23 (later) — multi-agent audit + longitudinal e2e
+- AUDIT: audits/2026-08-23-multiagent-audit.md. One HIGH: A-1 referral
+  attribution poisoning via forged V4 hookData on direct pool swaps —
+  PoC test/integration/PoisonedAttribution.t.sol (passes = vulnerable).
+  Fix is a design call (drop hook-lazy recording, bind via user-signed
+  registry.record()) — NOT yet applied; applying requires rewriting the
+  R1 lazy-attribution tests in test/integration/Referral.t.sol.
+- E2E: test/integration/LongitudinalLifecycle.t.sol (4 tests) — 8 users,
+  2 full rounds, ~4 months, per-phase mixETH/PSP conservation audits,
+  staggered-join fee fairness, 102-cycle buy/sell chains, carry exactness.
+  Learnings encoded: carry > PREDEPOSIT_CAP (500 mix) closes round-2's
+  public window (instant launch); drainAll takes reserve + fee surplus;
+  quorum denominator = max(locked, supply) at propose.
+- Skill evm-cortex patched with the hookData-identity pattern + the
+  longitudinal conservation-audit recipe.
+
+## 2026-08-24 — user's edited studio art landed (THE art fix)
+- SOURCES: user re-sent compiled.zip + expressions.txt (Desktop zip was a boomerang of my own bundle).
+  All 6 files hash-differ from golden → genuine edit, finally.
+- palettes.py export typo: every skin entry `))})` → repaired to `)}`; after fix,
+  `python3 script/gen_pepe_art.py` output is BYTE-IDENTICAL to studio-compiled PepeArtData.sol
+  (round-trip proof: sources ⟺ on-chain art consistent).
+- NEW art: skins +Grey/Orange/Green (8), iris +BASE (7), bgs +Yellow/MAGENTA (10),
+  eyes +STARRY/EYEROLL/DEAD (9), hats +NARUTO/TOPHAT/FRENCH/WIZARD/HOMER (10),
+  wear +MOGGED/MAGNIFYING/EYEPATCH/HEARTGLASSES (8), items +STITCHES/TATTOO/MUSTACHE/NOOSE,
+  SNACK cookie REMOVED (8). COMBOS 1,440,000 → 25,804,800.
+- Slot 13 "cookie gold" #B27532 repurposed → blue #001EFF (letter k).
+- Letter map: r=7 R=8 c=9(red tongue) n=10 g=11 d=12 k=13 s=14(dark interior) b=15.
+  GOTCHA: str() dumps of slot grids are ambiguous (14 vs 1,4) — trust hexgrid composites only.
+- PepeDescriptor.t.sol: 6 stale-golden tests re-pinned to MEASURED pixels
+  (axis bounds, COMBOS, neutral lip y28→y29, smile seam juts [30][21]/[30][32],
+  smirk dark inner band, cigarette moved right x31-43, Item_Others → pipe/chain/
+  stitches/tattoo/noose). NoTeethEver still passes.
+- 608/608 green. Fresh anvil deploy: Factory 0x18e3…b629, ZapIn 0xc0f1…4f8,
+  ZapOut 0xc963…8a75, Descriptor 0x4b6a…af28. DriveAnvil round 1 driven.
+- UI: https://rising-fresco-yg7r.here.now/ (anon 24h; claim https://here.now/c/_dRftEf9f28y7yXP)
+  — old regal-fennel slug expired, new one issued.
+
+## 2026-08-24 (b) — studio app updated + DNA codec fix
+- STUDIO SYNCED to new art: psp_state.json palettes rebuilt from repaired palettes.py
+  (8 skins / 7 irises / 10 bgs), GOLDEN_SHA repinned everywhere (0c94847e…13dd) in
+  test_compiler.mjs + app-core.js + make_defaults.py, spec/golden/PepeArtData.sol(.sha256)
+  refreshed, defaults.js regenerated (self-proves vs golden), dist rebuilt (314,592 B).
+  test_compiler.mjs: ALL CHECKS PASSED. Zipped to scoopy (psp-studio.zip, 26 files).
+- **BUG FOUND + FIXED (pre-mainnet): eyes field was 3 bits but art has 9 eyes traits**
+  → id 8 was UNREACHABLE on-chain ((x&7)%9 = identity; pack(eyes=8) collided with hat).
+  COMBOS advertised 25.8M vs 22.9M reachable. Layout widened: eyes 4 bits —
+  expr<<0 | eyes<<3(4b) | hat<<7 | wear<<11 | item<<15 | skin<<19 | iris<<22 | bg<<25.
+  Patched: PepeDescriptor.sol decode+pack, studio app-core.js packDNA, KnownUnpack test
+  (+ eyes=8 regression + pack(decode(maxDna))==maxDna). Descriptor suite 18/18.
+  NOTE for future art additions: axis counts are bounded by bit widths —
+  expr 8, eyes 16, hat 16, wear 16, item 16, skin 8, iris 8, bg 16 (modulo counts).
+- Fresh anvil redeploy (codec): Factory 0xab16…c926, ZapIn 0x38a0…93d4, ZapOut 0x5fc7…177c.
+  UI: https://ebony-grace-drd5.here.now/ (claim https://here.now/c/KoErkcW10wB4E9HW).
+
+## UPDATE 2026-08-26 (b): HEAD EDITING in the Trait Studio
+
+The one base head sprite is now editable, first-class:
+- `script/traits/head.txt` — single `BASE` block, full-canvas 69-char rows,
+  canonical header (byte-stable through compiler traitText). GENERATED from
+  the original _base() trace by script/out/gen_head_txt.py; from now on the
+  FILE is the source of truth (gen_pepe_art.py loads it, reference trace is
+  the fallback). gen also rewrites studio/spec/psp_state.json on regen.
+- studio: HEAD tab (first), single BASE entry, all six trait ops disabled,
+  full paint tools + per-trait undo work on it, ghost underlay skipped when
+  editing the head itself (it IS the head), no-teeth validation extended to
+  the head grid, export now carries 6 files (head.txt), import has a
+  head-specific replace flow. localStorage format v2 (axes.head); v1 saves
+  auto-convert.
+- PROOFS: python door — regen via head.txt byte-identical (golden sha
+  unchanged 2f41f45a…9229, so forge 612/612 carries over, no contract
+  change). Node door — referee ALL CHECKS PASSED (head.txt parse/round-trip/
+  byte-stable + golden compile). Browser — paint→preview→undo→compile
+  identical, self-test pass, zero console errors.
+- LIVE: https://fancy-comet-qdpg.here.now/trait-studio.html
+  (claim https://here.now/c/VcuGwTbHGt-ITdyV). Zip: ~/clawd/psp-studio-69.zip.
+- Edit flow for scoopy: paint head in studio → Compile → drop PepeArtData.sol
+  into src/, OR Export Files → drop head.txt (+ any traits) into
+  script/traits/ → python3 script/gen_pepe_art.py. Both doors byte-exact.
+
+## UPDATE 2026-08-27: STUDIO PASS v3 INTEGRATED (scoopy's art, both doors)
+
+Scoopy edited/added traits in the studio and shipped two zips (identical):
+6 trait files + palettes.py + his compiled PepeArtData.sol.
+
+- **Axes 10 across the board** (was 8 expr / 9 eyes / 8 wear / 8 item / 8 skin
+  / 7 iris): new CRINGE (gritted teeth — human-approved exception to the
+  no-teeth invariant, exempted as expr id 8), MEH, CROSSEYED, HOODIE
+  (replaces HOMER), 3D/Cyber/Cool shades (MAGNIFYING dropped), CIGAR/BONG/
+  JARHEAD/LOLLIPOP (TATTOO/MUSTACHE dropped). **Item file order: JARHEAD=8,
+  LOLLIPOP=9** (bit me once — dna item 8 is the jar, not the candy).
+- **Palette**: Gold/Diamond/Night/Lime/Orange retuned, Toad+Sick skins,
+  Magenta/NeonGreen/Grey irises, Midnight/Void recolored, cookie slot 13 now
+  #0055FF (bong water). 7 hand-set slot-19 mid-shadows pinned in
+  script/traits/palettes.py; `_extend()` is setdefault — hand-set wins over
+  derivation. Studio export flattens palettes (drops 16-23) — always MERGE
+  exports into the repo file, never overwrite.
+- **PROOF**: repo regen (`python3 script/gen_pepe_art.py`) is BYTE-IDENTICAL
+  to his compiled .sol. Golden sha 73fff0a5…d364 (pins: test_compiler.mjs,
+  app-core.js badge, make_defaults.py). Referee ALL CHECKS PASSED.
+- **Descriptor codec v2**: every axis 4 bits (expr<<0 … bg<<28). Old 3-bit
+  expr/skin/iris fields would ALIAS ids 8/9 onto 0/1 — real bug, fixed.
+  COMBOS = 10^8 = 100,000,000. Name tables rewritten to match.
+- **Tests**: PepeDescriptor.t.sol re-pinned from measured compose (23 edits +
+  3 fixes). Key pin deltas: brows #1A2E1E (skin-deep), bridge row 29
+  #D3EDCD glint, smirk band LIPSDARK, cigarette filter cols 44-47 + ember
+  60-62 rows 43-44, bong glass #5C6270/#C2C8D4 + water #0055FF + cherry,
+  lollipop [39][36] RED / [40][31] WHITE, jar [0][33]/[44][9]. Descriptor
+  suite 19/19.
+- **ArtDump v5** (test/unit/ArtDump.t.sol): dumps 80 axis SVGs + 16 new-trait
+  highlights + 16 deterministic randoms to out/art-dump/. Rasterize sheets:
+  python3 /tmp/svg_sheet.py out/art-dump out.png 10 (rect-SVG parser + PIL).
+- **Frontend**: zero changes needed — PepePanel/PepePicker render via
+  eth_call renderSVG; new bytecode picked up on next anvil deploy.
+- **Live studio**: https://fancy-comet-qdpg.here.now/trait-studio.html
+  (verified serving v3 defaults + new golden badge).

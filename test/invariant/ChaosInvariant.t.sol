@@ -6,10 +6,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
+import {PSPStaker} from "../../src/PSPStaker.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
 import {MockMixETH} from "../mocks/MockMixETH.sol";
 import {MockHook} from "../mocks/MockHook.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title ChaosInvariant — Full-system invariant fuzzing
 /// @notice Handler models the REAL controller (not a simulation): real locks,
@@ -42,11 +45,11 @@ contract ChaosInvariant is Test {
         );
     }
 
-    /// INV-2: Sum of all lock positions == controller.totalLocked (no phantom/untracked PSP)
+    /// INV-2: Sum of all lock positions == stakerV.totalLocked (no phantom/untracked PSP)
     function invariant_TrackedLocksMatchAccounting() public view {
         assertEq(
             handler.sumLockAmounts(),
-            handler.controller().totalLocked(),
+            handler.controller().staker().totalLocked(),
             "lock position sum diverged from totalLocked"
         );
     }
@@ -61,7 +64,7 @@ contract ChaosInvariant is Test {
         assertGe(balance, reserve, "hook balance fell below mixETH reserve");
         uint256 available = balance - reserve;
         assertTrue(
-            c.pendingFeesMixETH() <= available,
+            c.staker().pendingFeesMixETH() <= available,
             "accounted pending fees exceed hook's unreserved balance"
         );
     }
@@ -75,7 +78,7 @@ contract ChaosInvariant is Test {
     /// INV-5: totalLocked never exceeds PSP token total supply
     function invariant_LocksBoundedBySupply() public view {
         assertLe(
-            handler.controller().totalLocked(),
+            handler.controller().staker().totalLocked(),
             handler.psp().totalSupply(),
             "locked more PSP than exists"
         );
@@ -87,6 +90,7 @@ contract ChaosHandler is Test {
     uint256 constant USERS = 5;
 
     RoundController public controller;
+    PSPStaker public stakerV; // cached: single vm.prank must not be eaten by the staker() view call
     PSPToken public psp;
     MockMixETH public mixETH;
     MockHook public hook;
@@ -109,7 +113,8 @@ contract ChaosHandler is Test {
         );
 
         psp = new PSPToken("PSP", "PSP", address(this));
-        controller = new RoundController(psp, IERC20(address(mixETH)), params, address(this));
+        controller = new RoundController(psp, IERC20(address(mixETH)), params, address(this), address(0), new StakerDeployer());
+        stakerV = controller.staker();
 
         // Hand mint rights to controller, then mint as controller
         psp.setController(address(controller));
@@ -123,7 +128,7 @@ contract ChaosHandler is Test {
 
         for (uint256 i = 0; i < USERS; i++) {
             vm.prank(users[i]);
-            psp.approve(address(controller), type(uint256).max);
+            psp.approve(address(stakerV), type(uint256).max);
         }
 
         // Wire + fund the hook (reserve 100k, available fees 100k)
@@ -140,7 +145,7 @@ contract ChaosHandler is Test {
         uint256 i = userSeed % USERS;
         amount = bound(amount, 1, psp.balanceOf(users[i]));
         vm.prank(users[i]);
-        controller.lock(amount);
+        stakerV.lock(amount);
         _checkNoDrift(i);
     }
 
@@ -161,7 +166,7 @@ contract ChaosHandler is Test {
         if (_pending(users[i]) == 0) return;
         uint256 before = mixETH.balanceOf(users[i]);
         vm.prank(users[i]);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 gotMix = mixETH.balanceOf(users[i]) - before;
         // Track in ETH terms at current (1:1) rate — invariant is conservative
         totalClaimedETHValue_ += gotMix;
@@ -176,19 +181,21 @@ contract ChaosHandler is Test {
 
     function unlockIfExpired(uint256 userSeed) external {
         uint256 i = userSeed % USERS;
-        (uint256 amt,,, uint256 unlockT) = controller.locks(users[i]);
+        uint256 amt = stakerV.lockedPSPOf(users[i]);
+        (,, , uint256 unlockT) = stakerV.positions(users[i]);
         if (amt == 0 || block.timestamp < unlockT) return;
         vm.prank(users[i]);
-        controller.unlock();
+        stakerV.unlock();
         _checkNoDrift(i);
     }
 
     function relockIfWindow(uint256 userSeed) external {
         uint256 i = userSeed % USERS;
-        (uint256 amt,,, uint256 unlockT) = controller.locks(users[i]);
+        uint256 amt = stakerV.lockedPSPOf(users[i]);
+        (,, , uint256 unlockT) = stakerV.positions(users[i]);
         if (amt == 0 || block.timestamp < unlockT - 7 days) return;
         vm.prank(users[i]);
-        controller.relock();
+        stakerV.relock();
         _checkNoDrift(i);
     }
 
@@ -202,8 +209,8 @@ contract ChaosHandler is Test {
     }
 
     function _pending(address u) internal view returns (uint256) {
-        (uint256 amt, uint256 rDebt,,) = controller.locks(u);
-        return (amt * controller.accFeePerShareMixETH()) / 1e18 - rDebt;
+        // staker exposes pending directly (rewardDebt is internal there)
+        return stakerV.pendingFeesOf(u);
     }
 
     // ── Views for invariants ──
@@ -219,8 +226,7 @@ contract ChaosHandler is Test {
 
     function sumLockAmounts() external view returns (uint256 sum) {
         for (uint256 i = 0; i < USERS; i++) {
-            (uint256 amt,,,) = controller.locks(users[i]);
-            sum += amt;
+            sum += stakerV.lockedPSPOf(users[i]);
         }
     }
 }

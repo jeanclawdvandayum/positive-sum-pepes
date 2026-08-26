@@ -17,6 +17,8 @@ import {CurveHook} from "../../src/CurveHook.sol";
 import {RoundController} from "../../src/RoundController.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
 import {HostileMixETH} from "./NK24.t.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title NK24-MultiZone — inflection-point crossing audit
 /// @notice Scoopy's question: do large trades that traverse multiple
@@ -60,7 +62,7 @@ contract NK24MultiZoneTest is Test {
         vm.createSelectFork(vm.envString("MAINNET_RPC_URL"));
         mixETH = new HostileMixETH();
         mixETH.deposit{value: 200_000_000e18}();
-        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), 0);
+        factory = new PSPFactory(poolManager, mixETH, new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), 0);
         mixETH.transfer(alice, 1_000_000e18);
         mixETH.transfer(whale, 100_000_000e18);
         r = _deployRound();
@@ -383,18 +385,15 @@ contract NK24MultiZoneTest is Test {
 
         uint256 whalePSP = r.token.balanceOf(whale);
         assertGt(whalePSP, 1e12, "no PSP to drain");
-        (uint256 potAfterBuy,) = r.controller.potState();
 
-        // everything unburned after the drain = genesis + 1 wei of whale dust
-        // + every PSP the pot ever minted/skimmed (buy cut + sell cut)
-        uint256 potCut = ((whalePSP - 1) * 25) / 10000;
+        // (2026-08-19) side pot retired: buys mint no pot PSP and sells burn
+        // their FULL input — after a total drain the only unburned PSP is
+        // genesis + the 1 wei of dust the whale leaves behind.
         Leg[] memory drain = new Leg[](1);
         drain[0] = Leg({isBuy: false, amount: whalePSP - 1});
         _multiLeg(whale, drain);
 
-        (uint256 potPSP,) = r.controller.potState();
-        assertEq(r.hook.totalSupplyPSP(), genesisSupply + 1 + potPSP, "supply = genesis + dust + unburned pot PSP");
-        assertApproxEqAbs(potPSP - potAfterBuy, potCut, 2, "pot ledger did not accrue the skimmed cut");
+        assertEq(r.hook.totalSupplyPSP(), genesisSupply + 1, "supply = genesis + dust (sells burn fully)");
         assertGe(r.hook.reserveMixETH(), CurveMath.curveIntegral(0, genesisSupply, cc), "reserve below backing");
 
         // the last wei: input < MIN_SWAP_INPUT -> clean revert, no panic,

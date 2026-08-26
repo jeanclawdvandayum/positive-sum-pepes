@@ -7,15 +7,19 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
+import {PSPStaker} from "../../src/PSPStaker.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
 import {MockMixETH} from "../mocks/MockMixETH.sol";
 import {MockHook} from "../mocks/MockHook.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title ControllerTest — Tests for locking, fee distribution, governance
 /// @notice Tests the controller in isolation (no V4 PoolManager needed)
 contract ControllerTest is Test {
     RoundController controller;
+    PSPStaker public stakerV; // cached: single vm.prank must not be eaten by the staker() view call
     MockMixETH mixETH;
     PSPToken pspToken;
 
@@ -36,7 +40,8 @@ contract ControllerTest is Test {
             0.1e18
         );
         pspToken = new PSPToken("Positive Sum Pepes", "PSP", address(this));
-        controller = new RoundController(pspToken, IERC20(address(mixETH)), params, factory);
+        controller = new RoundController(pspToken, IERC20(address(mixETH)), params, factory, address(0), new StakerDeployer());
+        stakerV = controller.staker();
         pspToken.setController(address(controller));
 
         // Give Alice and Bob some PSP
@@ -47,9 +52,9 @@ contract ControllerTest is Test {
 
         // Approve controller to transfer PSP
         vm.prank(alice);
-        pspToken.approve(address(controller), type(uint256).max);
+        pspToken.approve(address(stakerV), type(uint256).max);
         vm.prank(bob);
-        pspToken.approve(address(controller), type(uint256).max);
+        pspToken.approve(address(stakerV), type(uint256).max);
 
         // Give controller enough mixETH for fee distribution and destruction
         mixETH.transfer(address(controller), 1000e18);
@@ -59,33 +64,45 @@ contract ControllerTest is Test {
 
     function test_LockPSP() public {
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         (uint256 amount,,,,) = _getLockInfo(alice);
         assertEq(amount, 1000e18, "Lock amount mismatch");
-        assertEq(controller.totalLocked(), 1000e18, "Total locked mismatch");
+        assertEq(stakerV.totalLocked(), 1000e18, "Total locked mismatch");
     }
 
     function test_LockMultipleUsers() public {
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         vm.prank(bob);
-        controller.lock(3000e18);
+        stakerV.lock(3000e18);
 
-        assertEq(controller.totalLocked(), 4000e18, "Total should be 4000");
+        assertEq(stakerV.totalLocked(), 4000e18, "Total should be 4000");
     }
 
-    function test_LockZeroFails() public {
+    function test_LockZeroMintsPepeOnly() public {
+        // 2026-08-22: lock(0) is the pepe-first onboarding path — mints the
+        // NFT with no stake, no Locked event, no clock.
         vm.prank(alice);
-        vm.expectRevert();
-        controller.lock(0);
+        stakerV.lock(0);
+
+        uint256 id = stakerV.tokenOf(alice);
+        assertGt(id, 0, "NFT minted");
+        assertEq(stakerV.ownerOf(id), alice, "owner");
+        assertEq(stakerV.lockedPSPOf(alice), 0, "no stake");
+        assertEq(stakerV.totalLocked(), 0, "nothing locked");
+
+        // idempotent: a second zero-lock does not mint again
+        vm.prank(alice);
+        stakerV.lock(0);
+        assertEq(stakerV.tokenOf(alice), id, "same NFT");
     }
 
     function test_LockInsufficientBalance() public {
         vm.prank(alice);
         vm.expectRevert();
-        controller.lock(999_999e18); // Alice only has 10k
+        stakerV.lock(999_999e18); // Alice only has 10k
     }
 
     // ─────────────────── Fee Distribution Tests ───────────────────
@@ -93,9 +110,9 @@ contract ControllerTest is Test {
     function test_FeeDistribution() public {
         // Alice locks 1000, Bob locks 3000 (25%/75% split)
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
         vm.prank(bob);
-        controller.lock(3000e18);
+        stakerV.lock(3000e18);
 
         // Simulate fees being added
         // We need to call addFees from the hook, so we mock it
@@ -105,20 +122,20 @@ contract ControllerTest is Test {
         // This is better tested in integration tests
 
         // Instead, test the accumulator math directly
-        assertEq(controller.totalLocked(), 4000e18, "Total locked should be 4000");
+        assertEq(stakerV.totalLocked(), 4000e18, "Total locked should be 4000");
     }
 
     function test_ClaimFeesNoLock() public {
         vm.prank(alice);
-        vm.expectRevert(RoundController.NotLocker.selector);
-        controller.claimFees();
+        vm.expectRevert(PSPStaker.NotLocker.selector);
+        stakerV.claimFees();
     }
 
     // ─────────────────── Governance Tests ───────────────────
 
     function test_ProposeDestruction() public {
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         vm.prank(alice);
         controller.proposeCarpetBomb();
@@ -130,15 +147,15 @@ contract ControllerTest is Test {
 
     function test_ProposeWithoutLocking() public {
         vm.prank(alice);
-        vm.expectRevert(RoundController.NotLocker.selector);
+        vm.expectRevert(PSPStaker.NotLocker.selector);
         controller.proposeCarpetBomb();
     }
 
     function test_VoteDestruction() public {
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
         vm.prank(bob);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         vm.warp(block.timestamp + 1); // M-1: locks must predate the proposal
         vm.prank(alice);
@@ -153,19 +170,19 @@ contract ControllerTest is Test {
 
     function test_VoteWithoutLocking() public {
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         vm.prank(alice);
         controller.proposeCarpetBomb();
 
         vm.prank(bob);
-        vm.expectRevert(RoundController.NotLocker.selector);
+        vm.expectRevert(PSPStaker.NotLocker.selector);
         controller.voteCarpetBomb(true);
     }
 
     function test_DoubleVoteFails() public {
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         vm.warp(block.timestamp + 1); // M-1: locks must predate the proposal
         vm.prank(alice);
@@ -181,7 +198,7 @@ contract ControllerTest is Test {
 
     function test_ExecuteBeforeDurationFails() public {
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         vm.warp(block.timestamp + 1); // M-1: locks must predate the proposal
         vm.prank(alice);
@@ -205,10 +222,10 @@ contract ControllerTest is Test {
         controller.setHook(CurveHook(address(hook)));
 
         vm.prank(bob);
-        controller.lock(2000e18);
+        stakerV.lock(2000e18);
 
         vm.startPrank(alice);
-        controller.lock(2000e18);
+        stakerV.lock(2000e18);
         vm.stopPrank();
 
         vm.warp(block.timestamp + 1); // M-1: locks must predate the proposal
@@ -235,7 +252,7 @@ contract ControllerTest is Test {
 
     function test_ExecuteQuorumFails() public {
         vm.startPrank(alice);
-        controller.lock(2000e18);
+        stakerV.lock(2000e18);
         vm.stopPrank();
 
         vm.warp(block.timestamp + 1); // M-1: locks must predate the proposal
@@ -272,7 +289,7 @@ contract ControllerTest is Test {
 
         // Sole locker
         vm.prank(alice);
-        controller.lock(1000e18);
+        stakerV.lock(1000e18);
 
         // Hook accrues 100e18 ETH-denominated fees
         vm.prank(address(hook));
@@ -284,20 +301,20 @@ contract ControllerTest is Test {
         // Relock pays the pending fees (alice owns 100% of weight)
         uint256 aliceBefore = mixETH.balanceOf(alice);
         vm.prank(alice);
-        controller.relock();
+        stakerV.relock();
         uint256 paidAtRelock = mixETH.balanceOf(alice) - aliceBefore;
         assertGt(paidAtRelock, 90e18, "relock should pay ~all pending fees");
 
         // Immediate second claim must find nothing pending
         vm.prank(alice);
-        vm.expectRevert(RoundController.NothingToClaim.selector);
-        controller.claimFees();
+        vm.expectRevert(PSPStaker.NothingToClaim.selector);
+        stakerV.claimFees();
 
         // And the following claim cycle only pays fees accrued AFTER the relock
         vm.prank(address(hook));
         controller.addFees(50e18);
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 secondPayment = mixETH.balanceOf(alice) - aliceBefore - paidAtRelock;
         // 50e18 ETH accrued after rewardDebt refresh → paid in full, not 150e18
         assertApproxEqRel(secondPayment, 50e18, 0.001e18, "second cycle must pay only new fees");
@@ -306,7 +323,9 @@ contract ControllerTest is Test {
     // ─────────────── Helpers ───────────────
 
     function _getLockInfo(address user) internal view returns (uint256 amount, uint256 rewardDebt, uint256 lockTime, uint256 unlockTime, bool) {
-        (amount, rewardDebt, lockTime, unlockTime) = controller.locks(user);
+        amount = stakerV.lockedPSPOf(user);
+        (,, uint256 lockTime, ) = stakerV.positions(user);
+        (,, , uint256 unlockTime) = stakerV.positions(user);
         return (amount, rewardDebt, lockTime, unlockTime, false);
     }
 
@@ -361,8 +380,8 @@ contract ControllerTest is Test {
             psp2,
             IERC20(address(mixETH)),
             CurveMath.singleCurve(1_000e18, 1_000_000e18, 0.0000000046e18, 0.05e18),
-            factory
-        );
+            factory,
+            address(0), new StakerDeployer());
         psp2.setController(address(c2));
         vm.prank(factory);
         c2.setHook(CurveHook(address(hook2)));
@@ -396,7 +415,8 @@ contract ControllerTest is Test {
         assertFalse(claimed, "dust depositor must NOT be marked claimed");
 
         // No 0-amount lock side effects (lockTime stays 0)
-        (uint256 amt,, uint256 lockTime,) = c2.locks(carol);
+        uint256 amt = c2.staker().lockedPSPOf(carol);
+        (,, uint256 lockTime,) = c2.staker().positions(carol);
         assertEq(amt, 0, "no lock amount created");
         assertEq(lockTime, 0, "no lockTime set");
 
@@ -418,7 +438,8 @@ contract ControllerTest is Test {
         view
         returns (uint256 amount, uint256 rewardDebt, uint256 lockTime, uint256 unlockTime, bool dummy)
     {
-        (amount, rewardDebt, lockTime, unlockTime) = c.locks(user);
+        amount = c.staker().lockedPSPOf(user);
+        (,, lockTime, unlockTime) = c.staker().positions(user);
         dummy = false;
     }
 
@@ -456,7 +477,7 @@ contract ControllerTest is Test {
         vm.prank(address(controller));
         pspToken.mint(bob, 10_000_000e18);
         vm.prank(bob);
-        controller.lock(10_000_000e18);
+        stakerV.lock(10_000_000e18);
 
         // Fees accrue across the full locked base (bob's lock + genesis lock)
         mixETH.transfer(address(hook), 50e18);
@@ -478,21 +499,21 @@ contract ControllerTest is Test {
         // Explicit fee claims stay strict and revert informatively
         vm.prank(bob);
         vm.expectRevert(MockHook.InsufficientFees.selector);
-        controller.claimFees();
+        stakerV.claimFees();
 
         // The predeposit claim goes through, forfeiting both fee legs:
         // (a) pending fees on bob's own lock, (b) fees accrued by his
         // predeposit share while it sat in the genesis virtual lock
-        uint256 acc = controller.accFeePerShareMixETH();
+        uint256 acc = stakerV.accFeePerShareMixETH();
         (uint256 bobLockAmt, uint256 bobRewardDebt,,,) = _getLockInfo(bob);
         uint256 pendingOnLock = (bobLockAmt * acc) / controller.PRECISION() - bobRewardDebt;
         uint256 genesisAccrued = (controller.totalInitialPSP() * acc) / controller.PRECISION();
 
         uint256 bobMixBefore = mixETH.balanceOf(bob);
         vm.expectEmit(true, true, true, true);
-        emit RoundController.FeesForfeited(bob, pendingOnLock);
+        emit PSPStaker.FeesForfeited(bob, pendingOnLock);
         vm.expectEmit(true, true, true, true);
-        emit RoundController.FeesForfeited(bob, genesisAccrued);
+        emit PSPStaker.FeesForfeited(bob, genesisAccrued);
         vm.prank(bob);
         controller.claimPredepositPSP();
         assertEq(mixETH.balanceOf(bob), bobMixBefore, "fees forfeited, nothing paid");

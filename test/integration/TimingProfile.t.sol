@@ -13,6 +13,7 @@ import {CurveMath} from "../../src/libraries/CurveMath.sol";
 
 import {MockMixETH} from "../mocks/MockMixETH.sol";
 import {MockPoolManager} from "../mocks/MockPoolManager.sol";
+import {StakerDeployer} from "../../src/StakerDeployer.sol";
 
 /// @title Timing-profile integration pins (2026-08-19)
 /// @notice The original 5x64-bit timings packing shifted the vote slot by
@@ -47,6 +48,7 @@ contract TimingProfileTest is Test {
             IERC20(address(mixETH)),
             hookDeployer,
             controllerDeployer,
+            new StakerDeployer(),
             timings
         );
         mixETH.transfer(alice, 1_000e18);

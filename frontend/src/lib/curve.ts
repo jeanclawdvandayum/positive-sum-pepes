@@ -49,14 +49,12 @@ export interface CurvePoint {
 }
 
 /// Sample the curve: reserve(s) via numeric integration of marginalPrice.
-/// Grid concentrates points around zone boundaries where the curve bends.
-export function sampleCurve(cc: CurveConfig, liveSupply: bigint, n = 320): CurvePoint[] {
-  // chart domain: up to 1.15x the larger of (live supply, last finite zone end)
-  const finiteEnds = cc.zones.filter((z) => z.endSupply < 2n ** 100n).map((z) => z.endSupply)
-  const domainEnd =
-    finiteEnds.length > 0 ? finiteEnds[finiteEnds.length - 1] : liveSupply * 115n / 100n
-  const sMax = (domainEnd > liveSupply ? domainEnd : liveSupply * 115n / 100n)
-
+/// Grid: per-zone geometric — every zone (cliff, tread, seed, tail) gets the
+/// same number of interior points, so every leg stays resolved no matter how
+/// late/small it is. Required for the log-x chart (2026-08-19): a
+/// uniform-in-supply grid starves the late legs to zero points and fakes a
+/// smooth line. Tail zone (open end) gets a log ramp beyond its start.
+export function sampleCurve(cc: CurveConfig, liveSupply: bigint, perZone = 10): CurvePoint[] {
   const pts: CurvePoint[] = []
   let reserve = 0
   let prevS = 0
@@ -72,17 +70,40 @@ export function sampleCurve(cc: CurveConfig, liveSupply: bigint, n = 320): Curve
     pts.push({ reserve, supply: s, price: p })
   }
 
-  // include every zone boundary in the grid so bends land on sample points
-  const bounds = cc.zones.map((z) => z.startSupply).filter((b) => b > 0n && b < sMax)
-  const grid: bigint[] = []
-  for (let i = 0; i <= n; i++) {
-    grid.push(BigInt(Math.round((Number(sMax) * i) / n)))
+  // grid: zone boundaries + geometric interior points per zone
+  const grid: bigint[] = [0n]
+  for (const z of cc.zones) {
+    if (z.startSupply > 0n) grid.push(z.startSupply)
+    const finite = z.endSupply < 2n ** 200n
+    if (finite) {
+      const s0 = Number(z.startSupply)
+      const s1 = Number(z.endSupply)
+      if (s1 > s0) {
+        // geometric interp; zones starting at 0 fall back to linear.
+        // NOTE: s0/s1 are wad-scale floats — do NOT multiply by WAD again.
+        for (let i = 1; i <= perZone; i++) {
+          const t = i / (perZone + 1)
+          const s = s0 === 0 ? s1 * t : s0 * Math.pow(s1 / s0, t)
+          grid.push(BigInt(Math.round(s)))
+        }
+      }
+    } else {
+      // open tail: log ramp to 3x its start (bounded by live supply too)
+      const s0 = Number(z.startSupply)
+      const sCap = Math.max(s0 * 3, Number(liveSupply) * 1.15)
+      for (let i = 1; i <= 12; i++) {
+        grid.push(BigInt(Math.round(s0 * Math.pow(sCap / s0, i / 12))))
+      }
+    }
   }
-  for (const b of bounds) if (!grid.some((g) => Number(g) === Number(b))) grid.push(b)
   grid.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
-
+  const seen = new Set<string>()
   for (const g of grid) {
-    if (g > BigInt(Math.round(prevS * WAD)) - 1n) push(g)
+    const key = g.toString()
+    if (!seen.has(key)) {
+      seen.add(key)
+      push(g)
+    }
   }
   return pts
 }

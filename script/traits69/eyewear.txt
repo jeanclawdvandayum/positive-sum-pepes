@@ -1,0 +1,180 @@
+# PSP pepe traits — EYEWEAR (69x69)
+# Letters: s shades-black(14) W white(5) g gold(11)
+#          A steel-light(20) a steel-dark(21) C cream(22)
+# Format: '# name:' + '# dx:' + '# dy:' then rows of uniform
+# width. '.' = transparent. DNA id 0 is always NONE (implicit).
+# Other blocks: DNA id = file order + 1.
+
+# name: SHADES
+# dx: 10
+# dy: 24
+sssssssssssssssssssssssssssssssssssssssssssssssss
+sssssssssssssssssssssssssssssssssssssssssssssssss
+sss....sssWWWsssssssssssss...ssWWWsssssssssssssss
+.......sssWWWsssssssssssss...ssWWWsssssssssssssss
+.......sssWWWsssssssssssss...ssWWWsssssssssssssss
+.......sssWWWsssssssssssss...ssWWWsssssssssssssss
+.......sssWWWsssssssssssss...ssWWWsssssssssssssss
+.......sssWWWsssssssssssss...ssWWWsssssssssssssss
+.......sssWWWsssssssssssss...ssWWWsssssssssssssss
+.......sssWWWsssssssssssss...ssWWWsssssssssssssss
+.......sssssssssssssssssss...ssssssssssssssssssss
+.......sssssssssssssssssss...ssssssssssssssssssss
+.........ssssssssssssssss.....ssssssssssssssssss.
+
+# name: MONOCLE
+# dx: 37
+# dy: 22
+...sssssssssssss......
+..sssssssssssssss.....
+.ssss..........sss....
+ssss............sss...
+sss..............sss..
+ss................ss..
+ss................ss..
+ss................ss..
+ss................ss..
+ss................ss..
+ss................ss..
+ss................ss..
+ss...............ss...
+sss.............sss...
+.sss...........sss....
+..sssssssssssssss.....
+...sssssssssssss......
+............ssss......
+.............sss......
+..............sss.....
+...............sss....
+................sss...
+.................sss..
+..................ssss
+
+# name: GLASSES
+# dx: 12
+# dy: 24
+.....sssssssssssssssssssGGGGsssssssssssssssssss
+.....sssssssssssssssssssGGGGsssssssssssssssssss
+ssssssss.............sssGGGGsss.............sss
+ssssssss.............sssGGGGsss.............sss
+ssssssss.............sssGGGGsss.............sss
+.....sss.............ssssssssss.............sss
+.....sss.............sssGGGGsss.............sss
+.....sss.............sssGGGGsss.............sss
+.....sss.............sssGGGGsss.............sss
+.....sss.............sssGGGGsss.............sss
+.....sss.............sssGGGGsss.............sss
+.....sssssssssssssssssssGGGGsssssssssssssssssss
+.....sssssssssssssssssssGGGGsssssssssssssssssss
+........GGGGGGGGGGGGG.........GGGGGGGGGGGGGG...
+
+# name: MOGGED
+# dx: 12
+# dy: 23
+sssssssssssssssssssssssssssssssssssssssssssssss
+ssssgggggggggggggggggsssssssggggggggggggggggggs
+ssssgggggggggggggggggsssssssggggggggggggggggggs
+ssssggggggggggggggggggggggggggggggggggggggggggs
+ssssggggggggggggggggggggggggggggggggggggggggggs
+ssssggggggggggggggggggggggggggggggggggggggggggs
+.sssggggggggggggggggggggggggggggggggggggggggggs
+.sssgggggggggggggggggggssssgggggggggggggggggggs
+.sssgggggggggggggggggggssssgggggggggggggggggggs
+..ssgggggggggggggggggggs.ssgggggggggggggggggggs
+..ssgggggggggggggggggggs.ssggggggggggggggggggss
+..ssgggggggggggggggggggs.ssgggggggggggggggggss.
+..sssggggggggggggggggsss.sssgggggggggggggggss..
+....ssssssssssssssssssss...sssssssssssssssss...
+
+# name: EYEPATCH
+# dx: 16
+# dy: 23
+.......sssssssssssss.............sssssss
+ssss..sssssssssssssss........sssssssssss
+ssss..sssssssssssssss.....ssssssssssssss
+.sssssssssssssssssssssssssssssssss......
+..sssssssssssssssssssssssssssss.........
+...sssssssssssssssssssssssssss..........
+....sssssssssssssssssss.................
+....sssssssssssssssssss.................
+....sssssssssssssssssss.................
+....sssssssssssssssssss.................
+....sssssssssssssssssss.................
+....sssssssssssssssssss.................
+....sssssssssssssssssss.................
+......sssssssssssssss...................
+.......sssssssssssss....................
+.......sssssssssssss....................
+
+# name: HEARTGLASSES
+# dx: 11
+# dy: 25
+............RRR.......RRR....RRR.......RRR....
+...........RRRRR.....RRRRR..RRRRR.....RRRRR...
+..........RRRcRRR...RRRcRRRRRRcRRR...RRRcRRRRR
+RRRRRRRRRRRRcccRRR.RRRcccRRRRcccRRR.RRRcccRR..
+RR........RRccccRRRRRccccRRRRccccRRRRRccccRR..
+RR........RRcccccRRRcccccRRRRcccccRRRcccccRR..
+..........RRRcccccRcccccRRRRRRcccccRcccccRRR..
+...........RRRcccccccccRRR..RRRcccccccccRRR...
+............RRRcccccccRRR....RRRcccccccRRR....
+.............RRRcccccRRR......RRRcccccRRR.....
+..............RRRcccRRR........RRRcccRRR......
+...............RRRcRRR..........RRRcRRR.......
+................RRRRR............RRRRR........
+.................RRR..............RRR.........
+..................R................R..........
+
+# name: THREEDIMGLASSES
+# dx: 12
+# dy: 24
+.....WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+.....WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+WWWWWWWWWWkkkkkkkkkWWWWWWWWWWWWWWcccccccccWWWWW
+.....WWWWWkkkkkkkkkWWWWWWWWWWWWWWcccccccccWWWWW
+.....WWWWWkkkkkkkkkWWWWWWWWWWWWWWcccccccccWWWWW
+.....WWWWWkkkkkkkkkWWWWWWWWWWWWWWcccccccccWWWWW
+.....WWWWWkkkkkkkkkWWWWWWWWWWWWWWcccccccccWWWWW
+.....WWWWWWWWWWWWWWWWWWWWGGWWWWWWWWWWWWWWWWWWWW
+.....WWWWWWWWWWWWWWWWWWWGGGGWWWWWWWWWWWWWWWWWWW
+.....WWWWWWWWWWWWWWWWWWWGGGGWWWWWWWWWWWWWWWWWWW
+.....WWWWWWWWWWWWWWWWWWWGGGGWWWWWWWWWWWWWWWWWWW
+........GGGGGGGGGGGGG.........GGGGGGGGGGGGGG...
+
+# name: CYBERSHADES
+# dx: 11
+# dy: 23
+..........sssssssssssssssssssssssssssssss.......
+........sssssssssssssssssssssssssssssssssss.....
+.....ssssssssssrrsksssssssssssssksrrssssssssss..
+...sssssrrrrrrrssskkkkkkkkkkkkkkksssrrrrrrrsssss
+.sssssksssssssssssssssksssssksssssssssssssssksss
+sssssskkkkkkkkkkkkkkssksssssksskkkkkkkkkkkkkksss
+ssssssssssssssssssssskssssssskssssssssssssssssss
+.sssssssssskkssssssssssssssssssssssssskkssssssss
+...ssskkkkkkssrrrrrrsssssssssssrrrrrrsskkkkkksss
+....sssssssssssssssssssssGsssssssssssssssssssss.
+.....sskkkkkkkkkkkkksssssGssssskkkkkkkkkkkkkss..
+......ssssssskssssskkkssGGGsskkksssssksssssss...
+.......srrrrskkkkkkssksGGGGGsksskkkkkksrrrrs....
+........sssssssssssssssGGGGGGssssssssssssss.....
+........GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG.....
+
+# name: COOLSHADES
+# dx: 10
+# dy: 24
+kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
+kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
+kkk....ksssssssssssssssssk.GGkssssssssssssssssssk
+.......ksssssssssssssssssk.GGkssssssssssssssssssk
+.......ksssssssssssssssssk.GGkssssssssssssssssssk
+.......ksssssssssssssssssk.GGkssssssssssssssssssk
+.......ksssssssssssssssssk.GGkssssssssssssssssssk
+........ksssWssssssssssssk.GG.ksssWsssssssssssssk
+.........ksWsWsssssssssssk.GG..ksWsWssssssssssssk
+..........ksWsWsssssssssk.GGGG..ksWsWssssssssssk.
+...........ksWsWsssssssk..GGGG...ksWsWssssssssk..
+............ksssssssssk..GGGGGG...kssssssssssk...
+.............kkkkkkkkk...GGGGGG....kkkkkkkkkk....

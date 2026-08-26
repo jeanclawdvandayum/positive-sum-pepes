@@ -1,0 +1,41 @@
+Final state summary — audit run interrupted at the deliverable-writing stage. Everything below is grounded in code I read and tests I ran; the required deliverable file has NOT yet been written (last action was a compile fix that hasn't been re-verified). Being explicit per my own rules: this run is incomplete.
+
+WHAT WAS DONE
+
+1. Full independent read of all scope files: src/CurveHook.sol, src/libraries/CurveMath.sol, src/PSPZapIn.sol, src/PSPZapOut.sol, plus integration context (RoundController, PSPFactory, PSPToken, V4 core PoolManager/Hooks/BeforeSwapDelta semantics, soladye FixedPointMathLib).
+2. Found a prior interrupted run's test files (B1–B6 + BBase harness) already in test/wave2/auditorB/. Treated them as claims to re-verify, not anchors. 55/57 passed on first run.
+3. Diagnosed both failures:
+   - B4a was a harness bug, not a finding: `input * 5` overflowed uint128 inside the test itself. Fixed (widen to uint256 before multiply). The library's integral bound actually held — fuzz counterexample value was exactly at the cap.
+   - B4c's deterministic pin was stale. I re-derived the fuzzer's config via forge keccak: the true counterexample is P0 = 1e59 (not 1e56 — I had miscounted console zeros), exp zone width 1e25, k = 116,225,508,139, flat tail. Verified it reverts MulWadFailed (selector 0xbac65e5b, decoded via keccak reconstruction). Re-pinned.
+4. Wrote test/wave2/auditorB/B7_Supplemental.t.sol with 7 new tests (fat-P0 deploy impact, multi-zone accounting, zone-boundary price continuity, pool-init gates through WrappedError, donation semantics incl. phantom-pot reconciliation, initializeCurve trust, exact-out rejection via real PM unlock both directions). Fixed all harness mismatches found along the way (PREDEPOSIT_CAP=500e18, WrappedError wrapping, no-arg getMarginalPrice, SwapParams import).
+
+FINDINGS (all PoC'd in test/wave2/auditorB/)
+
+B-3 | LOW | 95% | CurveMath.sol validate() — no P0 upper bound. Validate-legal config (P0=1e59, width=1e25, k=116225508139) makes curveIntegral revert MulWadFailed (mulWad overflow: divWad(P0,k)*ePowMinus1 > 2^256) for essentially every supply range. Fail-closed, pure function. Deploy-gated: PSPFactory accepts the config, launchPooledBuy can never complete → round bricks pre-activation (depositors retain refund path). PoCs: B4::test_B4c (reproduces), B7::test_B7a (deploy impact).
+
+INFO | 95% | CurveHook — PSP donated directly to the hook is permanently stuck: swaps never touch a pre-existing balance, no recovery entry point. ERC20 supply permanently exceeds the hook ledger by exactly the donated amount (reconciled against the controller's phantom pot credit). No dilution, no extraction. PoC: B7::test_B7e.
+
+INFO/LOW | 90% | CurveHook.initializeCurve trusts the controller with zero re-validation (no validate() call, no PSP-supply cross-check). Within the controller-trust model but a defense-in-depth gap. PoC: B7::test_B7f.
+
+LOW | 95% | Buy input above the 150M ethInput cap silently absorbs the excess into the reserve as a donation — no revert, no refund of the overage. Fairness footgun. PoC: B3::test_B3l (prior run, passed).
+
+INFO | 95% | sqrtPriceLimitX96 is silently ignored — full fill regardless of limit; slippage safety is router-level minOut only (zaps have it). PoC: B3::test_B3m (prior run, passed).
+
+VERIFIED-SAFE (attacked, held)
+
+- Buy/sell symmetry & rounding: buy outputs integral-bounded (fuzz B1b/B4a-after-fix), flat-mode sells exactly pro-rata (B2a/B2b fuzz), round trips always lose >= fees in both modes (B1d, B2d), oscillation fuzz bounded (B4j).
+- Delta spoofing: all hook callbacks PM-gated (NotPoolManager, B3n); hookData can't alter execution (B3 test); V4 sign conventions correct; afterSwap netting + HookDeltaExceedsSwapAmount hold.
+- Mode-switch continuity curve<->flat holds (B2c) and zone-boundary price continuity in the library (B7c).
+- Fee/pot accrual exact (B1e, B2f); dust-swap arb blocked by SwapTooSmall (B1g/B1h); cannot sell entire supply (B1f).
+- Pool initialization: wrong fee/tickSpacing/currency-pair all gated (B7d, via WrappedError since PM wraps hook reverts); factory initializes atomically — no front-run window on the canonical pool key.
+- mixETH donations to the hook land in the sweepable fee ledger, never the reserve — no backing dilution (B7e).
+- Exact-out rejected uniformly both directions through a real PM unlock (B7g).
+- Zap sandwich/stuck-fund probes (B5) and admin API gates (B6) all passed in the prior run.
+
+COULD-NOT-VERIFY
+
+- Final green run: my last compile fix (SwapParams import in EOAmount) was applied but the suite was never re-run, so B7's pass/fail state is unconfirmed.
+- audits/wave2-20260818/auditorB.md — the REQUIRED deliverable — was not written. All content for it is above.
+- Mainnet-fork zap MEV and real-mixETH edge behavior: unit-level only.
+
+NEXT STEP (one command away): `cd /Users/clawdbot/clawd/positive-sum-pepes && forge test --match-path "test/wave2/auditorB/*" -vv` — if green, write the deliverable from the content above; any B7 failures will be harness-shaped (the findings themselves are already reproduced in B3/B4 pins).

@@ -11,6 +11,7 @@ import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 
 import {PSPToken} from "../../src/PSPToken.sol";
 import {RoundController} from "../../src/RoundController.sol";
+import {PSPStaker} from "../../src/PSPStaker.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
 import {HookDeployer} from "../../src/HookDeployer.sol";
@@ -20,6 +21,8 @@ import {CurveMath} from "../../src/libraries/CurveMath.sol";
 import {MainnetConfig} from "./MainnetConfig.sol";
 import {V4SwapRouter} from "./V4SwapRouter.sol";
 import {MockMixETH} from "../mocks/MockMixETH.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @title AdvancedScenarioTest
 /// @notice Tests yield reinvestment, multi-round lifecycle, slippage protection,
@@ -34,6 +37,7 @@ contract AdvancedScenarioTest is Test {
 
     PSPToken pspToken;
     RoundController controller;
+    PSPStaker public stakerV; // cached: single vm.prank must not be eaten by the staker() view call
     CurveHook hook;
     PoolKey poolKey;
 
@@ -48,7 +52,7 @@ contract AdvancedScenarioTest is Test {
         mixETH = new MockMixETH();
         mixETH.depositETH{value: 100_000e18}();
 
-        factory = new PSPFactory(poolManager, IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), 0);
+        factory = new PSPFactory(poolManager, IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), 0);
         router = new V4SwapRouter(poolManager);
 
         _dealMixETH(alice, 1_000e18);
@@ -108,13 +112,13 @@ contract AdvancedScenarioTest is Test {
         // Alice claims
         uint256 aliceBefore = mixETH.balanceOf(alice);
         vm.prank(alice);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 aliceFees = mixETH.balanceOf(alice) - aliceBefore;
 
         // Bob claims
         uint256 bobBefore = mixETH.balanceOf(bob);
         vm.prank(bob);
-        controller.claimFees();
+        stakerV.claimFees();
         uint256 bobFees = mixETH.balanceOf(bob) - bobBefore;
 
         console.log("=== Yield + Fees ===");
@@ -278,14 +282,15 @@ contract AdvancedScenarioTest is Test {
         // PSP is minted to controller, factory claims (auto-locked)
         vm.prank(address(factory));
         c2.claimPredepositPSP();
-        (uint256 factoryPSP2,,,) = c2.locks(address(factory));
+        uint256 factoryPSP2 = c2.staker().lockedPSPOf(address(factory));
         assertGt(factoryPSP2, 0, "Factory has round 2 PSP (locked)");
 
         // Transfer locked PSP — need to unlock first since it's auto-locked
         // Warp past lock period
         skip(90 days + 1);
+        PSPStaker _stk2 = c2.staker();
         vm.prank(address(factory));
-        c2.unlock();
+        _stk2.unlock();
         uint256 freePSP2 = r2.token.balanceOf(address(factory));
         assertGt(freePSP2, 0, "Factory has free PSP2");
 
@@ -294,8 +299,8 @@ contract AdvancedScenarioTest is Test {
         r2.token.transfer(alice, freePSP2);
 
         vm.startPrank(alice);
-        r2.token.approve(address(c2), freePSP2);
-        c2.lock(freePSP2);
+        r2.token.approve(address(c2.staker()), freePSP2);
+        c2.staker().lock(freePSP2);
         // M-1: locks must predate the proposal timestamp
         skip(1);
         c2.proposeCarpetBomb();
@@ -438,8 +443,9 @@ contract AdvancedScenarioTest is Test {
 
         uint256 totalInput = 10e18 + 20e18 + 15e18;
         // 95% curve + 0.25% side-pot PSP mint (both enter the reserve);
-        // 4.75% is the staker fee, held over the reserve
-        assertEq(reserveAfter - reserveBefore, totalInput - (totalInput * 475) / 10000,
+        // v5.1: the full 5% fee leaves the reserve (referral carve pays out
+        // live; unattributed remainder goes to the staker accumulator)
+        assertEq(reserveAfter - reserveBefore, totalInput - (totalInput * 500) / 10000,
                  "Reserve increased by total minus staker fees");
         assertGt(supplyAfter, supplyBefore, "Supply increased");
 
@@ -529,6 +535,7 @@ contract AdvancedScenarioTest is Test {
         PSPFactory.Round memory round = factory.getRound(roundId);
         pspToken = round.token;
         controller = round.controller;
+        stakerV = controller.staker();
         hook = round.hook;
 
         Currency currency0 = Currency.wrap(address(mixETH));
@@ -560,7 +567,7 @@ contract AdvancedScenarioTest is Test {
     function _claim(address user) internal returns (uint256) {
         vm.prank(user);
         controller.claimPredepositPSP();
-        (uint256 amount,,,) = controller.locks(user);
+        uint256 amount = stakerV.lockedPSPOf(user);
         return amount;
     }
 
@@ -570,8 +577,8 @@ contract AdvancedScenarioTest is Test {
 
     function _lock(address user, uint256 amount) internal {
         vm.startPrank(user);
-        pspToken.approve(address(controller), amount);
-        controller.lock(amount);
+        pspToken.approve(address(stakerV), amount);
+        stakerV.lock(amount);
         vm.stopPrank();
     }
 

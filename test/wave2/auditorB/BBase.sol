@@ -18,6 +18,7 @@ import {ControllerDeployer} from "../../../src/ControllerDeployer.sol";
 import {CurveHook} from "../../../src/CurveHook.sol";
 import {CurveMath} from "../../../src/libraries/CurveMath.sol";
 import {RoundController} from "../../../src/RoundController.sol";
+import {PSPStaker} from "../../../src/PSPStaker.sol";
 import {PSPZapOut} from "../../../src/PSPZapOut.sol";
 import {MockMixETH} from "../../mocks/MockMixETH.sol";
 
@@ -30,6 +31,7 @@ abstract contract BBase is Test {
     PSPFactory factory;
     CurveHook hook;
     RoundController controller;
+    PSPStaker public stakerV; // cached: single vm.prank must not be eaten by the staker() view call
     IERC20 psp;
     PoolKey key;
     BRouter router;
@@ -48,7 +50,7 @@ abstract contract BBase is Test {
         mixETH.depositETH{value: 1_000_000e18}();
         poolManager = new PoolManager(address(this)); // REAL v4-core PM
         factory = new PSPFactory(
-            IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer()
+            IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer()
         , 0);
 
         PSPFactory.RoundParams memory params =
@@ -57,6 +59,7 @@ abstract contract BBase is Test {
         PSPFactory.Round memory r = factory.getRound(roundId);
         hook = CurveHook(payable(address(r.hook)));
         controller = RoundController(address(r.controller));
+        stakerV = controller.staker();
         psp = IERC20(address(r.token));
 
         Currency c0 = Currency.wrap(address(mixETH));
@@ -98,8 +101,8 @@ abstract contract BBase is Test {
         calls[0] = c;
         uint256[] memory outs = router.execute(key, calls, bob);
         pspOut = outs[0];
-        psp.approve(address(controller), type(uint256).max);
-        controller.lock(pspOut);
+        psp.approve(address(stakerV), type(uint256).max);
+        stakerV.lock(pspOut);
         vm.stopPrank();
     }
 
@@ -322,7 +325,7 @@ contract ReentrantForward {
 
     function sell(uint256 pspIn) external {
         psp.approve(address(zap), pspIn);
-        zap.zapOut(key, pspIn, 0, 0);
+        zap.zapOut(key, pspIn, 0, 0, 0);
     }
 
     receive() external payable {
@@ -332,13 +335,15 @@ contract ReentrantForward {
             uint256 bal = psp.balanceOf(address(this));
             if (bal > 0) {
                 psp.approve(address(zap), bal);
-                try zap.zapOut(key, bal, 0, 0) {} catch {}
+                try zap.zapOut(key, bal, 0, 0, 0) {} catch {}
             }
         }
     }
 }
 
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
+import {StakerDeployer} from "src/StakerDeployer.sol";
+
 
 /// @dev Calls CurveHook.beforeSwap DIRECTLY (no PoolManager wrap) so custom
 ///      errors and panics surface unwrapped and can be pinned exactly.

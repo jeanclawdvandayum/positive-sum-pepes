@@ -29,14 +29,15 @@ contract DriveAnvil is Script, StdCheats {
         PSPFactory factory = PSPFactory(factoryAddr);
         PSPZapIn zapIn = PSPZapIn(zapInAddr);
 
-        (, RoundController controller, CurveHook hook,,) = _round(factory);
+        (uint256 roundId, RoundController controller, CurveHook hook,,) = _round(factory);
         PSPStaker staker = PSPStaker(controller.stakerAddress());
-        PSPReferralRegistry registry = PSPReferralRegistry(factory.referralRegistry());
+        PSPReferralRegistry registry = PSPReferralRegistry(factory.referralRegistryOf(roundId));
         IERC20 mix = IERC20(factory.mixETH());
 
         address alice = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; // anvil[0]
         address bob = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8; // anvil[1]
         address carol = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; // anvil[2]
+        address dave = 0x90F79bf6EB2c4f870365E785982E1f101E93b906; // anvil[3]
 
         // ── alice: wrap ETH → predeposit to cap (500) → permissionless launch ──
         vm.startBroadcast(alice);
@@ -61,24 +62,56 @@ contract DriveAnvil is Script, StdCheats {
             hooks: IHooks(address(hook))
         });
 
-        // bob arrives on alice's ref link: attribution binds on first trade
+        // ── alice stakes ≥ MIN_STAKE PSP → position NFT → referrer-eligible ──
+        vm.startBroadcast(alice);
+        uint256 alicePsp = IERC20(tokenAddr).balanceOf(alice);
+        IERC20(tokenAddr).approve(address(staker), type(uint256).max);
+        staker.lock(alicePsp); // whole predeposit claim — well past the gate
+        vm.stopBroadcast();
+        uint256 aliceNft = staker.tokenOf(alice);
+        console.log("alice locked, NFT:", aliceNft);
+
+        // bob arrives on alice's ref link (?ref=<nftId>): binds on first trade
         vm.startBroadcast(bob);
         MockMixETH(payable(address(mix))).depositETH{value: 100e18}();
         mix.approve(zapInAddr, type(uint256).max);
-        uint256 b1 = zapIn.buyWithMix(key, 25e18, 0, 0, alice);
-        uint256 b2 = zapIn.buyWithMix(key, 12e18, 0, 0, alice);
+        uint256 b1 = zapIn.buyWithMix(key, 25e18, 0, 0, aliceNft);
+        uint256 b2 = zapIn.buyWithMix(key, 12e18, 0, 0, aliceNft);
         vm.stopBroadcast();
         console.log("bob bought:", b1, b2);
-        console.log("bob referredBy:", registry.referrerOf(bob));
+        console.log("bob referredByNft:", registry.traderRefNftOf(bob));
 
-        // carol arrives on bob's link → 2-dim chain (bob 80%, alice 12%)
+        // carol arrives on bob's link → 2-dim chain (bob 80%, alice 12%).
+        // bob needs his own NFT: he buys, stakes the min, then carol rides it.
+        vm.startBroadcast(bob);
+        uint256 bobPsp = IERC20(tokenAddr).balanceOf(bob);
+        IERC20(tokenAddr).approve(address(staker), type(uint256).max);
+        staker.lock(bobPsp);
+        vm.stopBroadcast();
+        uint256 bobNft = staker.tokenOf(bob);
+
         vm.startBroadcast(carol);
         MockMixETH(payable(address(mix))).depositETH{value: 60e18}();
         mix.approve(zapInAddr, type(uint256).max);
-        uint256 c1out = zapIn.buyWithMix(key, 30e18, 0, 0, bob);
+        uint256 c1out = zapIn.buyWithMix(key, 30e18, 0, 0, bobNft);
         vm.stopBroadcast();
         console.log("carol bought:", c1out);
-        console.log("carol referredBy:", registry.referrerOf(carol));
+        console.log("carol referredByNft:", registry.traderRefNftOf(carol));
+
+        // pepe-first onboarding (2026-08-22): dave hatches a pepe with ZERO
+        // stake — art-first entry, no capital. If a descriptor is wired,
+        // tokenURI answers with on-chain SVG.
+        vm.startBroadcast(dave);
+        staker.lock(0);
+        vm.stopBroadcast();
+        uint256 daveNft = staker.tokenOf(dave);
+        console.log("dave pepe-only NFT:", daveNft);
+        console.log("dave dna:", staker.dnaOf(daveNft));
+        try staker.tokenURI(daveNft) returns (string memory uri) {
+            console.log("dave tokenURI bytes:", bytes(uri).length);
+        } catch {
+            console.log("dave tokenURI: no descriptor wired");
+        }
 
         console.log("supply:", hook.totalSupplyPSP());
         console.log("reserve:", hook.reserveMixETH());
