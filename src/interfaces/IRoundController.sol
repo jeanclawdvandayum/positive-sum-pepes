@@ -22,9 +22,7 @@ interface IRoundController {
     function stakerAddress() external view returns (address);
     function hookAddress() external view returns (address);
     function flatTime() external view returns (uint256);
-    function LOCK_DURATION() external view returns (uint256);
-    function EXTEND_DURATION() external view returns (uint256);
-    function RELOCK_WINDOW() external view returns (uint256);
+    function VEST_DURATION() external view returns (uint256);
 
     // ── Curve params ──
     function getCurveConfig() external view returns (CurveMath.CurveConfig memory);

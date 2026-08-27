@@ -1,4 +1,5 @@
 [profile.default]
+skip = []
 fs_permissions = [
     { access = "read", path = "./script/" },
     { access = "write", path = "./out/" }

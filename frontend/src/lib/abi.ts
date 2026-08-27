@@ -27,7 +27,7 @@ export const controllerAbi = parseAbi([
   'function VOTE_DURATION() view returns (uint256)',
   'function QUORUM_BIPS() view returns (uint256)',
   'function MAJORITY_BIPS() view returns (uint256)',
-  'function RELOCK_WINDOW() view returns (uint256)',
+  'function VEST_DURATION() view returns (uint256)',
   'event CarpetBombProposed(address indexed proposer)',
   'event Voted(address indexed voter, bool support, uint256 weight)',
   'event CarpetBombExecuted(uint256 mixETHCarried)',
@@ -35,12 +35,17 @@ export const controllerAbi = parseAbi([
 
 /// PSPStaker — ERC-721 staking positions + pepe art (2026-08-22).
 export const stakerAbi = parseAbi([
-  'function positions(address) view returns (uint256 amount, uint256 rewardDebt, uint256 lockTime, uint256 unlockTime)',
-  'function lockedPSPOf(address) view returns (uint256)',
-  'function pendingFeesOf(address) view returns (uint256)',
+  'function positions(uint256) view returns (uint256 amount, uint256 rewardDebt, uint256 requestTime, uint256 actionTime, uint256 dayCursor)',
+  'function pendingFeesOf(uint256 pepeId) view returns (uint256)',
+  'function biasOf(uint256 pepeId, uint256 at) view returns (uint256)',
   'function totalLocked() view returns (uint256)',
+  'function totalWeight() view returns (uint256)',
   'function accFeePerShareMixETH() view returns (uint256)',
-  'function tokenOf(address) view returns (uint256)',
+  'function balanceOf(address) view returns (uint256)',
+  'function tokenOfOwnerByIndex(address, uint256) view returns (uint256)',
+  'function primaryOf(address) view returns (uint256)',
+  'function stakedTotalOf(address) view returns (uint256)',
+  'function voteWeight(address, uint256) view returns (uint256)',
   'function ownerOf(uint256) view returns (address)',
   'function dnaOf(uint256) view returns (uint256)',
   'function descriptor() view returns (address)',
@@ -48,14 +53,20 @@ export const stakerAbi = parseAbi([
   'function symbol() view returns (string)',
   'function lock(uint256 amount)',
   'function lockWithPepe(uint256 amount, uint256 pepeId)',
-  'function relock()',
-  'function unlock()',
-  'function claimFees()',
+  'function stakeFor(address user, uint256 pepeId, uint256 amount)',
+  'function requestWithdraw(uint256 pepeId)',
+  'function cancelWithdraw(uint256 pepeId)',
+  'function withdraw(uint256 pepeId)',
+  'function claimFees(uint256 pepeId)',
+  'function claimFeesTo(uint256 pepeId, address to)',
+  'function claimAllTo(uint256[] pepeIds, address to)',
+  'function setApprovalForAll(address operator, bool approved)',
+  'function isApprovedForAll(address, address) view returns (bool)',
   'function transferFrom(address from, address to, uint256 tokenId)',
   'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
-  'event Locked(address indexed user, uint256 amount)',
-  'event Unlocked(address indexed user, uint256 amount)',
-  'event FeesClaimed(address indexed user, uint256 amount)',
+  'event Locked(address indexed user, uint256 indexed pepeId, uint256 amount)',
+  'event Withdrawn(address indexed user, uint256 indexed pepeId, uint256 amount)',
+  'event FeesClaimed(address indexed user, uint256 indexed pepeId, uint256 amount)',
 ])
 
 /// PepeDescriptor — on-chain SVG art (eth_call-able, pure).
@@ -107,6 +118,14 @@ export const zapOutAbi = parseAbi([
 /// MixETHFaucet — testnet-only: pay multiples of 0.0001 ETH, receive 100 mixETH each.
 export const faucetAbi = parseAbi([
   'function drip() payable',
+])
+
+/// PSPReinvestor — claims mixETH fees and compounds them into PSP stakes.
+export const reinvestorAbi = parseAbi([
+  'function reinvest(uint256 pepeId, (address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 minPspOut, uint256 deadline)',
+  'function reinvestAll(uint256[] pepeIds, (address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 minPspOut, uint256 deadline)',
+  'function staker() view returns (address)',
+  'event Reinvested(address indexed owner, uint256 indexed pepeId, uint256 mixIn, uint256 pspStaked)',
 ])
 
 /// Uniswap V4 PoolKey the factory initializes: dynamic-fee flag + tickSpacing 60.

@@ -102,7 +102,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // original values. Slots are 51 bits (2026-08-19: the original 5x64
     // layout overflowed uint256 — the [256] vote slot silently truncated
     // to zero, closing the vote window instantly on every custom profile).
-    // Slots: [0] predeposit [51] lock [102] extend [153] relock [204] vote
+    // Slots: [0] predeposit [51] vest [102] vote
     uint256 public immutable PREDEPOSIT_DURATION; // default 7 days
     uint256 public constant PREDEPOSIT_CAP = 500e18; // 500 mixETH
     uint256 public immutable predepositStartTime;
@@ -111,9 +111,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // (2026-08-19) the lock ledger, accumulator, and fee claims moved to
     // PSPStaker (ERC-721 positions). The controller keeps the timing
     // immutables — the staker reads them through IRoundController.
-    uint256 public immutable LOCK_DURATION;   // default 90 days (3 months)
-    uint256 public immutable EXTEND_DURATION; // relock adds this; default 90 days
-    uint256 public immutable RELOCK_WINDOW;   // last window before expiry; default 7 days
+    uint256 public immutable VEST_DURATION; // 6 weeks (decay horizon)
     uint256 public constant PRECISION = 1e18;
 
     /// @dev bomb time — nonzero means the round is flat and every lock is
@@ -171,22 +169,15 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         uint256 t = _config.timings;
         if (t == 0) {
             PREDEPOSIT_DURATION = 7 days;
-            LOCK_DURATION = 90 days;
-            EXTEND_DURATION = 90 days;
-            RELOCK_WINDOW = 7 days;
+            VEST_DURATION = 42 days;
             VOTE_DURATION = 3 days;
         } else {
             PREDEPOSIT_DURATION = t & CurveMath.TIMINGS_MASK;
-            LOCK_DURATION = (t >> 51) & CurveMath.TIMINGS_MASK;
-            EXTEND_DURATION = (t >> 102) & CurveMath.TIMINGS_MASK;
-            RELOCK_WINDOW = (t >> 153) & CurveMath.TIMINGS_MASK;
-            VOTE_DURATION = (t >> 204) & CurveMath.TIMINGS_MASK;
+            VEST_DURATION = (t >> 51) & CurveMath.TIMINGS_MASK;
+            VOTE_DURATION = (t >> 102) & CurveMath.TIMINGS_MASK;
             // 2026-08-19 tripwire: the vote-slot truncation deployed silently
             // on the first sepolia dry-run — never again.
-            if (
-                PREDEPOSIT_DURATION == 0 || LOCK_DURATION == 0 || EXTEND_DURATION == 0
-                    || RELOCK_WINDOW == 0 || VOTE_DURATION == 0
-            ) revert TimingsIncomplete();
+            if (PREDEPOSIT_DURATION == 0 || VEST_DURATION == 0 || VOTE_DURATION == 0) revert TimingsIncomplete();
         }
         if (address(_pspToken) == address(0)) revert ZeroAddress();
         if (address(_mixETH) == address(0)) revert ZeroAddress();
@@ -492,7 +483,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // ─────────────── Destruction Governance ───────────────
 
     function proposeCarpetBomb() external nonReentrant {
-        if (staker.lockedPSPOf(msg.sender) == 0) revert NotLocker();
+        if (staker.voteWeight(msg.sender, block.timestamp) == 0) revert NotLocker();
 
         // No governance theater on a destroyed round
         if (address(hook) != address(0)
@@ -544,16 +535,17 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         emit CarpetBombProposed(msg.sender);
     }
 
-    /// @dev Quorum denominator: max(locked, total PSP supply) — see proposeCarpetBomb
+    /// @dev Quorum denominator: max(live weight, total PSP supply) — see
+    ///      proposeCarpetBomb. Live weight counts decaying positions at
+    ///      their CURRENT bias (an exiting staker's vote fades with their
+    ///      dividend — the decay hits both equally).
     function _quorumDenominator() internal view returns (uint256) {
         uint256 supply = address(hook) != address(0) ? hook.totalSupplyPSP() : 0;
-        uint256 locked = staker.totalLocked();
+        uint256 locked = staker.totalWeight();
         return locked > supply ? locked : supply;
     }
 
     function voteCarpetBomb(bool support) external nonReentrant {
-        uint256 weight = staker.lockedPSPOf(msg.sender);
-        if (weight == 0) revert NotLocker();
         if (currentProposal.proposeTime == 0) revert ProposalExists();
         if (block.timestamp > currentProposal.proposeTime + VOTE_DURATION) revert VotingEnded();
         // G-3 fix: per-proposal epoch — voters from previous proposals can vote again
@@ -561,17 +553,15 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
 
         lastVotedOn[msg.sender] = proposalCount;
 
-        // M-1 fix: vote weight must come from locks that existed at propose
-        // time. Any lock(), top-up, or relock after proposeTime resets
-        // lockTime — such users sit this proposal out. Since amounts can only
-        // DECREASE after propose (unlock) and any increase resets lockTime,
-        // totalVotes is structurally capped at lockedAtPropose. Kills the
-        // post-snapshot lock-capture vector (lock 2M after propose, outvote
-        // a thin snapshot).
-        // 2026-08-19: reads the staker's position ledger (positions moved to
-        // PSPStaker with the NFTs). lockTime via the public mapping getter.
-        (,, uint256 lockTime,) = staker.positions(msg.sender);
-        if (lockTime >= currentProposal.proposeTime) revert VoteLockedAfterPropose();
+        // M-1 fix (ve-decay form): weight = Σ bias(id, proposeTime) over the
+        // caller's pepes whose last weight-mutating action (lock, top-up,
+        // request, cancel) PREDATES proposeTime — post-propose actors sit
+        // the vote out, so totalVotes stays structurally capped at the
+        // propose-time snapshot. Weight is evaluated AT propose time: a
+        // pre-propose withdraw request decays the vote exactly like the
+        // dividends.
+        uint256 weight = staker.voteWeight(msg.sender, currentProposal.proposeTime);
+        if (weight == 0) revert NotLocker();
 
         if (support) {
             currentProposal.yesVotes += weight;

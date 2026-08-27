@@ -48,7 +48,7 @@ contract DriveAnvil is Script, StdCheats {
         controller.claimPredepositPSP(); // genesis PSP locks; alice's position NFT mints
         vm.stopBroadcast();
         console.log("launched. mode:", uint256(hook.mode()));
-        console.log("alice position NFT:", staker.tokenOf(alice));
+        console.log("alice position NFT:", staker.primaryOf(alice));
 
         // ── curve trades: pool key = sorted(mix, psp), dynamic fee, ts60 ──
         (,,,, address tokenAddr) = _round(factory);
@@ -68,7 +68,7 @@ contract DriveAnvil is Script, StdCheats {
         IERC20(tokenAddr).approve(address(staker), type(uint256).max);
         staker.lock(alicePsp); // whole predeposit claim — well past the gate
         vm.stopBroadcast();
-        uint256 aliceNft = staker.tokenOf(alice);
+        uint256 aliceNft = staker.primaryOf(alice);
         console.log("alice locked, NFT:", aliceNft);
 
         // bob arrives on alice's ref link (?ref=<nftId>): binds on first trade
@@ -88,7 +88,7 @@ contract DriveAnvil is Script, StdCheats {
         IERC20(tokenAddr).approve(address(staker), type(uint256).max);
         staker.lock(bobPsp);
         vm.stopBroadcast();
-        uint256 bobNft = staker.tokenOf(bob);
+        uint256 bobNft = staker.primaryOf(bob);
 
         vm.startBroadcast(carol);
         MockMixETH(payable(address(mix))).depositETH{value: 60e18}();
@@ -104,7 +104,7 @@ contract DriveAnvil is Script, StdCheats {
         vm.startBroadcast(dave);
         staker.lock(0);
         vm.stopBroadcast();
-        uint256 daveNft = staker.tokenOf(dave);
+        uint256 daveNft = staker.primaryOf(dave);
         console.log("dave pepe-only NFT:", daveNft);
         console.log("dave dna:", staker.dnaOf(daveNft));
         try staker.tokenURI(daveNft) returns (string memory uri) {

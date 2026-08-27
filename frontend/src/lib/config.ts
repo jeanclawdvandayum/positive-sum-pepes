@@ -29,10 +29,14 @@ export const ADDRESSES = {
   zapOut: (env.VITE_ZAP_OUT || '0x') as `0x${string}`,
   mix: (env.VITE_MIX || '0x') as `0x${string}`,
   faucet: (env.VITE_FAUCET || '0x') as `0x${string}`,
+  reinvestor: (env.VITE_REINVESTOR || '0x') as `0x${string}`,
 }
 
 /// testnet faucet UI is env-gated: hidden unless both addresses are configured.
 export const FAUCET_ENABLED = Boolean(env.VITE_MIX && env.VITE_FAUCET)
+
+/// reinvest buttons are env-gated the same way.
+export const REINVEST_ENABLED = Boolean(env.VITE_REINVESTOR)
 
 export const wagmiConfig = getDefaultConfig({
   appName: 'Positive Sum Pepes',

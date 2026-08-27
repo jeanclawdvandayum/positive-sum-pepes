@@ -25,7 +25,7 @@ export default function CarpetBombCard() {
     contracts: [
       { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'getCarpetBombState' },
       { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'currentProposal' },
-      { address: round.staker ?? ZERO, abi: stakerAbi, functionName: 'lockedPSPOf', args: [address ?? ZERO] },
+      { address: round.staker ?? ZERO, abi: stakerAbi, functionName: 'stakedTotalOf', args: [address ?? ZERO] },
       { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'VOTE_DURATION' },
       { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'QUORUM_BIPS' },
       { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'MAJORITY_BIPS' },

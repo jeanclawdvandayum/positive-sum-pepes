@@ -33,7 +33,7 @@ export default function PepePanel({ round, refreshKey = 0 }: Props) {
     let dead = false
     async function tick() {
       try {
-        const id = (await rpcCall(staker!, stakerAbi, 'tokenOf', [address])) as bigint
+        const id = (await rpcCall(staker!, stakerAbi, 'primaryOf', [address])) as bigint
         if (dead) return
         setTokenId(id)
         if (id === 0n) { setDna(undefined); setSvg(null); return }

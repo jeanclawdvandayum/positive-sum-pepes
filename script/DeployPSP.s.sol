@@ -16,6 +16,9 @@ import {Curve3Zones} from "../src/curves/Curve3Zones.sol";
 import {PepeDescriptor} from "../src/PepeDescriptor.sol";
 import {PSPZapIn} from "../src/PSPZapIn.sol";
 import {PSPZapOut} from "../src/PSPZapOut.sol";
+import {PSPReinvestor} from "../src/PSPReinvestor.sol";
+import {IPSPStaker} from "../src/interfaces/IPSPStaker.sol";
+import {IPSPZapIn} from "../src/interfaces/IPSPZapIn.sol";
 import {IMixETH} from "../src/interfaces/IMixETH.sol";
 import {SepoliaMixETH} from "../src/testnet/SepoliaMixETH.sol";
 import {MixETHFaucet} from "../src/testnet/MixETHFaucet.sol";
@@ -68,14 +71,11 @@ contract DeployPSP is Script {
     address constant PM_UNICHAIN_SEPOLIA = 0x9cB26A7183B2F4515945Dc52CB4195B0d2D06C95; // 1301
 
     /// @dev Packed playtest timing profile (see RoundController "Timing
-    ///      profile"): 24h predeposit offer · 2d lock · +1d relock extend ·
-    ///      1d relock window (relock opens 1 day before expiry) · 1d bomb
-    ///      vote. Flat exit: constant 3d. Packs via CurveMath.packTimings
-    ///      (2026-08-19: the old hand-rolled 5x64 packing shifted the vote slot
-    ///      by 256 — silently zero). 2026-08-26: lock 3d -> 2d for the
-    ///      Friday playtest (lock Fri expires Sun, relock window Sat+).
+    ///      profile"): 24h predeposit offer · 6h vest (compressed decay for
+    ///      playtest visibility; mainnet default is 42 days) · 1d bomb vote.
+    ///      Flat exit: constant 3d. Packs via CurveMath.packTimings.
     function _testnetTimings() internal pure returns (uint256) {
-        return CurveMath.packTimings(1 days, 2 days, 1 days, 1 days, 1 days);
+        return CurveMath.packTimings(1 days, 6 hours, 1 days);
     }
 
     function run() external {
@@ -137,6 +137,10 @@ contract DeployPSP is Script {
         // quality-of-life routers: ETH <-> PSP round trip
         PSPZapIn zapIn = new PSPZapIn(IMixETH(address(mix)), IPoolManager(pm));
         PSPZapOut zapOut = new PSPZapOut(IMixETH(address(mix)), IPoolManager(pm));
+        // claim-and-compound router: fees -> curve buy -> back into the stake
+        PSPFactory.Round memory r = factory.getRound(roundId);
+        PSPReinvestor reinvestor =
+            new PSPReinvestor(IPSPStaker(r.controller.stakerAddress()), IPSPZapIn(address(zapIn)), IERC20(address(mix)), IERC20(address(r.token)));
         vm.stopBroadcast();
 
         console.log("factory:", address(factory));
@@ -144,6 +148,7 @@ contract DeployPSP is Script {
         console.log("hook:", hookAddr);
         console.log("zapIn:", address(zapIn));
         console.log("zapOut:", address(zapOut));
+        console.log("reinvestor:", address(reinvestor));
         console.log("ui bytes:", bytes(h).length);
     }
 

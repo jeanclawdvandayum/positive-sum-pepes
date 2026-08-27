@@ -111,7 +111,7 @@ contract PSPReferralRegistry {
         if (!_qualified(referrerNftId)) revert NotQualifiedReferrer();
 
         // The trader's own position NFT (0 if they stake none yet).
-        uint256 traderNftId = staker.tokenOf(trader);
+        uint256 traderNftId = staker.primaryOf(trader);
         if (traderNftId == referrerNftId) revert SelfReferral();
 
         // Cycle guard: walk the referrer NFT's ancestry; the trader's own
@@ -139,7 +139,7 @@ contract PSPReferralRegistry {
         address nftOwner = _ownerOf(nftId);
         if (nftOwner == address(0)) return false; // dead/burned NFT
         if (nftOwner == address(staker)) return false; // genesis slot: never a referrer
-        return staker.lockedPSPOf(nftOwner) >= MIN_STAKE_PSP;
+        return staker.stakedTotalOf(nftOwner) >= MIN_STAKE_PSP;
     }
 
     function _ownerOf(uint256 nftId) internal view returns (address) {
@@ -202,7 +202,7 @@ contract PSPReferralRegistry {
     /// @dev The trader's entry edge: their position NFT's edge if they hold
     ///      one, else their personal trader-slot edge.
     function _entryOf(address trader) internal view returns (uint256) {
-        uint256 traderNftId = staker.tokenOf(trader);
+        uint256 traderNftId = staker.primaryOf(trader);
         if (traderNftId != 0) return _nextEdge(traderNftId);
         return traderRefNftOf[trader];
     }

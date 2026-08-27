@@ -521,22 +521,19 @@ library CurveMath {
     uint256 internal constant TIMINGS_MASK = (1 << 51) - 1;
 
     /// @notice Pack a timing profile into the CurveConfig.timings slot.
-    ///         All five fields MUST be non-zero (zero encodes defaults).
+    ///         All three fields MUST be non-zero (zero encodes defaults).
     ///         Reverts on any field >= 2^51 — an oversized field would
     ///         otherwise spill nonzero garbage into the next slot, which
     ///         the deploy-side TimingsIncomplete guard cannot see.
+    ///         (2026-08-28: lock/extend/relock retired with the ve-decay
+    ///         redesign — three slots remain: predeposit, vest, vote.)
     function packTimings(
         uint256 predeposit,
-        uint256 lock,
-        uint256 extend,
-        uint256 relock,
+        uint256 vest,
         uint256 vote
     ) internal pure returns (uint256) {
-        if (
-            predeposit >= (1 << 51) || lock >= (1 << 51) || extend >= (1 << 51) || relock >= (1 << 51)
-                || vote >= (1 << 51)
-        ) revert TimingsOverflow();
-        return predeposit | (lock << 51) | (extend << 102) | (relock << 153) | (vote << 204);
+        if (predeposit >= (1 << 51) || vest >= (1 << 51) || vote >= (1 << 51)) revert TimingsOverflow();
+        return predeposit | (vest << 51) | (vote << 102);
     }
 
     error TimingsOverflow();
