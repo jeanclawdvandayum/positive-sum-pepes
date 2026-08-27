@@ -20,10 +20,12 @@ One mechanism for everyone — no Synthetix accumulator, no day buckets, no
 rewardDebt.
 
 ### Epochs
-- `epochSize = VEST_DURATION / 6` (mainnet 42d → 7d; testnet 6h → 1h so decay
-  is visible in a playtest). `epoch(ts) = ts / epochSize`. Constructor guards
-  `vest % 6 == 0` and anchors a point at deployment (never walk from epoch 0 —
-  1h epochs would make that ~500k iterations).
+- `epochSize = VEST_DURATION / 6` (mainnet 42d → 7d; testnet 2d → 8h).
+  `epoch(ts) = ts / epochSize`. `packTimings` guards `vest % 6 == 0`. The
+  genesis point anchor is lazy: it materializes at the first write-side use
+  (a position-creating call), so no delta can predate it and the walk never
+  starts from epoch 0 (small epochs would otherwise make that ~100k+
+  iterations).
 - **Weight only changes at epoch boundaries.** Every weight mutation (stake,
   top-up, request, cancel, flat-withdraw) registers a per-epoch delta that goes
   live at the NEXT boundary. Within an epoch, weights are constant — that is

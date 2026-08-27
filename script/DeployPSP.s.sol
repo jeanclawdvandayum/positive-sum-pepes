@@ -50,9 +50,8 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///   PSP_TESTNET  =1 to deploy SepoliaMixETH (dumb 1:1, no yield) +
 ///                MixETHFaucet (0.0001 ETH -> 100 mixETH) against a
 ///                canonical v4 testnet PoolManager + playtest timing
-///                profile (24h predeposit offer, 2d stake lock, +1d
-///                relock extend, 1d relock window, 1d bomb vote;
-///                flat exit 3d)
+///                profile (24h predeposit offer, 2d unstake vest decaying
+///                in 6 × 8h epochs, 1d bomb vote; flat exit 3d)
 ///   PSP_FORK     =1 to vm.deal the broadcaster 5 ETH first — lets you
 ///                dry-run the FULL testnet path (PSP_TESTNET + PSP_PM +
 ///                --fork-url $SEPOLIA_RPC_URL) with any throwaway key and
@@ -71,11 +70,12 @@ contract DeployPSP is Script {
     address constant PM_UNICHAIN_SEPOLIA = 0x9cB26A7183B2F4515945Dc52CB4195B0d2D06C95; // 1301
 
     /// @dev Packed playtest timing profile (see RoundController "Timing
-    ///      profile"): 24h predeposit offer · 6h vest (compressed decay for
-    ///      playtest visibility; mainnet default is 42 days) · 1d bomb vote.
+    ///      profile"): 24h predeposit offer · 2d unstake vest (scoopy
+    ///      2026-08-29 — decay visible in a 2-day playtest via 6 × 8h
+    ///      epochs; mainnet default is 42 days) · 1d bomb vote.
     ///      Flat exit: constant 3d. Packs via CurveMath.packTimings.
     function _testnetTimings() internal pure returns (uint256) {
-        return CurveMath.packTimings(1 days, 6 hours, 1 days);
+        return CurveMath.packTimings(1 days, 2 days, 1 days);
     }
 
     function run() external {

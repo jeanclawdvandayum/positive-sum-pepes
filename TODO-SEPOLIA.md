@@ -4,8 +4,8 @@ End-to-end checklist for shipping a playtest round of PSP to Sepolia
 (chain `11155111`). Work top to bottom; every box is a verifiable step.
 
 Timings cheat-sheet (testnet profile, packed by the deploy script):
-24h predeposit offer · 2d stake lock · +1d relock extend · 1d relock
-window · 1d bomb vote · 3d flat exit.
+24h predeposit offer · 2d unstake vest (6 × 8h decay epochs) · 1d bomb
+vote · 3d flat exit.
 
 ---
 
