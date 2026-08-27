@@ -31,7 +31,7 @@ const mechanics = [
     body: 'if stakers vote with 69% quorum and a majority, the round is flattened: every lock opens immediately and the curve goes flat so stakers can exit at average backing. after the exit window closes, whatever remains drains to the factory and the next round is born with the treasure.',
   },
   {
-    icon: 'recycle',
+    icon: 'sum',
     title: 'positive sum',
     color: 'from-sky-400 to-emerald-400',
     body: 'the whole reserve sits in mixETH, an ETH yield token curated by alchemix dao — defi OGs running trusted infrastructure since 2021 — so the pot earns from outside the game and your backing compounds even when nobody trades. fees recycle to stakers instead of extracting. the math tilts positive for everyone who stays.',
@@ -84,7 +84,7 @@ export default function Landing() {
               label="reserve"
               value={
                 <>
-                  {fmtAmount(round.reserve)} <MixLogo /> mix
+                  {fmtAmount(round.reserve)} <MixLogo px={28} /> mix
                 </>
               }
             />

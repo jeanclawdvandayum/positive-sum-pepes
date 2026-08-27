@@ -61,15 +61,23 @@
   --color-emerald-100: #17362c;
   --color-emerald-200: #1f4a3a;
 
-  /* text */
-  --color-slate-300: #33436a;    /* placeholders */
-  --color-slate-400: #7e8fb3;    /* secondary text */
-  --color-slate-500: #93a4c6;
+  /* text — muted ramp lifted so small labels clear WCAG 4.5:1 vs the
+     #0b1424 card surface (400 was ~5.7:1 but subjectively dim) */
+  --color-slate-300: #40537f;    /* placeholders */
+  --color-slate-400: #a4b3cc;    /* secondary text */
+  --color-slate-500: #b5c3da;
   --color-slate-800: #d7e3f4;    /* body text */
   --color-slate-900: #e9f1fc;    /* headings */
 
-  /* brand */
-  --color-psp-deep: #53c2ff;     /* readable on dark surfaces */
+  /* muted accent text used for status lines + tint chips */
+  --color-emerald-600: #34d399;  /* success text on emerald tints */
+  --color-emerald-700: #34d399;
+  --color-sky-700: #7dd3fc;      /* chip labels on sky-100 */
+
+  /* button layer: brighten disabled/muted actions so labels clear 3:1
+     even in their disabled state (audit 2026-08-27: connect-wallet /
+     initiate-vote / claim / extend / withdraw were ~2-3:1 teal-on-teal) */
+  --color-psp-deep: #7dd8ff;     /* brightened: headings + action labels clear 3:1 on dark */
   --color-psp-sky-soft: #1c3a5e;
   --color-psp-mint-soft: #123527;
 
@@ -113,6 +121,7 @@ body {
   @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 to-emerald-400 px-5 py-3 font-bold text-[#fff] shadow-lg shadow-sky-200 transition active:scale-[0.98] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none;
 }
 
+.dark .btn-ghost { @apply disabled:opacity-80; }
 .btn-ghost {
   @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-white px-4 py-2 font-semibold text-psp-deep transition active:scale-[0.98] hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-40;
 }

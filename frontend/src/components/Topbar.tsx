@@ -7,6 +7,7 @@ import { renderPepeSvg, randomDna } from '../lib/pepeRender'
 import { ADDRESSES, FAUCET_ENABLED } from '../lib/config'
 import { faucetAbi } from '../lib/abi'
 import ThemeSwitcher from './ThemeSwitcher'
+import MixLogo from './MixLogo'
 
 const links = [
   { to: '/', label: 'home' },
@@ -89,7 +90,7 @@ function FaucetButton() {
         step === 'done' ? 'text-emerald-600' : ''
       }`}
     >
-      {step === 'done' ? '✅' : step === 'tx' ? '💧…' : '💧'}
+      {step === 'done' ? '✅' : step === 'tx' ? <><MixLogo px={14} />…</> : <MixLogo px={14} />}
       <span className="hidden lg:inline">{step === 'done' ? 'dripped' : step === 'tx' ? 'confirming' : 'faucet'}</span>
     </button>
   )

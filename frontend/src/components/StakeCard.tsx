@@ -8,6 +8,8 @@ import { fmtAmount, fmtCountdown, parseAmountToWad } from '../lib/format'
 import MixLogo from './MixLogo'
 import PepePanel from './PepePanel'
 import PepePicker from './PepePicker'
+import { PspIcon } from './TokenIcon'
+import { PixelIcon } from './PixelIcon'
 
 type Step = 'idle' | 'approve' | 'tx' | 'done'
 
@@ -150,7 +152,9 @@ export default function StakeCard() {
 
   return (
     <div className="card p-5">
-      <h2 className="text-lg font-black text-slate-900">💎 stake PSP</h2>
+      <h2 className="flex items-center gap-1.5 text-lg font-black text-slate-900">
+        <PspIcon px={24} /> stake PSP
+      </h2>
       <p className="text-xs text-slate-400">
         90-day lock · every trade fee flows to stakers · your pepe stays with you forever
       </p>
@@ -236,10 +240,10 @@ export default function StakeCard() {
 
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <button className="btn-ghost flex-1" disabled={!canExtend || busy} onClick={() => run('relock')}>
-          🔄 extend +90d {canExtend ? '' : '(final week only)'}
+          extend +90d {canExtend ? '' : '(final week only)'}
         </button>
         <button className="btn-ghost flex-1" disabled={!canUnlock || busy} onClick={() => run('unlock')}>
-          🔓 withdraw (keep pepe)
+          <PixelIcon name="unlock" size={16} /> withdraw (keep pepe)
         </button>
       </div>
 
@@ -255,7 +259,7 @@ export default function StakeCard() {
             disabled={!isConnected || busy}
             onClick={drip}
           >
-            {dripStep === 'done' ? '✅' : dripStep === 'tx' ? 'confirm…' : '💧 get mixETH'}
+            {dripStep === 'done' ? '✅' : dripStep === 'tx' ? 'confirm…' : <><MixLogo px={16} /> get mixETH</>}
           </button>
         </div>
       )}

@@ -265,6 +265,12 @@ export default function CurveChart() {
             <path d={path} fill="none" stroke="url(#curveStroke)" strokeWidth="3" strokeLinecap="round" />
           </g>
 
+          {pts.length === 0 && (
+            <text x={W / 2} y={H / 2} textAnchor="middle" className="fill-slate-400 text-[13px] font-bold">
+              curve data unavailable — waiting for the round
+            </text>
+          )}
+
           {/* live point */}
           {live && (
             <g>

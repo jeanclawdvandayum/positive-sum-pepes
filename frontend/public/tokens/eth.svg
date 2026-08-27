@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 318 318">
+  <!-- canonical Ethereum diamond — geometry lifted from mixeth.svg, recolored
+       to the standard two-tone look (light crown, body-blue waist, deep pavilion).
+       no background circle: transparent so it sits cleanly beside token labels -->
+  <g>
+    <!-- top-right facet (was #333) -->
+    <path d="M159.2,71v64.5l54.5,24.4-54.5-88.9Z" fill="#8FA6F4"/>
+    <!-- top-left facet (was #8c8c8c) -->
+    <path d="M159.2,71l-54.5,88.9,54.5-24.4v-64.5Z" fill="#CACFFD"/>
+    <!-- bottom-right outer (was #333) -->
+    <path d="M159.2,201.6v43.8l54.6-75.5-54.6,31.7Z" fill="#3F4C89"/>
+    <!-- bottom-left outer (was #8c8c8c) -->
+    <path d="M159.2,245.5v-43.8l-54.5-31.7,54.5,75.5Z" fill="#454A75"/>
+    <!-- waist-right inner (was #141414) -->
+    <path d="M159.2,191.5l54.5-31.7-54.5-24.3v56Z" fill="#556AC0"/>
+    <!-- waist-left inner (was #383838) -->
+    <path d="M104.7,159.8l54.5,31.7v-56l-54.5,24.3Z" fill="#627EEA"/>
+  </g>
+</svg>

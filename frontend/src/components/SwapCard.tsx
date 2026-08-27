@@ -6,6 +6,7 @@ import { ADDRESSES } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
 import { fmtAmount, parseAmountToWad } from '../lib/format'
 import MixLogo from './MixLogo'
+import { EthIcon, PspIcon } from './TokenIcon'
 
 type PayToken = 'ETH' | 'MIX'
 type Side = 'buy' | 'sell'
@@ -353,7 +354,7 @@ export default function SwapCard() {
             <TokenPicker options={['ETH', 'MIX']} value={payToken} onChange={setPayToken} />
           ) : (
             <div className="shrink-0 rounded-2xl bg-white px-4 py-3 text-lg font-black text-slate-700 shadow-sm">
-              🐸 PSP
+              <PspIcon px={20} /> PSP
             </div>
           )}
         </div>
@@ -379,7 +380,7 @@ export default function SwapCard() {
           </div>
           {side === 'buy' ? (
             <div className="shrink-0 rounded-2xl bg-white px-4 py-3 text-lg font-black text-slate-700 shadow-sm">
-              🐸 PSP
+              <PspIcon px={20} /> PSP
             </div>
           ) : (
             <TokenPicker options={['ETH', 'MIX']} value={payToken} onChange={setPayToken} />
@@ -456,7 +457,9 @@ function TokenPicker({
               <MixLogo px={18} /> mix
             </>
           ) : (
-            'Ξ ETH'
+            <>
+              <EthIcon px={18} /> ETH
+            </>
           )}
         </button>
       ))}

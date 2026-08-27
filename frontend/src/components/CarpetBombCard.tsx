@@ -3,6 +3,7 @@ import { useAccount, useReadContracts, useWriteContract } from 'wagmi'
 import { controllerAbi, stakerAbi } from '../lib/abi'
 import { useRound } from '../lib/useRound'
 import { fmtAmount, fmtCountdown } from '../lib/format'
+import { PixelIcon } from './PixelIcon'
 
 type Step = 'idle' | 'tx' | 'done'
 
@@ -104,7 +105,9 @@ export default function CarpetBombCard() {
   return (
     <div className="card overflow-hidden p-0">
       <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 px-5 py-3">
-        <h2 className="text-lg font-black text-[#fff]">💣 carpet bomb</h2>
+        <h2 className="flex items-center gap-1.5 text-lg font-black text-[#fff]">
+          <PixelIcon name="bomb" size={20} /> carpet bomb
+        </h2>
         <p className="text-xs font-bold text-[#fff]/80">
           stakers vote to end the round · treasury inherits into the next
         </p>

@@ -4,6 +4,7 @@ import { stakerAbi, descriptorAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
 import { renderPepeSvg } from '../lib/pepeRender'
 import type { RoundInfo } from '../lib/useRound'
+import { PixelIcon } from './PixelIcon'
 
 const isZero = (a: string | undefined) => !a || /^0x0+$/.test(a)
 
@@ -92,7 +93,9 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
     <div className="card p-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-black text-slate-900">🎨 choose your pepe</h2>
+          <h2 className="flex items-center gap-1.5 text-lg font-black text-slate-900">
+            <PixelIcon name="palette" size={20} /> choose your pepe
+          </h2>
           <p className="text-xs text-slate-400">
             {localMode
               ? 'rolled locally — same art data the contract renders'
@@ -106,7 +109,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
             onReroll()
           }}
         >
-          🎲 refresh
+          <PixelIcon name="die" size={16} /> refresh
         </button>
       </div>
 
