@@ -94,7 +94,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
       <div className="flex items-center justify-between">
         <div>
           <h2 className="flex items-center gap-1.5 text-lg font-black text-slate-900">
-            <PixelIcon name="palette" size={20} /> choose your pepe
+            choose your pepe
           </h2>
           <p className="text-xs text-slate-400">
             {localMode

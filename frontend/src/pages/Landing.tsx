@@ -13,7 +13,7 @@ const mechanics = [
     body: 'every buy climbs a preset price curve; every sell walks it back down. no LPs to farm you, no rug to pull — the curve is the market and it never sleeps. it runs as a uniswap v4 hook on a real v4 pool: battle-tested plumbing, zero custodians.',
   },
   {
-    icon: 'coin',
+    icon: 'window',
     title: 'predeposit window',
     color: 'from-emerald-400 to-emerald-500',
     body: 'each round opens with a 7-day window. up to 500 mixETH gets first position at the seed price and PSP auto-locks at launch. miss it and you buy on the open curve.',
