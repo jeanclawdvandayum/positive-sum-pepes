@@ -212,8 +212,9 @@ contract FactoryTest is Test {
         vm.prank(bob);
         controller.claimPredepositPSP();
 
-        // M-1 convention: locks must predate the proposal
-        vm.warp(block.timestamp + 1);
+        // M-1 convention: locks must predate the proposal — and fresh claims
+        // go live at the next epoch boundary (epoch-point liveness)
+        vm.warp(((block.timestamp / 7 days) + 1) * 7 days + 1);
 
         vm.prank(alice);
         controller.proposeCarpetBomb();

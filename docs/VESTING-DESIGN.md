@@ -1,89 +1,149 @@
-# PSP Vesting Redesign — indefinite locks, ve-style decay, per-pepe cards
+# PSP Vesting Redesign — indefinite locks, InfiniFi-style epoch decay, per-pepe cards
 
 Spec (scoopy, 2026-08-28): indefinite locks; `requestWithdraw` starts a 6-week
 linear decay of dividend + voting power (1000 PSP → 5/6 at wk1, 1/2 at wk3, 0
 at wk6, then withdrawable). Stake page: one card per staked pepe NFT (art,
-amount, $value, unlock date, extend→cancel / withdraw buttons, per-card claim +
+amount, $value, unlock date, cancel-request / withdraw buttons, per-card claim +
 reinvest), header totals + multiclaim + reinvest-all.
 
-## Contract changes
+**2026-08-29 update — fee engine replaced.** The dual-leg design below is
+RETIRED. It shipped with two exactness bugs under staggered decayers (see git
+history). The engine is now the InfiniFi epoch-point design
+(`InfiniFi-Labs/infinifi-protocol`, `src/locking/UnwindingModule.sol`) — the
+mechanism their locked iUSD uses to decay boosted yield down to the unlocked
+rate while unwinding. PSP-specific mapping below; the old dual-leg section is
+kept at the bottom for the record.
 
-### PSPStaker — rewrite to multi-position (id-keyed)
-- `Position{amount, rewardDebt, requestTime, actionTime}` keyed by tokenId.
-  Genesis virtual position lives at tokenId 0 (never minted, never decays).
-- ERC721-lite enumeration: `_ownerOf[id]`, `_owned[user] = uint256[]`,
-  `balanceOf`, `tokenOfOwnerByIndex`. Transfers move whole positions (no more
-  one-per-address merge/husk logic — cards are the positions).
-- `lock(amount)` mints a sequential pepe; `lockWithPepe(amount, id)` chosen id;
-  top-up = `stakeFor/lock` on an owned id. Top-up while decaying → revert
-  (`RequestActive` — cancel first; keeps bias math one-slope per position).
-- `requestWithdraw(id)`: claims classic fee leg, stamps requestTime, sets the
-  position's day-bucket cursor to day(request)+1. Power starts decaying NOW.
-- `cancelWithdraw(id)`: pays the bucket leg, clears requestTime, rewardDebt =
-  amount×acc (rejoins classic leg). The UI's "extend" analog.
-- `withdraw(id)`: allowed when elapsed ≥ VEST_DURATION or round is flat
-  (carpet-bomb keeps immediate-open). Pays bucket leg, principal out, NFT
-  survives as husk (amount=0 position; re-stakeable).
-- `claimFees(id)` / `claimFeesTo(id, to)` / `claimAll(ids[])`: classic leg for
-  non-decaying, bucket leg for decaying. `claimFeesTo` is the reinvestor hook.
-- `stakeFor(user, pepeId, amount)`: permissionless — reinvestor path (pulls
-  PSP from msg.sender into user's owned pepeId).
-- Voting: `voteWeight(user, at)` = Σ bias(id, at) over ids with
-  `actionTime < at` (propose-snapshot guard, finding-29 pattern extended).
+## The epoch-point engine (current, after InfiniFi)
 
-### Fee math (dual-leg, in-staker — move to PSPFeeVault only if size demands)
-Classic Synthetix leg breaks under time-varying weights. Design:
-- `addFees(fee)` at event time t:
-  `W(t) = totalLocked − decayingBias(t)` where decayingBias is maintained
-  O(1) via aggregate (snapshot + slope-sum integral, veCRV totalSupply trick).
-  `acc += fee·P / W_full? NO — /W_total(t)`; simultaneously
-  `dayAcc[day(t)] += fee·P / W_total(t)` (same division, one extra SSTORE).
-- Non-decaying position claim: `amount·acc − rewardDebt` (unchanged math,
-  O(1)); their true share fee·amount/W_total is exact because W_total is
-  evaluated at every event.
-- Decaying position claim: walk `dayAcc[d] × bias(id, d_start)/P` from cursor
-  to min(today, day(request)+42). bias(d_start) is pure per position.
-  Approximation: intra-day drift of the DECAYER's own weight only
-  (<1/42 of a decaying position's daily slice) — Curve feeDistributor makes
-  weekly approximations at higher stakes. Bounded ≤42 iterations.
-- Weight floor: after decay completes, bias = 0 → earns nothing, withdraws.
+One mechanism for everyone — no Synthetix accumulator, no day buckets, no
+rewardDebt.
 
-### RoundController — timing + vote surface
+### Epochs
+- `epochSize = VEST_DURATION / 6` (mainnet 42d → 7d; testnet 6h → 1h so decay
+  is visible in a playtest). `epoch(ts) = ts / epochSize`. Constructor guards
+  `vest % 6 == 0` and anchors a point at deployment (never walk from epoch 0 —
+  1h epochs would make that ~500k iterations).
+- **Weight only changes at epoch boundaries.** Every weight mutation (stake,
+  top-up, request, cancel, flat-withdraw) registers a per-epoch delta that goes
+  live at the NEXT boundary. Within an epoch, weights are constant — that is
+  the exactness invariant the dual-leg design lacked.
+
+### Global point
+`GlobalPoint {epoch, weight, slope, fees}` stored per epoch, lazily
+extrapolated (`_advance`) from the last stored point via four delta maps:
+`biasAdd/biasSub/slopeAdd/slopeSub[epoch]` (applied advancing e→e+1). Stored
+points are authoritative — walkers prefer them so direct corrections
+(mid-decay cancel) propagate (InfiniFi's Certora-tested pattern).
+
+### Decay (the veCRV bias/slope pattern)
+`requestWithdraw` at epoch E: `base = amount − amount%6`, `slope = base/6`.
+- weight = full `amount` through E; `base − k·slope` during E+k (k=1..5); 0
+  from E+6. Dust (amount%6) is removed up-front via `biasSub[E]` so the decay
+  lands on exactly zero (InfiniFi's rounding).
+- Global: `slopeAdd[E] += slope` (decay starts at the boundary after the
+  request), `slopeSub[E+6] += slope` (slope retires when the position zeroes).
+- Spec checkpoints hold EXACTLY at any request phase: +1wk crosses exactly one
+  boundary → 5/6; +3wk → 1/2; +6wk → 0.
+- `withdraw` unlocks at `epoch ≥ E+6` (`withdrawableAt = (E+6)·epochSize`).
+  Slope retirement is lazy — no correction needed on withdraw.
+
+### Fees
+`addFees` credits the CURRENT epoch's point (`point.fees += amount`),
+distributed pro-rata by that epoch's weights. Zero-weight epochs orphan in
+`pendingFeesMixETH` until weight exists (unchanged).
+
+### Settlement (claims)
+Every position carries a self-anchor `{settledEpoch, settledW, settledSlope}` —
+the global point at its last settle. Claims replay epochs
+`(settledEpoch, lastClosed]`: advance a virtual point (same delta math, stored
+points preferred), and for each epoch with fees: `alloc += fees · w(pos,e) / W(e)`.
+Then pay `alloc`; move the anchor. Consequences:
+- Claims settle through the last CLOSED epoch — fees deposited during the
+  current epoch become claimable at the next boundary (weekly on mainnet).
+  This keeps splits exact and symmetric (InfiniFi unwinding-side semantics).
+- Replay is bounded by settle cadence, not history — any mutation settles first.
+- Positions never depend on a stored point existing at their settled epoch.
+
+### Mutations (uniform rule: upward changes land next boundary)
+- `_stake` fresh: `startEpoch = e`, `biasAdd[e] += amount` — live from e+1. A
+  fresh stake does not retroactively claim this epoch's already-deposited fees
+  (mid-epoch fairness — why InfiniFi registers bias at the current epoch).
+- top-up: settle + pay first, `biasAdd[e] += add`, `startEpoch = e` re-anchor
+  (the top-up epoch itself is forfeit — ≤1 epoch under-accrual, uniform).
+- `requestWithdraw`: settle+pay, arm the slope (weight unchanged at E).
+- `cancelWithdraw` at f: settle+pay. If f == E: unwind the pending deltas
+  (slopeAdd/slopeSub/biasSub). If f > E: checkpoint + correct the live point
+  (`p.slope -= slope`), `biasAdd[f] += (f−E)·slope + dust` (full power from
+  f+1; the cancel epoch itself is forfeit), `slopeSub[E+6] -= slope`.
+  Position re-anchors at full amount (`startEpoch = f`, requestEpoch = 0).
+- `withdraw` (decayed): weight is already 0 — no corrections. Flat-path
+  (carpet bomb): `biasSub[e] += amount` for tidy bookkeeping.
+- Genesis (`positions[0]`): lockGenesis registers like a stake; share claims
+  settle genesis, pay the share's pro-rata fees (`alloc · share / amount`),
+  `biasSub[e] += share` out + fresh pepe `biasAdd[e] += share` in.
+
+### Views
+- `weightAt(pepeId, e)` / `biasOf(pepeId, ts)`: the stepped schedule.
+- `totalWeight()`: extrapolated global point (controller quorum).
+- `pendingFeesOf`: read-only replay to the last closed epoch.
+- `withdrawableAt`: `(requestEpoch+6)·epochSize` or uint.max.
+- `voteWeight(user, at)`: Σ weightAt(epochOf(at)) with the finding-29
+  actionTime guard — snapshots stay exact at propose time.
+
+### Deviations from InfiniFi (all favor simplicity; documented)
+- PSP is single-system: weight never hops contracts (their locked→unwinding
+  move creates a 1-epoch earning gap; ours keeps full weight through the
+  request epoch — ≤1 epoch of full weight post-request instead).
+- Epoch length derives from the vest window (theirs is a fixed week with a
+  3-day offset) — keeps testnet decay visible and mainnet on exact week steps.
+- No slashIndex / share-price legs (PSP fees are mixETH, not the stake token —
+  replay-claim is the natural fit).
+
+## RoundController — timing + vote surface
 - Timings pack: PREDEPOSIT, VEST_DURATION, VOTE_DURATION (+flat exit const).
   LOCK/EXTEND/RELOCK slots retired (findings-46 zero-guards preserved).
 - vote(): weight = Σ bias(id, proposeTime), per-id actionTime < proposeTime.
-- Quorum denominator: max(totalBias(proposeTime), hook.totalSupplyPSP()).
+- Quorum denominator: max(totalWeight(proposeTime), hook.totalSupplyPSP()).
 - flatTime bypass on withdraw stays (carpet bomb = all locks open).
 
-### PSPReinvestor (new, script-deployed like zaps — zero factory size)
+## PSPReinvestor (script-deployed like zaps — zero factory size)
 `reinvest(pepeId, key, minOut, deadline)`:
 claimFeesTo(pepeId, reinvestor) → mix.forceApprove(zapIn) →
 zapIn.buyWithMix(key, mix, minOut, deadline) → PSP → stakeFor(owner, pepeId).
 `reinvestAll(ids[], …)` loops. No custody beyond in-flight, no admin.
 
-### Size plan (EIP-170, per finding 50)
-- Staker net: −relock/extend/merge/husk-transfer, +enumeration/request/
-  cancel/withdraw/buckets/stakeFor. Measure; headroom test at 24,000B.
-- If over: extract fee/bias math to PSPFeeVault (deployed by StakerDeployer
-  vessel BEFORE staker — counterparty-has-code order, finding 47 — bound via
-  staker constructor passing address(this)).
-- Controller: three timing immutables → one; net negative expected.
-
 ## Frontend (stake page)
 - PepeCards: one card per owned pepe id — art via renderPepeSvg(dnaOf(id));
   rows: amount staked, $value (amount × curvePrice × mix→USD), unlock date
-  (requestTime ? requestTime+6w : 'indefinite'), buttons: cancel-request /
-  withdraw (greyed per state machine), claim [claim – X mixETH], reinvest.
-- Header: total PSP staked (Σ), total $ value, multiclaim (claimAll), 
+  ((requestEpoch+6)·epochSize — read via positions()[2] and VEST_DURATION/6),
+  stepped power % (client mirror of the contract schedule), buttons:
+  cancel-request / withdraw (greyed per state machine), claim
+  [claim – X mixETH], reinvest.
+- Header: total PSP staked (Σ), total $ value, multiclaim (claimAllTo),
   reinvest-all.
-- ABI additions: positions(id), requestWithdraw, cancelWithdraw, withdraw,
-  claimFees(id), claimAll, stakeFor, voteWeight, VEST_DURATION; reinvestor.
+- app.html (on-chain fallback app): user panel now reads staker() →
+  stakedTotalOf(acct) (the old locks(address) read died with the multi-NFT
+  rewrite).
 
-## Test plan
-- New: decay curve pins (wk0 1.0, wk1 5/6, wk3 1/2, wk6 0), fee-split
-  exactness (decayer vs stayer over shared windows), vote-weight snapshot
-  (request/cancel/lock post-propose excluded), withdraw gating, stakeFor,
-  reinvestor e2e (claim→buy→restake), multiclaim gas, size gates.
-- Adapt: every relock/extend/unlock-window test → new lifecycle; temporal
-  guards (warp between last action and propose).
-- Longitudinal: conservation across full lifecycle stays green.
+## Test plan (test/unit/Vesting.t.sol — epoch-exact)
+- Decay pins at boundary-anchored requests: full through request epoch, 5/6
+  +1wk, 1/2 +3wk, 0 +6wk; aggregate exact.
+- **Staggered decayers exact** (the retired dual-leg's known-issue #1): two
+  requests one epoch apart; per-position and totalWeight pinned floor-for-floor.
+- Exact fee splits incl. a mid-decay epoch (decayer 5/6 vs stayer full),
+  never over-distributes (retired known-issue #2).
+- Withdraw gating (first unlock instant = (E+6)·epochSize), husk + re-stake,
+  cancel same-epoch / mid-decay (forfeit epoch documented), stakeFor gating,
+  multiclaim, vote snapshot semantics, dust rounding (amount%6 → exact zero),
+  sparse replay across quiet gap epochs, genesis share fee split.
+
+## Retired: dual-leg fee math (2026-08-28 — do not resurrect)
+Classic Synthetix accumulator for non-decayers + day-bucket legs for decayers,
+with an O(1) aggregate decaying-bias snapshot. Two exactness failures shipped:
+staggered second requester's aggregate decayed at double rate, and decayer
+bucket legs read a 28d-equivalent bias instead of 21d. Root cause class:
+continuous-weight accumulator + sub-day bucket approximations interacting.
+Superseded wholesale by the epoch-point engine above. Lesson: when weights
+decay, use epoch/point-slope replay (veCRV / InfiniFi) — not hybrid
+accumulators.

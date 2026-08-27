@@ -18,11 +18,15 @@ contract MockFactory {
     constructor() { owner = msg.sender; }
 }
 
-/// @title VestingTest — ve-style decay: pins, fee split, gating, votes
-/// @notice 2026-08-28 redesign: indefinite locks; requestWithdraw starts a
-///         42-day linear decay of dividends + voting power; withdraw after;
-///         cancelWithdraw aborts. Spec pins (1000 PSP): wk1 → 5/6, wk3 → 1/2,
-///         wk6 → 0.
+/// @title VestingTest — InfiniFi epoch-point decay: pins, exact fee splits,
+///         staggered decayers, gating, votes, dust, sparse replays.
+/// @notice Epoch = VEST/6 = 7d. Weight changes go live at the NEXT epoch
+///         boundary; a request at epoch E holds full weight through E and
+///         steps down 5/6, 4/6, … 0 at each boundary after (k = e - E).
+///         Fees fed during epoch e are claimable once e closes.
+/// @dev All warps are ABSOLUTE from a captured t0 — two textually identical
+///      `vm.warp(block.timestamp + X)` expressions in one function get CSE'd
+///      by via-ir and the second re-evaluates with the stale timestamp.
 contract VestingTest is Test {
     RoundController controller;
     PSPStaker stakerV;
@@ -35,6 +39,21 @@ contract VestingTest is Test {
     address bob = makeAddr("bob");
 
     uint256 constant VEST = 42 days;
+    uint256 constant EPOCH = 7 days; // VEST / 6
+    uint256 t0; // setUp ends exactly on the epoch-2 boundary
+
+    /// @dev decay math mirror: (base, slope) for an amount
+    function _dec(uint256 amount) internal pure returns (uint256 base, uint256 slope) {
+        base = amount - (amount % 6);
+        slope = base / 6;
+    }
+
+    /// @dev expected weight of an amount at k epochs past its request
+    function _wAt(uint256 amount, uint256 k) internal pure returns (uint256) {
+        if (k >= 6) return 0;
+        (uint256 base, uint256 slope) = _dec(amount);
+        return base - k * slope;
+    }
 
     function setUp() public {
         mixETH = new MockMixETH();
@@ -58,8 +77,9 @@ contract VestingTest is Test {
         vm.prank(address(mockFactory));
         controller.setHook(CurveHook(payable(address(hook))));
 
-        // midnight anchor so bucket days are deterministic
-        vm.warp(block.timestamp / 1 days * 1 days + 1 days);
+        // anchor exactly ON an epoch boundary (epoch 1), then stake — both
+        // stakes share epoch 1 and go live at epoch 2 (= t0)
+        vm.warp(((block.timestamp / EPOCH) + 1) * EPOCH);
 
         vm.startPrank(alice);
         pspToken.approve(address(stakerV), type(uint256).max);
@@ -69,6 +89,9 @@ contract VestingTest is Test {
         pspToken.approve(address(stakerV), type(uint256).max);
         stakerV.lockWithPepe(1000e18, 202);
         vm.stopPrank();
+
+        vm.warp(block.timestamp + EPOCH); // enter epoch 2: both live
+        t0 = block.timestamp; // == 2 * EPOCH exactly
     }
 
     function _feedFees(uint256 amount) internal {
@@ -76,94 +99,101 @@ contract VestingTest is Test {
         stakerV.addFees(amount);
     }
 
-    // ── decay pins: the exact spec numbers ──
+    // ── decay pins: the exact spec numbers, boundary-anchored ──
 
     function test_DecayPins() public {
         vm.prank(alice);
-        stakerV.requestWithdraw(101);
-        assertEq(stakerV.biasOf(101, block.timestamp), 1000e18);
-        vm.warp(block.timestamp + 7 days);
-        uint256 decayed1w = 1000e18 - 1000e18 * 7 days / VEST;
-        assertEq(stakerV.biasOf(101, block.timestamp), decayed1w);
-        vm.warp(block.timestamp + 14 days);
-        assertEq(stakerV.biasOf(101, block.timestamp), 500e18);
-        vm.warp(block.timestamp + 21 days);
-        assertEq(stakerV.biasOf(101, block.timestamp), 0);
-        assertApproxEqAbs(stakerV.totalWeight(), 1000e18, 1e7);
+        stakerV.requestWithdraw(101); // requestEpoch = 2, full through it
+        assertEq(stakerV.biasOf(101, block.timestamp), 1000e18, "full through request epoch");
+
+        vm.warp(t0 + 1 * EPOCH); // +1 week → 5/6
+        assertEq(stakerV.biasOf(101, block.timestamp), _wAt(1000e18, 1), "1wk = 5/6");
+
+        vm.warp(t0 + 3 * EPOCH); // +3 weeks → 1/2
+        assertEq(stakerV.biasOf(101, block.timestamp), _wAt(1000e18, 3), "3wk = 1/2");
+
+        vm.warp(t0 + 6 * EPOCH); // +6 weeks → 0
+        assertEq(stakerV.biasOf(101, block.timestamp), 0, "6wk = 0");
+        assertEq(stakerV.totalWeight(), 1000e18, "bob remains at full");
     }
 
-    function test_TotalWeightTwoDecayers() public {
-        // KNOWN-ISSUE 2026-08-28: staggered requestWithdraw aggregate drops
-        // 2x the expected slope-week (probe: _snapTs behaves as unstamped on
-        // the second request). Single-decayer aggregate is exact. Next pass:
-        // root-cause _snap() state persistence under via_ir; then tighten.
-        uint256 t0 = block.timestamp;
+    // ── staggered decayers: the former known-issue, now exact ──
+
+    function test_TotalWeightStaggeredExact() public {
         vm.prank(alice);
-        stakerV.requestWithdraw(101);
-        vm.warp(t0 + 7 days);
+        stakerV.requestWithdraw(101); // epoch 2
+        vm.warp(t0 + 1 * EPOCH); // epoch 3
         vm.prank(bob);
-        stakerV.requestWithdraw(202);
-        vm.warp(t0 + 14 days);
-        // alice: 1000*(1-14/42)=666.67 bob: 1000*(1-7/42)=833.33 → 1500e18
-        uint256 pinned = 1166666666666669408000;
-        assertApproxEqAbs(stakerV.totalWeight(), pinned, 1e18); // pins CURRENT (buggy) behavior — see KNOWN-ISSUE
+        stakerV.requestWithdraw(202); // epoch 3
+        vm.warp(t0 + 2 * EPOCH); // epoch 4: alice k=2, bob k=1
+
+        assertEq(stakerV.biasOf(101, block.timestamp), _wAt(1000e18, 2));
+        assertEq(stakerV.biasOf(202, block.timestamp), _wAt(1000e18, 1));
+        assertEq(stakerV.totalWeight(), _wAt(1000e18, 2) + _wAt(1000e18, 1), "aggregate exact");
+
+        vm.warp(t0 + 6 * EPOCH); // epoch 8: alice exhausted (k=6), bob k=5
+        assertEq(stakerV.totalWeight(), _wAt(1000e18, 5), "alice 0 + bob 5/6");
     }
 
-    // ── fee split: stayer classic leg, decayer bucket leg (day-exact) ──
+    // ── exact fee splits: same-epoch vs decayer, floor-for-floor ──
 
-    function test_FeeSplitStayerVsDecayer() public {
-        // fee while both full: 50/50 classic
-        _feedFees(100e18);
-        uint256 exp101 = 1000e18 * 75e18;
-        exp101 /= 2250e18;
-        assertApproxEqAbs(stakerV.pendingFeesOf(101), exp101, 1e15);
+    function test_FeeSplitExact() public {
+        _feedFees(100e18); // during epoch 2: both live, 50/50
+        assertEq(stakerV.pendingFeesOf(101), 0, "current epoch not closed yet");
+
+        vm.warp(t0 + 1 * EPOCH); // epoch 3: epoch 2 closed
+        assertEq(stakerV.pendingFeesOf(101), 50e18);
         assertEq(stakerV.pendingFeesOf(202), 50e18);
 
-        uint256 t0 = block.timestamp;
         vm.prank(alice);
-        stakerV.requestWithdraw(101); // pays the 50e18 classic pending now
+        stakerV.requestWithdraw(101); // r=3: settles + pays the 50e18
+        assertEq(mixETH.balanceOf(alice), 50e18);
 
-        // warp exactly 21 days (alice bias 500, bob 1000 → total 1500)
-        vm.warp(t0 + 21 days);
-        _feedFees(150e18);
+        vm.warp(t0 + 2 * EPOCH); // epoch 4: alice k=1
+        uint256 wA = _wAt(1000e18, 1);
+        uint256 total = wA + 1000e18;
+        _feedFees(150e18); // during epoch 4
 
-        // bob (classic): 1000/1500 of 150 = 100e18
-        assertEq(stakerV.pendingFeesOf(202), 100e18);
-        // alice (bucket): day(t0+21d) delta × bias(day start 500)/P
-uint256 e101 = 1000e18 * 75e18;
-        e101 /= 2250e18;
-        assertApproxEqAbs(stakerV.pendingFeesOf(101), exp101, 1e15);
+        vm.warp(t0 + 3 * EPOCH); // epoch 5: epoch 4 closed
+        uint256 expA = (150e18 * wA) / total;
+        uint256 expB = (150e18 * 1000e18) / total;
+        assertEq(stakerV.pendingFeesOf(101), expA, "decayer share exact");
+        // bob settled nothing since epoch 2 — his epoch-2 50e18 rides along
+        assertEq(stakerV.pendingFeesOf(202), 50e18 + expB, "stayer share (+unclaimed ep2)");
+        assertTrue(expA + expB <= 150e18, "never over-distributes");
 
-        uint256 aliceMixBefore = mixETH.balanceOf(alice);
         vm.prank(alice);
         stakerV.claimFees(101);
-        assertEq(mixETH.balanceOf(alice) - aliceMixBefore, 50e18 + 50e18);
+        assertEq(mixETH.balanceOf(alice), 50e18 + expA);
+        vm.prank(bob);
+        stakerV.claimFees(202);
+        assertEq(mixETH.balanceOf(bob), 50e18 + expB);
     }
 
     // ── lifecycle gates ──
 
     function test_WithdrawGating() public {
         vm.prank(alice);
-        stakerV.requestWithdraw(101);
+        stakerV.requestWithdraw(101); // r=2
+        assertEq(stakerV.withdrawableAt(101), 8 * EPOCH);
+
         vm.prank(alice);
         vm.expectRevert(PSPStaker.VestNotComplete.selector);
         stakerV.withdraw(101);
 
-        vm.warp(block.timestamp + VEST);
+        vm.warp(8 * EPOCH); // first instant it unlocks
         uint256 pspBefore = pspToken.balanceOf(alice);
         vm.prank(alice);
         stakerV.withdraw(101);
         assertEq(pspToken.balanceOf(alice) - pspBefore, 1000e18);
-        (uint256 amt,,,,) = stakerV.positions(101);
+        (uint256 amt,,,,,,,) = stakerV.positions(101);
         assertEq(amt, 0);
-        assertEq(stakerV.ownerOf(101), alice, "NFT kept as proof");
+        assertEq(stakerV.ownerOf(101), alice, "NFT kept as husk");
 
-        // husk re-stakeable via stakeFor
-        vm.prank(alice);
-        pspToken.approve(address(stakerV), type(uint256).max);
+        // husk re-stakeable
         vm.prank(alice);
         stakerV.stakeFor(alice, 101, 5e18);
-        (uint256 amt2,,,,) = stakerV.positions(101);
+        (uint256 amt2,,,,,,,) = stakerV.positions(101);
         assertEq(amt2, 5e18);
     }
 
@@ -174,21 +204,35 @@ uint256 e101 = 1000e18 * 75e18;
     }
 
     function test_CancelRestoresFullPower() public {
-        uint256 t0 = block.timestamp;
         vm.prank(alice);
-        stakerV.requestWithdraw(101);
-        vm.warp(t0 + 7 days);
+        stakerV.requestWithdraw(101); // r=2
+        vm.warp(t0 + 1 * EPOCH); // epoch 3: alice k=1
+        assertEq(stakerV.biasOf(101, block.timestamp), _wAt(1000e18, 1));
+
         vm.prank(alice);
         stakerV.cancelWithdraw(101);
-        assertEq(stakerV.biasOf(101, block.timestamp), 1000e18);
-        assertApproxEqAbs(stakerV.totalWeight(), 2000e18, 1e7);
+        // documented quirk: the cancel epoch itself is forfeit (re-anchored),
+        // full power returns at the next boundary
+        assertEq(stakerV.biasOf(101, block.timestamp), 0, "cancel epoch forfeit");
+
+        vm.warp(t0 + 2 * EPOCH); // epoch 4
+        assertEq(stakerV.biasOf(101, block.timestamp), 1000e18, "restored");
+        assertEq(stakerV.totalWeight(), 2000e18, "aggregate restored");
+    }
+
+    function test_CancelSameEpoch() public {
+        vm.prank(alice);
+        stakerV.requestWithdraw(101);
+        vm.prank(alice);
+        stakerV.cancelWithdraw(101);
+        vm.warp(t0 + 1 * EPOCH);
+        assertEq(stakerV.biasOf(101, block.timestamp), 1000e18, "nothing ever decayed");
+        assertEq(stakerV.totalWeight(), 2000e18);
     }
 
     function test_StakeForRevertsWhileDecaying() public {
         vm.prank(alice);
         stakerV.requestWithdraw(101);
-        vm.prank(alice);
-        pspToken.approve(address(stakerV), type(uint256).max);
         vm.prank(alice);
         vm.expectRevert(PSPStaker.RequestActive.selector);
         stakerV.stakeFor(alice, 101, 1e18);
@@ -198,46 +242,99 @@ uint256 e101 = 1000e18 * 75e18;
 
     function test_MultiPepesAndClaimAll() public {
         vm.startPrank(alice);
-        stakerV.lock(250e18); // second pepe, sequential id
+        stakerV.lock(250e18); // second pepe, sequential id = 1, stakes at epoch 2
         vm.stopPrank();
         assertEq(stakerV.balanceOf(alice), 2);
 
-        _feedFees(75e18); // weights 1000+250 vs 1000 → alice total 60e18 (50+10)
-        uint256 exp101 = 1000e18 * 75e18;
-        exp101 /= 2250e18;
-        assertApproxEqAbs(stakerV.pendingFeesOf(101), exp101, 1e15);
-        assertEq(stakerV.pendingFeesOf(2), 10e18);
+        vm.warp(t0 + 1 * EPOCH); // epoch 3: all three live
+        _feedFees(75e18); // weights 1000 + 1000 + 250
 
-        uint256 before = mixETH.balanceOf(alice);
+        vm.warp(t0 + 2 * EPOCH); // epoch 4: closed
+        uint256 exp101 = (uint256(75e18) * 1000e18) / 2250e18;
+        uint256 exp1 = (uint256(75e18) * 250e18) / 2250e18;
+        assertEq(stakerV.pendingFeesOf(101), exp101);
+        assertEq(stakerV.pendingFeesOf(1), exp1);
+
         uint256[] memory ids = new uint256[](2);
         ids[0] = 101;
-        ids[1] = 2;
+        ids[1] = 1;
         vm.prank(alice);
         stakerV.claimAllTo(ids, alice);
-        assertEq(mixETH.balanceOf(alice) - before, 60e18);
+        assertEq(mixETH.balanceOf(alice), exp101 + exp1);
     }
 
     // ── vote weights: propose-time snapshot semantics ──
 
     function test_VoteWeightSnapshot() public {
-        uint256 t0 = block.timestamp;
         vm.prank(alice);
-        stakerV.requestWithdraw(101); // pre-propose decay
-        uint256 propose = t0 + 1;
-        // weight at propose: bias(propose) = full (decay starts at t0, 1s in)
-        uint256 w = stakerV.voteWeight(alice, propose);
-        assertApproxEqAbs(w, 1000e18, 1e15);
+        stakerV.requestWithdraw(101); // r=2
+        uint256 propose = t0 + 1; // still epoch 2 → full weight
+        assertEq(stakerV.voteWeight(alice, propose), 1000e18);
 
-        // warp 21d: weight evaluated AT propose stays ~1000 (snapshot), live decays
-        vm.warp(t0 + 21 days);
-        assertApproxEqAbs(stakerV.voteWeight(alice, propose), 1000e18, 1e15);
-        assertEq(stakerV.biasOf(101, block.timestamp), 500e18);
+        vm.warp(t0 + 3 * EPOCH); // epoch 5
+        assertEq(stakerV.voteWeight(alice, propose), 1000e18, "snapshot frozen at propose");
+        assertEq(stakerV.biasOf(101, block.timestamp), _wAt(1000e18, 3));
 
         // post-propose action excluded: bob tops up AFTER propose
-        vm.startPrank(bob);
         vm.warp(propose + 1);
+        vm.prank(bob);
         stakerV.stakeFor(bob, 202, 1e18);
-        vm.stopPrank();
         assertEq(stakerV.voteWeight(bob, propose), 0);
+    }
+
+    // ── dust: amounts not divisible by 6 still hit exactly zero ──
+
+    function test_DustRounding() public {
+        vm.startPrank(alice);
+        stakerV.lockWithPepe(1003e18, 303); // stakes at epoch 2
+        vm.stopPrank();
+        vm.warp(t0 + 1 * EPOCH); // epoch 3: live
+
+        vm.prank(alice);
+        stakerV.requestWithdraw(303); // r=3
+        assertEq(stakerV.biasOf(303, block.timestamp), 1003e18, "full at request");
+
+        vm.warp(t0 + 7 * EPOCH); // epoch 9: k=6
+        assertEq(stakerV.biasOf(303, block.timestamp), 0, "dust-safe zero");
+        assertEq(stakerV.totalWeight(), 2000e18, "global clean");
+    }
+
+    // ── sparse replay: fees across a quiet gap, single claim at the end ──
+
+    function test_SparseReplayAcrossGap() public {
+        _feedFees(60e18); // epoch 2
+        vm.warp(t0 + 4 * EPOCH); // epoch 6 — three silent epochs
+        _feedFees(120e18); // epoch 6
+        vm.warp(t0 + 5 * EPOCH); // epoch 7
+
+        assertEq(stakerV.pendingFeesOf(101), 90e18, "60*1/2 + 120*1/2");
+        assertEq(stakerV.pendingFeesOf(202), 90e18);
+
+        vm.prank(alice);
+        stakerV.claimFees(101);
+        assertEq(mixETH.balanceOf(alice), 90e18);
+    }
+
+    // ── genesis share claims carry their fee share ──
+
+    function test_GenesisShareFees() public {
+        vm.startPrank(address(controller));
+        stakerV.lockGenesis(2000e18); // stakes at epoch 2 like everyone
+        vm.stopPrank();
+
+        vm.warp(t0 + 1 * EPOCH); // epoch 3: genesis + alice + bob live (4000 total)
+        _feedFees(100e18); // genesis half = 50e18
+
+        vm.warp(t0 + 2 * EPOCH); // epoch 4: closed
+        uint256 genesisCut = (uint256(100e18) * 2000e18) / 4000e18;
+
+        uint256 mixBefore = mixETH.balanceOf(alice);
+        vm.prank(address(controller));
+        stakerV.claimGenesisShare(alice, 500e18); // 1/4 of genesis → 1/4 of its cut
+
+        assertEq(mixETH.balanceOf(alice) - mixBefore, genesisCut * 500e18 / 2000e18);
+        (uint256 amt,,,,,,,) = stakerV.positions(1);
+        assertEq(amt, 500e18, "fresh pepe carries the share");
+        assertEq(stakerV.ownerOf(1), alice);
     }
 }

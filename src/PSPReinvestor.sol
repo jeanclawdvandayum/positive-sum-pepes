@@ -48,7 +48,7 @@ contract PSPReinvestor {
         address owner = staker.ownerOf(pepeId);
         // fail fast: stakeFor reverts on a decaying position (RequestActive) —
         // surface that BEFORE the claim+buy legs run
-        if (staker.positions(pepeId).requestTime != 0) revert NothingToReinvest();
+        if (staker.positions(pepeId).requestEpoch != 0) revert NothingToReinvest();
 
         uint256 mixBefore = mix.balanceOf(address(this));
         staker.claimFeesTo(pepeId, address(this));
@@ -88,7 +88,7 @@ contract PSPReinvestor {
         uint256 totalShare;
         for (uint256 i; i < pepeIds.length; ++i) {
             IPSPStaker.PositionView memory pos = staker.positions(pepeIds[i]);
-            if (pos.requestTime != 0) revert NothingToReinvest();
+            if (pos.requestEpoch != 0) revert NothingToReinvest();
             totalShare += pos.amount;
         }
         if (totalShare == 0) revert NothingToReinvest();

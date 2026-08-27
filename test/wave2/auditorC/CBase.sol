@@ -94,7 +94,9 @@ contract CBase is Test {
         controller1.claimPredepositPSP();
         vm.prank(bob);
         controller1.claimPredepositPSP();
-        vm.warp(block.timestamp + 1); // locks strictly predate the proposal (M-1)
+        // locks strictly predate the proposal (M-1) AND fresh claims go live
+        // at the next epoch boundary (epoch-point liveness)
+        vm.warp(((block.timestamp / 7 days) + 1) * 7 days + 1);
     }
 
     /// @dev Governance: propose + 100% yes votes, past the voting window.

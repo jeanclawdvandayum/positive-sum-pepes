@@ -83,7 +83,7 @@ a{color:var(--acc)}
 "use strict";
 // factory address is injected at deploy (vm.replace __FACTORY__)
 var FACTORY="__FACTORY__";
-var SEL={cur:"0x9cbe5efd",rounds:"0x8c65c81f",pstate:"0xa81c1eed",pdep:"0xaed1af6b",claim:"0x6989bb72",launch:"0x2ffc07fe",dep:"0xf2a89c35",getPSP:"0x345634ce",locks:"0x5de9a137",appr:"0x095ea7b3",bal:"0x70a08231",allow:"0xdd62ed3e",sym:"0x95d89b41",mixETH:"0x762d8140",name:"0x06fdde03",fees:"0xd294f093"};
+var SEL={cur:"0x9cbe5efd",rounds:"0x8c65c81f",pstate:"0xa81c1eed",pdep:"0xaed1af6b",claim:"0x6989bb72",launch:"0x2ffc07fe",dep:"0xf2a89c35",getPSP:"0x345634ce",staker:"0x5ebaf1db",staked:"0xb2f160fb",appr:"0x095ea7b3",bal:"0x70a08231",allow:"0xdd62ed3e",sym:"0x95d89b41",mixETH:"0x762d8140",name:"0x06fdde03",fees:"0xd294f093"};
 var RPC={8453:"https://mainnet.base.org",84532:"https://sepolia.base.org",1:"https://eth.llamarpc.com",11155111:"https://ethereum-sepolia-rpc.publicnode.com"};
 var acct=null,cid=null,MIX=null,sel={id:0,tok:"",ctl:"",hk:"",name:"",sym:"",psp:""};
 var $=function(i){return document.getElementById(i)};
@@ -167,9 +167,9 @@ async function refresh(){
       var psp="0x"+raw(await callRaw(sel.ctl,SEL.getPSP)).slice(24,64);
       sel.psp=psp;
       var wal=n16(await callRaw(psp,SEL.bal+pad(acct)));
-      var l=raw(await callRaw(sel.ctl,SEL.locks+pad(acct)));
-      var lk=n16(l.slice(0,64)),ul=n16(l.slice(192,256)); // LockInfo: amount,rewardDebt,lockTime,unlockTime
-      $("upsp").textContent=fmt(wal)+" free · "+fmt(lk)+" locked"+(lk>0n&&ul>BigInt(Math.floor(Date.now()/1000))?" → "+new Date(Number(ul)*1000).toLocaleDateString():"");
+      var stk="0x"+raw(await callRaw(sel.ctl,SEL.staker)).slice(24,64);
+      var lk=stk!="0x0000000000000000000000000000000000000000"?n16(await callRaw(stk,SEL.staked+pad(acct))):0n; // stakedTotalOf(acct)
+      $("upsp").textContent=fmt(wal)+" free · "+fmt(lk)+" locked";
       $("headroom").textContent="headroom "+fmt(cap>total?cap-total:0n)+" mixETH";
       $("claimCard").style.display=amt>0n&&!claimed&&!sel.dead?"":"none";
       $("depCard").style.display=!closed&&!sel.dead?"":"none";

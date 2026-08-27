@@ -89,7 +89,9 @@ abstract contract BBase is Test {
         controller.launchPooledBuy();
         vm.prank(alice);
         controller.claimPredepositPSP(); // auto-locks genesis PSP
-        skip(1);
+        // fresh claims earn/vote from the NEXT epoch boundary (epoch-point
+        // liveness) — warp past it before any propose
+        skip((((block.timestamp / 7 days) + 1) * 7 days + 1) - block.timestamp);
     }
 
     /// @dev bob buys `amount` mixETH worth and locks (for governance quorum)
@@ -109,8 +111,10 @@ abstract contract BBase is Test {
     function _bomb() internal {
         // M-1 fix: vote weight must come from locks with lockTime < proposeTime.
         // All locks in this harness happen at the same warp instant as the
-        // proposal unless we advance — advance first.
-        skip(1);
+        // proposal unless we advance — advance first. Epoch-point liveness:
+        // locks made this epoch only carry weight NEXT epoch, so hop the
+        // boundary (+1s), not just +1s.
+        skip((((block.timestamp / 7 days) + 1) * 7 days + 1) - block.timestamp);
         vm.prank(alice);
         controller.proposeCarpetBomb();
         vm.prank(alice);

@@ -6,10 +6,13 @@ pragma solidity 0.8.26;
 interface IPSPStaker {
     struct PositionView {
         uint256 amount;
-        uint256 rewardDebt;
-        uint256 requestTime;
+        uint256 startEpoch;
+        uint256 requestEpoch; // 0 = indefinitely locked (reinvestable)
+        uint256 settledEpoch;
+        uint256 settledW;
+        uint256 settledSlope;
+        uint256 feesPaid;
         uint256 actionTime;
-        uint256 dayCursor;
     }
 
     function ownerOf(uint256 pepeId) external view returns (address);

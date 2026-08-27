@@ -15,7 +15,7 @@ import { useEthUsd } from '../lib/useEthUsd'
 export interface PepeEntry {
   id: bigint
   amount: bigint
-  requestTime: bigint
+  requestEpoch: bigint
 }
 
 type CardStep = 'idle' | 'tx' | 'done'
@@ -59,17 +59,20 @@ export function PepeCard({
     return () => clearInterval(t)
   }, [])
 
-  const { id, amount, requestTime } = entry
-  const decaying = requestTime > 0n
-  const vestEnd = requestTime > 0n && vest ? Number(requestTime + vest) : undefined
+  const { id, amount, requestEpoch } = entry
+  const epoch = vest ? vest / 6n : undefined // VEST_EPOCHS = 6 in the staker
+  const decaying = requestEpoch > 0n
+  const vestEnd = decaying && epoch ? Number((requestEpoch + 6n) * epoch) : undefined // (r+6)·epochSize
   const decayed = vestEnd !== undefined && now >= vestEnd
-  const elapsed = vest ? requestTime > 0n ? BigInt(now) - requestTime : 0n : 0n
-  const powerLeft =
-    !decaying || !vest
-      ? undefined
-      : elapsed >= vest
-        ? 0
-        : Number((amount - (amount * elapsed) / vest) * 10000n / amount) / 100
+  // stepped power mirror: weight(k) = base - k·slope, k = epochs past request
+  const powerLeft = !decaying || !epoch ? undefined : now >= vestEnd! ? 0 : (() => {
+    const k = BigInt(Math.floor(now / Number(epoch))) - requestEpoch
+    if (k >= 6n) return 0
+    const base = amount - (amount % 6n)
+    const slope = base / 6n
+    const w = base - k * slope
+    return Number((w * 10000n) / amount) / 100
+  })()
 
   const valueMix = round.marginalPrice ? (amount * round.marginalPrice) / 10n ** 18n : undefined
   const valueUsd = valueMix !== undefined && ethUsd ? (Number(valueMix) / 1e18) * ethUsd : undefined

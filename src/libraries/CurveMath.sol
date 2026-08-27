@@ -533,8 +533,10 @@ library CurveMath {
         uint256 vote
     ) internal pure returns (uint256) {
         if (predeposit >= (1 << 51) || vest >= (1 << 51) || vote >= (1 << 51)) revert TimingsOverflow();
+        if (vest % 6 != 0) revert VestNotEpochal(); // staker splits the vest into 6 decay epochs
         return predeposit | (vest << 51) | (vote << 102);
     }
 
     error TimingsOverflow();
+    error VestNotEpochal();
 }

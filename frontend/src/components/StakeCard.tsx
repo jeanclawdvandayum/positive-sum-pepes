@@ -82,9 +82,9 @@ export default function StakeCard() {
   const entries: PepeEntry[] = useMemo(() => {
     const out: PepeEntry[] = []
     for (let i = 0; i < ids.length; i++) {
-      const pos = detailReads.data?.[i * 2]?.result as [bigint, bigint, bigint, bigint, bigint] | undefined
+      const pos = detailReads.data?.[i * 2]?.result as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint] | undefined
       if (!pos) continue
-      out.push({ id: ids[i], amount: pos[0], requestTime: pos[2] })
+      out.push({ id: ids[i], amount: pos[0], requestEpoch: pos[2] })
     }
     return out
   }, [ids, detailReads.data])
@@ -101,7 +101,7 @@ export default function StakeCard() {
   const totalValueMix = round.marginalPrice ? (totalStaked * round.marginalPrice) / 10n ** 18n : undefined
   const totalValueUsd = totalValueMix !== undefined && ethUsd ? (Number(totalValueMix) / 1e18) * ethUsd : undefined
   const totalPending = [...pendings.values()].reduce<bigint>((a, p) => a + (p ?? 0n), 0n)
-  const stakeableIds = entries.filter((e) => e.requestTime === 0n && e.amount > 0n).map((e) => e.id)
+  const stakeableIds = entries.filter((e) => e.requestEpoch === 0n && e.amount > 0n).map((e) => e.id)
 
   const refresh = () => setPepeKey((k) => k + 1)
 

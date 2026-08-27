@@ -83,7 +83,9 @@ contract AuditorBase is Test {
     function _claim(address who) internal {
         vm.prank(who);
         controller.claimPredepositPSP();
-        vm.warp(block.timestamp + 1);
+        // fresh claims earn/vote from the NEXT epoch boundary (epoch-point
+        // liveness) — warp past it before any propose
+        vm.warp(((block.timestamp / 7 days) + 1) * 7 days + 1);
     }
 
     /// @dev `proposer` proposes + votes yes, window passes, bomb executes
