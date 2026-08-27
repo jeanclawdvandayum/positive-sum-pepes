@@ -1,5 +1,5 @@
 import { http, cookieStorage, createStorage } from 'wagmi'
-import { base, mainnet } from 'wagmi/chains'
+import { base, mainnet, sepolia } from 'wagmi/chains'
 import { defineChain } from 'viem'
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 
@@ -14,13 +14,25 @@ const anvil = defineChain({
 
 export const CHAIN_ID = Number(env.VITE_CHAIN_ID || 8453)
 
-const targetChain = CHAIN_ID === 31337 ? anvil : CHAIN_ID === 1 ? mainnet : base
+const targetChain =
+  CHAIN_ID === 31337
+    ? anvil
+    : CHAIN_ID === 1
+      ? mainnet
+      : CHAIN_ID === 11155111
+        ? sepolia
+        : base
 
 export const ADDRESSES = {
   factory: (env.VITE_FACTORY || '0x') as `0x${string}`,
   zapIn: (env.VITE_ZAP_IN || '0x') as `0x${string}`,
   zapOut: (env.VITE_ZAP_OUT || '0x') as `0x${string}`,
+  mix: (env.VITE_MIX || '0x') as `0x${string}`,
+  faucet: (env.VITE_FAUCET || '0x') as `0x${string}`,
 }
+
+/// testnet faucet UI is env-gated: hidden unless both addresses are configured.
+export const FAUCET_ENABLED = Boolean(env.VITE_MIX && env.VITE_FAUCET)
 
 export const wagmiConfig = getDefaultConfig({
   appName: 'Positive Sum Pepes',

@@ -1,7 +1,11 @@
+import { useMemo, useState } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { NavLink } from 'react-router-dom'
-import { useMemo } from 'react'
+import { useAccount, useWriteContract } from 'wagmi'
+import { parseEther } from 'viem'
 import { renderPepeSvg, randomDna } from '../lib/pepeRender'
+import { ADDRESSES, FAUCET_ENABLED } from '../lib/config'
+import { faucetAbi } from '../lib/abi'
 import ThemeSwitcher from './ThemeSwitcher'
 
 const links = [
@@ -42,6 +46,7 @@ export default function Topbar() {
           ))}
         </nav>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {FAUCET_ENABLED && <FaucetButton />}
           <ThemeSwitcher />
           <div className="scale-90 sm:scale-100">
             <ConnectButton showBalance={false} chainStatus="icon" />
@@ -49,5 +54,43 @@ export default function Topbar() {
         </div>
       </div>
     </header>
+  )
+}
+
+/// compact testnet faucet: one drip per click — pay 0.0001 ETH, receive 100 mixETH
+function FaucetButton() {
+  const { isConnected } = useAccount()
+  const [step, setStep] = useState<'idle' | 'tx' | 'done'>('idle')
+  const { writeContractAsync } = useWriteContract()
+
+  async function drip() {
+    try {
+      setStep('tx')
+      await writeContractAsync({
+        address: ADDRESSES.faucet,
+        abi: faucetAbi,
+        functionName: 'drip',
+        value: parseEther('0.0001'),
+      })
+      setStep('done')
+      setTimeout(() => setStep('idle'), 2500)
+    } catch {
+      setStep('idle')
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      title="faucet · 100 mixETH per 0.0001 ETH"
+      disabled={!isConnected}
+      onClick={drip}
+      className={`inline-flex h-7 items-center gap-1 rounded-full border border-emerald-200 bg-white px-2.5 text-xs font-bold text-psp-deep transition active:scale-[0.98] hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-40 ${
+        step === 'done' ? 'text-emerald-600' : ''
+      }`}
+    >
+      {step === 'done' ? '✅' : step === 'tx' ? '💧…' : '💧'}
+      <span className="hidden lg:inline">{step === 'done' ? 'dripped' : step === 'tx' ? 'confirming' : 'faucet'}</span>
+    </button>
   )
 }

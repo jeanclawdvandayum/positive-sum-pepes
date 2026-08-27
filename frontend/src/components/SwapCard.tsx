@@ -5,6 +5,7 @@ import { rpcCall } from '../lib/rpc'
 import { ADDRESSES } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
 import { fmtAmount, parseAmountToWad } from '../lib/format'
+import MixLogo from './MixLogo'
 
 type PayToken = 'ETH' | 'MIX'
 type Side = 'buy' | 'sell'
@@ -450,7 +451,13 @@ function TokenPicker({
             value === o ? 'bg-gradient-to-r from-sky-400 to-emerald-400 text-[#fff]' : 'text-slate-400'
           }`}
         >
-          {o === 'MIX' ? '🌊 mix' : 'Ξ ETH'}
+          {o === 'MIX' ? (
+            <>
+              <MixLogo px={18} /> mix
+            </>
+          ) : (
+            'Ξ ETH'
+          )}
         </button>
       ))}
     </div>

@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useAccount, useReadContracts, useWriteContract } from 'wagmi'
-import { controllerAbi, erc20Abi, stakerAbi } from '../lib/abi'
+import { parseEther } from 'viem'
+import { ADDRESSES, FAUCET_ENABLED } from '../lib/config'
+import { controllerAbi, erc20Abi, faucetAbi, stakerAbi } from '../lib/abi'
 import { useRound, useBalances } from '../lib/useRound'
 import { fmtAmount, fmtCountdown, parseAmountToWad } from '../lib/format'
+import MixLogo from './MixLogo'
 import PepePanel from './PepePanel'
 import PepePicker from './PepePicker'
 
@@ -125,6 +128,26 @@ export default function StakeCard() {
 
   const submitFn = hasPepe ? 'lock' : 'lockWithPepe'
 
+  /// testnet-only: one drip per click — pay 0.0001 ETH, receive 100 mixETH
+  const [dripStep, setDripStep] = useState<'idle' | 'tx' | 'done'>('idle')
+  async function drip() {
+    setError(null)
+    try {
+      setDripStep('tx')
+      await writeContractAsync({
+        address: ADDRESSES.faucet,
+        abi: faucetAbi,
+        functionName: 'drip',
+        value: parseEther('0.0001'),
+      })
+      setDripStep('done')
+      setTimeout(() => setDripStep('idle'), 2500)
+    } catch (e) {
+      setError(e instanceof Error ? e.message.slice(0, 140) : 'transaction failed')
+      setDripStep('idle')
+    }
+  }
+
   return (
     <div className="card p-5">
       <h2 className="text-lg font-black text-slate-900">💎 stake PSP</h2>
@@ -220,6 +243,23 @@ export default function StakeCard() {
         </button>
       </div>
 
+      {FAUCET_ENABLED && (
+        <div className="mt-3 flex items-center justify-between rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 px-4 py-2">
+          <MixLogo className="mr-3 shrink-0 text-[1.6em]" />
+          <div className="flex-1">
+            <div className="text-xs font-black text-slate-700">faucet</div>
+            <div className="text-[11px] font-bold text-slate-400">100 mixETH per 0.0001 ETH</div>
+          </div>
+          <button
+            className="btn-ghost ml-3 shrink-0"
+            disabled={!isConnected || busy}
+            onClick={drip}
+          >
+            {dripStep === 'done' ? '✅' : dripStep === 'tx' ? 'confirm…' : '💧 get mixETH'}
+          </button>
+        </div>
+      )}
+
       <div className="mt-4 rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 to-sky-50 p-4">
         <div className="flex items-center justify-between">
           <div>
@@ -227,7 +267,7 @@ export default function StakeCard() {
               staking rewards
             </div>
             <div className="text-xl font-black text-emerald-600">
-              {fmtAmount(pending, 4)} <span className="text-sm">mixETH</span>
+              {fmtAmount(pending, 4)} <MixLogo /> <span className="text-sm">mixETH</span>
             </div>
           </div>
           <button

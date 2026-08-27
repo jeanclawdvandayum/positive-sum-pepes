@@ -104,6 +104,11 @@ export const zapOutAbi = parseAbi([
   'function sellToMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 pspIn, uint256 minMixOut, uint256 deadline) returns (uint256)',
 ])
 
+/// MixETHFaucet — testnet-only: pay multiples of 0.0001 ETH, receive 100 mixETH each.
+export const faucetAbi = parseAbi([
+  'function drip() payable',
+])
+
 /// Uniswap V4 PoolKey the factory initializes: dynamic-fee flag + tickSpacing 60.
 export function buildPoolKey(mix: Address, psp: Address, hooks: Address) {
   const [c0, c1] = [mix, psp].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())) as Address[]

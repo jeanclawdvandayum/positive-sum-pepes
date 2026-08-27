@@ -3,6 +3,7 @@ import { usePublicClient } from 'wagmi'
 import { parseAbiItem } from 'viem'
 import { useRound } from '../lib/useRound'
 import { fmtAmount, fmtPrice } from '../lib/format'
+import MixLogo from './MixLogo'
 
 interface Trade {
   block: bigint
@@ -96,7 +97,9 @@ export default function StatsPanel() {
         <h3 className="text-xs font-black uppercase tracking-wide text-slate-400">volume</h3>
         <div className="mt-1 text-2xl font-black text-slate-900">
           {fmtAmount(BigInt(Math.round(stats.volume * 1e18)))}
-          <span className="ml-1 text-sm font-bold text-slate-400">mixETH</span>
+          <span className="ml-1 inline-flex items-center gap-1 text-sm font-bold text-slate-400">
+            <MixLogo px={20} /> mixETH
+          </span>
         </div>
         <div className="mt-2 text-xs font-bold text-slate-400">
           {stats.count} trades all-time this round
@@ -159,7 +162,9 @@ export default function StatsPanel() {
         </h3>
         <div className="mt-1 text-2xl font-black text-slate-900">
           {fmtAmount(fees)}
-          <span className="ml-1 text-sm font-bold text-slate-400">mixETH</span>
+          <span className="ml-1 inline-flex items-center gap-1 text-sm font-bold text-slate-400">
+            <MixLogo /> mixETH
+          </span>
         </div>
         <div className="mt-2 text-xs font-bold text-slate-400">
           4.5% → stakers on every trade · 0.5% → referrals

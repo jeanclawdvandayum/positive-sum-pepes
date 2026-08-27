@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { PixelIcon } from '../components/PixelIcon'
+import MixLogo from '../components/MixLogo'
 import { useRound } from '../lib/useRound'
 import { fmtAmount, fmtPrice } from '../lib/format'
 
@@ -78,7 +80,14 @@ export default function Landing() {
             </Link>
           </div>
           <div className="mx-auto mt-10 grid max-w-2xl grid-cols-3 gap-2 sm:gap-4">
-            <HeroStat label="reserve" value={`${fmtAmount(round.reserve)} mix`} />
+            <HeroStat
+              label="reserve"
+              value={
+                <>
+                  {fmtAmount(round.reserve)} <MixLogo /> mix
+                </>
+              }
+            />
             <HeroStat label="supply" value={`${fmtAmount(round.supply)} PSP`} />
             <HeroStat label="price" value={`${fmtPrice(round.marginalPrice)}`} />
           </div>
@@ -147,7 +156,7 @@ export default function Landing() {
   )
 }
 
-function HeroStat({ label, value }: { label: string; value: string }) {
+function HeroStat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-2xl bg-white/80 px-3 py-3 shadow-sm backdrop-blur">
       <div className="text-lg font-black text-slate-900 sm:text-2xl">{value}</div>
