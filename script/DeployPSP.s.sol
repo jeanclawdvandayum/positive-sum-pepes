@@ -82,8 +82,20 @@ contract DeployPSP is Script {
     // on-chain 2026-08-18 via eth_getCode — 24009 bytes each)
     address constant PM_SEPOLIA = 0xE03A1074c86CFeDd5C142C4F04F1a1536e203543;      // 11155111
     address constant PM_BASE_SEPOLIA = 0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408; // 84532
-    address constant PM_ARB_SEPOLIA = 0xFB3e0C6F74eB1a21CC1Da29aeC80D2Dfe6C9a317;  // 421614
+    address constant PM_ARB_SEPOLIA = 0xFB3e0C6f74eB1a21CC1Da29aeC80D2Dfe6C9a317;  // 421614
     address constant PM_UNICHAIN_SEPOLIA = 0x9cB26A7183B2F4515945Dc52CB4195B0d2D06C95; // 1301
+
+    // Base Sepolia (84532) v4 periphery — scoopy's table, code-verified
+    // 2026-08-28 via publicnode + sepolia.base.org + drpc:
+    //   Universal Router  0x492e6456d9528771018deb9e87ef7750ef184104 (19,540 B)
+    //   PositionManager   0x4b2c77d209d3405f41a037ec6c77f7f5b8e2ca80 (23,877 B)
+    //   StateView         0x571291b572ed32ce6751a2cb2486ebee8defb9b4  (3,531 B)
+    //   Quoter            0x4a6513c898fe1b2d0e78d3b0e0a4a151589b1cba  (5,820 B)
+    //   PoolSwapTest      0x8b5bcc363dde2614281ad875bad385e0a785d3b9  (6,950 B)
+    //   PoolModifyLiqTest 0x37429cd17cb1454c34e7f50b09725202fd533039  (6,050 B)
+    //   Permit2           0x000000000022D473030F116dDEE9F6B43aC78BA3  (9,152 B)
+    //   ReservesLens      0x0000001b173C3bbF3984D417d8614E3eed34865B — NOT
+    //   DEPLOYED on 84532 (0 bytes on three RPCs; unused by PSP anyway)
 
     /// @dev Packed playtest timing profile (see RoundController "Timing
     ///      profile"): predeposit window · unstake vest · bomb vote, all

@@ -1,5 +1,5 @@
 import { http, cookieStorage, createStorage } from 'wagmi'
-import { base, mainnet, sepolia } from 'wagmi/chains'
+import { base, baseSepolia, mainnet, sepolia } from 'wagmi/chains'
 import { defineChain } from 'viem'
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 
@@ -21,7 +21,9 @@ const targetChain =
       ? mainnet
       : CHAIN_ID === 11155111
         ? sepolia
-        : base
+        : CHAIN_ID === 84532
+          ? baseSepolia
+          : base
 
 export const ADDRESSES = {
   factory: (env.VITE_FACTORY || '0x') as `0x${string}`,
@@ -35,8 +37,17 @@ export const ADDRESSES = {
 /// testnet faucet UI is env-gated: hidden unless both addresses are configured.
 export const FAUCET_ENABLED = Boolean(env.VITE_MIX && env.VITE_FAUCET)
 
-/// external PoW faucet for sepolia ETH itself (linked from onboarding UI).
-export const SEPOLIA_ETH_FAUCET_URL = 'https://sepolia-faucet.pk910.de/'
+/// external faucet for the chain's native ETH (linked from onboarding UI).
+/// ETH Sepolia: PoW faucet. Base Sepolia: Coinbase's official faucet
+/// (also accepts Alchemy's: https://www.alchemy.com/faucets/base-sepolia).
+export const NATIVE_ETH_FAUCET_URL =
+  CHAIN_ID === 84532
+    ? 'https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet'
+    : 'https://sepolia-faucet.pk910.de/'
+
+/// true when the connected chain is one of the supported testnets that needs
+/// a native-ETH faucet link in onboarding.
+export const TESTNET_ETH_FAUCET = CHAIN_ID === 11155111 || CHAIN_ID === 84532
 
 /// reinvest buttons are env-gated the same way.
 export const REINVEST_ENABLED = Boolean(env.VITE_REINVESTOR)

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAccount, useBalance, useWriteContract } from 'wagmi'
 import { controllerAbi, erc20Abi, zapInAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
-import { ADDRESSES, CHAIN_ID, FAUCET_ENABLED, SEPOLIA_ETH_FAUCET_URL } from '../lib/config'
+import { ADDRESSES, CHAIN_ID, FAUCET_ENABLED, NATIVE_ETH_FAUCET_URL, TESTNET_ETH_FAUCET } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
 import { fmtAmount, fmtCountdown, parseAmountToWad } from '../lib/format'
 import ReferralCard, { RefBanner } from '../components/ReferralCard'
@@ -323,17 +323,17 @@ export default function Predeposit() {
               )}
             </div>
 
-            {(FAUCET_ENABLED || CHAIN_ID === 11155111) && (
+            {(FAUCET_ENABLED || TESTNET_ETH_FAUCET) && (
               <div className="mt-3 space-y-2">
                 {FAUCET_ENABLED && <FaucetButton full />}
-                {CHAIN_ID === 11155111 && (
+                {TESTNET_ETH_FAUCET && (
                   <a
-                    href={SEPOLIA_ETH_FAUCET_URL}
+                    href={NATIVE_ETH_FAUCET_URL}
                     target="_blank"
                     rel="noreferrer"
                     className="btn-ghost w-full"
                   >
-                    get sepolia ETH ↗
+                    get {CHAIN_ID === 84532 ? 'base ' : ''}sepolia ETH ↗
                   </a>
                 )}
               </div>

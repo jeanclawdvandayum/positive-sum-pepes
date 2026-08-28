@@ -35,6 +35,10 @@ staircase with 44x headroom — fork dry-run verified.**
 
 **2026-08-28 CHAIN DECISION: testnet moves to Base Sepolia (scoopy).** Round
 2 = PSP_CURVE=0 full staircase, PM 0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408.
+Full code-verified v4 periphery table recorded in script/DeployPSP.s.sol
+(ReservesLens is NOT deployed on 84532 — 0 bytes on three RPCs). Frontend
+wired for 84532 (baseSepolia chain, Coinbase faucet link; testnet deployers:
+PSP_PM=0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408 PSP_CURVE=0).
 
 **2026-08-28 MAINNET VERDICT: no such wall exists there.** Mainnet has no
 per-tx cap (a tx may consume the whole block) and the block limit is 60M
