@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useAccount, useReadContracts, useWriteContract } from 'wagmi'
+import { useAccount, useWriteContract } from 'wagmi'
 import { parseEther } from 'viem'
 import { ADDRESSES, FAUCET_ENABLED, REINVEST_ENABLED } from '../lib/config'
 import { controllerAbi, erc20Abi, faucetAbi, stakerAbi, reinvestorAbi, buildPoolKey } from '../lib/abi'
 import { useRound, useBalances } from '../lib/useRound'
-import { fmtAmount, parseAmountToWad } from '../lib/format'
+import { useRpcReads } from '../lib/useRpcReads'
+import { rpcCall } from '../lib/rpc'
+import { fmtAmount, fmtCountdown, parseAmountToWad } from '../lib/format'
 import MixLogo from './MixLogo'
 import PepePanel from './PepePanel'
 import PepePicker from './PepePicker'
@@ -34,68 +36,89 @@ export default function StakeCard() {
   }, [])
 
   const ZERO = '0x0000000000000000000000000000000000000000' as const
-  const baseReads = useReadContracts({
-    contracts: [
-      { address: round.staker ?? ZERO, abi: stakerAbi, functionName: 'balanceOf', args: [address ?? ZERO] },
-      { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'VEST_DURATION' },
-      { address: round.token ?? ZERO, abi: erc20Abi, functionName: 'allowance', args: [address ?? ZERO, round.staker ?? ZERO] },
+  const baseResults = useRpcReads(
+    [
+      { to: round.staker, abi: stakerAbi, functionName: 'balanceOf', args: [address ?? ZERO] },
+      { to: round.controller, abi: controllerAbi, functionName: 'VEST_DURATION' },
+      { to: round.token, abi: erc20Abi, functionName: 'allowance', args: [address ?? ZERO, round.staker ?? ZERO] },
+      { to: round.staker, abi: stakerAbi, functionName: 'pendingFeesMixETH' },
+      { to: round.staker, abi: stakerAbi, functionName: 'epochSize' },
     ],
-    query: { enabled: !!address && !!round.staker && !!round.token, refetchInterval: 6000 },
-  })
-  const apprReads = useReadContracts({
-    contracts: [
-      { address: round.staker ?? ZERO, abi: stakerAbi, functionName: 'isApprovedForAll', args: [address ?? ZERO, ADDRESSES.reinvestor] },
+    !!address && !!round.staker && !!round.token,
+  )
+  const apprResults = useRpcReads(
+    [
+      { to: round.staker, abi: stakerAbi, functionName: 'isApprovedForAll', args: [address ?? ZERO, ADDRESSES.reinvestor] },
     ],
-    query: { enabled: REINVEST_ENABLED && !!address && !!round.staker, refetchInterval: 6000 },
-  })
+    REINVEST_ENABLED && !!address && !!round.staker,
+  )
 
-  const count = baseReads.data?.[0]?.result as bigint | undefined
-  const vest = baseReads.data?.[1]?.result as bigint | undefined
-  const allowance = baseReads.data?.[2]?.result as bigint | undefined
-  const reinvestApproved = REINVEST_ENABLED ? (apprReads.data?.[0]?.result as boolean | undefined) : undefined
+  const count = baseResults[0] as bigint | undefined
+  const vest = baseResults[1] as bigint | undefined
+  const allowance = baseResults[2] as bigint | undefined
+  const feesInFlight = baseResults[3] as bigint | undefined
+  const epochSizeSec = baseResults[4] as bigint | undefined
+
+  /// current-epoch point — fees credited there are visible to pendingFeesOf
+  /// only after the epoch CLOSES; parked pendingFeesMixETH additionally needs
+  /// a fee-generating trade to attach. the banner covers both stages.
+  const epochSecNum = epochSizeSec !== undefined ? Number(epochSizeSec) : undefined
+  const curEpoch =
+    epochSecNum !== undefined && epochSecNum > 0
+      ? BigInt(Math.floor(Math.floor(Date.now() / 1000) / epochSecNum))
+      : undefined
+  const epochRes = useRpcReads(
+    [{ to: round.staker, abi: stakerAbi, functionName: 'points', args: [curEpoch ?? 0n] }],
+    curEpoch !== undefined && !!round.staker,
+  )
+  const epochFees = (epochRes[0] as [bigint, bigint, bigint, bigint] | undefined)?.[3]
+  const parked = feesInFlight ?? 0n
+  const attached = epochFees ?? 0n
+  const inPipe = parked + attached
+  const reinvestApproved = REINVEST_ENABLED ? (apprResults[0] as boolean | undefined) : undefined
 
   const n = count !== undefined ? Number(count) : 0
 
   // per-pepe reads: ids, positions, pendings
-  const idReads = useReadContracts({
-    contracts: Array.from({ length: n }, (_, i) => ({
-      address: round.staker ?? ZERO,
+  const idResults = useRpcReads(
+    Array.from({ length: n }, (_, i) => ({
+      to: round.staker,
       abi: stakerAbi,
-      functionName: 'tokenOfOwnerByIndex' as const,
-      args: [address ?? ZERO, BigInt(i)] as const,
+      functionName: 'tokenOfOwnerByIndex',
+      args: [address ?? ZERO, BigInt(i)],
     })),
-    query: { enabled: !!address && n > 0, refetchInterval: 6000 },
-  })
+    !!address && n > 0,
+  )
   const ids = useMemo(
-    () => (idReads.data ?? []).map((r) => r.result as bigint | undefined).filter((x): x is bigint => x !== undefined),
-    [idReads.data],
+    () => idResults.filter((x): x is bigint => x !== undefined),
+    [idResults],
   )
 
-  const detailReads = useReadContracts({
-    contracts: ids.flatMap((id) => [
-      { address: round.staker ?? ZERO, abi: stakerAbi, functionName: 'positions', args: [id] },
-      { address: round.staker ?? ZERO, abi: stakerAbi, functionName: 'pendingFeesOf', args: [id] },
+  const detailResults = useRpcReads(
+    ids.flatMap((id) => [
+      { to: round.staker, abi: stakerAbi, functionName: 'positions', args: [id] },
+      { to: round.staker, abi: stakerAbi, functionName: 'pendingFeesOf', args: [id] },
     ]),
-    query: { enabled: ids.length > 0, refetchInterval: 6000 },
-  })
+    ids.length > 0,
+  )
 
   const entries: PepeEntry[] = useMemo(() => {
     const out: PepeEntry[] = []
     for (let i = 0; i < ids.length; i++) {
-      const pos = detailReads.data?.[i * 2]?.result as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint] | undefined
+      const pos = detailResults[i * 2] as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint] | undefined
       if (!pos) continue
       out.push({ id: ids[i], amount: pos[0], requestEpoch: pos[2] })
     }
     return out
-  }, [ids, detailReads.data])
+  }, [ids, detailResults])
 
   const pendings = useMemo(() => {
     const m = new Map<bigint, bigint | undefined>()
     ids.forEach((id, i) => {
-      m.set(id, detailReads.data?.[i * 2 + 1]?.result as bigint | undefined)
+      m.set(id, detailResults[i * 2 + 1] as bigint | undefined)
     })
     return m
-  }, [ids, detailReads.data])
+  }, [ids, detailResults])
 
   const totalStaked = entries.reduce((a, e) => a + e.amount, 0n)
   const totalValueMix = round.marginalPrice ? (totalStaked * round.marginalPrice) / 10n ** 18n : undefined
@@ -128,7 +151,9 @@ export default function StakeCard() {
                 ? 'stake with this pepe'
                 : 'approve & stake'
             : approved
-              ? 'stake into a fresh pepe'
+              ? pickedId !== null
+                ? 'stake into the picked pepe'
+                : 'stake into a fresh pepe'
               : 'approve & stake'
 
   async function run(fn: 'lock' | 'lockWithPepe', needsApproval = false) {
@@ -153,6 +178,30 @@ export default function StakeCard() {
       setStep('done')
       setAmount('')
       setPickedId(null)
+      refresh()
+      setTimeout(() => setStep('idle'), 2500)
+    } catch (e) {
+      setError(e instanceof Error ? e.message.slice(0, 140) : 'transaction failed')
+      setStep('idle')
+    }
+  }
+
+  /// Hatch a fresh unstaked pepe — contract supports lock(0) for owners who
+  /// already hold pepes; the main button only offers amount > 0 stakes then.
+  async function hatch() {
+    setError(null)
+    try {
+      setStep('tx')
+      await writeContractAsync({
+        address: round.staker!,
+        abi: stakerAbi,
+        ...(pickedId !== null
+          ? { functionName: 'lockWithPepe' as const, args: [0n, pickedId] as const }
+          : { functionName: 'lock' as const, args: [0n] as const }),
+      })
+      setStep('done')
+      setPickedId(null)
+      setPickerSeed((s) => s + 1)
       refresh()
       setTimeout(() => setStep('idle'), 2500)
     } catch (e) {
@@ -228,10 +277,90 @@ export default function StakeCard() {
     }
   }
 
+  /// Unclaimed genesis share — the claim lives HERE now (the predeposit page
+  /// is a launch-phase view; post-launch users look for their PSP on stake).
+  /// Polls predeposits(address) once the curve is live; claiming mints a
+  /// fresh pepe with the share locked in.
+  const [myDep, setMyDep] = useState<{ mixETHAmount: bigint; claimed: boolean } | undefined>(undefined)
+  const [claimStep, setClaimStep] = useState<'idle' | 'tx' | 'done' | 'err'>('idle')
+  useEffect(() => {
+    if (!round.controller || !address || (round.mode ?? 0) < 1) return
+    let dead = false
+    const c = round.controller
+    const who = address
+    async function tick() {
+      try {
+        const d = (await rpcCall(c, controllerAbi, 'predeposits', [who])) as [bigint, boolean]
+        if (!dead) setMyDep({ mixETHAmount: d[0], claimed: d[1] })
+      } catch { /* keep last */ }
+    }
+    tick()
+    const iv = setInterval(tick, 6000)
+    return () => { dead = true; clearInterval(iv) }
+  }, [round.controller, round.mode, address])
+
+  async function claimGenesis() {
+    setError(null)
+    if (!round.controller) return
+    try {
+      setClaimStep('tx')
+      await writeContractAsync({
+        address: round.controller,
+        abi: controllerAbi,
+        functionName: 'claimPredepositPSP',
+      })
+      setClaimStep('done')
+      refresh()
+      setTimeout(() => setClaimStep('idle'), 2500)
+    } catch (e) {
+      setError(e instanceof Error ? e.message.slice(0, 140) : 'claim failed')
+      setClaimStep('idle')
+    }
+  }
+
+  const claimable = (round.mode ?? 0) >= 1 && myDep !== undefined && !myDep.claimed && myDep.mixETHAmount > 0n
+
+  /// epoch boundaries are exact multiples of epochSize in unix time
+  /// (staker._epoch = block.timestamp / epochSize) — countdown is exact.
+  const epochSizeNum = epochSizeSec !== undefined ? Number(epochSizeSec) : undefined
+  const nowUnix = Math.floor(Date.now() / 1000)
+  const untilBoundary =
+    epochSizeNum !== undefined && epochSizeNum > 0
+      ? (Math.floor(nowUnix / epochSizeNum) + 1) * epochSizeNum - nowUnix
+      : undefined
+
   const multiBusy = multiStep === 'tx'
 
   return (
     <div className="flex flex-col gap-5">
+      {claimable && (
+        <div className="card border-2 border-emerald-200 p-5">
+          <h2 className="flex items-center gap-1.5 text-lg font-black text-slate-900">
+            🐸 unclaimed genesis share
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            your predeposit ({fmtAmount(myDep!.mixETHAmount)} mixETH) has an unclaimed pro-rata PSP share
+            waiting — claiming mints a fresh pepe with the PSP locked in, earning fees from day one.
+          </p>
+          <button className="btn-primary mt-3 w-full" disabled={claimStep === 'tx' || busy} onClick={claimGenesis}>
+            {claimStep === 'done' ? '✅ claimed' : claimStep === 'tx' ? 'confirm in wallet…' : 'claim your genesis PSP'}
+          </button>
+        </div>
+      )}
+      {inPipe > 0n && (
+        <div className="card p-4">
+          <p className="text-xs font-bold text-slate-500">
+            ⏳ {fmtAmount(inPipe)} mixETH of swap fees in the fee engine
+            {parked > 0n
+              ? ' — waiting on the next fee-generating trade to attach to a weighted epoch'
+              : ' — credited to the current epoch'}
+            . the engine settles whole epochs: claimable right after the next boundary
+            {untilBoundary !== undefined ? ` (in ${fmtCountdown(untilBoundary)})` : ''}
+            {parked > 0n ? ', plus one trade to sweep it in' : ''}. nothing is lost while waiting —
+            fresh stakes also go live at boundaries.
+          </p>
+        </div>
+      )}
       <div className="card p-5">
         <h2 className="flex items-center gap-1.5 text-lg font-black text-slate-900">
           <PspIcon px={24} /> stake PSP
@@ -277,15 +406,13 @@ export default function StakeCard() {
           </div>
         )}
 
-        {!hasPepes && (
-          <div className="mt-3">
-            <PepePicker round={round} selected={pickedId} onSelect={setPickedId} seed={pickerSeed} onReroll={() => setPickerSeed((s) => s + 1)} />
-          </div>
-        )}
+        <div className="mt-3">
+          <PepePicker round={round} selected={pickedId} onSelect={setPickedId} seed={pickerSeed} onReroll={() => setPickerSeed((s) => s + 1)} />
+        </div>
 
         <div className="mt-3 rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
           <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-            <span>stake amount {hasPepes ? '(fresh pepe)' : ''}</span>
+            <span>stake amount {hasPepes ? (pickedId !== null ? '(picked pepe)' : '(fresh pepe)') : ''}</span>
             <span className="flex items-center gap-2">
               {!hasPepes && amountWad === 0n && <span className="text-emerald-500">0 = pepe only</span>}
               bal {fmtAmount(pspBal)}
@@ -303,9 +430,14 @@ export default function StakeCard() {
               max
             </button>
           </div>
-          <button className="btn-primary mt-3 w-full" disabled={!canSubmit} onClick={() => run(hasPepes ? 'lock' : 'lockWithPepe', !approved)}>
+          <button className="btn-primary mt-3 w-full" disabled={!canSubmit} onClick={() => run(pickedId !== null ? 'lockWithPepe' : 'lock', !approved)}>
             {mainLabel}
           </button>
+          {hasPepes && (
+            <button className="btn-ghost mt-2 w-full" disabled={!isConnected || busy} onClick={hatch}>
+              {step === 'tx' ? 'confirm…' : '🐸 hatch another pepe (stake 0)'}
+            </button>
+          )}
           {!hasPepes && pickedId === null && !busy && step !== 'done' && (
             <p className="mt-2 text-center text-xs font-bold text-slate-400">↑ pick a pepe above to enable staking</p>
           )}

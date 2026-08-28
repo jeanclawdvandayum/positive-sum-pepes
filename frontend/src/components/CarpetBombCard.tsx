@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useAccount, useReadContracts, useWriteContract } from 'wagmi'
+import { useAccount, useWriteContract } from 'wagmi'
+import { useRpcReads } from '../lib/useRpcReads'
 import { controllerAbi, stakerAbi } from '../lib/abi'
 import { useRound } from '../lib/useRound'
 import { fmtAmount, fmtCountdown } from '../lib/format'
@@ -21,35 +22,35 @@ export default function CarpetBombCard() {
   }, [])
 
   const ZERO = '0x0000000000000000000000000000000000000000' as const
-  const reads = useReadContracts({
-    contracts: [
-      { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'getCarpetBombState' },
-      { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'currentProposal' },
-      { address: round.staker ?? ZERO, abi: stakerAbi, functionName: 'stakedTotalOf', args: [address ?? ZERO] },
-      { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'VOTE_DURATION' },
-      { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'QUORUM_BIPS' },
-      { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'MAJORITY_BIPS' },
-      { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'lastVotedOn', args: [address ?? ZERO] },
-      { address: round.controller ?? ZERO, abi: controllerAbi, functionName: 'proposalCount' },
+  const reads = useRpcReads(
+    [
+      { to: round.controller, abi: controllerAbi, functionName: 'getCarpetBombState' },
+      { to: round.controller, abi: controllerAbi, functionName: 'currentProposal' },
+      { to: round.staker, abi: stakerAbi, functionName: 'stakedTotalOf', args: [address ?? ZERO] },
+      { to: round.controller, abi: controllerAbi, functionName: 'VOTE_DURATION' },
+      { to: round.controller, abi: controllerAbi, functionName: 'QUORUM_BIPS' },
+      { to: round.controller, abi: controllerAbi, functionName: 'MAJORITY_BIPS' },
+      { to: round.controller, abi: controllerAbi, functionName: 'lastVotedOn', args: [address ?? ZERO] },
+      { to: round.controller, abi: controllerAbi, functionName: 'proposalCount' },
     ],
-    query: { enabled: !!round.controller },
-  })
+    !!round.controller,
+  )
 
-  const stArr = reads.data?.[0]?.result as [string, bigint, bigint, bigint, boolean, boolean] | undefined
+  const stArr = reads[0] as [string, bigint, bigint, bigint, boolean, boolean] | undefined
   const st = stArr
     ? { proposer: stArr[0], proposeTime: stArr[1], yesVotes: stArr[2], noVotes: stArr[3], executed: stArr[4], canExecute: stArr[5] }
     : undefined
-  const propArr = reads.data?.[1]?.result as [string, bigint, bigint, bigint, bigint, boolean] | undefined
+  const propArr = reads[1] as [string, bigint, bigint, bigint, bigint, boolean] | undefined
   const prop = propArr
     ? { proposer: propArr[0], proposeTime: propArr[1], yesVotes: propArr[2], noVotes: propArr[3], lockedAtPropose: propArr[4], executed: propArr[5] }
     : undefined
-  const lockAmount = reads.data?.[2]?.result as bigint | undefined
+  const lockAmount = reads[2] as bigint | undefined
   const lock = lockAmount !== undefined ? { amount: lockAmount } : undefined
-  const voteDuration = Number(reads.data?.[3]?.result ?? 3n * 86400n)
-  const quorumBips = Number(reads.data?.[4]?.result ?? 6900n)
-  const majorityBips = Number(reads.data?.[5]?.result ?? 5001n)
-  const lastVotedOn = reads.data?.[6]?.result as bigint | undefined
-  const proposalCount = reads.data?.[7]?.result as bigint | undefined
+  const voteDuration = Number(reads[3] ?? 3n * 86400n)
+  const quorumBips = Number(reads[4] ?? 6900n)
+  const majorityBips = Number(reads[5] ?? 5001n)
+  const lastVotedOn = reads[6] as bigint | undefined
+  const proposalCount = reads[7] as bigint | undefined
 
   const derived = useMemo(() => {
     if (!st || st.proposeTime === 0n)

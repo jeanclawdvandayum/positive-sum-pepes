@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAccount, useBalance, useWriteContract } from 'wagmi'
 import { controllerAbi, erc20Abi, zapInAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
@@ -121,7 +122,6 @@ export default function Predeposit() {
   const [amount, setAmount] = useState('')
   const [step, setStep] = useState<Step>('idle')
   const [launchStep, setLaunchStep] = useState<'idle' | 'tx' | 'done'>('idle')
-  const [claimStep, setClaimStep] = useState<'idle' | 'tx' | 'done'>('idle')
   const [error, setError] = useState<string | null>(null)
   const { writeContractAsync } = useWriteContract()
 
@@ -199,24 +199,6 @@ export default function Predeposit() {
     } catch (e) {
       setError(e instanceof Error ? e.message.slice(0, 140) : 'transaction failed')
       setLaunchStep('idle')
-    }
-  }
-
-  async function claim() {
-    if (!round.controller) return
-    setError(null)
-    try {
-      setClaimStep('tx')
-      await writeContractAsync({
-        address: round.controller,
-        abi: controllerAbi,
-        functionName: 'claimPredepositPSP',
-      })
-      setClaimStep('done')
-      setNonce((n) => n + 1)
-    } catch (e) {
-      setError(e instanceof Error ? e.message.slice(0, 140) : 'transaction failed')
-      setClaimStep('idle')
     }
   }
 
@@ -371,12 +353,31 @@ export default function Predeposit() {
               <h2 className="text-lg font-black text-slate-900">{launched ? 'round launched' : 'launch'}</h2>
               {launched ? (
                 <>
-                  <p className="mt-1 text-sm text-slate-500">
-                    predeposit closed — your PSP is minted into the staker genesis lock (auto-locked, claims anytime).
-                  </p>
-                  <button className="btn-primary mt-3 w-full" disabled={claimStep === 'tx'} onClick={claim}>
-                    {claimStep === 'done' ? '✅ claimed' : claimStep === 'tx' ? 'confirm in wallet…' : 'claim your PSP'}
-                  </button>
+                  {myDep && myDep.claimed ? (
+                    <>
+                      <p className="mt-1 text-sm text-slate-500">
+                        ✅ claimed — your genesis PSP is locked inside your pepe on the stake page
+                        (vesting on the decay schedule, earning fees as they accrue).
+                      </p>
+                      <Link to="/stake" className="btn-primary mt-3 block w-full text-center">
+                        see your pepe →
+                      </Link>
+                    </>
+                  ) : myDep && myDep.mixETHAmount > 0n ? (
+                    <>
+                      <p className="mt-1 text-sm text-slate-500">
+                        predeposit closed — your pro-rata PSP share is waiting. claiming mints your
+                        pepe with the PSP locked in.
+                      </p>
+                      <Link to="/stake" className="btn-primary mt-3 block w-full text-center">
+                        claim your PSP on the stake page →
+                      </Link>
+                    </>
+                  ) : (
+                    <p className="mt-1 text-sm text-slate-500">
+                      round is live — no predeposit from you this round. buy on the curve instead.
+                    </p>
+                  )}
                 </>
               ) : (
                 <>

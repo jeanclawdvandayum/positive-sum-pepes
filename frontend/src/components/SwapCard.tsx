@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useAccount, useBalance, useReadContracts, useWriteContract } from 'wagmi'
+import { useAccount, useBalance, useWriteContract } from 'wagmi'
+import { useRpcReads } from '../lib/useRpcReads'
 import { erc20Abi, hookAbi, controllerAbi, zapInAbi, zapOutAbi, mixVaultAbi, buildPoolKey } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
 import { ADDRESSES } from '../lib/config'
@@ -113,15 +114,15 @@ export default function SwapCard() {
       ? payToken === 'MIX' ? round.controller : ADDRESSES.zapIn
       : payToken === 'MIX' ? ADDRESSES.zapIn : ADDRESSES.zapIn
 
-  const allowance = useReadContracts({
-    contracts: [
-      { address: approveToken ?? ZERO, abi: erc20Abi, functionName: 'allowance', args: [address ?? ZERO, approveTarget ?? ZERO] },
+  const allowanceRes = useRpcReads(
+    [
+      { to: approveToken ?? undefined, abi: erc20Abi, functionName: 'allowance', args: [address ?? ZERO, approveTarget ?? ZERO] },
     ],
-    query: { enabled: needsApproval && !!approveToken && !!approveTarget },
-  })
+    needsApproval && !!approveToken && !!approveTarget,
+  )
   const hasAllowance =
-    (allowance.data?.[0]?.result as bigint | undefined) !== undefined &&
-    (allowance.data?.[0]?.result as bigint) >= (side === 'sell' ? pspIn : mixIn)
+    allowanceRes[0] !== undefined &&
+    (allowanceRes[0] as bigint) >= (side === 'sell' ? pspIn : mixIn)
 
   const minOut = useMemo(() => {
     const q = side === 'buy' ? quoteRaw : quoteMixOut
