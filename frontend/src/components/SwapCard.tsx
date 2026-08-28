@@ -5,7 +5,7 @@ import { erc20Abi, hookAbi, controllerAbi, zapInAbi, zapOutAbi, buildPoolKey } f
 import { rpcCall } from '../lib/rpc'
 import { ADDRESSES } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
-import { fmtAmount, parseAmountToWad } from '../lib/format'
+import { fmtAmount, parseAmountToWad, wadToExact } from '../lib/format'
 import MixLogo from './MixLogo'
 import { PspIcon } from './TokenIcon'
 
@@ -27,6 +27,13 @@ export default function SwapCard() {
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
   const { writeContractAsync } = useWriteContract()
+
+  /// Flat mode = one-way exit (scoopy 2026-08-29, fix #3): buying is
+  /// disabled at the hook (BuyingDisabled) — force the sell side and lock
+  /// the toggle so nobody wires a doomed buy.
+  useEffect(() => {
+    if (round.mode === 2) setSide('sell')
+  }, [round.mode])
 
   const ZERO = '0x0000000000000000000000000000000000000000' as const
   const amountWad = parseAmountToWad(amount)
@@ -273,7 +280,9 @@ export default function SwapCard() {
         <div className="flex rounded-full bg-sky-50 p-1">
           <button
             onClick={() => setSide('buy')}
-            className={`rounded-full px-4 py-1 text-sm font-bold transition ${
+            disabled={round.mode === 2}
+            title={round.mode === 2 ? 'buying is disabled while the round is flat' : undefined}
+            className={`rounded-full px-4 py-1 text-sm font-bold transition disabled:opacity-30 ${
               side === 'buy' ? 'bg-white text-psp-deep shadow' : 'text-slate-400'
             }`}
           >
@@ -314,10 +323,18 @@ export default function SwapCard() {
       <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
         <div className="flex items-center justify-between text-xs font-bold text-slate-400">
           <span>{side === 'buy' ? 'pay' : 'sell'}</span>
-          <span>
+          <button
+            type="button"
+            title="fill your full balance"
+            onClick={() => setAmount(wadToExact(side === 'buy' ? mixBal : pspBal))}
+            className="rounded-md px-1.5 py-0.5 transition hover:bg-sky-100 hover:text-sky-600"
+          >
             balance{' '}
             {side === 'buy' ? fmtAmount(mixBal) : fmtAmount(pspBal)}
-          </span>
+            {((side === 'buy' ? mixBal : pspBal) ?? 0n) > 0n && (
+              <span className="ml-1 text-[10px] text-sky-500">MAX</span>
+            )}
+          </button>
         </div>
         <div className="mt-2 flex items-center gap-2">
           <input
@@ -427,7 +444,7 @@ export default function SwapCard() {
       )}
       {round.mode === 2 && (
         <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-600">
-          ⚪ round is dying — exits are toll-free at exact average backing.
+          ⚪ round is dying — exits are toll-free at exact average backing. buying is disabled.
         </div>
       )}
     </div>

@@ -2,11 +2,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAccount, useWriteContract } from 'wagmi'
 import { useRpcReads } from '../lib/useRpcReads'
 import { controllerAbi, stakerAbi } from '../lib/abi'
+import { rpcCall } from '../lib/rpc'
 import { useRound } from '../lib/useRound'
 import { fmtAmount, fmtCountdown } from '../lib/format'
 import { PixelIcon } from './PixelIcon'
 
 type Step = 'idle' | 'tx' | 'done'
+
+/// one pepe of the connected wallet, with its vote state
+interface Pepe {
+  id: bigint
+  weight: bigint          // pepeVoteWeight now (0 while unstaking)
+  staked: bigint          // principal
+  unstaking: boolean      // withdraw request armed
+  voted: boolean          // already voted this proposal
+}
 
 export default function CarpetBombCard() {
   const round = useRound()
@@ -16,23 +26,27 @@ export default function CarpetBombCard() {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
   const { writeContractAsync } = useWriteContract()
 
+  /// selected pepes for the vote (ids); undefined = not loaded yet
+  const [pepes, setPepes] = useState<Pepe[] | undefined>(undefined)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+
   useEffect(() => {
     const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000)
     return () => clearInterval(t)
   }, [])
 
+  /// poll: proposal + my pepes + per-pepe vote state + live denominator
   const ZERO = '0x0000000000000000000000000000000000000000' as const
   const reads = useRpcReads(
     [
       { to: round.controller, abi: controllerAbi, functionName: 'getCarpetBombState' },
-      { to: round.controller, abi: controllerAbi, functionName: 'currentProposal' },
-      { to: round.staker, abi: stakerAbi, functionName: 'stakedTotalOf', args: [address ?? ZERO] },
       { to: round.controller, abi: controllerAbi, functionName: 'VOTE_DURATION' },
       { to: round.controller, abi: controllerAbi, functionName: 'FLAT_EXIT_WINDOW' },
       { to: round.controller, abi: controllerAbi, functionName: 'QUORUM_BIPS' },
       { to: round.controller, abi: controllerAbi, functionName: 'MAJORITY_BIPS' },
-      { to: round.controller, abi: controllerAbi, functionName: 'lastVotedOn', args: [address ?? ZERO] },
       { to: round.controller, abi: controllerAbi, functionName: 'proposalCount' },
+      { to: round.staker, abi: stakerAbi, functionName: 'totalVotableWeight' },
+      { to: round.staker, abi: stakerAbi, functionName: 'stakedTotalOf', args: [address ?? ZERO] },
     ],
     !!round.controller,
   )
@@ -41,46 +55,93 @@ export default function CarpetBombCard() {
   const st = stArr
     ? { proposer: stArr[0], proposeTime: stArr[1], yesVotes: stArr[2], noVotes: stArr[3], executed: stArr[4], canExecute: stArr[5] }
     : undefined
-  const propArr = reads[1] as [string, bigint, bigint, bigint, bigint, boolean] | undefined
-  const prop = propArr
-    ? { proposer: propArr[0], proposeTime: propArr[1], yesVotes: propArr[2], noVotes: propArr[3], lockedAtPropose: propArr[4], executed: propArr[5] }
-    : undefined
-  const lockAmount = reads[2] as bigint | undefined
-  const lock = lockAmount !== undefined ? { amount: lockAmount } : undefined
-  const voteDuration = Number(reads[3] ?? 3n * 86400n)
-  const exitWindow = Number(reads[4] ?? 3n * 86400n)
-  const quorumBips = Number(reads[5] ?? 6900n)
-  const majorityBips = Number(reads[6] ?? 5001n)
-  const lastVotedOn = reads[7] as bigint | undefined
-  const proposalCount = reads[8] as bigint | undefined
+  const voteDuration = Number(reads[1] ?? 3n * 86400n)
+  const exitWindow = Number(reads[2] ?? 3n * 86400n)
+  const quorumBips = Number(reads[3] ?? 6900n)
+  const majorityBips = Number(reads[4] ?? 5001n)
+  const proposalCount = reads[5] as bigint | undefined
+  /// LIVE denominator (scoopy 2026-08-29): Σ locked PSP not awaiting the
+  /// withdraw cooldown — quorum tracks the round's live staking set.
+  const denominator = reads[6] as bigint | undefined
+  const stakedTotal = reads[7] as bigint | undefined
+
+  const voting = st !== undefined && st.proposeTime !== 0n && !st.executed
+    && now < Number(st.proposeTime) + voteDuration
+
+  /// my pepes + their vote state (only while a vote could matter)
+  useEffect(() => {
+    if (!round.staker || !address || !round.controller) return
+    let dead = false
+    async function tick() {
+      try {
+        const n = Number(await rpcCall(round.staker!, stakerAbi, 'balanceOf', [address!]) as bigint)
+        const out: Pepe[] = []
+        for (let i = 0; i < n; ++i) {
+          const id = await rpcCall(round.staker!, stakerAbi, 'tokenOfOwnerByIndex', [address!, BigInt(i)]) as bigint
+          const pos = await rpcCall(round.staker!, stakerAbi, 'positions', [id]) as [bigint, bigint, bigint, bigint, bigint, bigint]
+          const w = await rpcCall(round.staker!, stakerAbi, 'pepeVoteWeight', [id, BigInt(Math.floor(Date.now() / 1000))]) as bigint
+          const lastVoted = proposalCount !== undefined
+            ? await rpcCall(round.controller!, controllerAbi, 'lastVotedPepeOn', [id]) as bigint
+            : 0n
+          out.push({
+            id,
+            staked: pos[0],
+            unstaking: pos[2] !== 0n,
+            weight: w,
+            voted: proposalCount !== undefined && lastVoted === proposalCount,
+          })
+        }
+        if (!dead) {
+          setPepes(out)
+          // default selection: every votable, unvoted pepe
+          setSelected((prev) => {
+            const prevIds = new Set([...prev].map((i) => Number(out[i]?.id ?? -1n)))
+            const fresh = new Set<number>()
+            out.forEach((p, i) => {
+              if (p.weight > 0n && !p.voted && (prev.size === 0 || prevIds.has(Number(p.id)))) fresh.add(i)
+            })
+            return fresh
+          })
+        }
+      } catch {
+        /* keep last */
+      }
+    }
+    tick()
+    const iv = setInterval(tick, 5000)
+    return () => { dead = true; clearInterval(iv) }
+  }, [round.staker, round.controller, address, proposalCount, voting])
+
+  const selectedIds = useMemo(() => {
+    if (!pepes) return []
+    return [...selected].sort((a, b) => a - b).map((i) => pepes[i]?.id).filter((x): x is bigint => x !== undefined)
+  }, [pepes, selected])
+  const selectedWeight = useMemo(() => {
+    if (!pepes) return 0n
+    return [...selected].reduce((acc, i) => acc + (pepes[i]?.weight ?? 0n), 0n)
+  }, [pepes, selected])
+  const votableCount = pepes?.filter((p) => p.weight > 0n && !p.voted).length ?? 0
 
   const derived = useMemo(() => {
     if (!st || st.proposeTime === 0n)
       return { phase: 'none' as const }
     const endsAt = Number(st.proposeTime) + voteDuration
-    const voting = now < endsAt
+    const isVoting = now < endsAt
     const totalVotes = st.yesVotes + st.noVotes
-    const quorumPct = prop && prop.lockedAtPropose > 0n
-      ? Math.min(999, Number((totalVotes * 10000n) / prop.lockedAtPropose) / 100)
+    const denom = denominator !== undefined && denominator > 0n ? denominator : undefined
+    const quorumPct = denom
+      ? Math.min(999, Number((totalVotes * 10000n) / denom) / 100)
       : 0
     const quorumTarget = quorumBips / 100
-    const quorumMet = prop && prop.lockedAtPropose > 0n
-      ? totalVotes * 10000n >= prop.lockedAtPropose * BigInt(quorumBips)
-      : false
+    const quorumMet = denom ? totalVotes * 10000n >= denom * BigInt(quorumBips) : false
     const majorityMet = totalVotes > 0n && st.yesVotes * 10000n > totalVotes * BigInt(majorityBips)
     if (st.executed) return { phase: 'executed' as const }
-    if (voting) return { phase: 'voting' as const, endsAt, totalVotes, quorumPct, quorumTarget, quorumMet, majorityMet }
+    if (isVoting) return { phase: 'voting' as const, endsAt, totalVotes, quorumPct, quorumTarget, quorumMet, majorityMet }
     if (quorumMet && majorityMet) return { phase: 'executable' as const, totalVotes, quorumPct, quorumTarget }
     return { phase: 'failed' as const, totalVotes, quorumPct, quorumTarget }
-  }, [st, prop, now, voteDuration, quorumBips, majorityBips])
+  }, [st, denominator, now, voteDuration, quorumBips, majorityBips])
 
-  const canVote =
-    derived.phase === 'voting' &&
-    isConnected &&
-    !!lock &&
-    lock.amount > 0n &&
-    lastVotedOn !== proposalCount
-  const alreadyVoted = lastVotedOn !== undefined && proposalCount !== undefined && lastVotedOn === proposalCount
+  const canVote = voting && isConnected && votableCount > 0 && selectedWeight > 0n && selectedIds.length > 0
 
   async function run(
     fn: 'proposeCarpetBomb' | 'voteCarpetBomb' | 'carpetBomb' | 'finalizeCarpet',
@@ -89,12 +150,20 @@ export default function CarpetBombCard() {
     setError(null)
     try {
       setStep('tx')
-      await writeContractAsync({
-        address: round.controller!,
-        abi: controllerAbi,
-        functionName: fn,
-        ...(fn === 'voteCarpetBomb' ? { args: [support] } : {}),
-      })
+      if (fn === 'voteCarpetBomb') {
+        await writeContractAsync({
+          address: round.controller!,
+          abi: controllerAbi,
+          functionName: 'voteCarpetBomb',
+          args: [selectedIds, support],
+        })
+      } else {
+        await writeContractAsync({
+          address: round.controller!,
+          abi: controllerAbi,
+          functionName: fn,
+        })
+      }
       setStep('done')
       setTimeout(() => setStep('idle'), 2500)
     } catch (e) {
@@ -104,6 +173,17 @@ export default function CarpetBombCard() {
   }
 
   const busy = step === 'tx'
+
+  function togglePepe(i: number) {
+    const p = pepes?.[i]
+    if (!p || p.weight === 0n || p.voted) return
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
+  }
 
   return (
     <div className="card overflow-hidden p-0">
@@ -121,15 +201,15 @@ export default function CarpetBombCard() {
           <div>
             <div className="rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-700">
               no active proposal. initiating a vote requires staked PSP — quorum is
-              measured against total staked PSP at proposal time
-              (69%), majority of cast votes (50%+).
+              measured against locked PSP not currently unstaking (69%),
+              majority of cast votes (50%+).
             </div>
             <button
               className="btn-primary mt-4 w-full"
-              disabled={!isConnected || !lock || lock.amount === 0n || busy}
+              disabled={!isConnected || !stakedTotal || stakedTotal === 0n || busy}
               onClick={() => run('proposeCarpetBomb')}
             >
-              {isConnected && (!lock || lock.amount === 0n)
+              {isConnected && (!stakedTotal || stakedTotal === 0n)
                 ? 'stake PSP to propose'
                 : ' initiate vote'}
             </button>
@@ -169,14 +249,14 @@ export default function CarpetBombCard() {
               </div>
             </div>
 
-            {/* quorum */}
+            {/* quorum — LIVE votable denominator */}
             <div className="mt-4">
               <div className="mb-1 flex justify-between text-xs font-bold text-slate-400">
                 <span>
                   quorum {derived.quorumPct.toFixed(1)}% / {derived.quorumTarget}%{' '}
                   {derived.quorumMet ? '✅' : ''}
                 </span>
-                <span>{fmtAmount(prop?.lockedAtPropose)} PSP denominator</span>
+                <span>{fmtAmount(denominator)} PSP votable (live)</span>
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-slate-100">
                 <div
@@ -188,36 +268,79 @@ export default function CarpetBombCard() {
                   style={{ width: `${Math.min(100, (derived.quorumPct / derived.quorumTarget) * 100)}%` }}
                 />
               </div>
+              <div className="mt-1 text-[11px] font-bold text-slate-400">
+                unstaking PSP leaves the quorum pool · new stakes join it and can vote
+              </div>
             </div>
 
             {derived.phase === 'voting' && (
               <>
+                {/* pepe selector — vote with specific NFTs (scoopy 2026-08-29) */}
+                {isConnected && (
+                  <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+                    <div className="mb-2 flex items-center justify-between text-xs font-bold text-slate-400">
+                      <span>vote with which pepes?</span>
+                      <span>{fmtAmount(selectedWeight)} PSP selected</span>
+                    </div>
+                    {pepes === undefined ? (
+                      <div className="text-xs font-bold text-slate-400">loading your pepes…</div>
+                    ) : pepes.length === 0 ? (
+                      <div className="text-xs font-bold text-slate-400">no pepes — stake PSP to vote</div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {pepes.map((p, i) => {
+                          const disabled = p.weight === 0n || p.voted
+                          const on = selected.has(i)
+                          return (
+                            <button
+                              key={p.id.toString()}
+                              type="button"
+                              disabled={disabled}
+                              onClick={() => togglePepe(i)}
+                              title={
+                                p.voted ? 'already voted this proposal'
+                                  : p.unstaking ? 'unstaking — cancel the withdraw to restore its vote'
+                                  : `${fmtAmount(p.staked)} PSP`
+                              }
+                              className={`rounded-xl px-3 py-2 text-xs font-black transition ${
+                                p.voted
+                                  ? 'bg-slate-100 text-slate-400'
+                                  : p.unstaking
+                                    ? 'bg-amber-50 text-amber-400'
+                                    : on
+                                      ? 'bg-gradient-to-r from-sky-400 to-emerald-400 text-[#fff] shadow'
+                                      : 'bg-white text-slate-600 shadow-sm'
+                              }`}
+                            >
+                              #{p.id.toString()}
+                              {p.voted ? ' ✓voted' : p.unstaking ? ' ⏳unstaking' : ` · ${fmtAmount(p.staked)}`}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <button
                     className="rounded-2xl bg-emerald-400 px-4 py-3 font-black text-[#fff] shadow-md shadow-emerald-200 transition active:scale-[0.98] disabled:opacity-40"
                     disabled={!canVote || busy}
                     onClick={() => run('voteCarpetBomb', true)}
                   >
-                    vote yes
+                    vote yes{selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
                   </button>
                   <button
                     className="rounded-2xl bg-rose-400 px-4 py-3 font-black text-[#fff] shadow-md shadow-rose-200 transition active:scale-[0.98] disabled:opacity-40"
                     disabled={!canVote || busy}
                     onClick={() => run('voteCarpetBomb', false)}
                   >
-                    vote no
+                    vote no{selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
                   </button>
                 </div>
-                <button
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-400"
-                  disabled
-                  title="abstaining = simply not voting"
-                >
-                  abstain (sit out)
-                </button>
-                {alreadyVoted && (
-                  <div className="mt-2 text-center text-xs font-bold text-slate-400">
-                    you already voted on this proposal
+                {isConnected && pepes !== undefined && pepes.some((p) => p.unstaking && !p.voted) && (
+                  <div className="mt-2 text-center text-xs font-bold text-amber-500">
+                    ⏳ = unstaking (no vote) — cancel the withdraw on the stake page to restore it
                   </div>
                 )}
                 {!isConnected && (
@@ -242,16 +365,16 @@ export default function CarpetBombCard() {
                 </div>
                 <button
                   className="btn-primary mt-3 w-full"
-                  disabled={!isConnected || !lock || lock.amount === 0n || busy}
+                  disabled={!isConnected || !stakedTotal || stakedTotal === 0n || busy}
                   onClick={() => run('proposeCarpetBomb')}
                 >
-                  {isConnected && (!lock || lock.amount === 0n)
+                  {isConnected && (!stakedTotal || stakedTotal === 0n)
                     ? 'stake PSP to propose'
                     : '🔄 propose again'}
                 </button>
                 <p className="mt-2 text-[11px] font-bold text-slate-400">
-                  voting power aggregates ALL your pepes — but stakes made this epoch only
-                  count from the next epoch boundary.
+                  votes are cast per-pepe — unstaking pepes sit out (cancel to rejoin),
+                  fresh stakes vote at full power immediately.
                 </p>
               </div>
             )}
@@ -266,7 +389,7 @@ export default function CarpetBombCard() {
               {round.supply && round.supply > 0n && round.reserve
                 ? fmtAmount((round.reserve * 10n ** 18n) / round.supply)
                 : '…'}{' '}
-              mixETH per PSP).
+              mixETH per PSP). buying is disabled until the next round.
             </div>
             {now < Number(round.flatTime) + exitWindow ? (
               <div className="text-xs font-bold text-[#fff]/60">

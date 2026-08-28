@@ -121,7 +121,9 @@ contract B1_CurveRoundTrip is BBase {
         // one sell of half his balance
         uint256 pspBal = psp.balanceOf(bob);
         uint256 pspIn = pspBal / 2;
-        uint256 integral = hook.getSellOutput(pspIn);
+        // getSellOutput is POST-fee since 8038c017 (mirrors execution) — the
+        // ledger records the fee on the PRE-fee integral, so compute it here
+        uint256 integral = CurveMath.computeSellOutput(pspIn, hook.totalSupplyPSP(), _cfg());
         _sell(bob, pspIn);
         expectedFees += (integral * 500) / 10000;
 

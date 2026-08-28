@@ -5,7 +5,7 @@ import { controllerAbi, erc20Abi, faucetAbi, stakerAbi, reinvestorAbi, buildPool
 import { useRound, useBalances } from '../lib/useRound'
 import { useRpcReads } from '../lib/useRpcReads'
 import { rpcCall } from '../lib/rpc'
-import { fmtAmount, parseAmountToWad } from '../lib/format'
+import { fmtAmount, parseAmountToWad, wadToExact } from '../lib/format'
 import MixLogo from './MixLogo'
 import PepePanel from './PepePanel'
 import PepePicker from './PepePicker'
@@ -403,7 +403,7 @@ export default function StakeCard() {
               inputMode="decimal"
               onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
             />
-            <button className="btn-ghost shrink-0" onClick={() => setAmount(pspBal ? (Number(pspBal) / 1e18).toString() : '0')}>
+            <button className="btn-ghost shrink-0" onClick={() => setAmount(wadToExact(pspBal))}>
               max
             </button>
           </div>

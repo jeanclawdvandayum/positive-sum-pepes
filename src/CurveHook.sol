@@ -37,6 +37,7 @@ contract CurveHook is BaseHook {
     error NotActive();
     error NotController();
     error InvalidMode();
+    error BuyingDisabled(); // Flat mode is a one-way exit (scoopy 2026-08-29) — no buys into a dying round
     error BuyZeroAmount();
     error SellExceedsSupply();
     error InsufficientFees();
@@ -281,7 +282,11 @@ contract CurveHook is BaseHook {
         internal returns (bytes4, BeforeSwapDelta, uint24)
     {
         if (mode == Mode.Flat) {
-            return _handleFlatBuy(key, params, mixETHInput, mixETH, psp);
+            // scoopy 2026-08-29: once the curve flattens, BUYING is disabled —
+            // the flat window is a settlement/exit at average backing, not a
+            // live market. Nobody should buy into a dying round; the sell
+            // path (_handleFlatSell) stays open until Destroyed.
+            revert BuyingDisabled();
         }
 
         // NK24 fix: mixETH is the unit of account — the curve is solved
@@ -394,48 +399,9 @@ contract CurveHook is BaseHook {
 
     // ─────────────── Flat Mode (Destruction) ───────────────
 
-    function _handleFlatBuy(PoolKey calldata, SwapParams calldata, uint256 mixETHInput,
-        Currency mixETH, Currency psp)
-        internal returns (bytes4, BeforeSwapDelta, uint24)
-    {
-        if (totalSupplyPSP == 0) revert NotActive();
-
-        // L-3 fix: price the buy DIRECTLY pro-rata — (x * S) / R — the exact
-        // mirror of _handleFlatSell's (psp * R) / S. The old form derived a
-        // floored flatPrice = (R * 1e18) / S and divided by it again, which
-        // could over-mint vs true pro-rata (backing dilution, bounded by
-        // x*S/F but nonzero). Direct form: R1*S == R*S1 holds exactly, and
-        // the floor favors the reserve (dust stays), like the sell path.
-        // Overflow: buyMixETH/potMixETH are real swap inputs (<= 1e30 class),
-        // S <= MAX_SUPPLY (1e28) → product <= 1e58, fits uint256 easily.
-        //
-        // F-9 fix (2026-08-19): NO swap fee in Flat. The flat window is
-        // settlement at fair value, not a live market — late trades accrue
-        // nothing to the pot (flat-window pot PSP was never redeemed at
-        // finalize: its backing drained to generic carry and the tokens
-        // died at the controller) and nothing to stakers. Price is exactly
-        // pro-rata; floor-only rounding keeps the round over-backed (pspOut
-        // floors, the full input enters the reserve).
-        uint256 buyMixETH = mixETHInput;
-
-        uint256 pspOut = (buyMixETH * totalSupplyPSP) / reserveMixETH;
-        if (pspOut == 0) revert ZeroOutput();
-
-        reserveMixETH += buyMixETH;
-        totalSupplyPSP += pspOut;
-
-        emit Buy(msg.sender, mixETHInput, pspOut, totalSupplyPSP, reserveMixETH);
-
-        poolManager.take(mixETH, address(this), mixETHInput);
-        controller.mintPSPForSwap(pspOut);
-        _settleCurrency(psp, pspOut);
-
-        BeforeSwapDelta hookDelta = toBeforeSwapDelta(
-            int128(int256(mixETHInput)),   // +input: hook handles specified input
-            int128(-int256(pspOut))         // -output: hook provides unspecified output
-        );
-        return (IHooks.beforeSwap.selector, hookDelta, 0);
-    }
+    // (_handleFlatBuy deleted 2026-08-29, scoopy: flat mode is a one-way
+    // exit — buys revert BuyingDisabled in _handleBuy. Only _handleFlatSell
+    // remains: pro-rata PSP→mixETH settlement, fee-free (F-9).)
 
     function _handleFlatSell(PoolKey calldata, SwapParams calldata, uint256 pspInputAmount,
         Currency mixETH, Currency psp)
@@ -571,10 +537,9 @@ contract CurveHook is BaseHook {
     function getBuyOutput(uint256 mixETHInput) external view returns (uint256) {
         // B7b catch (2026-08-19): the view must mirror execution. In curve
         // mode the curve only ever sees the POST-FEE input (95%); quoting the
-        // raw input overstated output by ~5%. Flat mode is fee-free pro-rata.
-        if (mode == Mode.Flat) {
-            return (mixETHInput * totalSupplyPSP) / reserveMixETH;
-        }
+        // raw input overstated output by ~5%. Flat mode has NO buys at all
+        // (scoopy 2026-08-29) — the view reverts like the swap path.
+        if (mode == Mode.Flat) revert BuyingDisabled();
         uint256 fee = (mixETHInput * SWAP_FEE_BIPS) / 10000;
         return CurveMath.computeBuyOutput(mixETHInput - fee, totalSupplyPSP, curveConfig);
     }

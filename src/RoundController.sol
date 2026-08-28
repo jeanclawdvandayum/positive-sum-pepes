@@ -49,7 +49,10 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     error ZeroShare(); // L-4: predeposit share rounded to 0 — claim refused, flag not set
     error PredepositOpen(); // window still live and cap not reached — only owner may launch early
     error CapExceeded(); // public predeposit would push total past PREDEPOSIT_CAP
+    error WalletCapExceeded(); // per-wallet predeposit cap (scoopy 2026-08-29 — sybil friction)
     error NotFactory(); // carry seeding is factory-only
+    error NotPepeOwner(); // per-NFT vote: pepes must belong to the voter
+    error NothingVoted(); // per-NFT vote batch carried zero votable weight
 
     // ─────────────── Events ───────────────
     event Predeposited(address indexed user, uint256 ethAmount, uint256 mixETHAmount);
@@ -105,6 +108,13 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // Slots: [0] predeposit [51] vest [102] vote
     uint256 public immutable PREDEPOSIT_DURATION; // default 7 days
     uint256 public constant PREDEPOSIT_CAP = 500e18; // 500 mixETH
+    /// @dev Per-wallet predeposit cap, WHOLE mixETH from the 5th packed
+    ///      timing slot (scoopy 2026-08-29: "10 mixETH per wallet — can be
+    ///      sybilled but at least that adds some friction"). 0 = uncapped
+    ///      (mainnet default). Applies to the PUBLIC path only (predeposit /
+    ///      predepositFor, guarding the BENEFICIARY); the factory carry
+    ///      (seedCarry) is exempt — it IS the bootstrap.
+    uint256 public immutable PREDEPOSIT_CAP_PER_WALLET; // 0 = off
     uint256 public immutable predepositStartTime;
 
     // ─────────────── Locking (vlCVX-style) ───────────────
@@ -136,14 +146,15 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         uint256 proposeTime;
         uint256 yesVotes;
         uint256 noVotes;
-        uint256 lockedAtPropose; // G-1 fix: quorum snapshot — mid-vote locks can't inflate denominator
         bool executed;
     }
     CarpetBombProposal public currentProposal;
-    /// @dev G-3 fix: epoch per proposal. Voters compare lastVotedOn == proposalCount,
-    ///      so a new proposal re-enfranchises everyone without iterating a mapping.
+    /// @dev G-3 fix: epoch per proposal. Voters compare lastVotedPepeOn ==
+    ///      proposalCount, so a new proposal re-enfranchises every pepe
+    ///      without iterating a mapping (per-pepe dedup, scoopy 2026-08-29:
+    ///      votes are cast BY NFT — a wallet votes each pepe it owns).
     uint256 public proposalCount;
-    mapping(address => uint256) public lastVotedOn;
+    mapping(uint256 => uint256) public lastVotedPepeOn; // pepeId => proposalCount
     uint256 public immutable VOTE_DURATION; // default 3 days
     /// @dev Flat-exit window after a carpet bomb — became the 4th packed
     ///      timing slot (2026-08-28); mainnet default stays 3 days.
@@ -174,11 +185,14 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             VEST_DURATION = 42 days;
             VOTE_DURATION = 3 days;
             FLAT_EXIT_WINDOW = 3 days;
+            PREDEPOSIT_CAP_PER_WALLET = 0; // uncapped (mainnet)
         } else {
             PREDEPOSIT_DURATION = t & CurveMath.TIMINGS_MASK;
             VEST_DURATION = (t >> 51) & CurveMath.TIMINGS_MASK;
             VOTE_DURATION = (t >> 102) & CurveMath.TIMINGS_MASK;
             FLAT_EXIT_WINDOW = (t >> 153) & CurveMath.TIMINGS_MASK;
+            // 5th slot (2026-08-29): per-wallet predeposit cap, whole mixETH
+            PREDEPOSIT_CAP_PER_WALLET = ((t >> 204) & CurveMath.TIMINGS_MASK) * 1e18;
             // 2026-08-19 tripwire: the vote-slot truncation deployed silently
             // on the first sepolia dry-run — never again.
             if (
@@ -296,6 +310,15 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // (anyone may then launch). A deposit that would overshoot reverts —
         // the depositor retries with the remaining headroom.
         if (totalPredepositMixETH + mixETHAmount > PREDEPOSIT_CAP) revert CapExceeded();
+        // Per-wallet friction (scoopy 2026-08-29): optional cap (testnet packs
+        // 10 mixETH) per beneficiary across the whole window. Sybil-able by
+        // design — the point is friction, not prevention. 0 = uncapped.
+        if (
+            PREDEPOSIT_CAP_PER_WALLET != 0
+                && predeposits[beneficiary].mixETHAmount + mixETHAmount > PREDEPOSIT_CAP_PER_WALLET
+        ) {
+            revert WalletCapExceeded();
+        }
 
         // Use balanceBefore/After to support fee-on-transfer tokens safely
         uint256 balBefore = mixETH.balanceOf(address(this));
@@ -511,8 +534,11 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
                 revert ProposalExists();
             }
             // Window closed, unexecuted: replaceable only if it failed
+            // (quorum evaluated against the LIVE votable denominator —
+            // scoopy 2026-08-29 semantics, same as carpetBomb())
             uint256 totalVotes = currentProposal.yesVotes + currentProposal.noVotes;
-            bool quorumPassed = totalVotes * 10000 >= currentProposal.lockedAtPropose * QUORUM_BIPS;
+            bool quorumPassed =
+                totalVotes * 10000 >= staker.totalVotableWeight() * QUORUM_BIPS;
             bool majorityPassed = currentProposal.yesVotes * 10000 > totalVotes * MAJORITY_BIPS;
             if (quorumPassed && majorityPassed) {
                 revert ProposalExists(); // passing — go execute it (permissionless)
@@ -525,39 +551,35 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             proposeTime: block.timestamp,
             yesVotes: 0,
             noVotes: 0,
-            // Quorum denominator = STAKED PSP at propose (G-1 snapshot
-            // semantics unchanged). scoopy 2026-08-27 (Sepolia playtest
-            // finding): the retired NK24 supply floor — max(weight,
-            // totalSupplyPSP) — made quorum unreachable whenever staked
-            // was a minority of supply, freezing carpet governance. Thin-
-            // lock counter-forces now: execution only after the FULL
-            // VOTE_DURATION (honest stakers can counter-vote an attacker's
-            // self-vote), and the bomber's own locked value is damaged
-            // proportionally by the flatten.
-            lockedAtPropose: staker.totalWeight(),
             executed: false
         });
 
         emit CarpetBombProposed(msg.sender);
     }
 
-    function voteCarpetBomb(bool support) external nonReentrant {
+    /// @notice Vote on the carpet bomb WITH SPECIFIC PEPES (scoopy
+    ///         2026-08-29: the UI picks the NFT(s); pass every owned pepe
+    ///         to vote the whole bag).
+    /// @dev Per-pepe dedup (lastVotedPepeOn): each NFT votes once per
+    ///      proposal; a new proposal re-enfranchises all pepes. Weight per
+    ///      pepe is its full principal if no withdraw request is armed —
+    ///      unstaking PSP cannot vote, canceling the request restores the
+    ///      vote (all scoopy 2026-08-29).
+    function voteCarpetBomb(uint256[] calldata pepeIds, bool support) external nonReentrant {
         if (currentProposal.proposeTime == 0) revert ProposalExists();
         if (block.timestamp > currentProposal.proposeTime + VOTE_DURATION) revert VotingEnded();
-        // G-3 fix: per-proposal epoch — voters from previous proposals can vote again
-        if (lastVotedOn[msg.sender] == proposalCount) revert AlreadyVoted();
 
-        lastVotedOn[msg.sender] = proposalCount;
-
-        // scoopy 2026-08-27 (Sepolia playtest finding — supersedes the M-1/
-        // finding-29 sit-out rule): weight is evaluated LIVE at the vote.
-        // Stakes made after the proposal count, so new lockers can always
-        // defend or oppose an active bomb; an armed withdraw request decays
-        // the vote exactly like the dividends. Quorum stays anchored to the
-        // propose-time snapshot (G-1), so late locks widen participation
-        // without diluting it.
-        uint256 weight = staker.voteWeight(msg.sender, block.timestamp);
-        if (weight == 0) revert NotLocker();
+        uint256 weight;
+        for (uint256 i; i < pepeIds.length; ++i) {
+            uint256 pepeId = pepeIds[i];
+            if (staker.ownerOf(pepeId) != msg.sender) revert NotPepeOwner();
+            if (lastVotedPepeOn[pepeId] == proposalCount) revert AlreadyVoted();
+            uint256 w = staker.pepeVoteWeight(pepeId, block.timestamp);
+            if (w == 0) revert NotLocker(); // unstaking or empty — this pepe can't vote
+            lastVotedPepeOn[pepeId] = proposalCount;
+            weight += w;
+        }
+        if (weight == 0) revert NothingVoted();
 
         if (support) {
             currentProposal.yesVotes += weight;
@@ -574,10 +596,18 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         if (prop.executed) revert AlreadyExecuted();
         if (block.timestamp <= prop.proposeTime + VOTE_DURATION) revert VotingEnded();
 
-        // Check quorum against the SNAPSHOT taken at proposal time (G-1 fix):
-        // locking PSP mid-vote can no longer dilute participation below quorum
+        // LIVE quorum denominator (scoopy 2026-08-29): Σ locked PSP not
+        // currently awaiting a withdraw cooldown, evaluated at execution —
+        // new stakes during the vote both widen the denominator AND can
+        // themselves vote, so the bar tracks the round's live staking set.
+        // (Supersedes the G-1 propose-time snapshot: an attacker staking
+        // mid-vote to inflate the denominator adds weight they could have
+        // voted with anyway — the trade is accepted deliberately.)
+        uint256 denominator = staker.totalVotableWeight();
+
+        // Check quorum
         uint256 totalVotes = prop.yesVotes + prop.noVotes;
-        if (totalVotes * 10000 < prop.lockedAtPropose * QUORUM_BIPS) revert QuorumNotReached();
+        if (totalVotes * 10000 < denominator * QUORUM_BIPS) revert QuorumNotReached();
 
         // Check majority
         if (prop.yesVotes * 10000 <= totalVotes * MAJORITY_BIPS) revert MajorityNotReached();

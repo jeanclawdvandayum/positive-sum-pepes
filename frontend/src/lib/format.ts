@@ -46,3 +46,14 @@ export function parseAmountToWad(input: string): bigint {
     return 0n
   }
 }
+
+/// Exact decimal string for a wad — NO rounding (scoopy 2026-08-29, fix #2:
+/// max-fill used the ROUNDED display string; when display rounding rounded
+/// UP the parsed amount exceeded the balance by a few wei and the button
+/// greyed out). This is what max buttons must feed the input.
+export function wadToExact(wad: bigint | undefined): string {
+  if (wad === undefined || wad <= 0n) return '0'
+  const whole = wad / 10n ** 18n
+  const frac = (wad % 10n ** 18n).toString().padStart(18, '0').replace(/0+$/, '')
+  return frac ? `${whole}.${frac}` : `${whole}`
+}

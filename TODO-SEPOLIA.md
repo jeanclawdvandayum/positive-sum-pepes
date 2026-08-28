@@ -3,6 +3,33 @@
 End-to-end checklist for shipping a playtest round of PSP to Sepolia
 (chain `11155111`). Work top to bottom; every box is a verifiable step.
 
+**2026-08-29 PLAYTEST WAVE 2 (scoopy's demo feedback, sepolia-fixes branch):**
+1. UI max-selectors everywhere (swap pay box, predeposit commit, stake) —
+   filled with EXACT balance strings (wadToExact), not the rounded display
+2. stake-max greying FIXED: root cause was `(Number(bal)/1e18).toString()` —
+   float string could round UP past the balance; exact formatter replaces it
+3. Flat mode = one-way exit: CurveHook reverts BuyingDisabled on buys
+   (+ getBuyOutput mirrors), UI locks the buy tab while flat
+4. unstaking PSP cannot vote — hard exclusion (per-pepe weight 0 while a
+   withdraw request is armed); canceling restores full power instantly
+5. quorum denominator is LIVE (staker.totalVotableWeight, maintained O(1)):
+   new stakes join the denominator AND can vote; unstaking leaves both —
+   G-1 propose-time snapshot retired (accepted trade, documented in-code)
+6. rebirth already existed (finalizeCarpet → spawnNextRound); added the UI
+   views: factory.currentRound() / pspRoundToken(n) / roundPool(n) /
+   roundInfo(n) — round 2 deploys as "Positive Sum Pepes 2"/"PSP2" from ITS
+   predeposit phase with the carry seeded (test_Rebirth proves it all)
+7. per-wallet predeposit cap = 5th packed timing slot, WHOLE mixETH units,
+   0 = uncapped (mainnet/legacy tests unchanged); testnet deploy packs 10
+   (PSP_WALLET_CAP_MIX, default 10) — per-BENEFICIARY on the public path,
+   carry exempt
+8. voting is per-NFT: voteCarpetBomb(uint256[] pepeIds, bool) with per-pepe
+   dedup (lastVotedPepeOn); UI gets a pepe selector (weight, unstaking, and
+   voted states shown; default = all votable pepes)
+Also: BBase warps to a realistic epoch (foundry ts=1 → epoch 0 collides
+with the staker's lastPointEpoch==0 "never anchored" sentinel — totalWeight
+read 0 in pure-genesis scenarios; the old quorum-vs-0 passed vacuously).
+
 Timings cheat-sheet (testnet profile, packed by the deploy script):
 2h predeposit offer · 1h unstake vest (6 × 10m decay epochs) · 30m bomb
 vote · 3d flat exit (constant). All three tunables: PSP_PREDEPOSIT_SEC /

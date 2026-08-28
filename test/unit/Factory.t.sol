@@ -17,6 +17,7 @@ import {PSPFactory} from "../../src/PSPFactory.sol";
 import {HookDeployer} from "../../src/HookDeployer.sol";
 import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
+import {PSPStaker} from "../../src/PSPStaker.sol";
 import {PSPZapIn} from "../../src/PSPZapIn.sol";
 import {PSPZapOut} from "../../src/PSPZapOut.sol";
 import {IMixETH} from "../../src/interfaces/IMixETH.sol";
@@ -47,6 +48,16 @@ contract FactoryTest is Test {
     address attacker = makeAddr("attacker");
 
     uint160 constant SQRT_RATIO_1_1 = 79228162514264337593543950336;
+
+    /// @dev Vote with EVERY pepe `who` owns (2026-08-29 per-NFT voting).
+    function _voteAll(address who, bool support) internal {
+        PSPStaker s = controller.staker();
+        uint256 n = s.balanceOf(who);
+        uint256[] memory ids = new uint256[](n);
+        for (uint256 i; i < n; ++i) ids[i] = s.tokenOfOwnerByIndex(who, i);
+        vm.prank(who);
+        controller.voteCarpetBomb(ids, support);
+    }
 
     function setUp() public {
         mixETH = new MockMixETH();
@@ -218,10 +229,8 @@ contract FactoryTest is Test {
 
         vm.prank(alice);
         controller.proposeCarpetBomb();
-        vm.prank(alice);
-        controller.voteCarpetBomb(true);
-        vm.prank(bob);
-        controller.voteCarpetBomb(true);
+        _voteAll(alice, true);
+        _voteAll(bob, true);
 
         skip(3 days + 1);
         controller.carpetBomb();

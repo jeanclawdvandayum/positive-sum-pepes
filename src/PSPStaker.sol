@@ -117,6 +117,13 @@ contract PSPStaker {
     uint256 public pendingFeesMixETH; // orphaned (zero-weight) fees + rolling remainder
     uint256 public totalLocked;       // Σ principal (display)
 
+    /// @dev Σ principal of positions with NO armed withdraw request — the
+    ///      carpet-vote denominator (scoopy 2026-08-29: quorum must reflect
+    ///      the LIVE locked PSP that is not awaiting the withdraw vest).
+    ///      Maintained incrementally at every mutation site; genesis (id 0)
+    ///      counts (it is always request-free).
+    uint256 public totalVotable;
+
     /// @dev decay steps per vest window: weight(e) = base - k·slope, k = e - requestEpoch
     uint256 public constant VEST_EPOCHS = 6;
 
@@ -411,6 +418,7 @@ contract PSPStaker {
         pos.amount += amount;
         pos.actionTime = block.timestamp;
         totalLocked += amount;
+        totalVotable += amount; // staking always lands on a request-free position (RequestActive guard)
 
         emit Locked(user, pepeId, amount);
     }
@@ -433,6 +441,9 @@ contract PSPStaker {
         slopeAdd[e] += slope;              // decay starts at the next boundary
         slopeSub[e + VEST_EPOCHS] += slope; // slope retires after the final step
         if (base != pos.amount) biasSub[e] += pos.amount - base; // dust now, exact zero later
+        // Votes leave the pool the moment the request arms (scoopy
+        // 2026-08-29: unstaking PSP must not vote; canceling restores).
+        totalVotable -= pos.amount;
 
         emit WithdrawRequested(msg.sender, pepeId);
     }
@@ -469,6 +480,7 @@ contract PSPStaker {
         pos.requestEpoch = 0;
         pos.startEpoch = f; // re-anchor at full amount, live from f+1
         pos.actionTime = block.timestamp;
+        totalVotable += pos.amount; // full vote power restored (scoopy 2026-08-29)
 
         emit WithdrawCancelled(msg.sender, pepeId);
     }
@@ -494,6 +506,7 @@ contract PSPStaker {
         if (pos.requestEpoch != 0) {
             // slope retires at r+6 via slopeSub (lazy) — no correction needed;
             // the position's weight is already zero by construction.
+            // (totalVotable already excluded this at request time.)
         } else {
             // flat-path exit: keep the global honest, instantly
             GlobalPoint memory p = _checkpoint();
@@ -501,6 +514,7 @@ contract PSPStaker {
             points[p.epoch] = p;
         }
         totalLocked -= amount;
+        if (pos.requestEpoch == 0) totalVotable -= amount; // flat-path exit was still votable
         delete positions[pepeId];
 
         psp.safeTransfer(msg.sender, amount);
@@ -558,6 +572,7 @@ contract PSPStaker {
         genesis.amount += amount;
         genesis.actionTime = block.timestamp;
         totalLocked += amount;
+        totalVotable += amount; // genesis never carries a withdraw request
     }
 
     /// @dev Predeposit share claim: move `share` out of the genesis position
@@ -680,26 +695,42 @@ contract PSPStaker {
     /// @notice Voting weight at instant `at`: Σ live position power over the
     ///         caller's pepes that existed by `at`. Governance-only view —
     ///         a position carries FULL voting power from its creation
-    ///         instant, but `actionTime` excludes anything staked after the
-    ///         snapshot, so flash-governance is impossible. Decay from an
-    ///         armed withdraw request mirrors the fee engine step-for-step
-    ///         from the request epoch onward (5/6, 4/6, … 0).
+    ///         instant, so new stakes can always join a live vote
+    ///         (scoopy 2026-08-29). A position with an ARMED withdraw
+    ///         request contributes NOTHING — unstaking PSP does not vote;
+    ///         canceling the request restores full power instantly
+    ///         (scoopy 2026-08-29, supersedes the old decay-mirrored vote
+    ///         weight: hard exclusion is simpler to reason about and to
+    ///         display than a sliding 5/6, 4/6 … vote).
     function voteWeight(address user, uint256 at) external view returns (uint256) {
         uint256 e = at / epochSize();
         uint256[] storage ids = _owned[user];
         uint256 total;
         for (uint256 i; i < ids.length; ++i) {
-            Position storage pos = positions[ids[i]];
-            if (pos.actionTime > at || e < pos.startEpoch) continue;
-            if (pos.requestEpoch == 0 || e <= pos.requestEpoch) {
-                total += pos.amount;
-            } else {
-                uint256 k = e - pos.requestEpoch;
-                if (k >= VEST_EPOCHS) continue; // fully decayed
-                uint256 base = pos.amount - (pos.amount % VEST_EPOCHS);
-                total += base - k * (base / VEST_EPOCHS);
-            }
+            total += _votableAt(ids[i], e, at);
         }
         return total;
+    }
+
+    /// @notice Voting weight of ONE pepe at instant `at` (per-NFT voting —
+    ///         scoopy 2026-08-29). Same rules as voteWeight, single position.
+    function pepeVoteWeight(uint256 pepeId, uint256 at) external view returns (uint256) {
+        return _votableAt(pepeId, at / epochSize(), at);
+    }
+
+    /// @dev votable weight of a position: full principal while request-free,
+    ///      ZERO the moment a withdraw request arms (restored on cancel).
+    function _votableAt(uint256 pepeId, uint256 e, uint256 at) private view returns (uint256) {
+        Position storage pos = positions[pepeId];
+        if (pos.amount == 0) return 0;
+        if (pos.actionTime > at || e < pos.startEpoch) return 0;
+        if (pos.requestEpoch != 0) return 0; // unstaking = not voting
+        return pos.amount;
+    }
+
+    /// @notice Live carpet-vote denominator: Σ locked PSP not awaiting a
+    ///         withdraw cooldown (maintained incrementally — O(1)).
+    function totalVotableWeight() external view returns (uint256) {
+        return totalVotable;
     }
 }

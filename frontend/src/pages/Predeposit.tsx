@@ -5,7 +5,7 @@ import { controllerAbi, erc20Abi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
 import { CHAIN_ID, FAUCET_ENABLED, NATIVE_ETH_FAUCET_URL, TESTNET_ETH_FAUCET } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
-import { fmtAmount, fmtCountdown, parseAmountToWad } from '../lib/format'
+import { fmtAmount, fmtCountdown, parseAmountToWad, wadToExact } from '../lib/format'
 import ReferralCard, { RefBanner } from '../components/ReferralCard'
 import { FaucetButton } from '../components/Topbar'
 import MixLogo from '../components/MixLogo'
@@ -128,13 +128,35 @@ export default function Predeposit() {
   const balanceOk = amountWad > 0n && (mixBal === undefined || amountWad <= mixBal)
   const busy = step === 'approve' || step === 'tx'
 
+  /// per-wallet predeposit cap (0 = uncapped, e.g. mainnet profile)
+  const [walletCap, setWalletCap] = useState<bigint | undefined>(undefined)
+  useEffect(() => {
+    if (!round.controller) return
+    let dead = false
+    rpcCall(round.controller!, controllerAbi, 'PREDEPOSIT_CAP_PER_WALLET')
+      .then((v) => { if (!dead) setWalletCap(v as bigint) })
+      .catch(() => {})
+    return () => { dead = true }
+  }, [round.controller])
+
+  const myDepAmount = myDep?.mixETHAmount ?? 0n
+  const walletCapExceeded =
+    walletCap !== undefined && walletCap > 0n && amountWad > 0n && myDepAmount + amountWad > walletCap
+  /// the most THIS wallet can still deposit: balance ∧ wallet headroom ∧ global headroom
+  const maxDeposit =
+    mixBal !== undefined && pd
+      ? [mixBal, pd.cap - pd.total, walletCap !== undefined && walletCap > 0n ? walletCap - myDepAmount : undefined]
+          .filter((x): x is bigint => x !== undefined)
+          .reduce((a, b) => (a < b ? a : b))
+      : undefined
+
   const endTime = pd && duration !== undefined ? pd.startTime + duration : undefined
   const remaining = endTime !== undefined ? Math.max(0, Number(endTime - BigInt(nowSec))) : undefined
   const mode = round.mode
   const badge = mode !== undefined ? MODE_BADGES[mode] : undefined
   const launched = pd?.closed === true && (mode ?? 0) >= 1
   const canSubmit =
-    isConnected && !!round.controller && amountWad > 0n && balanceOk && !busy && !pd?.closed && !pd?.launchable
+    isConnected && !!round.controller && amountWad > 0n && balanceOk && !walletCapExceeded && !busy && !pd?.closed && !pd?.launchable
 
   async function fail(e: unknown) {
     setError(e instanceof Error ? e.message.slice(0, 140) : 'transaction failed')
@@ -275,7 +297,18 @@ export default function Predeposit() {
             <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
               <div className="flex items-center justify-between text-xs font-bold text-slate-400">
                 <span>commit</span>
-                <span>balance {fmtAmount(mixBal)}</span>
+                <button
+                  type="button"
+                  title="fill the most you can deposit"
+                  onClick={() => setAmount(wadToExact(maxDeposit))}
+                  disabled={maxDeposit === undefined || maxDeposit <= 0n}
+                  className="rounded-md px-1.5 py-0.5 transition hover:bg-sky-100 hover:text-sky-600 disabled:opacity-40"
+                >
+                  balance {fmtAmount(mixBal)}
+                  {maxDeposit !== undefined && maxDeposit > 0n && (
+                    <span className="ml-1 text-[10px] text-sky-500">MAX</span>
+                  )}
+                </button>
               </div>
               <input
                 className="input-amount mt-2"
@@ -284,8 +317,19 @@ export default function Predeposit() {
                 inputMode="decimal"
                 onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
               />
+              {walletCap !== undefined && walletCap > 0n && myDep !== undefined && (
+                <div className="mt-1 text-[11px] font-bold text-slate-400">
+                  per-wallet cap {fmtAmount(walletCap)} mix · yours {fmtAmount(myDep.mixETHAmount)} ·{' '}
+                  {fmtAmount(walletCap - myDep.mixETHAmount > 0n ? walletCap - myDep.mixETHAmount : 0n)} left
+                </div>
+              )}
               {amountWad > 0n && !balanceOk && (
                 <div className="mt-1 text-xs font-bold text-rose-500">insufficient balance</div>
+              )}
+              {amountWad > 0n && walletCapExceeded && (
+                <div className="mt-1 text-xs font-bold text-rose-500">
+                  over the per-wallet cap — max is {fmtAmount(walletCap)} mixETH
+                </div>
               )}
             </div>
 

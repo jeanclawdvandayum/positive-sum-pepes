@@ -55,14 +55,13 @@ contract B6_AdminAPI is BBase {
         );
     }
 
-    // ── F-B6d: drainAll mid-Flat leaves flat buys to div-by-zero panic ──
-    function test_B6d_drainMidFlatThenBuyPanics() public {
+    // ── F-B6d: flat buys are DISABLED outright (scoopy 2026-08-29) ──
+    // Flat mode is a one-way exit: _handleBuy reverts BuyingDisabled before
+    // any math, so the old post-drain div-by-zero panic class is unreachable.
+    function test_B6d_flatBuyDisabled() public {
         _launch(100e18);
         _bobBuysAndLocks(20e18);
-        _bomb();
-
-        vm.prank(address(controller));
-        hook.drainAll(address(controller)); // mode still Flat
+        _bomb(); // → Mode.Flat
 
         vm.startPrank(alice);
         mixETH.approve(address(router), 1e18);
@@ -71,11 +70,25 @@ contract B6_AdminAPI is BBase {
         (bool ok, bytes memory data) =
             address(router).call(abi.encodeCall(BRouter.execute, (key, calls, alice)));
         vm.stopPrank();
-        assertFalse(ok, "post-drain flat buy should revert");
+        assertFalse(ok, "flat buy must revert");
         assertTrue(
-            _contains(data, abi.encodeWithSignature("Panic(uint256)", 0x12)),
-            "expected division-by-zero panic"
+            _contains(data, abi.encodeWithSelector(CurveHook.BuyingDisabled.selector)),
+            "expected BuyingDisabled"
         );
+
+        // the quote view mirrors execution (B7b principle)
+        vm.expectRevert(CurveHook.BuyingDisabled.selector);
+        hook.getBuyOutput(1e18);
+
+        // sanity: the flat SELL path stays open (exit window)
+        uint256 bag = psp.balanceOf(alice);
+        if (bag > 0) {
+            psp.approve(address(router), bag / 10);
+            BRouter.Call[] memory sell = new BRouter.Call[](1);
+            sell[0] = BRouter.Call({isBuy: false, amount: bag / 10, settleMode: 0, takeMode: 0});
+            uint256[] memory outs = router.execute(key, sell, alice);
+            assertGt(outs[0], 0, "flat sell still pays pro-rata");
+        }
     }
 
     // ── mode transitions are strictly enforced ──

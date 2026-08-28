@@ -51,10 +51,11 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///   PSP_TESTNET  =1 to deploy SepoliaMixETH (dumb 1:1, no yield, public
 ///                free mint) + MixETHFaucet (free unlimited drip, no ETH)
 ///                against a canonical v4 testnet PoolManager + playtest
-///                timing profile (2h predeposit offer, 1h unstake vest
-///                decaying in 6 × 10m epochs, 30m bomb vote; flat exit 3d —
-///                all three tunable in seconds: PSP_PREDEPOSIT_SEC /
-///                PSP_VEST_SEC / PSP_VOTE_SEC, vest % 6 == 0)
+///                profile (2h predeposit offer, 1h unstake vest decaying
+///                in 6 × 10m epochs, 30m bomb vote, 10m flat exit, and a
+///                10-mixETH per-wallet predeposit cap — all five tunable:
+///                PSP_PREDEPOSIT_SEC / PSP_VEST_SEC / PSP_VOTE_SEC /
+///                PSP_FLAT_EXIT_SEC / PSP_WALLET_CAP_MIX; vest % 6 == 0)
 ///   PSP_FORK     =1 to vm.deal the broadcaster 5 ETH first — lets you
 ///                dry-run the FULL testnet path (PSP_TESTNET + PSP_PM +
 ///                --fork-url $SEPOLIA_RPC_URL) with any throwaway key and
@@ -98,19 +99,20 @@ contract DeployPSP is Script {
     //   DEPLOYED on 84532 (0 bytes on three RPCs; unused by PSP anyway)
 
     /// @dev Packed playtest timing profile (see RoundController "Timing
-    ///      profile"): predeposit window · unstake vest · bomb vote, all
-    ///      env-tunable IN SECONDS for granularity (PSP_PREDEPOSIT_SEC /
-    ///      PSP_VEST_SEC / PSP_VOTE_SEC; defaults 2h / 1h / 30m — scoopy's
-    ///      2026-08-28 fast-playtest profile, compressed so a full round
-    ///      lifecycle fits in one sitting). VEST must be divisible by 6 —
-    ///      six decay epochs (packTimings guards). Flat exit: PSP_FLAT_EXIT_SEC (4th
-///      packed slot — playtest default 10 minutes; mainnet profile stays 3d).
+    ///      profile"): predeposit window · unstake vest · bomb vote · flat
+    ///      exit · per-wallet predeposit cap (whole mixETH, 0 = uncapped),
+    ///      all env-tunable (PSP_PREDEPOSIT_SEC / PSP_VEST_SEC /
+    ///      PSP_VOTE_SEC / PSP_FLAT_EXIT_SEC / PSP_WALLET_CAP_MIX; defaults
+    ///      2h / 1h / 30m / 10m / 10 — scoopy's 2026-08-28+29 fast-playtest
+    ///      profiles). VEST must be divisible by 6 — six decay epochs
+    ///      (packTimings guards).
     function _testnetTimings() internal view returns (uint256) {
-        return CurveMath.packTimings(
+        return CurveMath.packTimingsCapped(
             vm.envOr("PSP_PREDEPOSIT_SEC", uint256(2 hours)),
             vm.envOr("PSP_VEST_SEC", uint256(1 hours)),
             vm.envOr("PSP_VOTE_SEC", uint256(30 minutes)),
-            vm.envOr("PSP_FLAT_EXIT_SEC", uint256(10 minutes))
+            vm.envOr("PSP_FLAT_EXIT_SEC", uint256(10 minutes)),
+            vm.envOr("PSP_WALLET_CAP_MIX", uint256(10))
         );
     }
 

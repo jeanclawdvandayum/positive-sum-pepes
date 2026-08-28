@@ -92,10 +92,18 @@ contract AuditorBase is Test {
     function _bomb(address proposer) internal {
         vm.prank(proposer);
         controller.proposeCarpetBomb();
-        vm.prank(proposer);
-        controller.voteCarpetBomb(true);
+        _voteAll(proposer, true);
         _warpPastVote();
         controller.carpetBomb();
+    }
+
+    /// @dev Vote with EVERY pepe `who` owns (2026-08-29 per-NFT voting).
+    function _voteAll(address who, bool support) internal {
+        uint256 n = stakerV.balanceOf(who);
+        uint256[] memory ids = new uint256[](n);
+        for (uint256 i; i < n; ++i) ids[i] = stakerV.tokenOfOwnerByIndex(who, i);
+        vm.prank(who);
+        controller.voteCarpetBomb(ids, support);
     }
 
     function _warpPastVote() internal {

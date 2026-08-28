@@ -299,4 +299,77 @@ contract PSPFactory is Ownable2Step {
     function getRound(uint256 roundId) external view returns (Round memory) {
         return rounds[roundId];
     }
+
+    // ─────────────── UI round views (scoopy 2026-08-29) ───────────────
+    // Everything a frontend needs to build the site for the CURRENT round
+    // (or any historical one), queryable by round number. Rebirth itself
+    // was already permissionless (finalizeCarpet → spawnNextRound deploys
+    // round n+1 with a fresh PSP-n token seeded with the carry — the game
+    // loop needs no extra "initialize" call).
+
+    /// @notice Number of the current (latest deployed) round.
+    function currentRound() external view returns (uint256) {
+        return currentRoundId;
+    }
+
+    /// @notice PSP token of a round — round 1 PSP, round 2 PSP2, …
+    function pspRoundToken(uint256 roundId) external view returns (address) {
+        address t = address(rounds[roundId].token);
+        if (t == address(0)) revert RoundNotFound();
+        return t;
+    }
+
+    /// @notice The V4 pool key of a round (sorted currencies + hook).
+    function roundPool(uint256 roundId)
+        external
+        view
+        returns (address currency0, address currency1, uint24 fee, int24 spacing, address hook)
+    {
+        Round storage r = rounds[roundId];
+        if (address(r.token) == address(0)) revert RoundNotFound();
+        currency0 = address(mixETH);
+        currency1 = address(r.token);
+        if (currency0 > currency1) (currency0, currency1) = (currency1, currency0);
+        return (currency0, currency1, 0x800000, tickSpacing, address(r.hook));
+    }
+
+    /// @notice One-call round summary for UIs: every contract + lifecycle
+    ///         flag for a round, including the live phase timings the
+    ///         controller carries (predeposit/vest/vote/flatExit).
+    function roundInfo(uint256 roundId)
+        external
+        view
+        returns (
+            address token,
+            address controller,
+            address hook,
+            address staker,
+            address referralRegistry,
+            string memory name,
+            string memory symbol,
+            bool destroyed,
+            uint256 predepositDuration,
+            uint256 vestDuration,
+            uint256 voteDuration,
+            uint256 flatExitWindow
+        )
+    {
+        Round storage r = rounds[roundId];
+        if (address(r.token) == address(0)) revert RoundNotFound();
+        RoundController c = r.controller;
+        return (
+            address(r.token),
+            address(c),
+            address(r.hook),
+            c.stakerAddress(),
+            referralRegistryOf[roundId],
+            r.name,
+            r.symbol,
+            r.destroyed,
+            c.PREDEPOSIT_DURATION(),
+            c.VEST_DURATION(),
+            c.VOTE_DURATION(),
+            c.FLAT_EXIT_WINDOW()
+        );
+    }
 }

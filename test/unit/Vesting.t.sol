@@ -271,12 +271,22 @@ contract VestingTest is Test {
     function test_VoteWeightSnapshot() public {
         vm.prank(alice);
         stakerV.requestWithdraw(101); // r=2
-        uint256 propose = t0 + 1; // still epoch 2 → full weight
-        assertEq(stakerV.voteWeight(alice, propose), 1000e18);
+        uint256 propose = t0 + 1; // still epoch 2
+        // 2026-08-29 semantics: an armed withdraw request HARD-EXCLUDES the
+        // position from voting — no more same-epoch full-weight grace
+        assertEq(stakerV.voteWeight(alice, propose), 0, "unstaking = no vote");
+        assertEq(stakerV.pepeVoteWeight(101, propose), 0, "per-pepe view agrees");
+        // while the fee engine still decays it step-for-step
+        assertEq(stakerV.biasOf(101, block.timestamp), 1000e18, "fee weight full at request");
 
         vm.warp(t0 + 3 * EPOCH); // epoch 5
-        assertEq(stakerV.voteWeight(alice, propose), 1000e18, "snapshot frozen at propose");
+        assertEq(stakerV.voteWeight(alice, propose), 0, "still excluded");
         assertEq(stakerV.biasOf(101, block.timestamp), _wAt(1000e18, 3));
+
+        // cancel restores the vote INSTANTLY (scoopy 2026-08-29)
+        vm.prank(alice);
+        stakerV.cancelWithdraw(101);
+        assertEq(stakerV.voteWeight(alice, block.timestamp), 1000e18, "cancel restored full power");
 
         // post-propose action excluded: bob tops up AFTER propose
         vm.warp(propose + 1);

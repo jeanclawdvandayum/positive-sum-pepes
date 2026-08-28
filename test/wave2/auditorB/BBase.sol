@@ -76,6 +76,14 @@ abstract contract BBase is Test {
         vm.deal(alice, 1000 ether);
         vm.deal(bob, 1000 ether);
         vm.deal(carol, 1000 ether);
+
+        // Realistic clock: foundry's default block.timestamp = 1 is EPOCH 0,
+        // and the staker's `lastPointEpoch == 0` doubles as the "never
+        // anchored" sentinel — a pure-genesis round (no _stake write yet)
+        // would read totalWeight() == 0 from _pointNow. On-chain epochs are
+        // never 0; warp so the harness matches reality (surfaced 2026-08-29
+        // by the totalVotableWeight asserts).
+        vm.warp(7 days * 1000 + 3 days + 1);
     }
 
     // ─────────────── lifecycle helpers ───────────────
@@ -117,12 +125,19 @@ abstract contract BBase is Test {
         skip((((block.timestamp / 7 days) + 1) * 7 days + 1) - block.timestamp);
         vm.prank(alice);
         controller.proposeCarpetBomb();
-        vm.prank(alice);
-        controller.voteCarpetBomb(true);
-        vm.prank(bob);
-        controller.voteCarpetBomb(true);
+        _voteAll(alice, true);
+        _voteAll(bob, true);
         skip(3 days + 1);
         controller.carpetBomb(); // → Mode.Flat, pot redeemed+burned
+    }
+
+    /// @dev Vote with EVERY pepe `who` owns (2026-08-29 per-NFT voting).
+    function _voteAll(address who, bool support) internal {
+        uint256 n = stakerV.balanceOf(who);
+        uint256[] memory ids = new uint256[](n);
+        for (uint256 i; i < n; ++i) ids[i] = stakerV.tokenOfOwnerByIndex(who, i);
+        vm.prank(who);
+        controller.voteCarpetBomb(ids, support);
     }
 
     /// @dev true if `needle` occurs anywhere in `haystack` (revert-data containment)

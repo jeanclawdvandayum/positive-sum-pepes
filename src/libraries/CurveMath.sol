@@ -542,6 +542,21 @@ library CurveMath {
         return predeposit | (vest << 51) | (vote << 102) | (flatExit << 153);
     }
 
+    /// @dev 5-slot profile (scoopy 2026-08-29): the four timing slots plus a
+    ///      per-wallet predeposit cap in WHOLE mixETH (slot 204 — wad values
+    ///      don't fit 51 bits; 10 = 10e18 wei). 0 = uncapped. packTimings
+    ///      output is a valid prefix (its slot-5 reads zero).
+    function packTimingsCapped(
+        uint256 predeposit,
+        uint256 vest,
+        uint256 vote,
+        uint256 flatExit,
+        uint256 walletCapMix
+    ) internal pure returns (uint256) {
+        if (walletCapMix >= (1 << 51)) revert TimingsOverflow();
+        return packTimings(predeposit, vest, vote, flatExit) | (walletCapMix << 204);
+    }
+
     error TimingsOverflow();
     error VestNotEpochal();
 }

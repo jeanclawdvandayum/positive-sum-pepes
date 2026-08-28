@@ -21,6 +21,7 @@ import {CurveMath} from "../../../src/libraries/CurveMath.sol";
 import {MockMixETH} from "../../mocks/MockMixETH.sol";
 import {MockPoolManager} from "../../mocks/MockPoolManager.sol";
 import {StakerDeployer} from "../../../src/StakerDeployer.sol";
+import {PSPStaker} from "../../../src/PSPStaker.sol";
 
 /// @dev Auditor C harness: the REAL PSPFactory + both deployer vessels + the
 ///      REAL CurveHook flow against the functional MockPoolManager. No source
@@ -103,13 +104,21 @@ contract CBase is Test {
     function _bombRound1() internal {
         vm.prank(alice);
         controller1.proposeCarpetBomb();
-        vm.prank(alice);
-        controller1.voteCarpetBomb(true);
-        vm.prank(bob);
-        controller1.voteCarpetBomb(true);
-        (, uint256 proposeTime,,,,) = controller1.currentProposal();
+        _voteAll1(alice, true);
+        _voteAll1(bob, true);
+        (, uint256 proposeTime,,,) = controller1.currentProposal();
         vm.warp(proposeTime + 3 days + 1);
         controller1.carpetBomb();
+    }
+
+    /// @dev Vote with EVERY round-1 pepe `who` owns (2026-08-29 per-NFT voting).
+    function _voteAll1(address who, bool support) internal {
+        PSPStaker s = controller1.staker();
+        uint256 n = s.balanceOf(who);
+        uint256[] memory ids = new uint256[](n);
+        for (uint256 i; i < n; ++i) ids[i] = s.tokenOfOwnerByIndex(who, i);
+        vm.prank(who);
+        controller1.voteCarpetBomb(ids, support);
     }
 
     /// @dev Past the flat exit window — finalizeCarpet is now unblocked.
