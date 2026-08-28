@@ -215,12 +215,11 @@ contract VestingTest is Test {
 
         vm.prank(alice);
         stakerV.cancelWithdraw(101);
-        // documented quirk: the cancel epoch itself is forfeit (re-anchored),
-        // full power returns at the next boundary
-        assertEq(stakerV.biasOf(101, block.timestamp), 0, "cancel epoch forfeit");
+        // 2026-08-28b: cancels restore instantly — the forfeit epoch is gone
+        assertEq(stakerV.biasOf(101, block.timestamp), 1000e18, "restored immediately");
 
         vm.warp(t0 + 2 * EPOCH); // epoch 4
-        assertEq(stakerV.biasOf(101, block.timestamp), 1000e18, "restored");
+        assertEq(stakerV.biasOf(101, block.timestamp), 1000e18, "stays restored");
         assertEq(stakerV.totalWeight(), 2000e18, "aggregate restored");
     }
 

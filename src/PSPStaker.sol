@@ -15,27 +15,32 @@ interface IPepeDescriptor {
 /// @title PSPStaker — epoch-point staking with InfiniFi-style linear unwinding.
 /// @notice Design (after InfiniFi-Labs/infinifi-protocol `UnwindingModule`):
 ///         All dividend/voting weight lives in a lazily-checkpointed global
-///         point {weight, slope} advanced once per epoch. Weight changes
-///         (stake, top-up, request, cancel) register per-epoch deltas that go
-///         live at the NEXT epoch boundary, so weight is constant within an
-///         epoch. A withdraw request arms a 6-epoch linear decay (veCRV-style
-///         bias + slope): full weight through the request epoch, then
-///         5/6, 4/6, … 0.
+///         point {weight, slope}. UPWARD weight changes (stake, top-up,
+///         cancel, genesis lock) land INSTANTLY via direct point correction
+///         (scoopy 2026-08-28b: a fresh stake earns on the subsequent trade —
+///         no next-epoch activation wait). DOWNWARD changes stay epoch-
+///         aligned: a withdraw request arms a 6-epoch linear decay (veCRV
+///         bias + slope) — full weight through the request epoch, then
+///         5/6, 4/6, … 0 at each boundary — implemented as per-epoch slope
+///         deltas. Accepted trade: front-running a known fee event with
+///         stake capital (JIT-LP style) earns that event's pro-rata share;
+///         governance is unaffected (voteWeight ignores post-snapshot
+///         actionTime).
 ///
 ///         Fee credits are NOT epoch-based (2026-08-28 redesign, scoopy's
 ///         must-fix): a single monotonic `creditPerWeight` accumulator is
 ///         advanced the instant fees arrive — `delta = fees * 1e30 /
 ///         totalWeight` — and every position claims `weightNow * (credit -
 ///         checkpoint) / 1e30` live, with no epoch walk and no boundary wait.
-///         Because weights are frozen within an epoch, the accumulator split
-///         for static positions is identical to the retired per-epoch bucket
-///         math. The one approximation (explicitly accepted): a DECAYING
-///         position that skips claims while its vest steps down has fees
-///         earned at earlier, higher weights settled at its current, lower
-///         weight — it under-credits only, never over-credits, and a position
-///         that reaches zero weight with unclaimed credit forfeits it (claim
-///         before your vest runs out). Weight anchoring still uses stored
-///         points so direct corrections (mid-decay cancel) propagate.
+///         Each feed splits at the total weight live at that instant, so
+///         same-instant weight/fee interleavings are exact; positions settle
+///         before any weight mutation, so nothing is credited retroactively.
+///         The one approximation (explicitly accepted): a DECAYING position
+///         that skips claims while its vest steps down has fees earned at
+///         earlier, higher weights settled at its current, lower weight — it
+///         under-credits only, never over-credits, and a position that
+///         reaches zero weight with unclaimed credit forfeits it (claim
+///         before your vest runs out).
 contract PSPStaker {
     using SafeERC20 for IERC20;
 
@@ -231,12 +236,14 @@ contract PSPStaker {
     // ─────────────── Weight math ───────────────
 
     /// @notice A position's live dividend/voting weight during epoch e.
-    ///         Indefinite locks: full amount from the epoch after staking.
-    ///         Decaying: full through the request epoch, then 5/6, 4/6, … 0
-    ///         (dust-safe: the base is rounded down to a multiple of 6).
+    ///         Upward changes (fresh stake, top-up, cancel, genesis) land
+    ///         INSTANTLY — weightAt(stakeEpoch) is already the full amount, so
+    ///         the trade right after a stake confirms credits it.
+    ///         Decaying: full through the request epoch, then 5/6, 4/6, … 0 at
+    ///         each boundary after (dust-safe: base rounds down to ×6).
     function weightAt(uint256 pepeId, uint256 e) public view returns (uint256) {
         Position storage pos = positions[pepeId];
-        if (pos.amount == 0 || e <= pos.startEpoch) return 0;
+        if (pos.amount == 0 || e < pos.startEpoch) return 0;
         if (pos.requestEpoch == 0 || e <= pos.requestEpoch) return pos.amount;
         uint256 k = e - pos.requestEpoch;
         if (k >= VEST_EPOCHS) return 0;
@@ -388,15 +395,19 @@ contract PSPStaker {
 
         uint256 e = _epoch();
         if (pos.amount == 0) {
-            _anchorNow(); // materialize the global anchor before any delta
             pos.startEpoch = e;
             pos.creditCheckpoint = creditPerWeight;
         } else {
-            // re-anchor at full weight, live from e+1 (epoch e forfeited —
-            // uniform with every other mutation)
-            pos.startEpoch = e;
+            pos.startEpoch = e; // re-anchor (credit already settled above)
         }
-        biasAdd[e] += amount;
+        // Weight goes live INSTANTLY (scoopy 2026-08-28b: a fresh stake earns
+        // on the subsequent trade): correct the stored point directly — a
+        // biasAdd[e] delta would double-apply at e+1 on top of this. The
+        // settle above paid everything accrued at the OLD weight, so crediting
+        // restarts at the new weight with zero retroactivity.
+        GlobalPoint memory p = _checkpoint();
+        p.weight += amount;
+        points[p.epoch] = p;
         pos.amount += amount;
         pos.actionTime = block.timestamp;
         totalLocked += amount;
@@ -446,13 +457,13 @@ contract PSPStaker {
             slopeSub[r + VEST_EPOCHS] -= slope;
             if (dust != 0) biasSub[r] -= dust;
         } else {
-            // slope partially applied — correct the live point directly and
-            // restore the decayed-away weight (+dust) from the next boundary
+            // slope partially applied — correct the live point directly:
+            // remove the slope AND restore the decayed-away weight + dust now
             GlobalPoint memory p = _checkpoint();
             p.slope -= slope;
+            p.weight += (f - r) * slope + dust;
             points[p.epoch] = p;
             slopeSub[r + VEST_EPOCHS] -= slope;
-            biasAdd[f] += (f - r) * slope + dust;
         }
 
         pos.requestEpoch = 0;
@@ -484,7 +495,10 @@ contract PSPStaker {
             // slope retires at r+6 via slopeSub (lazy) — no correction needed;
             // the position's weight is already zero by construction.
         } else {
-            biasSub[_epoch()] += amount; // flat-path exit: keep the global honest
+            // flat-path exit: keep the global honest, instantly
+            GlobalPoint memory p = _checkpoint();
+            p.weight -= amount;
+            points[p.epoch] = p;
         }
         totalLocked -= amount;
         delete positions[pepeId];
@@ -534,10 +548,13 @@ contract PSPStaker {
         if (amount == 0) revert ZeroAmount();
         Position storage genesis = positions[0];
         uint256 e = _epoch();
-        _anchorNow();
         genesis.startEpoch = e; // (re)anchor increments (pre-launch: no fees yet)
         genesis.creditCheckpoint = creditPerWeight;
-        biasAdd[e] += amount;
+        // live from the first post-launch trade — the whole predeposit pool
+        // backs the curve's earliest fees, so no first-locker capture window
+        GlobalPoint memory p = _checkpoint(); // anchors on the first write ever
+        p.weight += amount;
+        points[p.epoch] = p;
         genesis.amount += amount;
         genesis.actionTime = block.timestamp;
         totalLocked += amount;
@@ -559,17 +576,16 @@ contract PSPStaker {
         genesis.actionTime = block.timestamp;
 
         uint256 e = _epoch();
-        biasSub[e] += share;
+        // weight moves between positions (genesis → fresh pepe), both live
+        // immediately via their amounts — the global total is unchanged, so
+        // no deltas or corrections are needed here.
 
         uint256 id = _mintFresh(user);
-        _anchorNow();
         Position storage pos = positions[id];
         pos.amount = share;
         pos.startEpoch = e;
         pos.creditCheckpoint = creditPerWeight;
         pos.actionTime = block.timestamp;
-        biasAdd[e] += share;
-        // totalLocked unchanged: share moves between positions
 
         if (shareFees != 0) _payFees(user, shareFees, true);
 
@@ -663,12 +679,11 @@ contract PSPStaker {
 
     /// @notice Voting weight at instant `at`: Σ live position power over the
     ///         caller's pepes that existed by `at`. Governance-only view —
-    ///         unlike the fee engine (where fresh locks go live at the next
-    ///         epoch boundary so per-epoch splits stay exact), a position
-    ///         carries FULL voting power from its creation epoch, so a new
-    ///         stake can propose and vote immediately. Decay from an armed
-    ///         withdraw request mirrors the fee engine step-for-step from the
-    ///         request epoch onward (5/6, 4/6, … 0).
+    ///         a position carries FULL voting power from its creation
+    ///         instant, but `actionTime` excludes anything staked after the
+    ///         snapshot, so flash-governance is impossible. Decay from an
+    ///         armed withdraw request mirrors the fee engine step-for-step
+    ///         from the request epoch onward (5/6, 4/6, … 0).
     function voteWeight(address user, uint256 at) external view returns (uint256) {
         uint256 e = at / epochSize();
         uint256[] storage ids = _owned[user];

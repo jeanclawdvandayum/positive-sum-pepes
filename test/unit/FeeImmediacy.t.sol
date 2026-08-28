@@ -20,16 +20,22 @@ contract MockFactory2 {
 
 /// @title FeeImmediacyTest — scoopy's must-fix (2026-08-28): trading fees must
 ///         be assigned and claimable AS THEY COME IN, not at epoch close.
-/// @notice Pins the new accumulator semantics:
+///         Follow-up (2026-08-28b): a fresh stake must earn on the SUBSEQUENT
+///         trade — no next-epoch activation wait.
+/// @notice Pins the accumulator semantics:
 ///         1. fees fed mid-epoch are visible in pendingFeesOf and payable via
 ///            claimFees IMMEDIATELY — no boundary wait;
 ///         2. multiple feeds within one epoch stack;
-///         3. fresh stakes still earn nothing until the next epoch (the
-///            anti-sandwich property is preserved — immediacy ≠ front-running);
+///         3. fresh stakes / top-ups / cancels / genesis are live INSTANTLY —
+///            the trade after the stake credits it; pre-stake fees are NOT
+///            retroactively claimed (checkpoint discipline). Accepted trade:
+///            front-running a known fee event with stake capital (JIT-style)
+///            now works — capital-at-risk for one event's pro-rata share;
 ///         4. claims are checkpointed — no double pay on re-claim;
 ///         5. wei-scale dust is never stranded (rolling remainder);
 ///         6. decayers claiming epochs late get the blessed approximation:
-///            ≤ bucket-exact share, never more (solvency preserved).
+///            ≤ bucket-exact share, never more (solvency preserved);
+///         7. Σ position weights == totalWeight() at every instant.
 contract FeeImmediacyTest is Test {
     RoundController controller;
     PSPStaker stakerV;
@@ -115,30 +121,80 @@ contract FeeImmediacyTest is Test {
         assertEq(mixETH.balanceOf(bob), 50e18);
     }
 
-    // ── 3) immediacy does NOT open a same-epoch sandwich ──
+    // ── 3) fresh stakes earn on the SUBSEQUENT trade, never retroactively ──
 
-    function test_FreshStakeCannotHarvestSameEpochFees() public {
-        _feedFees(100e18); // alice + bob split
+    function test_FreshStakeEarnsOnSubsequentTrade() public {
+        _feedFees(100e18); // lands BEFORE carol stakes — not hers
 
-        // carol sees the fee event and stakes in the same epoch
         vm.startPrank(carol);
         pspToken.approve(address(stakerV), type(uint256).max);
         stakerV.lockWithPepe(10_000e18, 303);
         vm.stopPrank();
 
-        assertEq(stakerV.pendingFeesOf(303), 0, "fresh stake earns nothing this epoch");
-        assertEq(stakerV.pendingFeesOf(101), 50e18, "existing stakers unaffected");
+        assertEq(stakerV.pendingFeesOf(303), 0, "no retroactive credit for pre-stake fees");
 
-        // and carol cannot claim before her weight goes live at the boundary
+        // the first trade AFTER the stake confirms credits carol immediately
+        _feedFees(120e18); // weights 1000/1000/10000
+        assertEq(stakerV.pendingFeesOf(303), 100e18, "earns on the subsequent trade");
+        assertEq(stakerV.pendingFeesOf(101), 50e18 + 10e18, "alice: past + new");
+        assertEq(stakerV.pendingFeesOf(202), 50e18 + 10e18);
+
         vm.prank(carol);
-        vm.expectRevert(PSPStaker.NothingToClaim.selector);
         stakerV.claimFees(303);
+        assertEq(mixETH.balanceOf(carol), 100e18, "claimable immediately");
+    }
 
-        // after the boundary carol earns from NEW fees only — not the past ones
-        vm.warp(t0 + EPOCH); // epoch 3
-        _feedFees(120e18); // weights 1000/1000/10000 -> carol 10/12
-        assertEq(stakerV.pendingFeesOf(303), 100e18, "carol earns new fees at live weight");
-        assertEq(stakerV.pendingFeesOf(101), 50e18 + 10e18, "alice keeps past + new");
+    function test_TopUpEarnsOnSubsequentTrade() public {
+        _feedFees(100e18); // bob's 50e18 outstanding
+
+        vm.prank(bob);
+        stakerV.stakeFor(bob, 202, 2000e18); // settles + pays the 50e18, tops up
+
+        assertEq(mixETH.balanceOf(bob), 50e18, "top-up settles pre-topup fees first");
+        assertEq(stakerV.pendingFeesOf(202), 0);
+
+        _feedFees(120e18); // weights now 1000 + 3000
+        assertEq(stakerV.pendingFeesOf(202), 90e18, "top-up live immediately");
+        assertEq(stakerV.pendingFeesOf(101), 50e18 + 30e18);
+    }
+
+    function test_CancelRestoresWeightImmediately() public {
+        vm.prank(alice);
+        stakerV.requestWithdraw(101); // r=2
+        vm.warp(t0 + 1 * EPOCH); // epoch 3: alice k=1
+
+        vm.prank(alice);
+        stakerV.cancelWithdraw(101);
+        assertEq(stakerV.biasOf(101, block.timestamp), 1000e18, "restored immediately");
+        assertEq(stakerV.totalWeight(), 2000e18, "global restored immediately");
+
+        _feedFees(100e18); // 50/50 again right away
+        assertEq(stakerV.pendingFeesOf(101), 50e18);
+    }
+
+    function test_GenesisLiveOnFirstTrade() public {
+        vm.prank(address(controller));
+        stakerV.lockGenesis(2000e18); // locked during epoch 2
+
+        _feedFees(120e18); // first trade after the genesis lock — same epoch
+        assertEq(stakerV.pendingFeesOf(0), 60e18, "genesis earns from the first trade");
+        assertEq(stakerV.pendingFeesOf(101), 30e18);
+        assertEq(stakerV.pendingFeesOf(202), 30e18);
+    }
+
+    function test_TotalWeightMatchesPositionSumInstantly() public {
+        vm.startPrank(carol);
+        pspToken.approve(address(stakerV), type(uint256).max);
+        stakerV.lockWithPepe(10_000e18, 303);
+        vm.stopPrank();
+
+        // same epoch as the stake: global weight already includes it
+        uint256 e = block.timestamp / EPOCH;
+        assertEq(
+            stakerV.totalWeight(),
+            stakerV.weightAt(101, e) + stakerV.weightAt(202, e) + stakerV.weightAt(303, e),
+            "sum of position weights == totalWeight at every instant"
+        );
     }
 
     // ── 4) claims checkpoint: no double pay ──

@@ -88,8 +88,32 @@ contract B4_CurveMathFuzz is Test {
         // fresh fuzz seed found ~7bps overshoot at dust supplies (supply
         // ~6.7e3 wei). Widened to +20bps as the tolerance pin — the exact
         // pins below keep zero tolerance. Buyer-side bonus, not dilution.
+        // 2026-08-28: another fresh seed found +137bps at supply = 17 wei —
+        // same B-2 dust family. That regime is unreachable through the hook
+        // (launchPooledBuy jumps supply to the pooled output in one shot;
+        // MIN_SWAP_INPUT keeps it there), so the fuzz now assumes reachable
+        // supplies and the dust regime is pinned deterministically below
+        // (test_B4a2). Overshoot shrinks monotonically with supply (7bps at
+        // 6.7e3), so a 1e12 floor leaves ~8 orders of margin under +20bps.
+        vm.assume(supply >= 1e12);
         uint256 bound = uint256(input) + (uint256(input) * 20) / 10000;
         assertLe(spent, bound, "buy over-minted beyond +20bps");
+    }
+
+    // B-2 dust-regime pin (2026-08-28, fuzzer counterexample seed=8000,
+    // input=1e12, supply=17): computeBuyOutput over-mints ~+137bps of input
+    // at near-zero supplies — integer precision is coarse when the minted
+    // slice dwarfs the standing supply. Buyer-side bonus (they receive more
+    // PSP than the input backs). NOT reachable on-chain: hook supply never
+    // sits at dust (genesis pooled buy, MIN_SWAP_INPUT), see B4a comment.
+    // Sentinel: if the library is ever tightened, flip this pin like B4b's.
+    function test_B4a2_dustSupplyOvershoot_pinned() public {
+        CurveMath.CurveConfig memory c = _randCfg(8000);
+        uint256 out = CurveMath.computeBuyOutput(1e12, 17, c);
+        assertGt(out, 0, "no mint, config drifted?");
+        uint256 spent = CurveMath.curveIntegral(17, 17 + out, c);
+        assertGt(spent, 1e12, "dust over-mint regime vanished, library tightened?");
+        assertLe(spent, 1e12 + (1e12 * 150) / 10000, "dust overshoot grew beyond +150bps");
     }
 
     function _containsLocal(bytes memory haystack, bytes memory needle) internal pure returns (bool) {

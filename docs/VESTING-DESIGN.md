@@ -35,13 +35,20 @@ rewardDebt.
   (a position-creating call), so no delta can predate it and the walk never
   starts from epoch 0 (small epochs would otherwise make that ~100k+
   iterations).
-- **Weight only changes at epoch boundaries.** Every weight mutation (stake,
-  top-up, request, cancel, flat-withdraw) registers a per-epoch delta that goes
-  live at the NEXT boundary. Within an epoch, weights are constant — that is
-  the exactness invariant the dual-leg design lacked.
+- **Upward weight changes land INSTANTLY (2026-08-28b); downward steps stay
+  epoch-aligned.** Stakes, top-ups, cancels and the genesis lock correct the
+  stored global point directly (`p.weight ±= Δ`), so weight follows the
+  position the moment it changes — a fresh stake earns on the subsequent
+  trade. Withdraw requests arm slope deltas that step down at each boundary
+  (5/6, 4/6, … 0). Weight is NOT constant within an epoch anymore; the fee
+  accumulator doesn't care (each feed splits at the weight live at that
+  instant), and positions always settle before mutating, so nothing is
+  credited retroactively. Accepted trade: front-running a known fee event
+  with stake capital (JIT-LP style) earns that event's pro-rata share —
+  capital at risk for one event, bounded by A/(W+A).
 
 ### Global point
-`GlobalPoint {epoch, weight, slope, fees}` stored per epoch, lazily
+`GlobalPoint {epoch, weight, slope}` stored per epoch, lazily
 extrapolated (`_advance`) from the last stored point via four delta maps:
 `biasAdd/biasSub/slopeAdd/slopeSub[epoch]` (applied advancing e→e+1). Stored
 points are authoritative — walkers prefer them so direct corrections
@@ -72,14 +79,20 @@ so sub-precision dust accumulates until it crosses one credit unit — the
 wave2 A-F3 stranding bug stays dead. `FeesCredited(amount, creditAfter)` is
 emitted on every credit for UI/indexing.
 
-**Why exactness survives for static positions:** weights only change at epoch
-boundaries, so `totalWeight` is frozen within an epoch — the accumulator
-split `w · Δcredit / W` is arithmetically identical to the retired per-epoch
-bucket replay. Immediacy costs nothing here.
+**Why crediting stays exact:** every feed splits at the total weight live at
+that instant (`Δcredit = fees/W_now`), and every position settles before its
+weight mutates — so fees earned at weight w are always paid at w. Nothing is
+double-counted or credited retroactively, at any interleaving of stakes and
+trades.
 
-**Why immediacy is safe:** a fresh stake has `weightAt = 0` until the next
-epoch, so no same-tx stake→harvest→exit sandwich exists — the anti-manip
-property was always the next-epoch weight gate, never the claim delay.
+**Immediacy and manipulation (2026-08-28b):** fresh stakes are live the
+instant they confirm, so front-running a known fee-generating trade with
+stake capital DOES earn that event's pro-rata share (JIT-LP shaped: capital
+at risk, bounded by A/(W+A) of one event, and unwinding still walks the
+6-epoch vest). Accepted explicitly for the playtest. What remains
+impossible: retroactive credit for fees that landed before the stake
+(checkpoint discipline) and flash-governance (`voteWeight` ignores
+post-snapshot `actionTime`).
 
 ### Settlement (claims — O(1))
 Every position carries `creditCheckpoint` — the accumulator value at its last
@@ -98,23 +111,25 @@ under-credits only, never over-credits (solvency holds: Σ claims ≤ Σ fees).
 A position that reaches zero weight with unclaimed credit forfeits it —
 claim before your vest runs out (the UI surfaces this).
 
-### Mutations (uniform rule: upward changes land next boundary)
-- `_stake` fresh: `startEpoch = e`, `biasAdd[e] += amount` — live from e+1. A
-  fresh stake does not retroactively claim this epoch's already-deposited fees
-  (mid-epoch fairness — why InfiniFi registers bias at the current epoch).
-- top-up: settle + pay first, `biasAdd[e] += add`, `startEpoch = e` re-anchor
-  (the top-up epoch itself is forfeit — ≤1 epoch under-accrual, uniform).
+### Mutations (rule: upward lands INSTANTLY, downward steps at boundaries)
+- `_stake` fresh: `startEpoch = e`, checkpoint `creditPerWeight`, then direct
+  point correction `p.weight += amount` — live on the SUBSEQUENT trade (no
+  next-epoch wait). Fees that landed before the stake are not credited
+  retroactively (the checkpoint sees to that).
+- top-up: settle + pay first, re-anchor `startEpoch = e`, same direct
+  correction for the added amount — live instantly.
 - `requestWithdraw`: settle+pay, arm the slope (weight unchanged at E).
 - `cancelWithdraw` at f: settle+pay. If f == E: unwind the pending deltas
   (slopeAdd/slopeSub/biasSub). If f > E: checkpoint + correct the live point
-  (`p.slope -= slope`), `biasAdd[f] += (f−E)·slope + dust` (full power from
-  f+1; the cancel epoch itself is forfeit), `slopeSub[E+6] -= slope`.
-  Position re-anchors at full amount (`startEpoch = f`, requestEpoch = 0).
+  (`p.slope -= slope; p.weight += (f−E)·slope + dust`) — full power restored
+  INSTANTLY — and `slopeSub[E+6] -= slope`. Position re-anchors at full
+  amount (`startEpoch = f`, requestEpoch = 0).
 - `withdraw` (decayed): weight is already 0 — no corrections. Flat-path
-  (carpet bomb): `biasSub[e] += amount` for tidy bookkeeping.
-- Genesis (`positions[0]`): lockGenesis registers like a stake; share claims
-  settle genesis, pay the share's pro-rata fees (`alloc · share / amount`),
-  `biasSub[e] += share` out + fresh pepe `biasAdd[e] += share` in.
+  (carpet bomb): direct correction `p.weight -= amount` (instant).
+- Genesis (`positions[0]`): lockGenesis corrects the point up instantly —
+  the whole predeposit pool backs fees from the first post-launch trade.
+  Share claims move weight between positions (genesis.amount down, fresh
+  pepe up, both live immediately); the global total is untouched.
 
 ### Views
 - `weightAt(pepeId, e)` / `biasOf(pepeId, ts)`: the stepped schedule.
