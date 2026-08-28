@@ -138,7 +138,7 @@ export default function Landing() {
         </div>
         <div className="grid grid-cols-1 divide-y divide-sky-50 sm:grid-cols-5 sm:divide-x sm:divide-y-0">
           {[
-            ['1', 'predeposit', '7d window, 500 mix cap'],
+            ['1', 'predeposit', 'capped window, pooled genesis buy'],
             ['2', 'launch', 'seed buys mint initial PSP'],
             ['3', 'trade', 'curve market, fees accrue'],
             ['4', 'carpet bomb', '69% quorum ends it'],

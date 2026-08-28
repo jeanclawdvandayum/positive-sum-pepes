@@ -51,7 +51,9 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///                MixETHFaucet (0.0001 ETH -> 100 mixETH) against a
 ///                canonical v4 testnet PoolManager + playtest timing
 ///                profile (24h predeposit offer, 2d unstake vest decaying
-///                in 6 × 8h epochs, 1d bomb vote; flat exit 3d)
+///                in 6 × 8h epochs, 1d bomb vote; flat exit 3d — all
+///                three tunable in seconds: PSP_PREDEPOSIT_SEC /
+///                PSP_VEST_SEC / PSP_VOTE_SEC, vest % 6 == 0)
 ///   PSP_FORK     =1 to vm.deal the broadcaster 5 ETH first — lets you
 ///                dry-run the FULL testnet path (PSP_TESTNET + PSP_PM +
 ///                --fork-url $SEPOLIA_RPC_URL) with any throwaway key and
@@ -70,12 +72,17 @@ contract DeployPSP is Script {
     address constant PM_UNICHAIN_SEPOLIA = 0x9cB26A7183B2F4515945Dc52CB4195B0d2D06C95; // 1301
 
     /// @dev Packed playtest timing profile (see RoundController "Timing
-    ///      profile"): 24h predeposit offer · 2d unstake vest (scoopy
-    ///      2026-08-29 — decay visible in a 2-day playtest via 6 × 8h
-    ///      epochs; mainnet default is 42 days) · 1d bomb vote.
-    ///      Flat exit: constant 3d. Packs via CurveMath.packTimings.
-    function _testnetTimings() internal pure returns (uint256) {
-        return CurveMath.packTimings(1 days, 2 days, 1 days);
+    ///      profile"): predeposit window · unstake vest · bomb vote, all
+    ///      env-tunable IN SECONDS for granularity (PSP_PREDEPOSIT_SEC /
+    ///      PSP_VEST_SEC / PSP_VOTE_SEC; defaults 1d / 2d / 1d). VEST must
+    ///      be divisible by 6 — six decay epochs (packTimings guards).
+    ///      Flat exit: constant 3d.
+    function _testnetTimings() internal view returns (uint256) {
+        return CurveMath.packTimings(
+            vm.envOr("PSP_PREDEPOSIT_SEC", uint256(1 days)),
+            vm.envOr("PSP_VEST_SEC", uint256(2 days)),
+            vm.envOr("PSP_VOTE_SEC", uint256(1 days))
+        );
     }
 
     function run() external {

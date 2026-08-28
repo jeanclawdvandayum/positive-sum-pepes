@@ -6,18 +6,27 @@ import { parseEther } from 'viem'
 import { renderPepeSvg, randomDna } from '../lib/pepeRender'
 import { ADDRESSES, FAUCET_ENABLED } from '../lib/config'
 import { faucetAbi } from '../lib/abi'
+import { useRound } from '../lib/useRound'
 import ThemeSwitcher from './ThemeSwitcher'
 import MixLogo from './MixLogo'
 
-const links = [
+const baseLinks = [
   { to: '/', label: 'home' },
   { to: '/trade', label: 'trade' },
   { to: '/stake', label: 'stake' },
 ]
 
 export default function Topbar() {
+  const round = useRound()
   // a random pepe every load — the header IS the art
   const logo = useMemo(() => renderPepeSvg(randomDna()), [])
+  /// predeposit page is live while the round is in (or before) its predeposit window;
+  /// after launch the page stays reachable by URL for claims.
+  const showPredeposit = round.mode === 0 || round.predepositClosed === false
+  const links = useMemo(() => {
+    if (!showPredeposit) return baseLinks
+    return [...baseLinks.slice(0, 2), { to: '/predeposit', label: 'predeposit' }, baseLinks[2]]
+  }, [showPredeposit])
   return (
     <header className="sticky top-0 z-20 border-b border-sky-100 bg-white/80 backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-3 sm:gap-6 sm:px-6">
@@ -58,8 +67,9 @@ export default function Topbar() {
   )
 }
 
-/// compact testnet faucet: one drip per click — pay 0.0001 ETH, receive 100 mixETH
-function FaucetButton() {
+/// compact testnet faucet: one drip per click — pay 0.0001 ETH, receive 100 mixETH.
+/// `full` renders the wide card variant used on the Predeposit page.
+export function FaucetButton({ full = false }: { full?: boolean }) {
   const { isConnected } = useAccount()
   const [step, setStep] = useState<'idle' | 'tx' | 'done'>('idle')
   const { writeContractAsync } = useWriteContract()
@@ -78,6 +88,19 @@ function FaucetButton() {
     } catch {
       setStep('idle')
     }
+  }
+
+  if (full) {
+    return (
+      <button
+        type="button"
+        disabled={!isConnected}
+        onClick={drip}
+        className={`btn-ghost w-full ${step === 'done' ? 'border-emerald-200 text-emerald-600' : ''}`}
+      >
+        {step === 'done' ? '✅ 100 mixETH dripped' : step === 'tx' ? 'confirm in wallet…' : 'faucet: 0.0001 ETH → 100 mixETH'}
+      </button>
+    )
   }
 
   return (

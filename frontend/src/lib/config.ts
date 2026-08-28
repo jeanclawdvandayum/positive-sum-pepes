@@ -35,6 +35,9 @@ export const ADDRESSES = {
 /// testnet faucet UI is env-gated: hidden unless both addresses are configured.
 export const FAUCET_ENABLED = Boolean(env.VITE_MIX && env.VITE_FAUCET)
 
+/// external PoW faucet for sepolia ETH itself (linked from onboarding UI).
+export const SEPOLIA_ETH_FAUCET_URL = 'https://sepolia-faucet.pk910.de/'
+
 /// reinvest buttons are env-gated the same way.
 export const REINVEST_ENABLED = Boolean(env.VITE_REINVESTOR)
 

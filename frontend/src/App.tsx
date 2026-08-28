@@ -8,6 +8,7 @@ import Topbar from './components/Topbar'
 import Landing from './pages/Landing'
 import Trade from './pages/Trade'
 import Stake from './pages/Stake'
+import Predeposit from './pages/Predeposit'
 
 const queryClient = new QueryClient()
 
@@ -43,6 +44,7 @@ function Shell() {
                   <Route path="/" element={<Landing />} />
                   <Route path="/trade" element={<Trade />} />
                   <Route path="/stake" element={<Stake />} />
+                  <Route path="/predeposit" element={<Predeposit />} />
                 </Routes>
               </main>
               <footer className="pb-8 text-center text-xs text-slate-400">

@@ -6,6 +6,7 @@ export const factoryAbi = parseAbi([
   'function currentRoundId() view returns (uint256)',
   'function rounds(uint256) view returns (address token, address controller, address hook, bool destroyed, string name)',
   'function mixETH() view returns (address)',
+  'function referralRegistryOf(uint256) view returns (address)',
   'function poolManager() view returns (address)',
   'function html() view returns (string)',
 ])
@@ -15,6 +16,10 @@ export const controllerAbi = parseAbi([
   'function predepositState() view returns (uint256 total, uint256 cap, uint256 startTime, bool closed, bool capReached, bool windowOver, bool launchable)',
   'function claimPredepositPSP()',
   'function predeposit(uint256)',
+  'function launchPooledBuy()',
+  'function PREDEPOSIT_DURATION() view returns (uint256)',
+  'function totalPredepositors() view returns (uint256)',
+  'function predeposits(address) view returns ((uint256 mixETHAmount, bool claimed))',
   'function proposeCarpetBomb()',
   'function voteCarpetBomb(bool support)',
   'function carpetBomb()',
@@ -115,6 +120,15 @@ export const zapInAbi = parseAbi([
 export const zapOutAbi = parseAbi([
   'function zapOut((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 pspIn, uint256 minMixOut, uint256 deadline) returns (uint256)',
   'function sellToMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 pspIn, uint256 minMixOut, uint256 deadline) returns (uint256)',
+])
+
+/// PSPReferralRegistry — per-round referral attribution graph (2026-08-27).
+/// record() is called by the VISITOR (msg.sender = trader) and binds forever.
+export const registryAbi = parseAbi([
+  'function record(uint256 referrerNftId)',
+  'function attributed(address) view returns (bool)',
+  'function traderRefNftOf(address) view returns (uint256)',
+  'function canReferNft(uint256) view returns (bool)',
 ])
 
 /// MixETHFaucet — testnet-only: pay multiples of 0.0001 ETH, receive 100 mixETH each.
