@@ -9,6 +9,8 @@ vote · 3d flat exit.
 
 ---
 
+while testing a deployment version of this, I encountered something I REALLY DO NOT LIKE AND MUST BE ADDRESSED. Using the infinifi system for stake weights, you made it so trading fee distribution is delayed. this seriously degrades UX and sucks. The 
+
 ## 0) Prereqs (local machine)
 
 - [ ] Foundry installed and current (`foundryup`)
