@@ -23,7 +23,8 @@ contract MockFactory {
 /// @notice Epoch = VEST/6 = 7d. Weight changes go live at the NEXT epoch
 ///         boundary; a request at epoch E holds full weight through E and
 ///         steps down 5/6, 4/6, … 0 at each boundary after (k = e - E).
-///         Fees fed during epoch e are claimable once e closes.
+///         Fees are credited live via the creditPerWeight accumulator and
+///         are claimable the moment they land (see FeeImmediacy.t.sol).
 /// @dev All warps are ABSOLUTE from a captured t0 — two textually identical
 ///      `vm.warp(block.timestamp + X)` expressions in one function get CSE'd
 ///      by via-ir and the second re-evaluates with the stale timestamp.
@@ -139,9 +140,10 @@ contract VestingTest is Test {
 
     function test_FeeSplitExact() public {
         _feedFees(100e18); // during epoch 2: both live, 50/50
-        assertEq(stakerV.pendingFeesOf(101), 0, "current epoch not closed yet");
+        assertEq(stakerV.pendingFeesOf(101), 50e18, "live immediately, no epoch wait");
+        assertEq(stakerV.pendingFeesOf(202), 50e18);
 
-        vm.warp(t0 + 1 * EPOCH); // epoch 3: epoch 2 closed
+        vm.warp(t0 + 1 * EPOCH); // epoch 3
         assertEq(stakerV.pendingFeesOf(101), 50e18);
         assertEq(stakerV.pendingFeesOf(202), 50e18);
 
@@ -154,10 +156,12 @@ contract VestingTest is Test {
         uint256 total = wA + 1000e18;
         _feedFees(150e18); // during epoch 4
 
-        vm.warp(t0 + 3 * EPOCH); // epoch 5: epoch 4 closed
-        uint256 expA = (150e18 * wA) / total;
+        vm.warp(t0 + 3 * EPOCH); // epoch 5: alice k=2 (blessed: claims scale
+        // at the CURRENT weight, so epoch-4 fees settle at k=2, not k=1)
+        uint256 wA2 = _wAt(1000e18, 2);
+        uint256 expA = (150e18 * wA2) / total; // decayer share (approximation)
         uint256 expB = (150e18 * 1000e18) / total;
-        assertEq(stakerV.pendingFeesOf(101), expA, "decayer share exact");
+        assertEq(stakerV.pendingFeesOf(101), expA, "decayer share at current weight");
         // bob settled nothing since epoch 2 — his epoch-2 50e18 rides along
         assertEq(stakerV.pendingFeesOf(202), 50e18 + expB, "stayer share (+unclaimed ep2)");
         assertTrue(expA + expB <= 150e18, "never over-distributes");
@@ -186,14 +190,14 @@ contract VestingTest is Test {
         vm.prank(alice);
         stakerV.withdraw(101);
         assertEq(pspToken.balanceOf(alice) - pspBefore, 1000e18);
-        (uint256 amt,,,,,,,) = stakerV.positions(101);
+        (uint256 amt,,,,,) = stakerV.positions(101);
         assertEq(amt, 0);
         assertEq(stakerV.ownerOf(101), alice, "NFT kept as husk");
 
         // husk re-stakeable
         vm.prank(alice);
         stakerV.stakeFor(alice, 101, 5e18);
-        (uint256 amt2,,,,,,,) = stakerV.positions(101);
+        (uint256 amt2,,,,,) = stakerV.positions(101);
         assertEq(amt2, 5e18);
     }
 
@@ -333,7 +337,7 @@ contract VestingTest is Test {
         stakerV.claimGenesisShare(alice, 500e18); // 1/4 of genesis → 1/4 of its cut
 
         assertEq(mixETH.balanceOf(alice) - mixBefore, genesisCut * 500e18 / 2000e18);
-        (uint256 amt,,,,,,,) = stakerV.positions(1);
+        (uint256 amt,,,,,) = stakerV.positions(1);
         assertEq(amt, 500e18, "fresh pepe carries the share");
         assertEq(stakerV.ownerOf(1), alice);
     }

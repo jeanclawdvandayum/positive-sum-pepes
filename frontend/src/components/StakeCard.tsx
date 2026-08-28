@@ -6,7 +6,7 @@ import { controllerAbi, erc20Abi, faucetAbi, stakerAbi, reinvestorAbi, buildPool
 import { useRound, useBalances } from '../lib/useRound'
 import { useRpcReads } from '../lib/useRpcReads'
 import { rpcCall } from '../lib/rpc'
-import { fmtAmount, fmtCountdown, parseAmountToWad } from '../lib/format'
+import { fmtAmount, parseAmountToWad } from '../lib/format'
 import MixLogo from './MixLogo'
 import PepePanel from './PepePanel'
 import PepePicker from './PepePicker'
@@ -42,7 +42,6 @@ export default function StakeCard() {
       { to: round.controller, abi: controllerAbi, functionName: 'VEST_DURATION' },
       { to: round.token, abi: erc20Abi, functionName: 'allowance', args: [address ?? ZERO, round.staker ?? ZERO] },
       { to: round.staker, abi: stakerAbi, functionName: 'pendingFeesMixETH' },
-      { to: round.staker, abi: stakerAbi, functionName: 'epochSize' },
     ],
     !!address && !!round.staker && !!round.token,
   )
@@ -57,24 +56,12 @@ export default function StakeCard() {
   const vest = baseResults[1] as bigint | undefined
   const allowance = baseResults[2] as bigint | undefined
   const feesInFlight = baseResults[3] as bigint | undefined
-  const epochSizeSec = baseResults[4] as bigint | undefined
 
-  /// current-epoch point — fees credited there are visible to pendingFeesOf
-  /// only after the epoch CLOSES; parked pendingFeesMixETH additionally needs
-  /// a fee-generating trade to attach. the banner covers both stages.
-  const epochSecNum = epochSizeSec !== undefined ? Number(epochSizeSec) : undefined
-  const curEpoch =
-    epochSecNum !== undefined && epochSecNum > 0
-      ? BigInt(Math.floor(Math.floor(Date.now() / 1000) / epochSecNum))
-      : undefined
-  const epochRes = useRpcReads(
-    [{ to: round.staker, abi: stakerAbi, functionName: 'points', args: [curEpoch ?? 0n] }],
-    curEpoch !== undefined && !!round.staker,
-  )
-  const epochFees = (epochRes[0] as [bigint, bigint, bigint, bigint] | undefined)?.[3]
+  /// fees are credited to stakers the instant they land (live accumulator —
+  /// 2026-08-28 redesign). `pendingFeesMixETH` is only nonzero when there is
+  /// no staked weight at all (e.g. pre-launch): those park until weight
+  /// exists, then attach on the next trade.
   const parked = feesInFlight ?? 0n
-  const attached = epochFees ?? 0n
-  const inPipe = parked + attached
   const reinvestApproved = REINVEST_ENABLED ? (apprResults[0] as boolean | undefined) : undefined
 
   const n = count !== undefined ? Number(count) : 0
@@ -320,15 +307,6 @@ export default function StakeCard() {
 
   const claimable = (round.mode ?? 0) >= 1 && myDep !== undefined && !myDep.claimed && myDep.mixETHAmount > 0n
 
-  /// epoch boundaries are exact multiples of epochSize in unix time
-  /// (staker._epoch = block.timestamp / epochSize) — countdown is exact.
-  const epochSizeNum = epochSizeSec !== undefined ? Number(epochSizeSec) : undefined
-  const nowUnix = Math.floor(Date.now() / 1000)
-  const untilBoundary =
-    epochSizeNum !== undefined && epochSizeNum > 0
-      ? (Math.floor(nowUnix / epochSizeNum) + 1) * epochSizeNum - nowUnix
-      : undefined
-
   const multiBusy = multiStep === 'tx'
 
   return (
@@ -347,17 +325,11 @@ export default function StakeCard() {
           </button>
         </div>
       )}
-      {inPipe > 0n && (
+      {parked > 0n && (
         <div className="card p-4">
           <p className="text-xs font-bold text-slate-500">
-            ⏳ {fmtAmount(inPipe)} mixETH of swap fees in the fee engine
-            {parked > 0n
-              ? ' — waiting on the next fee-generating trade to attach to a weighted epoch'
-              : ' — credited to the current epoch'}
-            . the engine settles whole epochs: claimable right after the next boundary
-            {untilBoundary !== undefined ? ` (in ${fmtCountdown(untilBoundary)})` : ''}
-            {parked > 0n ? ', plus one trade to sweep it in' : ''}. nothing is lost while waiting —
-            fresh stakes also go live at boundaries.
+            ⏳ {fmtAmount(parked)} mixETH of swap fees parked — no staked weight yet, so they
+            attach on the next trade once weight exists. nothing is lost while waiting.
           </p>
         </div>
       )}

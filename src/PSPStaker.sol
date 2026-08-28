@@ -18,14 +18,24 @@ interface IPepeDescriptor {
 ///         point {weight, slope} advanced once per epoch. Weight changes
 ///         (stake, top-up, request, cancel) register per-epoch deltas that go
 ///         live at the NEXT epoch boundary, so weight is constant within an
-///         epoch and every fee split is exact — no accumulator/debt math.
-///         A withdraw request arms a 6-epoch linear decay (veCRV-style bias +
-///         slope): full weight through the request epoch, then 5/6, 4/6, … 0.
-///         Fees deposited during an epoch sit on that epoch's point and are
-///         replayed pro-rata by each position's per-epoch weight on claim.
-///         Positions self-anchor (settledW/settledSlope) so settlement never
-///         depends on a stored point at its settled epoch, and walkers prefer
-///         stored points so direct corrections (mid-decay cancel) propagate.
+///         epoch. A withdraw request arms a 6-epoch linear decay (veCRV-style
+///         bias + slope): full weight through the request epoch, then
+///         5/6, 4/6, … 0.
+///
+///         Fee credits are NOT epoch-based (2026-08-28 redesign, scoopy's
+///         must-fix): a single monotonic `creditPerWeight` accumulator is
+///         advanced the instant fees arrive — `delta = fees * 1e30 /
+///         totalWeight` — and every position claims `weightNow * (credit -
+///         checkpoint) / 1e30` live, with no epoch walk and no boundary wait.
+///         Because weights are frozen within an epoch, the accumulator split
+///         for static positions is identical to the retired per-epoch bucket
+///         math. The one approximation (explicitly accepted): a DECAYING
+///         position that skips claims while its vest steps down has fees
+///         earned at earlier, higher weights settled at its current, lower
+///         weight — it under-credits only, never over-credits, and a position
+///         that reaches zero weight with unclaimed credit forfeits it (claim
+///         before your vest runs out). Weight anchoring still uses stored
+///         points so direct corrections (mid-decay cancel) propagate.
 contract PSPStaker {
     using SafeERC20 for IERC20;
 
@@ -57,6 +67,7 @@ contract PSPStaker {
     event Withdrawn(address indexed user, uint256 indexed pepeId, uint256 amount);
     event FeesClaimed(address indexed user, uint256 indexed pepeId, uint256 amount);
     event FeesForfeited(address indexed user, uint256 mixETHAmount);
+    event FeesCredited(uint256 amount, uint256 creditPerWeightAfter);
 
     // ─────────────── Epoch-point core state ───────────────
 
@@ -67,18 +78,15 @@ contract PSPStaker {
         uint256 epoch;   // epoch this point describes (0 = virtual/empty)
         uint256 weight;  // total live weight during `epoch`
         uint256 slope;   // per-epoch weight decrease (sum of active decays)
-        uint256 fees;    // mixETH credited to `epoch`, split by weight
     }
 
     struct Position {
-        uint256 amount;       // principal PSP
-        uint256 startEpoch;   // weight live from startEpoch+1 (0 while minted-in-epoch)
-        uint256 requestEpoch; // 0 = indefinite lock; E = decay armed at E (full through E)
-        uint256 settledEpoch; // fees settled through this epoch
-        uint256 settledW;     // global weight at settledEpoch (self-anchor)
-        uint256 settledSlope; // global slope at settledEpoch (self-anchor)
-        uint256 feesPaid;     // cumulative fees paid out
-        uint256 actionTime;   // last weight-mutating action (vote guard)
+        uint256 amount;          // principal PSP
+        uint256 startEpoch;      // weight live from startEpoch+1 (0 while minted-in-epoch)
+        uint256 requestEpoch;    // 0 = indefinite lock; E = decay armed at E (full through E)
+        uint256 creditCheckpoint; // creditPerWeight at last settle (claims are O(1) deltas)
+        uint256 feesPaid;        // cumulative fees paid out
+        uint256 actionTime;      // last weight-mutating action (vote guard)
     }
 
     /// @dev pepeId-keyed: one position per NFT, many NFTs per user.
@@ -94,7 +102,14 @@ contract PSPStaker {
     mapping(uint256 => uint256) public slopeAdd; // +slope (requests)
     mapping(uint256 => uint256) public slopeSub; // -slope (decay completion)
 
-    uint256 public pendingFeesMixETH; // orphaned (zero-weight) fees
+    // ─────────────── Fee credit accumulator ───────────────
+    /// @dev Masterchef-style monotonic accumulator, advanced on every addFees
+    ///      by `fees * CREDIT_PRECISION / totalWeight`. Claims are O(1):
+    ///      `weightNow * (creditPerWeight - checkpoint) / CREDIT_PRECISION`.
+    uint256 public creditPerWeight;
+    uint256 public constant CREDIT_PRECISION = 1e30;
+
+    uint256 public pendingFeesMixETH; // orphaned (zero-weight) fees + rolling remainder
     uint256 public totalLocked;       // Σ principal (display)
 
     /// @dev decay steps per vest window: weight(e) = base - k·slope, k = e - requestEpoch
@@ -213,11 +228,6 @@ contract PSPStaker {
         return block.timestamp / epochSize();
     }
 
-    function _lastClosedEpoch() private view returns (uint256) {
-        uint256 e = _epoch();
-        return e == 0 ? 0 : e - 1;
-    }
-
     // ─────────────── Weight math ───────────────
 
     /// @notice A position's live dividend/voting weight during epoch e.
@@ -254,15 +264,13 @@ contract PSPStaker {
 
     /// @dev Advance a point from its epoch to `to`, applying stored deltas and
     ///      preferring stored points along the way (corrections propagate).
-    ///      Fees are zeroed at each step: they belong to exactly one epoch.
     function _advance(GlobalPoint memory p, uint256 to) private view returns (GlobalPoint memory) {
         for (uint256 e = p.epoch; e < to; ++e) {
             p.slope = p.slope + slopeAdd[e] - slopeSub[e];
             p.weight = p.weight + biasAdd[e] - biasSub[e] - p.slope;
             p.epoch = e + 1;
-            p.fees = 0;
             GlobalPoint storage stored = points[e + 1];
-            if (stored.epoch != 0) p = stored; // authoritative (with its fees)
+            if (stored.epoch != 0) p = stored; // authoritative
         }
         return p;
     }
@@ -274,7 +282,7 @@ contract PSPStaker {
             // no write-side use yet: nothing is staked, weight is honestly 0.
             // Deltas cannot predate the first _anchorNow (every delta-writer
             // runs through an anchor path or a storing path first).
-            return GlobalPoint({epoch: e, weight: 0, slope: 0, fees: 0});
+            return GlobalPoint({epoch: e, weight: 0, slope: 0});
         }
         GlobalPoint memory p = points[lastPointEpoch];
         return _advance(p, e);
@@ -286,7 +294,7 @@ contract PSPStaker {
     function _anchorNow() private returns (GlobalPoint memory p) {
         uint256 e = _epoch();
         if (lastPointEpoch == 0) {
-            p = GlobalPoint({epoch: e, weight: 0, slope: 0, fees: 0});
+            p = GlobalPoint({epoch: e, weight: 0, slope: 0});
             points[e] = p;
             lastPointEpoch = e;
             return p;
@@ -301,44 +309,26 @@ contract PSPStaker {
         lastPointEpoch = p.epoch;
     }
 
-    // ─────────────── Fee settlement (the replay) ───────────────
+    // ─────────────── Fee settlement (O(1) accumulator delta) ───────────────
 
-    /// @dev Cumulative fees allocated to `pepeId` for epochs (settledEpoch, through],
-    ///      replaying the global point from the position's self-anchor.
-    ///      Prefers stored points (same as _advance) so corrections propagate.
-    function _allocated(uint256 pepeId, uint256 through) private view returns (uint256 alloc, uint256 endW, uint256 endSlope) {
+    /// @dev Live unclaimed credit for `pepeId` — fees are assigned the moment
+    ///      they land, so this reads the CURRENT epoch's (frozen) weight times
+    ///      the accumulator growth since the position's last settle. For a
+    ///      decaying position claimed epochs after earning, the growth is
+    ///      scaled at the current (lower) weight — under-credits only.
+    function _liveCredit(uint256 pepeId) private view returns (uint256) {
         Position storage pos = positions[pepeId];
-        GlobalPoint memory p = GlobalPoint({
-            epoch: pos.settledEpoch, weight: pos.settledW, slope: pos.settledSlope, fees: 0
-        });
-        for (uint256 e = pos.settledEpoch + 1; e <= through; ++e) {
-            // advance p from e-1 to e
-            uint256 d = e - 1;
-            p.slope = p.slope + slopeAdd[d] - slopeSub[d];
-            p.weight = p.weight + biasAdd[d] - biasSub[d] - p.slope;
-            p.epoch = e;
-            p.fees = 0; // fees belong to exactly one epoch
-            GlobalPoint storage stored = points[e];
-            if (stored.epoch != 0) p = stored;
-            if (p.fees != 0 && p.weight != 0) {
-                uint256 w = weightAt(pepeId, e);
-                if (w != 0) alloc += (p.fees * w) / p.weight;
-            }
-        }
-        return (alloc, p.weight, p.slope);
+        return (weightAt(pepeId, _epoch()) * (creditPerWeight - pos.creditCheckpoint)) / CREDIT_PRECISION;
     }
 
-    /// @dev Settle `pepeId` through the last closed epoch and pay the newly
-    ///      allocated fees to `to`. Returns the amount paid.
+    /// @dev Settle `pepeId` to the current accumulator and pay the newly
+    ///      credited fees to `to`. Returns the amount paid.
     function _settleAndPay(uint256 pepeId, address to, bool forfeitOnShortfall) private returns (uint256 paid) {
-        uint256 through = _lastClosedEpoch();
-        (uint256 alloc, uint256 endW, uint256 endSlope) = _allocated(pepeId, through);
         Position storage pos = positions[pepeId];
-        pos.settledEpoch = through;
-        pos.settledW = endW;
-        pos.settledSlope = endSlope;
-        pos.feesPaid += alloc;
-        paid = alloc;
+        uint256 due = _liveCredit(pepeId);
+        pos.creditCheckpoint = creditPerWeight;
+        pos.feesPaid += due;
+        paid = due;
         if (paid != 0) _payFees(to, paid, forfeitOnShortfall);
     }
 
@@ -398,11 +388,9 @@ contract PSPStaker {
 
         uint256 e = _epoch();
         if (pos.amount == 0) {
-            GlobalPoint memory p = _anchorNow();
+            _anchorNow(); // materialize the global anchor before any delta
             pos.startEpoch = e;
-            pos.settledEpoch = e;
-            pos.settledW = p.weight;
-            pos.settledSlope = p.slope;
+            pos.creditCheckpoint = creditPerWeight;
         } else {
             // re-anchor at full weight, live from e+1 (epoch e forfeited —
             // uniform with every other mutation)
@@ -546,11 +534,9 @@ contract PSPStaker {
         if (amount == 0) revert ZeroAmount();
         Position storage genesis = positions[0];
         uint256 e = _epoch();
-        GlobalPoint memory p = _anchorNow();
+        _anchorNow();
         genesis.startEpoch = e; // (re)anchor increments (pre-launch: no fees yet)
-        genesis.settledEpoch = e;
-        genesis.settledW = p.weight;
-        genesis.settledSlope = p.slope;
+        genesis.creditCheckpoint = creditPerWeight;
         biasAdd[e] += amount;
         genesis.amount += amount;
         genesis.actionTime = block.timestamp;
@@ -564,14 +550,10 @@ contract PSPStaker {
         if (msg.sender != address(controller)) revert NotController();
 
         Position storage genesis = positions[0];
-        uint256 through = _lastClosedEpoch();
-        (uint256 alloc, uint256 endW, uint256 endSlope) = _allocated(0, through);
-
+        uint256 genesisDue = _liveCredit(0);
         uint256 genesisAmount = genesis.amount;
-        uint256 shareFees = genesisAmount == 0 ? 0 : (alloc * share) / genesisAmount;
-        genesis.settledEpoch = through;
-        genesis.settledW = endW;
-        genesis.settledSlope = endSlope;
+        uint256 shareFees = genesisAmount == 0 ? 0 : (genesisDue * share) / genesisAmount;
+        genesis.creditCheckpoint = creditPerWeight;
         genesis.feesPaid += shareFees;
         genesis.amount = genesisAmount - share;
         genesis.actionTime = block.timestamp;
@@ -580,13 +562,11 @@ contract PSPStaker {
         biasSub[e] += share;
 
         uint256 id = _mintFresh(user);
-        GlobalPoint memory p = _anchorNow();
+        _anchorNow();
         Position storage pos = positions[id];
         pos.amount = share;
         pos.startEpoch = e;
-        pos.settledEpoch = e;
-        pos.settledW = p.weight;
-        pos.settledSlope = p.slope;
+        pos.creditCheckpoint = creditPerWeight;
         pos.actionTime = block.timestamp;
         biasAdd[e] += share;
         // totalLocked unchanged: share moves between positions
@@ -597,22 +577,28 @@ contract PSPStaker {
     }
 
     /// @dev Fee feed — controller forwards hook addFees() here. Fees credit
-    ///      the CURRENT epoch's point and split by that epoch's weights.
+    ///      the accumulator IMMEDIATELY (scoopy 2026-08-28: never epoch-gated);
+    ///      zero-weight rounds park them in pending until weight exists.
     function addFees(uint256 mixETHAmount) external {
         if (msg.sender != address(controller)) revert NotController();
         pendingFeesMixETH += mixETHAmount;
         _distribute();
     }
 
-    /// @dev Credit pending fees to the current epoch (orphans wait for weight).
+    /// @dev Credit pending fees at the current (epoch-frozen) weight.
+    ///      Rolling remainder (A-F3): only the distributed part leaves
+    ///      `pendingFeesMixETH`, so sub-precision dust accumulates until it
+    ///      crosses one credit unit instead of being stranded forever.
     function _distribute() private {
         if (pendingFeesMixETH == 0) return;
-        GlobalPoint memory p = _pointNow();
-        if (p.weight == 0) return; // orphaned: distributes once weight exists
-        p.fees += pendingFeesMixETH;
-        pendingFeesMixETH = 0;
-        points[p.epoch] = p;
-        lastPointEpoch = p.epoch;
+        uint256 w = _pointNow().weight;
+        if (w == 0) return; // orphaned: distributes once weight exists
+        uint256 delta = (pendingFeesMixETH * CREDIT_PRECISION) / w;
+        if (delta == 0) return; // sub-precision: keep rolling in pending
+        uint256 distributed = (delta * w) / CREDIT_PRECISION; // ≤ pendingFeesMixETH
+        creditPerWeight += delta;
+        pendingFeesMixETH -= distributed;
+        emit FeesCredited(distributed, creditPerWeight);
     }
 
     // ─────────────── Fee payout ───────────────
@@ -662,11 +648,10 @@ contract PSPStaker {
 
     // ─────────────── UI views ───────────────
 
-    /// @notice Live claimable fees for one pepe — the replay up to the last
-    ///         closed epoch (new epochs only; paid epochs are settled away).
+    /// @notice Live claimable fees for one pepe — fees are assigned the moment
+    ///         they land, so this is real-time: it ticks up on every trade.
     function pendingFeesOf(uint256 pepeId) external view returns (uint256) {
-        (uint256 alloc,,) = _allocated(pepeId, _lastClosedEpoch());
-        return alloc;
+        return _liveCredit(pepeId);
     }
 
     /// @notice Timestamp when a decayed position becomes withdrawable

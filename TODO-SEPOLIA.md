@@ -9,7 +9,17 @@ vote · 3d flat exit.
 
 ---
 
-while testing a deployment version of this, I encountered something I REALLY DO NOT LIKE AND MUST BE ADDRESSED. Using the infinifi system for stake weights, you made it so trading fee distribution is delayed. this seriously degrades UX and sucks. The 
+while testing a deployment version of this, I encountered something I REALLY DO NOT LIKE AND MUST BE ADDRESSED. Using the infinifi system for stake weights, you made it so trading fee distribution is delayed. this seriously degrades UX and sucks.
+
+> **RESOLVED 2026-08-28 (same day, post-deploy).** Fees are no longer
+> epoch-based: a single live `creditPerWeight` accumulator is advanced the
+> instant fees arrive, and claims/`pendingFeesOf` settle in O(1) at real time —
+> no epoch walk, no boundary wait. Static positions keep exact bucket-math
+> splits (weights are frozen within an epoch); decayers claiming epochs late
+> under-credit only (accepted precision trade). Fresh stakes still earn from
+> the next epoch — the anti-sandwich property is untouched. See
+> `test/unit/FeeImmediacy.t.sol` and `docs/VESTING-DESIGN.md`. Requires a
+> fresh deploy (round 2) — the live round-1 contracts keep the old engine.
 
 ## 0) Prereqs (local machine)
 

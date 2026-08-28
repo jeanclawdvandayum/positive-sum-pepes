@@ -6,6 +6,15 @@ at wk6, then withdrawable). Stake page: one card per staked pepe NFT (art,
 amount, $value, unlock date, cancel-request / withdraw buttons, per-card claim +
 reinvest), header totals + multiclaim + reinvest-all.
 
+**2026-08-28 update — fee engine replaced AGAIN (live accumulator).** Testing
+the first real Sepolia deploy, scoopy flagged the epoch-gated claim window as
+a must-fix UX regression ("fees should be assigned and claimable as they come
+in, and not be epoch based"). Fee crediting and settlement now run on a live
+`creditPerWeight` accumulator (see the Fees section below); the epoch-point
+machinery remains for WEIGHTS ONLY (decay, votes, quorum). The per-epoch fee
+buckets, the `_allocated` replay walk, and the `{settledEpoch, settledW,
+settledSlope}` self-anchor are retired.
+
 **2026-08-29 update — fee engine replaced.** The dual-leg design below is
 RETIRED. It shipped with two exactness bugs under staggered decayers (see git
 history). The engine is now the InfiniFi epoch-point design
@@ -50,22 +59,44 @@ points are authoritative — walkers prefer them so direct corrections
 - `withdraw` unlocks at `epoch ≥ E+6` (`withdrawableAt = (E+6)·epochSize`).
   Slope retirement is lazy — no correction needed on withdraw.
 
-### Fees
-`addFees` credits the CURRENT epoch's point (`point.fees += amount`),
-distributed pro-rata by that epoch's weights. Zero-weight epochs orphan in
-`pendingFeesMixETH` until weight exists (unchanged).
+### Fees (LIVE accumulator — 2026-08-28, scoopy's must-fix)
+`addFees` advances a single monotonic accumulator the INSTANT fees arrive:
 
-### Settlement (claims)
-Every position carries a self-anchor `{settledEpoch, settledW, settledSlope}` —
-the global point at its last settle. Claims replay epochs
-`(settledEpoch, lastClosed]`: advance a virtual point (same delta math, stored
-points preferred), and for each epoch with fees: `alloc += fees · w(pos,e) / W(e)`.
-Then pay `alloc`; move the anchor. Consequences:
-- Claims settle through the last CLOSED epoch — fees deposited during the
-  current epoch become claimable at the next boundary (weekly on mainnet).
-  This keeps splits exact and symmetric (InfiniFi unwinding-side semantics).
-- Replay is bounded by settle cadence, not history — any mutation settles first.
-- Positions never depend on a stored point existing at their settled epoch.
+```
+creditPerWeight += fees · 1e30 / totalWeight    (CREDIT_PRECISION = 1e30)
+```
+
+Zero-weight rounds orphan in `pendingFeesMixETH` until weight exists, and the
+buffer uses a rolling remainder (`pending -= distributed`, not `pending = 0`)
+so sub-precision dust accumulates until it crosses one credit unit — the
+wave2 A-F3 stranding bug stays dead. `FeesCredited(amount, creditAfter)` is
+emitted on every credit for UI/indexing.
+
+**Why exactness survives for static positions:** weights only change at epoch
+boundaries, so `totalWeight` is frozen within an epoch — the accumulator
+split `w · Δcredit / W` is arithmetically identical to the retired per-epoch
+bucket replay. Immediacy costs nothing here.
+
+**Why immediacy is safe:** a fresh stake has `weightAt = 0` until the next
+epoch, so no same-tx stake→harvest→exit sandwich exists — the anti-manip
+property was always the next-epoch weight gate, never the claim delay.
+
+### Settlement (claims — O(1))
+Every position carries `creditCheckpoint` — the accumulator value at its last
+settle. Claimable is a live product:
+
+```
+due = weightAt(pepeId, now) · (creditPerWeight − checkpoint) / 1e30
+```
+
+No epoch walk, no self-anchor, no boundary wait — `pendingFeesOf` and
+`claimFees` agree at every instant. The one accepted approximation (scoopy,
+2026-08-28: "im ok with some loss of precision from the decaying staked PSP
+positions"): a DECAYING position that skips claims while its vest steps down
+settles fees earned at earlier, higher weights at its current, lower weight —
+under-credits only, never over-credits (solvency holds: Σ claims ≤ Σ fees).
+A position that reaches zero weight with unclaimed credit forfeits it —
+claim before your vest runs out (the UI surfaces this).
 
 ### Mutations (uniform rule: upward changes land next boundary)
 - `_stake` fresh: `startEpoch = e`, `biasAdd[e] += amount` — live from e+1. A
@@ -88,7 +119,7 @@ Then pay `alloc`; move the anchor. Consequences:
 ### Views
 - `weightAt(pepeId, e)` / `biasOf(pepeId, ts)`: the stepped schedule.
 - `totalWeight()`: extrapolated global point (controller quorum).
-- `pendingFeesOf`: read-only replay to the last closed epoch.
+- `pendingFeesOf`: live O(1) accumulator read — agrees with claim at every instant.
 - `withdrawableAt`: `(requestEpoch+6)·epochSize` or uint.max.
 - `voteWeight(user, at)`: Σ live position power at `at` — governance-only
   (a fresh lock carries FULL power in its creation epoch; the fee engine

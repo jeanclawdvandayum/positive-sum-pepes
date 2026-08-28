@@ -8,9 +8,7 @@ interface IPSPStaker {
         uint256 amount;
         uint256 startEpoch;
         uint256 requestEpoch; // 0 = indefinitely locked (reinvestable)
-        uint256 settledEpoch;
-        uint256 settledW;
-        uint256 settledSlope;
+        uint256 creditCheckpoint;
         uint256 feesPaid;
         uint256 actionTime;
     }

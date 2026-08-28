@@ -40,10 +40,10 @@ export const controllerAbi = parseAbi([
 
 /// PSPStaker — ERC-721 staking positions + pepe art (2026-08-22).
 export const stakerAbi = parseAbi([
-  'function positions(uint256) view returns (uint256 amount, uint256 startEpoch, uint256 requestEpoch, uint256 settledEpoch, uint256 settledW, uint256 settledSlope, uint256 feesPaid, uint256 actionTime)',
+  'function positions(uint256) view returns (uint256 amount, uint256 startEpoch, uint256 requestEpoch, uint256 creditCheckpoint, uint256 feesPaid, uint256 actionTime)',
   'function pendingFeesOf(uint256 pepeId) view returns (uint256)',
   'function pendingFeesMixETH() view returns (uint256)',
-  'function points(uint256) view returns (uint256 epoch, uint256 weight, uint256 slope, uint256 fees)',
+  'function points(uint256) view returns (uint256 epoch, uint256 weight, uint256 slope)',
   'function withdrawableAt(uint256 pepeId) view returns (uint256)',
   'function epochSize() view returns (uint256)',
   'function biasOf(uint256 pepeId, uint256 at) view returns (uint256)',
