@@ -90,8 +90,13 @@ Then pay `alloc`; move the anchor. Consequences:
 - `totalWeight()`: extrapolated global point (controller quorum).
 - `pendingFeesOf`: read-only replay to the last closed epoch.
 - `withdrawableAt`: `(requestEpoch+6)·epochSize` or uint.max.
-- `voteWeight(user, at)`: Σ weightAt(epochOf(at)) with the finding-29
-  actionTime guard — snapshots stay exact at propose time.
+- `voteWeight(user, at)`: Σ live position power at `at` — governance-only
+  (a fresh lock carries FULL power in its creation epoch; the fee engine
+  epoch-gates, governance does not). Decay mirrors the fee engine from the
+  request epoch onward. scoopy 2026-08-27: votes are evaluated live at the
+  vote (post-propose stakes count), quorum denominates against staked
+  weight only (supply floor retired — it froze governance when staked was
+  a minority of supply).
 
 ### Deviations from InfiniFi (all favor simplicity; documented)
 - PSP is single-system: weight never hops contracts (their locked→unwinding

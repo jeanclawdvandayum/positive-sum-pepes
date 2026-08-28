@@ -118,8 +118,8 @@ export default function CarpetBombCard() {
           <div>
             <div className="rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-700">
               no active proposal. initiating a vote requires staked PSP — quorum is
-              measured against max(total staked, total supply) at proposal time
-              (69%), majority of cast votes (50%+), 3-day window.
+              measured against total staked PSP at proposal time
+              (69%), majority of cast votes (50%+).
             </div>
             <button
               className="btn-primary mt-4 w-full"

@@ -518,31 +518,20 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             proposeTime: block.timestamp,
             yesVotes: 0,
             noVotes: 0,
-            // NK24 thin-lock fix: quorum is measured against the larger of
-            // totalLocked and the hook's total PSP supply. Against a bare
-            // totalLocked snapshot, an attacker could buy a large bag on the
-            // curve (unminting nothing), lock it, propose when honest lock
-            // participation is thin, and self-vote past quorum+majority to
-            // bomb the round out from under unlocked holders. With the supply
-            // floor, they must lock QUORUM% of EVERYTHING outstanding — the
-            // bomb damages their own position proportionally, killing the
-            // economics. Supply only shrinks via curve sells (burns), so the
-            // denominator can't be thinned either.
-            lockedAtPropose: _quorumDenominator(),
+            // Quorum denominator = STAKED PSP at propose (G-1 snapshot
+            // semantics unchanged). scoopy 2026-08-27 (Sepolia playtest
+            // finding): the retired NK24 supply floor — max(weight,
+            // totalSupplyPSP) — made quorum unreachable whenever staked
+            // was a minority of supply, freezing carpet governance. Thin-
+            // lock counter-forces now: execution only after the FULL
+            // VOTE_DURATION (honest stakers can counter-vote an attacker's
+            // self-vote), and the bomber's own locked value is damaged
+            // proportionally by the flatten.
+            lockedAtPropose: staker.totalWeight(),
             executed: false
         });
 
         emit CarpetBombProposed(msg.sender);
-    }
-
-    /// @dev Quorum denominator: max(live weight, total PSP supply) — see
-    ///      proposeCarpetBomb. Live weight counts decaying positions at
-    ///      their CURRENT bias (an exiting staker's vote fades with their
-    ///      dividend — the decay hits both equally).
-    function _quorumDenominator() internal view returns (uint256) {
-        uint256 supply = address(hook) != address(0) ? hook.totalSupplyPSP() : 0;
-        uint256 locked = staker.totalWeight();
-        return locked > supply ? locked : supply;
     }
 
     function voteCarpetBomb(bool support) external nonReentrant {
@@ -553,14 +542,14 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
 
         lastVotedOn[msg.sender] = proposalCount;
 
-        // M-1 fix (ve-decay form): weight = Σ bias(id, proposeTime) over the
-        // caller's pepes whose last weight-mutating action (lock, top-up,
-        // request, cancel) PREDATES proposeTime — post-propose actors sit
-        // the vote out, so totalVotes stays structurally capped at the
-        // propose-time snapshot. Weight is evaluated AT propose time: a
-        // pre-propose withdraw request decays the vote exactly like the
-        // dividends.
-        uint256 weight = staker.voteWeight(msg.sender, currentProposal.proposeTime);
+        // scoopy 2026-08-27 (Sepolia playtest finding — supersedes the M-1/
+        // finding-29 sit-out rule): weight is evaluated LIVE at the vote.
+        // Stakes made after the proposal count, so new lockers can always
+        // defend or oppose an active bomb; an armed withdraw request decays
+        // the vote exactly like the dividends. Quorum stays anchored to the
+        // propose-time snapshot (G-1), so late locks widen participation
+        // without diluting it.
+        uint256 weight = staker.voteWeight(msg.sender, block.timestamp);
         if (weight == 0) revert NotLocker();
 
         if (support) {

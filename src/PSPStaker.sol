@@ -676,17 +676,29 @@ contract PSPStaker {
         return r == 0 ? type(uint256).max : (r + VEST_EPOCHS) * epochSize();
     }
 
-    /// @notice Voting weight at a past instant `at` (propose snapshot):
-    ///         Σ weightAt over the caller's pepes whose last weight
-    ///         mutation predates `at` (finding-29 guard: post-propose
-    ///         lock/top-up/request/cancel actions sit the vote out).
+    /// @notice Voting weight at instant `at`: Σ live position power over the
+    ///         caller's pepes that existed by `at`. Governance-only view —
+    ///         unlike the fee engine (where fresh locks go live at the next
+    ///         epoch boundary so per-epoch splits stay exact), a position
+    ///         carries FULL voting power from its creation epoch, so a new
+    ///         stake can propose and vote immediately. Decay from an armed
+    ///         withdraw request mirrors the fee engine step-for-step from the
+    ///         request epoch onward (5/6, 4/6, … 0).
     function voteWeight(address user, uint256 at) external view returns (uint256) {
         uint256 e = at / epochSize();
         uint256[] storage ids = _owned[user];
         uint256 total;
         for (uint256 i; i < ids.length; ++i) {
             Position storage pos = positions[ids[i]];
-            if (pos.actionTime < at) total += weightAt(ids[i], e);
+            if (pos.actionTime > at || e < pos.startEpoch) continue;
+            if (pos.requestEpoch == 0 || e <= pos.requestEpoch) {
+                total += pos.amount;
+            } else {
+                uint256 k = e - pos.requestEpoch;
+                if (k >= VEST_EPOCHS) continue; // fully decayed
+                uint256 base = pos.amount - (pos.amount % VEST_EPOCHS);
+                total += base - k * (base / VEST_EPOCHS);
+            }
         }
         return total;
     }
