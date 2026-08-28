@@ -111,12 +111,20 @@ contract CBase is Test {
         controller1.carpetBomb();
     }
 
-    /// @dev Vote with EVERY round-1 pepe `who` owns (2026-08-29 per-NFT voting).
+    /// @dev Vote with every VOTABLE round-1 pepe `who` owns (husks and
+    ///      unstaking pepes sit out — same as the UI's default selection).
     function _voteAll1(address who, bool support) internal {
         PSPStaker s = controller1.staker();
         uint256 n = s.balanceOf(who);
         uint256[] memory ids = new uint256[](n);
-        for (uint256 i; i < n; ++i) ids[i] = s.tokenOfOwnerByIndex(who, i);
+        uint256 k;
+        for (uint256 i; i < n; ++i) {
+            uint256 id = s.tokenOfOwnerByIndex(who, i);
+            if (s.pepeVoteWeight(id, block.timestamp) == 0) continue;
+            ids[k++] = id;
+        }
+        assembly { mstore(ids, k) }
+        if (k == 0) return;
         vm.prank(who);
         controller1.voteCarpetBomb(ids, support);
     }

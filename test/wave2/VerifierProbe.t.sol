@@ -5,8 +5,11 @@ import {BBase, BRouter} from "./auditorB/BBase.sol";
 import {RoundController} from "../../../src/RoundController.sol";
 import {PSPStaker} from "../../../src/PSPStaker.sol";
 
-/// @dev INDEPENDENT VERIFIER PROBES (throwaway — not part of the suite).
-///      Hunting bypasses the committed suite does not cover.
+/// @dev INDEPENDENT VERIFIER PROBES (shaggoth's 2026-08-29 audit, kept as
+///      suite members — they pin accepted-trade edges and bypass classes
+///      the committed suites don't cover: late-stake execution griefing,
+///      husk-NFT votes, duplicate ids, armed-pepe transfers, totalVotable
+///      drift across every mutation site).
 contract VerifierProbe is BBase {
     uint256 constant EPOCH = 7 days;
 
@@ -43,24 +46,23 @@ contract VerifierProbe is BBase {
         uint256 pspOut = _bobBuysAndLocks(6_000e18);
         uint256 pepe = stakerV.tokenOfOwnerByIndex(bob, 0);
 
-        vm.prank(alice);
-        controller.proposeCarpetBomb(); // proposal must exist first
-
+        // burn the position down to a husk BEFORE proposing (the vest takes
+        // 6 epochs — far past the 3-day vote window)
         vm.startPrank(bob);
         stakerV.requestWithdraw(pepe);
-        skip(6 * EPOCH); // vest fully out
+        skip(6 * EPOCH);
         stakerV.withdraw(pepe); // position deleted, NFT husk stays
         assertEq(psp.balanceOf(bob), pspOut, "principal returned");
+        vm.stopPrank();
+
+        vm.prank(alice);
+        controller.proposeCarpetBomb(); // fresh window — no VotingEnded noise
 
         uint256[] memory ids = new uint256[](1);
         ids[0] = pepe;
-        vm.expectRevert(RoundController.NotLocker.selector);
-        controller.voteCarpetBomb(ids, true);
-        vm.stopPrank();
-
         vm.prank(bob);
         vm.expectRevert(RoundController.NotLocker.selector);
-        controller.voteCarpetBomb(ids, true); // still nothing while the proposal lives
+        controller.voteCarpetBomb(ids, true);
 
         vm.prank(bob);
         vm.expectRevert(RoundController.NotLocker.selector);
@@ -164,7 +166,9 @@ contract VerifierProbe is BBase {
         skip(3 days + 1);
         controller.carpetBomb(); // → Flat
 
-        uint256 pepeB = stakerV.tokenOfOwnerByIndex(bob, 0);
+        // bob's owned list still contains the husk (id 2) — the live pepe is
+        // the NEWEST entry, not index 0
+        uint256 pepeB = stakerV.tokenOfOwnerByIndex(bob, stakerV.balanceOf(bob) - 1);
         uint256 before = stakerV.totalVotableWeight();
         vm.prank(bob);
         stakerV.withdraw(pepeB); // flat path: request-free exit

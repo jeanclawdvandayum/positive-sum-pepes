@@ -131,11 +131,19 @@ abstract contract BBase is Test {
         controller.carpetBomb(); // → Mode.Flat, pot redeemed+burned
     }
 
-    /// @dev Vote with EVERY pepe `who` owns (2026-08-29 per-NFT voting).
+    /// @dev Vote with every VOTABLE pepe `who` owns (husks and unstaking
+    ///      pepes sit out — same as the UI's default selection).
     function _voteAll(address who, bool support) internal {
         uint256 n = stakerV.balanceOf(who);
         uint256[] memory ids = new uint256[](n);
-        for (uint256 i; i < n; ++i) ids[i] = stakerV.tokenOfOwnerByIndex(who, i);
+        uint256 k;
+        for (uint256 i; i < n; ++i) {
+            uint256 id = stakerV.tokenOfOwnerByIndex(who, i);
+            if (stakerV.pepeVoteWeight(id, block.timestamp) == 0) continue;
+            ids[k++] = id;
+        }
+        assembly { mstore(ids, k) }
+        if (k == 0) return;
         vm.prank(who);
         controller.voteCarpetBomb(ids, support);
     }
