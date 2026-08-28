@@ -21,6 +21,18 @@ while testing a deployment version of this, I encountered something I REALLY DO 
 > `test/unit/FeeImmediacy.t.sol` and `docs/VESTING-DESIGN.md`. Requires a
 > fresh deploy (round 2) — the live round-1 contracts keep the old engine.
 
+**2026-08-28 CURVE NOTE (scoopy: "ensure the curve is still the staircase").**
+Round 1 on-chain is the PSP_CURVE=4 two-zone S-curve, NOT the anchor-ladder
+staircase (chain-verified: controller 0x1666…0903, P0=1e-4, exp k=2e-6 over
+[0, 3.5M PSP] + log tail). Why: ETH Sepolia enforces a 2^24 = 16.78M per-tx
+gas cap; measured deployRound floors are ~12.6M fixed + ~600k/zone + on-chain
+mining luck — the 34-zone ladder needs 27.5M and no ladder variant beyond
+~2 legs can ever fit. **Rebirth is single-tx (spawnNextRound), so over-cap
+curves can never be reborn either.** Options shipped: PSP_CURVE=5 lean
+10-zone ladder (17.5M — fits OP-stack chains only) and the finding that
+**Base Sepolia (block limit 1.2B, no per-tx cap) runs the full 34-zone
+staircase with 44x headroom — fork dry-run verified.**
+
 ## 0) Prereqs (local machine)
 
 - [ ] Foundry installed and current (`foundryup`)

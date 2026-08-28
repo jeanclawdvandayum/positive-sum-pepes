@@ -10,6 +10,7 @@ import {HookDeployer} from "../src/HookDeployer.sol";
 import {ControllerDeployer} from "../src/ControllerDeployer.sol";
 import {CurveMath} from "../src/libraries/CurveMath.sol";
 import {LinearZones} from "../src/curves/LinearZones.sol";
+import {LinearZonesLean} from "../src/curves/LinearZonesLean.sol";
 import {Curve1Zones} from "../src/curves/Curve1Zones.sol";
 import {Curve2Zones} from "../src/curves/Curve2Zones.sol";
 import {Curve3Zones} from "../src/curves/Curve3Zones.sol";
@@ -58,8 +59,18 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///                dry-run the FULL testnet path (PSP_TESTNET + PSP_PM +
 ///                --fork-url $SEPOLIA_RPC_URL) with any throwaway key and
 ///                zero gas. Never set this for a real deployment.
-///   PSP_CURVE    1|2|3 rolling curves (glide/longswell/switchback,
-///                default 1); 0 = legacy anchor-ladder staircase
+///   PSP_CURVE    0|1|2|3 rolling curves (staircase/glide/longswell/switchback)
+///                4 = minimal 2-zone S-curve (the ONLY one that fits Ethereum
+///                Sepolia's 2^24 = 16.7M per-tx cap: deployRound floor is
+///                ~12.6M fixed + ~600k/zone + on-chain mining luck)
+///                5 = LEAN anchor-ladder staircase (10 zones, ~17.5M floor —
+///                fits OP-stack testnets like Base Sepolia's 1.2B block limit
+///                but NOT Ethereum Sepolia; kept for mid-cap chains)
+///                0 = the canonical 34-zone anchor-ladder staircase (27.5M —
+///                mainnet or OP-stack testnets only; rebirth spawnNextRound
+///                is single-tx so over-cap curves can never be reborn)
+///   testnet default: 4 (safe everywhere). For Base Sepolia round 2 set
+///   PSP_CURVE=0 explicitly for the full staircase.
 contract DeployPSP is Script {
     // Base mainnet Uniswap v4 PoolManager
     address constant PM_BASE = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
@@ -170,12 +181,13 @@ contract DeployPSP is Script {
     }
 
     function _roundParams(bool testnet) internal view returns (PSPFactory.RoundParams memory) {
-        uint256 curveSel = vm.envOr("PSP_CURVE", uint256(1));
+        uint256 curveSel = vm.envOr("PSP_CURVE", testnet ? uint256(4) : uint256(1));
         CurveMath.CurveConfig memory cc = curveSel == 0
             ? LinearZones.config()
             : curveSel == 2 ? Curve2Zones.config()
             : curveSel == 3 ? Curve3Zones.config()
             : curveSel == 4 ? _playtestCurve()
+            : curveSel == 5 ? LinearZonesLean.config()
             : Curve1Zones.config();
         cc.timings = testnet ? _testnetTimings() : 0; // anvil/mainnet: mainnet defaults
         return PSPFactory.RoundParams({
