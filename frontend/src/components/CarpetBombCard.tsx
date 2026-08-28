@@ -26,9 +26,10 @@ export default function CarpetBombCard() {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
   const { writeContractAsync } = useWriteContract()
 
-  /// selected pepes for the vote (ids); undefined = not loaded yet
+  /// selected pepes for the vote (id-KEYED — indices reshuffle when the
+  /// list reorders on mint/transfer, ids never do; shaggoth finding 1)
   const [pepes, setPepes] = useState<Pepe[] | undefined>(undefined)
-  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000)
@@ -93,12 +94,14 @@ export default function CarpetBombCard() {
         }
         if (!dead) {
           setPepes(out)
-          // default selection: every votable, unvoted pepe
+          // default selection: every votable, unvoted pepe (keep explicit
+          // user toggles across refreshes — keyed by id, survives reorder)
           setSelected((prev) => {
-            const prevIds = new Set([...prev].map((i) => Number(out[i]?.id ?? -1n)))
-            const fresh = new Set<number>()
-            out.forEach((p, i) => {
-              if (p.weight > 0n && !p.voted && (prev.size === 0 || prevIds.has(Number(p.id)))) fresh.add(i)
+            const fresh = new Set<string>()
+            const firstLoad = prev.size === 0
+            out.forEach((p) => {
+              const key = p.id.toString()
+              if (p.weight > 0n && !p.voted && (firstLoad || prev.has(key))) fresh.add(key)
             })
             return fresh
           })
@@ -114,11 +117,11 @@ export default function CarpetBombCard() {
 
   const selectedIds = useMemo(() => {
     if (!pepes) return []
-    return [...selected].sort((a, b) => a - b).map((i) => pepes[i]?.id).filter((x): x is bigint => x !== undefined)
+    return pepes.filter((p) => selected.has(p.id.toString())).map((p) => p.id)
   }, [pepes, selected])
   const selectedWeight = useMemo(() => {
     if (!pepes) return 0n
-    return [...selected].reduce((acc, i) => acc + (pepes[i]?.weight ?? 0n), 0n)
+    return pepes.filter((p) => selected.has(p.id.toString())).reduce((acc, p) => acc + p.weight, 0n)
   }, [pepes, selected])
   const votableCount = pepes?.filter((p) => p.weight > 0n && !p.voted).length ?? 0
 
@@ -174,13 +177,13 @@ export default function CarpetBombCard() {
 
   const busy = step === 'tx'
 
-  function togglePepe(i: number) {
-    const p = pepes?.[i]
-    if (!p || p.weight === 0n || p.voted) return
+  function togglePepe(id: bigint, p: Pepe) {
+    if (p.weight === 0n || p.voted) return
+    const key = id.toString()
     setSelected((prev) => {
       const next = new Set(prev)
-      if (next.has(i)) next.delete(i)
-      else next.add(i)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }
@@ -288,15 +291,15 @@ export default function CarpetBombCard() {
                       <div className="text-xs font-bold text-slate-400">no pepes — stake PSP to vote</div>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {pepes.map((p, i) => {
+                        {pepes.map((p) => {
                           const disabled = p.weight === 0n || p.voted
-                          const on = selected.has(i)
+                          const on = selected.has(p.id.toString())
                           return (
                             <button
                               key={p.id.toString()}
                               type="button"
                               disabled={disabled}
-                              onClick={() => togglePepe(i)}
+                              onClick={() => togglePepe(p.id, p)}
                               title={
                                 p.voted ? 'already voted this proposal'
                                   : p.unstaking ? 'unstaking — cancel the withdraw to restore its vote'
