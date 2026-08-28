@@ -28,6 +28,7 @@ export default function CarpetBombCard() {
       { to: round.controller, abi: controllerAbi, functionName: 'currentProposal' },
       { to: round.staker, abi: stakerAbi, functionName: 'stakedTotalOf', args: [address ?? ZERO] },
       { to: round.controller, abi: controllerAbi, functionName: 'VOTE_DURATION' },
+      { to: round.controller, abi: controllerAbi, functionName: 'FLAT_EXIT_WINDOW' },
       { to: round.controller, abi: controllerAbi, functionName: 'QUORUM_BIPS' },
       { to: round.controller, abi: controllerAbi, functionName: 'MAJORITY_BIPS' },
       { to: round.controller, abi: controllerAbi, functionName: 'lastVotedOn', args: [address ?? ZERO] },
@@ -47,10 +48,11 @@ export default function CarpetBombCard() {
   const lockAmount = reads[2] as bigint | undefined
   const lock = lockAmount !== undefined ? { amount: lockAmount } : undefined
   const voteDuration = Number(reads[3] ?? 3n * 86400n)
-  const quorumBips = Number(reads[4] ?? 6900n)
-  const majorityBips = Number(reads[5] ?? 5001n)
-  const lastVotedOn = reads[6] as bigint | undefined
-  const proposalCount = reads[7] as bigint | undefined
+  const exitWindow = Number(reads[4] ?? 3n * 86400n)
+  const quorumBips = Number(reads[5] ?? 6900n)
+  const majorityBips = Number(reads[6] ?? 5001n)
+  const lastVotedOn = reads[7] as bigint | undefined
+  const proposalCount = reads[8] as bigint | undefined
 
   const derived = useMemo(() => {
     if (!st || st.proposeTime === 0n)
@@ -234,8 +236,23 @@ export default function CarpetBombCard() {
               </>
             )}
             {derived.phase === 'failed' && (
-              <div className="mt-3 text-xs font-bold text-slate-400">
-                vote failed or expired without quorum — a new proposal can replace it.
+              <div className="mt-3">
+                <div className="text-xs font-bold text-slate-400">
+                  vote failed or expired without quorum — a new proposal can replace it.
+                </div>
+                <button
+                  className="btn-primary mt-3 w-full"
+                  disabled={!isConnected || !lock || lock.amount === 0n || busy}
+                  onClick={() => run('proposeCarpetBomb')}
+                >
+                  {isConnected && (!lock || lock.amount === 0n)
+                    ? 'stake PSP to propose'
+                    : '🔄 propose again'}
+                </button>
+                <p className="mt-2 text-[11px] font-bold text-slate-400">
+                  voting power aggregates ALL your pepes — but stakes made this epoch only
+                  count from the next epoch boundary.
+                </p>
               </div>
             )}
           </div>
@@ -251,10 +268,10 @@ export default function CarpetBombCard() {
                 : '…'}{' '}
               mixETH per PSP).
             </div>
-            {now < Number(round.flatTime) + 259_200 ? (
+            {now < Number(round.flatTime) + exitWindow ? (
               <div className="text-xs font-bold text-[#fff]/60">
                 exit window open · finalize in{' '}
-                {fmtCountdown(Number(round.flatTime) + 259_200 - now)} · whatever remains seeds
+                {fmtCountdown(Number(round.flatTime) + exitWindow - now)} · whatever remains seeds
                 round n+1
               </div>
             ) : (

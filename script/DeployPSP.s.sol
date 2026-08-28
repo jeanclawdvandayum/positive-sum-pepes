@@ -103,12 +103,14 @@ contract DeployPSP is Script {
     ///      PSP_VEST_SEC / PSP_VOTE_SEC; defaults 2h / 1h / 30m — scoopy's
     ///      2026-08-28 fast-playtest profile, compressed so a full round
     ///      lifecycle fits in one sitting). VEST must be divisible by 6 —
-    ///      six decay epochs (packTimings guards). Flat exit: constant 3d.
+    ///      six decay epochs (packTimings guards). Flat exit: PSP_FLAT_EXIT_SEC (4th
+///      packed slot — playtest default 10 minutes; mainnet profile stays 3d).
     function _testnetTimings() internal view returns (uint256) {
         return CurveMath.packTimings(
             vm.envOr("PSP_PREDEPOSIT_SEC", uint256(2 hours)),
             vm.envOr("PSP_VEST_SEC", uint256(1 hours)),
-            vm.envOr("PSP_VOTE_SEC", uint256(30 minutes))
+            vm.envOr("PSP_VOTE_SEC", uint256(30 minutes)),
+            vm.envOr("PSP_FLAT_EXIT_SEC", uint256(10 minutes))
         );
     }
 

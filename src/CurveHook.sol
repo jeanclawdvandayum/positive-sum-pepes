@@ -581,6 +581,15 @@ contract CurveHook is BaseHook {
 
     /// @return mixETH output for a PSP sell (curve unit of account)
     function getSellOutput(uint256 pspInput) external view returns (uint256) {
-        return CurveMath.computeSellOutput(pspInput, totalSupplyPSP, curveConfig);
+        // Mirror execution (the B7b principle, sell side): curve-mode sellers
+        // receive mixETHOut MINUS the SWAP_FEE_BIPS slice — quoting the raw
+        // integral overstated output by exactly the fee, so every UI sell
+        // with less-than-fee slippage reverted on minOut. Flat exits are
+        // fee-free pro-rata (F-9).
+        if (mode == Mode.Flat) {
+            return (pspInput * reserveMixETH) / totalSupplyPSP;
+        }
+        uint256 out = CurveMath.computeSellOutput(pspInput, totalSupplyPSP, curveConfig);
+        return out - (out * SWAP_FEE_BIPS) / 10000;
     }
 }

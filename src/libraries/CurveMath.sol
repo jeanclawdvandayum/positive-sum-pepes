@@ -521,20 +521,25 @@ library CurveMath {
     uint256 internal constant TIMINGS_MASK = (1 << 51) - 1;
 
     /// @notice Pack a timing profile into the CurveConfig.timings slot.
-    ///         All three fields MUST be non-zero (zero encodes defaults).
+    ///         All fields MUST be non-zero (zero encodes defaults).
     ///         Reverts on any field >= 2^51 — an oversized field would
     ///         otherwise spill nonzero garbage into the next slot, which
     ///         the deploy-side TimingsIncomplete guard cannot see.
     ///         (2026-08-28: lock/extend/relock retired with the ve-decay
-    ///         redesign — three slots remain: predeposit, vest, vote.)
+    ///         redesign; three slots remained. Same day: flat-exit added as
+    ///         a FOURTH slot — the hardcoded 3d window made playtest rebirth
+    ///         cycles unbearably slow and wasn't env-tunable.)
     function packTimings(
         uint256 predeposit,
         uint256 vest,
-        uint256 vote
+        uint256 vote,
+        uint256 flatExit
     ) internal pure returns (uint256) {
-        if (predeposit >= (1 << 51) || vest >= (1 << 51) || vote >= (1 << 51)) revert TimingsOverflow();
+        if (predeposit >= (1 << 51) || vest >= (1 << 51) || vote >= (1 << 51) || flatExit >= (1 << 51)) {
+            revert TimingsOverflow();
+        }
         if (vest % 6 != 0) revert VestNotEpochal(); // staker splits the vest into 6 decay epochs
-        return predeposit | (vest << 51) | (vote << 102);
+        return predeposit | (vest << 51) | (vote << 102) | (flatExit << 153);
     }
 
     error TimingsOverflow();

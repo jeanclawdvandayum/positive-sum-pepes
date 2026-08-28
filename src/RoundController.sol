@@ -145,7 +145,9 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     uint256 public proposalCount;
     mapping(address => uint256) public lastVotedOn;
     uint256 public immutable VOTE_DURATION; // default 3 days
-    uint256 public constant FLAT_EXIT_WINDOW = 3 days;
+    /// @dev Flat-exit window after a carpet bomb — became the 4th packed
+    ///      timing slot (2026-08-28); mainnet default stays 3 days.
+    uint256 public immutable FLAT_EXIT_WINDOW;
     uint256 public constant QUORUM_BIPS = 6900;  // 69% of locked PSP (nice)
     uint256 public constant MAJORITY_BIPS = 5001; // >50% of cast votes
 
@@ -171,13 +173,18 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             PREDEPOSIT_DURATION = 7 days;
             VEST_DURATION = 42 days;
             VOTE_DURATION = 3 days;
+            FLAT_EXIT_WINDOW = 3 days;
         } else {
             PREDEPOSIT_DURATION = t & CurveMath.TIMINGS_MASK;
             VEST_DURATION = (t >> 51) & CurveMath.TIMINGS_MASK;
             VOTE_DURATION = (t >> 102) & CurveMath.TIMINGS_MASK;
+            FLAT_EXIT_WINDOW = (t >> 153) & CurveMath.TIMINGS_MASK;
             // 2026-08-19 tripwire: the vote-slot truncation deployed silently
             // on the first sepolia dry-run — never again.
-            if (PREDEPOSIT_DURATION == 0 || VEST_DURATION == 0 || VOTE_DURATION == 0) revert TimingsIncomplete();
+            if (
+                PREDEPOSIT_DURATION == 0 || VEST_DURATION == 0 || VOTE_DURATION == 0
+                    || FLAT_EXIT_WINDOW == 0
+            ) revert TimingsIncomplete();
         }
         if (address(_pspToken) == address(0)) revert ZeroAddress();
         if (address(_mixETH) == address(0)) revert ZeroAddress();

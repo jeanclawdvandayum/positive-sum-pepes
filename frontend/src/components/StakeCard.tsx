@@ -276,8 +276,14 @@ export default function StakeCard() {
     const who = address
     async function tick() {
       try {
-        const d = (await rpcCall(c, controllerAbi, 'predeposits', [who])) as [bigint, boolean]
-        if (!dead) setMyDep({ mixETHAmount: d[0], claimed: d[1] })
+        // named-tuple return decodes as { mixETHAmount, claimed } in viem
+        const d = (await rpcCall(c, controllerAbi, 'predeposits', [who])) as unknown as {
+          mixETHAmount: bigint
+          claimed: boolean
+        }
+        if (!dead && typeof d.mixETHAmount === 'bigint') {
+          setMyDep({ mixETHAmount: d.mixETHAmount, claimed: d.claimed })
+        }
       } catch { /* keep last */ }
     }
     tick()

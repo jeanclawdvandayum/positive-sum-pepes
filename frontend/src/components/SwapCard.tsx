@@ -23,13 +23,14 @@ export default function SwapCard() {
   const [side, setSide] = useState<Side>('buy')
   const [amount, setAmount] = useState('')
   const [slippage, setSlippage] = useState(0.01)
+  const [customSlip, setCustomSlip] = useState('')
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
   const { writeContractAsync } = useWriteContract()
 
   const ZERO = '0x0000000000000000000000000000000000000000' as const
   const amountWad = parseAmountToWad(amount)
-  const live = round.mode === 1
+  const live = round.mode === 1 || round.mode === 2
   const predepositPhase = round.mode === 0
 
   /// mixETH entering the curve for this input
@@ -42,10 +43,22 @@ export default function SwapCard() {
 
   /// on-chain quote from the hook itself
   const [quoteRaw, setQuoteRaw] = useState<bigint | undefined>(undefined)
+  const flat = round.mode === 2
   useEffect(() => {
     setQuoteRaw(undefined)
     if (!round.hook) return
     if (side === 'buy' ? mixIn <= 0n : pspIn <= 0n) return
+    if (flat) {
+      // Flat mode pays exact pro-rata (F-9, fee-free) — and the DEPLOYED
+      // hook's views are curve-based, so compute locally from live state:
+      // sell = psp×R/S · buy = mix×S/R (mirrors _handleFlatSell/_handleFlatBuy).
+      setQuoteRaw(
+        side === 'buy'
+          ? (mixIn * (round.supply ?? 0n)) / (round.reserve ?? 1n)
+          : (pspIn * (round.reserve ?? 0n)) / (round.supply ?? 1n),
+      )
+      return
+    }
     let dead = false
     async function tick() {
       try {
@@ -62,8 +75,25 @@ export default function SwapCard() {
     tick()
     const iv = setInterval(tick, 4000)
     return () => { dead = true; clearInterval(iv) }
-  }, [round.hook, side, mixIn, pspIn])
+  }, [round.hook, side, mixIn, pspIn, flat, round.mode, round.supply, round.reserve])
   const quoteMixOut = side === 'sell' ? (quoteRaw ?? 0n) : 0n
+
+  /// Sell-fee haircut: the LIVE hook's getSellOutput returns the pre-fee
+  /// integral (fixed in src for future deploys; deployed rounds overstate by
+  /// SWAP_FEE_BIPS). Read the fee from the hook and haircut sell quotes +
+  /// minOut so execution matches the number the user saw.
+  const [sellFeeBps, setSellFeeBps] = useState<number>(500)
+  useEffect(() => {
+    if (!round.hook) return
+    let dead = false
+    rpcCall(round.hook!, hookAbi, 'SWAP_FEE_BIPS')
+      .then((v) => { if (!dead && v !== undefined) setSellFeeBps(Number(v)) })
+      .catch(() => {})
+    return () => { dead = true }
+  }, [round.hook])
+  /// Fee applies to curve-mode sells only — flat exits are fee-free (F-9).
+  const sellFactor = flat ? 1 : 1 - sellFeeBps / 10000
+  const quoteMixAfterFee = BigInt(Math.round(Number(quoteMixOut) * sellFactor))
 
   const poolKey = useMemo(
     () =>
@@ -97,10 +127,36 @@ export default function SwapCard() {
     (allowanceRes[0] as bigint) >= (side === 'sell' ? pspIn : mixIn)
 
   const minOut = useMemo(() => {
-    const q = side === 'buy' ? quoteRaw : quoteMixOut
+    const q = side === 'buy' ? quoteRaw : quoteMixAfterFee
     if (!q) return 0n
     return BigInt(Math.round(Number(q) * (1 - slippage)))
-  }, [quoteRaw, quoteMixOut, slippage, side])
+  }, [quoteRaw, quoteMixAfterFee, slippage, side])
+
+  /// Fresh quote at submit — a polled quote can be seconds stale; for large
+  /// trades that drift eats the whole slippage budget before the tx lands.
+  async function freshMinOut(): Promise<bigint> {
+    if (!round.hook) return minOut
+    try {
+      let q: bigint
+      if (flat) {
+        const [r, s] = await Promise.all([
+          rpcCall(round.hook!, hookAbi, 'reserveMixETH') as Promise<bigint>,
+          rpcCall(round.hook!, hookAbi, 'totalSupplyPSP') as Promise<bigint>,
+        ])
+        q = side === 'buy' ? (mixIn * s) / r : (pspIn * r) / s
+      } else {
+        q = (await rpcCall(
+          round.hook!, hookAbi,
+          side === 'buy' ? 'getBuyOutput' : 'getSellOutput',
+          [side === 'buy' ? mixIn : pspIn],
+        )) as bigint
+      }
+      const adj = side === 'sell' ? BigInt(Math.round(Number(q) * sellFactor)) : q
+      return BigInt(Math.round(Number(adj) * (1 - slippage)))
+    } catch {
+      return minOut
+    }
+  }
 
   const payBalance = side === 'buy' ? mixBal : pspBal
   const payBalanceOk = payBalance === undefined || amountWad <= payBalance
@@ -146,7 +202,7 @@ export default function SwapCard() {
           address: ADDRESSES.zapIn,
           abi: zapInAbi,
           functionName: 'buyWithMix',
-          args: [poolKey, mixIn, minOut, 0n],
+          args: [poolKey, mixIn, await freshMinOut(), 0n],
         })
         setStep('done')
         return
@@ -166,7 +222,7 @@ export default function SwapCard() {
         address: ADDRESSES.zapOut,
         abi: zapOutAbi,
         functionName: 'sellToMix',
-        args: [poolKey, pspIn, minOut, 0n],
+        args: [poolKey, pspIn, await freshMinOut(), 0n],
       })
       setStep('done')
     } catch (e) {
@@ -211,6 +267,9 @@ export default function SwapCard() {
         <h2 className="text-lg font-black text-slate-900">
           {predepositPhase ? 'predeposit' : 'swap'}
         </h2>
+        {round.mode === 2 && (
+          <span className="chip bg-slate-100 text-slate-500">flat — pro-rata, fee-free</span>
+        )}
         <div className="flex rounded-full bg-sky-50 p-1">
           <button
             onClick={() => setSide('buy')}
@@ -307,29 +366,53 @@ export default function SwapCard() {
       </div>
 
       {/* slippage */}
-      <div className="mt-3 flex items-center justify-between text-xs">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="font-bold text-slate-400">slippage</span>
-        <div className="flex gap-1">
-          {[0.005, 0.01, 0.05].map((s) => (
+        <div className="flex items-center gap-1">
+          {[0.005, 0.01, 0.03, 0.05, 0.1].map((s) => (
             <button
               key={s}
-              onClick={() => setSlippage(s)}
+              onClick={() => { setSlippage(s); setCustomSlip('') }}
               className={`rounded-lg px-2 py-1 font-bold transition ${
-                slippage === s ? 'bg-sky-400 text-[#fff]' : 'bg-sky-50 text-slate-500'
+                slippage === s && customSlip === ''
+                  ? 'bg-sky-400 text-[#fff]'
+                  : 'bg-sky-50 text-slate-500'
               }`}
             >
               {s * 100}%
             </button>
           ))}
+          <input
+            value={customSlip}
+            onChange={(e) => {
+              const v = e.target.value.replace(/[^0-9.]/g, '')
+              setCustomSlip(v)
+              const pct = parseFloat(v)
+              if (!Number.isNaN(pct) && pct >= 0 && pct <= 90) setSlippage(pct / 100)
+            }}
+            inputMode="decimal"
+            placeholder="custom %"
+            className="w-20 rounded-lg border border-sky-100 bg-white px-2 py-1 text-right font-bold text-slate-600 outline-none focus:border-sky-300"
+          />
         </div>
       </div>
 
       {live && quoteRaw !== undefined && quoteRaw > 0n && (
-        <div className="mt-2 flex justify-between text-xs text-slate-400">
-          <span>min out</span>
-          <span className="font-bold text-slate-500">
-            {side === 'buy' ? `${fmtAmount(minOut, 4)} PSP` : `${fmtAmount(minOut, 4)} mix`}
-          </span>
+        <div className="mt-2 space-y-1">
+          <div className="flex justify-between text-xs text-slate-400">
+            <span>{side === 'sell' ? 'expected out (after fee)' : 'expected out'}</span>
+            <span className="font-bold text-slate-500">
+              {side === 'buy'
+                ? `${fmtAmount(quoteRaw, 4)} PSP`
+                : `${fmtAmount(quoteMixAfterFee, 4)} mix`}
+            </span>
+          </div>
+          <div className="flex justify-between text-xs text-slate-400">
+            <span>min out (fresh at submit)</span>
+            <span className="font-bold text-slate-500">
+              {side === 'buy' ? `${fmtAmount(minOut, 4)} PSP` : `${fmtAmount(minOut, 4)} mix`}
+            </span>
+          </div>
         </div>
       )}
 
