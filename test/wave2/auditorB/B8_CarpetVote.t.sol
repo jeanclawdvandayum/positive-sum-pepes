@@ -119,4 +119,78 @@ contract B8_CarpetVote is BBase {
         vm.warp(((t0 / E) + 6) * E + 1);
         assertEq(stakerV.voteWeight(bob, block.timestamp), 0, "zero after six epochs");
     }
+
+    /// @dev Repro (scoopy 2026-08-27, Sepolia): buys work, sells revert
+    ///      while a carpet-bomb vote is active. Sell before propose (sanity),
+    ///      propose, vote, sell again during the live window.
+    function test_SellDuringActiveVote() public {
+        _launch(500e18);
+        uint256 bag = _bobBuysUnlocked(2_000e18); // unstaked PSP — sellable
+        assertGt(bag, 0, "precondition: bob holds PSP");
+
+        BRouter.Call[] memory sell = new BRouter.Call[](1);
+        sell[0] = BRouter.Call({isBuy: false, amount: bag / 4, settleMode: 0, takeMode: 0});
+
+        // sanity: sell BEFORE any proposal works
+        vm.startPrank(bob);
+        psp.approve(address(router), bag / 4);
+        router.execute(key, sell, bob);
+        vm.stopPrank();
+
+        // propose + yes vote from the genesis staker
+        vm.prank(alice);
+        controller.proposeCarpetBomb();
+        vm.prank(alice);
+        controller.voteCarpetBomb(true);
+
+        // sell DURING the live vote — reported broken on Sepolia
+        vm.startPrank(bob);
+        psp.approve(address(router), bag / 4);
+        uint256[] memory outs = router.execute(key, sell, bob);
+        vm.stopPrank();
+        assertGt(outs[0], 0, "sell during active vote paid out");
+    }
+
+    /// @dev Hardened repro: same scenario but with real time passage (epochs
+    ///      crossing under the engine) and interleaved staker actions around
+    ///      the vote — matches the Sepolia playtest sequence shape.
+    function test_SellDuringActiveVoteWithEpochPassage() public {
+        _launch(500e18);
+        uint256 bag = _bobBuysUnlocked(2_000e18);
+
+        // carol stakes + arms a withdraw (engine deltas live)
+        vm.startPrank(carol);
+        mixETH.approve(address(router), 500e18);
+        BRouter.Call[] memory buy = new BRouter.Call[](1);
+        buy[0] = BRouter.Call({isBuy: true, amount: 500e18, settleMode: 0, takeMode: 0});
+        uint256[] memory bought = router.execute(key, buy, carol);
+        uint256 carolBag = bought[0];
+        psp.approve(address(stakerV), type(uint256).max);
+        stakerV.lock(carolBag);
+        uint256 carolPepe = stakerV.tokenOfOwnerByIndex(carol, 0);
+        stakerV.requestWithdraw(carolPepe);
+        vm.stopPrank();
+
+        // epochs pass first (decay steps apply, walk state accumulates) —
+        // then propose: votes and the sell stay INSIDE the 3d window
+        uint256 t0 = block.timestamp;
+        vm.warp(((t0 / 7 days) + 2) * 7 days + 1);
+
+        // propose + votes from both a full-weight and a decaying staker
+        vm.prank(alice);
+        controller.proposeCarpetBomb();
+        vm.prank(alice);
+        controller.voteCarpetBomb(true);
+        vm.prank(carol);
+        controller.voteCarpetBomb(false); // decaying weight counts partially
+
+        // sell during the live vote, engine mid-walk
+        vm.startPrank(bob);
+        psp.approve(address(router), bag / 4);
+        BRouter.Call[] memory sell = new BRouter.Call[](1);
+        sell[0] = BRouter.Call({isBuy: false, amount: bag / 4, settleMode: 0, takeMode: 0});
+        uint256[] memory outs = router.execute(key, sell, bob);
+        vm.stopPrank();
+        assertGt(outs[0], 0, "sell mid-vote with epoch passage paid out");
+    }
 }
