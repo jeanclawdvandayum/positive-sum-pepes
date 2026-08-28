@@ -33,6 +33,20 @@ curves can never be reborn either.** Options shipped: PSP_CURVE=5 lean
 **Base Sepolia (block limit 1.2B, no per-tx cap) runs the full 34-zone
 staircase with 44x headroom — fork dry-run verified.**
 
+**2026-08-28 CHAIN DECISION: testnet moves to Base Sepolia (scoopy).** Round
+2 = PSP_CURVE=0 full staircase, PM 0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408.
+
+**2026-08-28 MAINNET VERDICT: no such wall exists there.** Mainnet has no
+per-tx cap (a tx may consume the whole block) and the block limit is 60M
+(verified via two independent RPCs). The full 34-zone staircase deployRound
+(~27.5-29.5M incl. mining luck) is ~46-49% of a block — routine. Rebirth
+fits identically; worst-case mining is bounded by the 4-candidate squat cap
+(~11M) → absolute worst ~35.5M < 60M. Mainnet-fork dry-run ran deployRound +
+on-chain UI green; it stopped only at router wiring because the throwaway
+fork key held no real mixETH (fund the broadcaster for a real run). Also
+fixed: PM_BASE was stale (0x498581fF…, no code on mainnet) — now the
+canonical v4 PoolManager 0x000000000004444c5dc75cB358380D2e3dE08A90.
+
 ## 0) Prereqs (local machine)
 
 - [ ] Foundry installed and current (`foundryup`)

@@ -72,8 +72,11 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///   testnet default: 4 (safe everywhere). For Base Sepolia round 2 set
 ///   PSP_CURVE=0 explicitly for the full staircase.
 contract DeployPSP is Script {
-    // Base mainnet Uniswap v4 PoolManager
-    address constant PM_BASE = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
+    // Base mainnet Uniswap v4 PoolManager (canonical v4 deployment; code
+    // verified on-chain 2026-08-28 — the previous constant 0x498581fF… had
+    // no code on mainnet and broke the mainnet path with
+    // "call to non-contract address")
+    address constant PM_BASE = 0x000000000004444c5dc75cB358380D2e3dE08A90;
 
     // Official v4 testnet PoolManagers (Uniswap deployments feed, verified
     // on-chain 2026-08-18 via eth_getCode — 24009 bytes each)
