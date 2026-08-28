@@ -123,6 +123,10 @@ contract DeployPSP is Script {
         }
         string memory htmlPath = vm.envOr("PSP_HTML", string("script/app.html"));
 
+        // Sepolia blocks cap at 60M gas and providers cap per-tx lower still
+        // (alchemy ~15M, publicnode 2^24) — the deploy as ONE tx measured
+        // 19.6M on this branch and is unsendable. Split into per-broadcast
+        // segments so forge sends separate txs (owner stays the broadcaster).
         vm.startBroadcast();
         PSPFactory factory = new PSPFactory(
             IPoolManager(pm), mix, new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), testnet ? _testnetTimings() : 0
@@ -133,15 +137,21 @@ contract DeployPSP is Script {
         // raw-calldata passthrough). Factory owner == this broadcaster.
         PepeDescriptor descriptor = new PepeDescriptor();
         factory.setDescriptor(address(descriptor));
+        vm.stopBroadcast();
 
+        vm.startBroadcast();
         (uint256 roundId, address hookAddr) = factory.deployRound(_roundParams(testnet));
+        vm.stopBroadcast();
 
         // publish the walk-away UI (fetch factory.html() from any rpc)
         string memory h = vm.readFile(htmlPath);
         h = vm.replace(h, "__FACTORY__", vm.toString(address(factory)));
+        vm.startBroadcast();
         factory.setHtml(h);
+        vm.stopBroadcast();
 
         // quality-of-life routers: ETH <-> PSP round trip
+        vm.startBroadcast();
         PSPZapIn zapIn = new PSPZapIn(IMixETH(address(mix)), IPoolManager(pm));
         PSPZapOut zapOut = new PSPZapOut(IMixETH(address(mix)), IPoolManager(pm));
         // claim-and-compound router: fees -> curve buy -> back into the stake
@@ -165,6 +175,7 @@ contract DeployPSP is Script {
             ? LinearZones.config()
             : curveSel == 2 ? Curve2Zones.config()
             : curveSel == 3 ? Curve3Zones.config()
+            : curveSel == 4 ? _playtestCurve()
             : Curve1Zones.config();
         cc.timings = testnet ? _testnetTimings() : 0; // anvil/mainnet: mainnet defaults
         return PSPFactory.RoundParams({
@@ -172,5 +183,26 @@ contract DeployPSP is Script {
             symbol: "PSP",
             curveConfig: cc
         });
+    }
+
+    /// @dev PSP_CURVE=4 — minimal 2-zone S-curve for gas-capped testnets.
+    ///      Sepolia enforces a network-wide per-tx cap of 2^24 = 16,777,216
+    ///      gas (every major EL client); the full curves' deployRound runs
+    ///      17.4M+ and is unmineable there. Two zones fit with headroom.
+    ///      Shape: e^7 (≈1096x price run) across the first 3.5M PSP — the
+    ///      widest legal exp leg (k·width = 7 WAD, the NK24 bound) — then a
+    ///      gentle log tail. Mechanics (vest, votes, referrals, bombs) are
+    ///      identical; only the curve shape is simpler.
+    function _playtestCurve() internal pure returns (CurveMath.CurveConfig memory) {
+        uint256[] memory b = new uint256[](2);
+        b[0] = 0;
+        b[1] = 3_500_000e18;
+        uint256[] memory r = new uint256[](2);
+        r[0] = 2_000_000_000_000; // k = 2e-6 → k·width = 7e18 exactly
+        r[1] = 250_000_000_000_000_000; // log tail, same rate as longswell's islands
+        bool[] memory e = new bool[](2);
+        e[0] = true;
+        e[1] = false;
+        return CurveMath.multiCurve(100000000000000, b, r, e); // P0 = 1e-4, matches the real curves
     }
 }
