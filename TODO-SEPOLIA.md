@@ -4,8 +4,9 @@ End-to-end checklist for shipping a playtest round of PSP to Sepolia
 (chain `11155111`). Work top to bottom; every box is a verifiable step.
 
 Timings cheat-sheet (testnet profile, packed by the deploy script):
-24h predeposit offer · 2d unstake vest (6 × 8h decay epochs) · 1d bomb
-vote · 3d flat exit.
+2h predeposit offer · 1h unstake vest (6 × 10m decay epochs) · 30m bomb
+vote · 3d flat exit (constant). All three tunables: PSP_PREDEPOSIT_SEC /
+PSP_VEST_SEC / PSP_VOTE_SEC (defaults are the fast profile above).
 
 ---
 
@@ -39,6 +40,27 @@ Full code-verified v4 periphery table recorded in script/DeployPSP.s.sol
 (ReservesLens is NOT deployed on 84532 — 0 bytes on three RPCs). Frontend
 wired for 84532 (baseSepolia chain, Coinbase faucet link; testnet deployers:
 PSP_PM=0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408 PSP_CURVE=0).
+
+**2026-08-28 TESTNET GOES mixETH-ONLY + FREE FAUCET (scoopy).** The zap
+in/out feature broke selling PSP on testnet: the old faucet sold unbacked
+mixETH (0.0001 ETH -> 100) while PSPZapOut.zapOut still called
+redeemETH on the mock — which holds no Base Sepolia ETH — so every
+sell-for-ETH reverted. Fixes (testnet branch only; mainnet keeps the ETH
+zap legs against the real vault):
+- SepoliaMixETH.mint(to, amount) is now PUBLIC and free — mixETH is pure
+  playtest scrip, unlimited supply.
+- MixETHFaucet is a stateless pass-through: drip(amount) mints free, no
+  ETH, no inventory, nothing to drain (deploy script no longer seeds it).
+- UI is mixETH-only everywhere: SwapCard buys via buyWithMix, sells via
+  sellToMix, predeposit via approve+predeposit. The ETH zap paths
+  (zapInBuy/zapOut/zapInPredeposit) are gone from the testnet UI; the
+  pool itself was always mixETH<->PSP (BadPool guard). The native-ETH
+  faucet link stays (Base Sepolia ETH is still needed for GAS).
+- Playtest timings compressed: predeposit 24h->2h, unstake vest 2d->1h
+  (6x10m epochs), bomb vote 1d->30m — new defaults in DeployPSP.s.sol,
+  countdowns read from chain so the UI self-reflects.
+- Round 2 deploy note: the previous deploy had a checksum bug in
+  PM_ARB_SEPOLIA (lowercase f) — fixed; it never blocked Base Sepolia.
 
 **2026-08-28 MAINNET VERDICT: no such wall exists there.** Mainnet has no
 per-tx cap (a tx may consume the whole block) and the block limit is 60M

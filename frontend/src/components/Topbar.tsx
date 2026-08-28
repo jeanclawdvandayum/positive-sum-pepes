@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { NavLink } from 'react-router-dom'
 import { useAccount, useWriteContract } from 'wagmi'
-import { parseEther } from 'viem'
 import { renderPepeSvg, randomDna } from '../lib/pepeRender'
 import { ADDRESSES, FAUCET_ENABLED } from '../lib/config'
 import { faucetAbi } from '../lib/abi'
@@ -67,21 +66,37 @@ export default function Topbar() {
   )
 }
 
-/// compact testnet faucet: one drip per click — pay 0.0001 ETH, receive 100 mixETH.
-/// `full` renders the wide card variant used on the Predeposit page.
+/// compact testnet faucet: mixETH is free playtest scrip — click to mint
+/// 1000, or pass an amount. `full` renders the input-card variant used on
+/// the Predeposit page.
+const QUICK_MINT = 1000n * 10n ** 18n
+
 export function FaucetButton({ full = false }: { full?: boolean }) {
   const { isConnected } = useAccount()
   const [step, setStep] = useState<'idle' | 'tx' | 'done'>('idle')
+  const [mintAmount, setMintAmount] = useState('1000')
   const { writeContractAsync } = useWriteContract()
 
+  function amountWad(): bigint | null {
+    const n = Number(mintAmount)
+    if (!Number.isFinite(n) || n <= 0) return null
+    try {
+      return BigInt(Math.round(n * 1e6)) * 10n ** 12n
+    } catch {
+      return null
+    }
+  }
+
   async function drip() {
+    const amt = full ? amountWad() : QUICK_MINT
+    if (!amt) return
     try {
       setStep('tx')
       await writeContractAsync({
         address: ADDRESSES.faucet,
         abi: faucetAbi,
         functionName: 'drip',
-        value: parseEther('0.0001'),
+        args: [amt],
       })
       setStep('done')
       setTimeout(() => setStep('idle'), 2500)
@@ -92,21 +107,34 @@ export function FaucetButton({ full = false }: { full?: boolean }) {
 
   if (full) {
     return (
-      <button
-        type="button"
-        disabled={!isConnected}
-        onClick={drip}
-        className={`btn-ghost w-full ${step === 'done' ? 'border-emerald-200 text-emerald-600' : ''}`}
-      >
-        {step === 'done' ? '✅ 100 mixETH dripped' : step === 'tx' ? 'confirm in wallet…' : 'faucet: 0.0001 ETH → 100 mixETH'}
-      </button>
+      <div className="flex gap-2">
+        <input
+          className="input-amount w-32 text-right"
+          placeholder="1000"
+          value={mintAmount}
+          inputMode="decimal"
+          onChange={(e) => setMintAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+        />
+        <button
+          type="button"
+          disabled={!isConnected || !amountWad()}
+          onClick={drip}
+          className={`btn-ghost flex-1 ${step === 'done' ? 'border-emerald-200 text-emerald-600' : ''}`}
+        >
+          {step === 'done'
+            ? '✅ minted'
+            : step === 'tx'
+              ? 'confirm in wallet…'
+              : 'faucet: mint mixETH (free)'}
+        </button>
+      </div>
     )
   }
 
   return (
     <button
       type="button"
-      title="faucet · 100 mixETH per 0.0001 ETH"
+      title="faucet · free mixETH"
       disabled={!isConnected}
       onClick={drip}
       className={`inline-flex h-7 items-center gap-1 rounded-full border border-emerald-200 bg-white px-2.5 text-xs font-bold text-psp-deep transition active:scale-[0.98] hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-40 ${
@@ -114,7 +142,7 @@ export function FaucetButton({ full = false }: { full?: boolean }) {
       }`}
     >
       {step === 'done' ? '✅' : step === 'tx' ? <><MixLogo px={14} />…</> : <MixLogo px={14} />}
-      <span className="hidden lg:inline">{step === 'done' ? 'dripped' : step === 'tx' ? 'confirming' : 'faucet'}</span>
+      <span className="hidden lg:inline">{step === 'done' ? 'minted' : step === 'tx' ? 'minting' : 'faucet'}</span>
     </button>
   )
 }

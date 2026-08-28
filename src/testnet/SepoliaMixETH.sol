@@ -9,18 +9,31 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 ///         yield, no rate variable, no owner, no admin surface — the
 ///         sharesToAssets rate is always exactly 1e18 by construction.
 ///
-///         Born with SUPPLY (10,000,000 mixETH) minted to the deployer; the
-///         deploy script seeds the MixETHFaucet with all of it (testers pay
-///         0.0001 testnet ETH for 100 mixETH — Sepolia ETH is scarce, the
-///         game's mixETH unit is not).
+///         PUBLIC MINT (2026-08-28): mixETH on testnet is a playtest unit,
+///         not a claim on ETH. The faucet no longer sells mixETH for ETH —
+///         anyone mints as much as they want for free (see mint()). The
+///         ETH legs (depositETH/redeemETH) stay for interface compatibility
+///         with the zap routers, but the testnet UI never touches them:
+///         the pool trades mixETH <-> PSP only. redeemETH draws on whatever
+///         real ETH was actually deposited (faucet minted shares have none),
+///         which is why the UI must keep off the ETH paths.
 ///
-///         NEVER deploy to mainnet: the supply is not backed 1:1 by ETH.
+///         NEVER deploy to mainnet: the supply is not backed 1:1 by ETH
+///         and the mint is wide open.
 contract SepoliaMixETH is ERC20 {
-    /// @dev Faucet inventory: 10M mixETH = 100,000 full-rate drips.
+    /// @dev Legacy faucet inventory seed — moot now that mint() is public,
+    ///      kept so the deploy script's console output stays truthful.
     uint256 public constant SUPPLY = 10_000_000 ether;
 
     constructor() ERC20("Sepolia mixETH (PSP test)", "mixETH") {
         _mint(msg.sender, SUPPLY);
+    }
+
+    /// @notice Mint any amount of mixETH, for free, to anyone. Testnet-only
+    ///         convenience: the whole point of the mock is that mixETH is
+    ///         unlimited so playtesters never need native ETH to play.
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
     }
 
     /// @notice Wrap ETH at the hardcoded 1:1 rate — exactly msg.value shares.
@@ -31,8 +44,9 @@ contract SepoliaMixETH is ERC20 {
     }
 
     /// @notice Unwrap at the hardcoded 1:1 rate. CEI: burn before the ETH
-    ///         call. Force-sent ETH (receive/selfdestruct) is redeemable by
-    ///         depositors first-come — acceptable on a testnet wrapper.
+    ///         call. Only real deposits are redeemable — faucet-minted
+    ///         shares have no ETH behind them and will revert here (the
+    ///         testnet UI never routes through this).
     function redeemETH(uint256 shareAmount) external returns (uint256 ethOut) {
         require(shareAmount > 0, "Zero amount");
         ethOut = shareAmount; // hardcoded 1:1

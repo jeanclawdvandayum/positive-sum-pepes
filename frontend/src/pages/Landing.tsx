@@ -16,13 +16,13 @@ const mechanics = [
     icon: 'window',
     title: 'predeposit window',
     color: 'from-emerald-400 to-emerald-500',
-    body: 'each round opens with a 7-day window. up to 500 mixETH gets first position at the seed price and PSP auto-locks at launch. miss it and you buy on the open curve.',
+    body: 'each round opens with a short predeposit window. up to 500 mixETH gets first position at the seed price and PSP auto-locks at launch. miss it and you buy on the open curve.',
   },
   {
     icon: 'diamond',
     title: 'stake & earn fees',
     color: 'from-teal-400 to-emerald-400',
-    body: 'lock PSP for 90 days and every curve fee flows to stakers pro-rata, in mixETH. your bag yield-farms the degens. extend anytime in the final week.',
+    body: 'lock PSP and every curve fee flows to stakers pro-rata, in mixETH. your bag yield-farms the degens. extend anytime in the final week.',
   },
   {
     icon: 'bomb',
@@ -40,7 +40,7 @@ const mechanics = [
     icon: 'shield',
     title: 'your keys, your pepes',
     color: 'from-cyan-400 to-sky-500',
-    body: 'non-custodial end to end. trade with ETH or mixETH through zaps in a single transaction. no admin keys on the curve, no pausing, no upgrades mid-game.',
+    body: 'non-custodial end to end. mixETH in, mixETH out — every trade settles against the round pool in a single transaction. no admin keys on the curve, no pausing, no upgrades mid-game.',
   },
 ]
 

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount, useWriteContract } from 'wagmi'
-import { parseEther } from 'viem'
 import { ADDRESSES, FAUCET_ENABLED, REINVEST_ENABLED } from '../lib/config'
 import { controllerAbi, erc20Abi, faucetAbi, stakerAbi, reinvestorAbi, buildPoolKey } from '../lib/abi'
 import { useRound, useBalances } from '../lib/useRound'
@@ -244,7 +243,7 @@ export default function StakeCard() {
     }
   }
 
-  /// testnet-only: one drip per click — pay 0.0001 ETH, receive 100 mixETH
+  /// testnet-only: free mixETH mint — one click, 1000 mixETH, no ETH needed
   const [dripStep, setDripStep] = useState<'idle' | 'tx' | 'done'>('idle')
   async function drip() {
     setError(null)
@@ -254,7 +253,7 @@ export default function StakeCard() {
         address: ADDRESSES.faucet,
         abi: faucetAbi,
         functionName: 'drip',
-        value: parseEther('0.0001'),
+        args: [1000n * 10n ** 18n],
       })
       setDripStep('done')
       setTimeout(() => setDripStep('idle'), 2500)
@@ -420,7 +419,7 @@ export default function StakeCard() {
             <MixLogo className="mr-3 shrink-0 text-[1.6em]" />
             <div className="flex-1">
               <div className="text-xs font-black text-slate-700">faucet</div>
-              <div className="text-[11px] font-bold text-slate-400">100 mixETH per 0.0001 ETH</div>
+              <div className="text-[11px] font-bold text-slate-400">free playtest mixETH · 1000 per click</div>
             </div>
             <button className="btn-ghost ml-3 shrink-0" disabled={!isConnected || busy} onClick={drip}>
               {dripStep === 'done' ? '✅' : dripStep === 'tx' ? 'confirm…' : <><MixLogo px={16} /> get mixETH</>}

@@ -2,47 +2,40 @@
 pragma solidity 0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @title MixETHFaucet — subsidized mixETH for PSP playtests
-/// @notice Pay 0.0001 testnet ETH, receive 100 mixETH. Multiples work:
-///         drips = msg.value / 0.0001 ETH; dust below one unit is kept
-///         (≤ 0.0001 ETH per call, negligible). Holds a pre-seeded mixETH
-///         inventory (the SepoliaMixETH constructor supply, transferred in
-///         by the deploy script).
+/// @dev The mock mixETH mints freely on testnet (see SepoliaMixETH.mint).
+interface IMintableMix {
+    function mint(address to, uint256 amount) external;
+}
+
+/// @title MixETHFaucet — free, unlimited mixETH for PSP playtests
+/// @notice 2026-08-28 rewrite: the faucet used to sell 100 mixETH per
+///         0.0001 testnet ETH out of a pre-seeded inventory. That made
+///         faucet-bought mixETH unbacked by any ETH while the zap routers
+///         still redeemed mixETH -> ETH — every "sell PSP for ETH" reverted.
+///         Testnet mixETH is now pure playtest scrip: drip() mints any
+///         requested amount for free, straight from the token. No ETH, no
+///         inventory, no price, nothing to run out of.
 ///
 ///         No owner, no per-address limit, no pause — a testnet convenience
-///         with zero attack surface worth guarding. Collected ETH stays in
-///         the contract (nothing to steal, nothing to admin).
+///         with zero attack surface worth guarding.
 contract MixETHFaucet {
-    using SafeERC20 for IERC20;
+    /// @dev mixETH mock with a public mint.
+    IMintableMix public immutable mixETH;
 
-    /// @dev Price of one drip unit.
-    uint256 public constant DRIP_PRICE = 0.0001 ether; // 1e14 wei
-    /// @dev mixETH per drip unit.
-    uint256 public constant DRIP_AMOUNT = 100 ether;
+    error ZeroAmount();
 
-    IERC20 public immutable mixETH;
-
-    error TooLittle();
-    error FaucetEmpty();
-
-    event Dripped(address indexed to, uint256 ethPaid, uint256 mixOut);
+    event Dripped(address indexed to, uint256 amount);
 
     constructor(IERC20 _mixETH) {
-        mixETH = _mixETH;
+        mixETH = IMintableMix(address(_mixETH));
     }
 
-    /// @notice Buy mixETH at the subsidized playtest rate (per 0.0001 ETH).
-    function drip() external payable {
-        uint256 units = msg.value / DRIP_PRICE;
-        if (units == 0) revert TooLittle();
-        uint256 out = units * DRIP_AMOUNT;
-        if (mixETH.balanceOf(address(this)) < out) revert FaucetEmpty();
-        emit Dripped(msg.sender, msg.value, out);
-        mixETH.safeTransfer(msg.sender, out);
+    /// @notice Mint mixETH to yourself, free, in any amount.
+    /// @param amount mixETH (wei) to mint — playtest scrip, take what you need
+    function drip(uint256 amount) external {
+        if (amount == 0) revert ZeroAmount();
+        emit Dripped(msg.sender, amount);
+        mixETH.mint(msg.sender, amount);
     }
-
-    /// @dev Accept accidental sends; like drip revenue, not recoverable.
-    receive() external payable {}
 }

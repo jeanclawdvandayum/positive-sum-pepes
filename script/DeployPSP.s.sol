@@ -48,12 +48,12 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///   PSP_MIXETH   mixETH token (required unless PSP_ANVIL/PSP_TESTNET)
 ///   PSP_HTML     ui file (default: script/app.html)
 ///   PSP_ANVIL    =1 to deploy MockMixETH+MockPoolManager first (local e2e)
-///   PSP_TESTNET  =1 to deploy SepoliaMixETH (dumb 1:1, no yield) +
-///                MixETHFaucet (0.0001 ETH -> 100 mixETH) against a
-///                canonical v4 testnet PoolManager + playtest timing
-///                profile (24h predeposit offer, 2d unstake vest decaying
-///                in 6 × 8h epochs, 1d bomb vote; flat exit 3d — all
-///                three tunable in seconds: PSP_PREDEPOSIT_SEC /
+///   PSP_TESTNET  =1 to deploy SepoliaMixETH (dumb 1:1, no yield, public
+///                free mint) + MixETHFaucet (free unlimited drip, no ETH)
+///                against a canonical v4 testnet PoolManager + playtest
+///                timing profile (2h predeposit offer, 1h unstake vest
+///                decaying in 6 × 10m epochs, 30m bomb vote; flat exit 3d —
+///                all three tunable in seconds: PSP_PREDEPOSIT_SEC /
 ///                PSP_VEST_SEC / PSP_VOTE_SEC, vest % 6 == 0)
 ///   PSP_FORK     =1 to vm.deal the broadcaster 5 ETH first — lets you
 ///                dry-run the FULL testnet path (PSP_TESTNET + PSP_PM +
@@ -82,7 +82,7 @@ contract DeployPSP is Script {
     // on-chain 2026-08-18 via eth_getCode — 24009 bytes each)
     address constant PM_SEPOLIA = 0xE03A1074c86CFeDd5C142C4F04F1a1536e203543;      // 11155111
     address constant PM_BASE_SEPOLIA = 0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408; // 84532
-    address constant PM_ARB_SEPOLIA = 0xFB3e0C6f74eB1a21CC1Da29aeC80D2Dfe6C9a317;  // 421614
+    address constant PM_ARB_SEPOLIA = 0xFB3e0C6F74eB1a21CC1Da29aeC80D2Dfe6C9a317;  // 421614
     address constant PM_UNICHAIN_SEPOLIA = 0x9cB26A7183B2F4515945Dc52CB4195B0d2D06C95; // 1301
 
     // Base Sepolia (84532) v4 periphery — scoopy's table, code-verified
@@ -100,14 +100,15 @@ contract DeployPSP is Script {
     /// @dev Packed playtest timing profile (see RoundController "Timing
     ///      profile"): predeposit window · unstake vest · bomb vote, all
     ///      env-tunable IN SECONDS for granularity (PSP_PREDEPOSIT_SEC /
-    ///      PSP_VEST_SEC / PSP_VOTE_SEC; defaults 1d / 2d / 1d). VEST must
-    ///      be divisible by 6 — six decay epochs (packTimings guards).
-    ///      Flat exit: constant 3d.
+    ///      PSP_VEST_SEC / PSP_VOTE_SEC; defaults 2h / 1h / 30m — scoopy's
+    ///      2026-08-28 fast-playtest profile, compressed so a full round
+    ///      lifecycle fits in one sitting). VEST must be divisible by 6 —
+    ///      six decay epochs (packTimings guards). Flat exit: constant 3d.
     function _testnetTimings() internal view returns (uint256) {
         return CurveMath.packTimings(
-            vm.envOr("PSP_PREDEPOSIT_SEC", uint256(1 days)),
-            vm.envOr("PSP_VEST_SEC", uint256(2 days)),
-            vm.envOr("PSP_VOTE_SEC", uint256(1 days))
+            vm.envOr("PSP_PREDEPOSIT_SEC", uint256(2 hours)),
+            vm.envOr("PSP_VEST_SEC", uint256(1 hours)),
+            vm.envOr("PSP_VOTE_SEC", uint256(30 minutes))
         );
     }
 
@@ -132,17 +133,18 @@ contract DeployPSP is Script {
             // pass PSP_PM explicitly (constants above for copy-paste).
             pm = vm.envAddress("PSP_PM");
             vm.startBroadcast();
-            // Dumb 1:1 wrapper (no yield, no admin) + subsidized faucet:
-            // the constructor mints 10M mixETH to the broadcaster, which
-            // seeds the faucet in full — testers pay 0.0001 ETH per 100.
+            // Dumb 1:1 wrapper (no yield, no admin) + free faucet: mixETH is
+            // playtest scrip — the token itself mints freely (public mint),
+            // so the faucet is a stateless pass-through. No ETH needed, no
+            // inventory to drain; the constructor SUPPLY just lands on the
+            // broadcaster (harmless leftovers).
             SepoliaMixETH mixT = new SepoliaMixETH();
             MixETHFaucet faucet = new MixETHFaucet(IERC20(address(mixT)));
-            mixT.transfer(address(faucet), mixT.balanceOf(msg.sender));
             vm.stopBroadcast();
             mix = IERC20(address(mixT));
             console.log("TESTNET PoolManager:", pm);
-            console.log("TESTNET mixETH (1:1, no yield):", address(mixT));
-            console.log("TESTNET faucet (0.0001 ETH -> 100 mix):", address(faucet));
+            console.log("TESTNET mixETH (1:1, free mint):", address(mixT));
+            console.log("TESTNET faucet (free unlimited):", address(faucet));
         } else {
             pm = vm.envOr("PSP_PM", PM_BASE);
             mix = IERC20(vm.envAddress("PSP_MIXETH"));

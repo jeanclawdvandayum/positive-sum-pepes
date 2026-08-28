@@ -133,9 +133,9 @@ export const registryAbi = parseAbi([
   'function canReferNft(uint256) view returns (bool)',
 ])
 
-/// MixETHFaucet — testnet-only: pay multiples of 0.0001 ETH, receive 100 mixETH each.
+/// MixETHFaucet — testnet-only: free unlimited mixETH mint (no ETH needed).
 export const faucetAbi = parseAbi([
-  'function drip() payable',
+  'function drip(uint256 amount)',
 ])
 
 /// PSPReinvestor — claims mixETH fees and compounds them into PSP stakes.

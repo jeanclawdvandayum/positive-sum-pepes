@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAccount, useBalance, useWriteContract } from 'wagmi'
-import { controllerAbi, erc20Abi, zapInAbi } from '../lib/abi'
+import { useAccount, useWriteContract } from 'wagmi'
+import { controllerAbi, erc20Abi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
-import { ADDRESSES, CHAIN_ID, FAUCET_ENABLED, NATIVE_ETH_FAUCET_URL, TESTNET_ETH_FAUCET } from '../lib/config'
+import { CHAIN_ID, FAUCET_ENABLED, NATIVE_ETH_FAUCET_URL, TESTNET_ETH_FAUCET } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
 import { fmtAmount, fmtCountdown, parseAmountToWad } from '../lib/format'
 import ReferralCard, { RefBanner } from '../components/ReferralCard'
 import { FaucetButton } from '../components/Topbar'
+import MixLogo from '../components/MixLogo'
 
-type Path = 'MIX' | 'ETH'
 type Step = 'idle' | 'approve' | 'tx' | 'done'
 
 interface PdState {
@@ -33,7 +33,6 @@ export default function Predeposit() {
   const round = useRound()
   const { address, isConnected } = useAccount()
   const { mix: mixBal } = useBalances(round.token, round.mix)
-  const { data: ethBal } = useBalance({ address })
 
   /// predepositState + duration + depositor count + own deposit, polled like
   /// every other read in this app (useReadContracts sits idle on custom chains)
@@ -118,7 +117,6 @@ export default function Predeposit() {
     return () => clearInterval(t)
   }, [])
 
-  const [path, setPath] = useState<Path>('MIX')
   const [amount, setAmount] = useState('')
   const [step, setStep] = useState<Step>('idle')
   const [launchStep, setLaunchStep] = useState<'idle' | 'tx' | 'done'>('idle')
@@ -127,9 +125,7 @@ export default function Predeposit() {
 
   const amountWad = parseAmountToWad(amount)
   const hasAllowance = allowance !== undefined && amountWad > 0n && allowance >= amountWad
-  const balanceOk =
-    amountWad > 0n &&
-    (path === 'ETH' ? ethBal === undefined || amountWad <= ethBal.value : mixBal === undefined || amountWad <= mixBal)
+  const balanceOk = amountWad > 0n && (mixBal === undefined || amountWad <= mixBal)
   const busy = step === 'approve' || step === 'tx'
 
   const endTime = pd && duration !== undefined ? pd.startTime + duration : undefined
@@ -149,34 +145,23 @@ export default function Predeposit() {
     if (!round.controller || amountWad <= 0n) return
     setError(null)
     try {
-      if (path === 'ETH') {
-        setStep('tx')
+      if (!round.mix) return
+      if (!hasAllowance) {
+        setStep('approve')
         await writeContractAsync({
-          address: ADDRESSES.zapIn,
-          abi: zapInAbi,
-          functionName: 'zapInPredeposit',
-          args: [round.controller, 0n],
-          value: amountWad,
-        })
-      } else {
-        if (!round.mix) return
-        if (!hasAllowance) {
-          setStep('approve')
-          await writeContractAsync({
-            address: round.mix,
-            abi: erc20Abi,
-            functionName: 'approve',
-            args: [round.controller, amountWad],
-          })
-        }
-        setStep('tx')
-        await writeContractAsync({
-          address: round.controller,
-          abi: controllerAbi,
-          functionName: 'predeposit',
-          args: [amountWad],
+          address: round.mix,
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [round.controller, amountWad],
         })
       }
+      setStep('tx')
+      await writeContractAsync({
+        address: round.controller,
+        abi: controllerAbi,
+        functionName: 'predeposit',
+        args: [amountWad],
+      })
       setStep('done')
       setNonce((n) => n + 1)
     } catch (e) {
@@ -217,16 +202,14 @@ export default function Predeposit() {
     : amountWad <= 0n
       ? 'enter an amount'
       : !balanceOk
-        ? `insufficient ${path === 'ETH' ? 'ETH' : 'mixETH'}`
+        ? 'insufficient mixETH'
         : step === 'approve'
           ? 'approving…'
           : step === 'tx'
             ? 'confirm in wallet…'
-            : path === 'ETH'
-              ? `predeposit ${fmtAmount(amountWad)} ETH`
-              : hasAllowance
-                ? `predeposit ${fmtAmount(amountWad)} mixETH`
-                : `approve ${fmtAmount(amountWad)} mixETH`
+            : hasAllowance
+              ? `predeposit ${fmtAmount(amountWad)} mixETH`
+              : `approve ${fmtAmount(amountWad)} mixETH`
 
   return (
     <div className="space-y-4">
@@ -245,7 +228,7 @@ export default function Predeposit() {
           )}
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          commit mixETH (or plain ETH) before launch — everything pools into the genesis buy, then claim your PSP.
+          commit mixETH before launch — everything pools into the genesis buy, then claim your PSP.
         </p>
       </div>
 
@@ -284,29 +267,15 @@ export default function Predeposit() {
           <div className="card p-5">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-black text-slate-900">deposit</h2>
-              <div className="flex rounded-full bg-sky-50 p-1">
-                {(['MIX', 'ETH'] as Path[]).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPath(p)}
-                    disabled={step === 'approve' || step === 'tx'}
-                    className={`rounded-full px-4 py-1 text-sm font-bold transition disabled:opacity-30 ${
-                      path === p ? 'bg-white text-psp-deep shadow' : 'text-slate-400'
-                    }`}
-                  >
-                    {p === 'MIX' ? 'mixETH' : 'ETH'}
-                  </button>
-                ))}
+              <div className="flex shrink-0 items-center gap-1 rounded-2xl bg-white px-4 py-2 shadow-sm">
+                <MixLogo px={18} /> <span className="text-sm font-black text-slate-700">mixETH</span>
               </div>
             </div>
 
             <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
               <div className="flex items-center justify-between text-xs font-bold text-slate-400">
                 <span>commit</span>
-                <span>
-                  balance{' '}
-                  {path === 'ETH' ? (ethBal ? fmtAmount(ethBal.value, 4) : '…') : fmtAmount(mixBal)}
-                </span>
+                <span>balance {fmtAmount(mixBal)}</span>
               </div>
               <input
                 className="input-amount mt-2"
@@ -317,9 +286,6 @@ export default function Predeposit() {
               />
               {amountWad > 0n && !balanceOk && (
                 <div className="mt-1 text-xs font-bold text-rose-500">insufficient balance</div>
-              )}
-              {path === 'ETH' && (
-                <div className="mt-1 text-xs text-slate-400">wraps to mixETH and predeposits in one tx</div>
               )}
             </div>
 
