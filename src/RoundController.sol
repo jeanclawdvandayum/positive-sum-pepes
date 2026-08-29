@@ -155,6 +155,12 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     ///      votes are cast BY NFT — a wallet votes each pepe it owns).
     uint256 public proposalCount;
     mapping(uint256 => uint256) public lastVotedPepeOn; // pepeId => proposalCount
+    /// @dev Prisoner's dilemma (scoopy 2026-08-29): weight this wallet has
+    ///      cast on proposal #`n`. While that vote is live the voter cannot
+    ///      arm ANY withdraw (wallet-level commitment — no hedging with
+    ///      unvoted pepes). Keyed by proposal epoch: a new proposal starts
+    ///      every wallet clean.
+    mapping(uint256 => mapping(address => uint256)) public castWeightOn; // n => voter => weight
     uint256 public immutable VOTE_DURATION; // default 3 days
     /// @dev Flat-exit window after a carpet bomb — became the 4th packed
     ///      timing slot (2026-08-28); mainnet default stays 3 days.
@@ -586,6 +592,9 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         } else {
             currentProposal.noVotes += weight;
         }
+        // Prisoner's dilemma (scoopy 2026-08-29): casting is committing —
+        // the voter cannot arm a withdraw while this vote is live.
+        castWeightOn[proposalCount][msg.sender] += weight;
 
         emit Voted(msg.sender, support, weight);
     }
@@ -661,6 +670,30 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         if (!okSpawn) revert FactorySpawnFailed();
 
         emit RoundFinalized(mixETHCarried);
+    }
+
+    /// @notice True while a carpet-bomb vote COMMITS its participants
+    ///         (scoopy 2026-08-29 — the prisoner's dilemma): the voting
+    ///         window itself, plus — for a passing proposal — the gap until
+    ///         it is executed. While live, in the staker:
+    ///           · a wallet that cast votes cannot arm a withdraw, and a
+    ///             pepe that voted cannot be armed by anyone (even after
+    ///             transfer) — requestWithdraw reverts
+    ///           · NO ONE can cancel an armed withdraw — cancelWithdraw
+    ///             reverts (an armed racer is committed: no reclaiming vote
+    ///             power, no dodging the flat)
+    ///         Voting is the commitment to stay; arming is the exit. A vote
+    ///         that closes without passing releases everyone immediately.
+    function carpetVoteLive() public view returns (bool) {
+        CarpetBombProposal storage prop = currentProposal;
+        if (prop.proposeTime == 0 || prop.executed) return false;
+        if (block.timestamp <= prop.proposeTime + VOTE_DURATION) return true;
+        // Window closed, unexecuted: still live iff it would execute right
+        // now (live-denominator quorum, same math as carpetBomb()). A
+        // failed proposal is dead — arms and voters are released.
+        uint256 totalVotes = prop.yesVotes + prop.noVotes;
+        return totalVotes * 10000 >= staker.totalVotableWeight() * QUORUM_BIPS
+            && prop.yesVotes * 10000 > totalVotes * MAJORITY_BIPS;
     }
 
     function getCarpetBombState() external view returns (

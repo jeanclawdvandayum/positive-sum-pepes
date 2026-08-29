@@ -61,6 +61,8 @@ contract PSPStaker {
     error NotDecaying();     // cancel/withdraw without an active request
     error VestNotComplete(); // withdraw before the decay ran out
     error BadOwnerIndex();   // enumeration out of range
+    error VoteLocksArm();    // prisoner's dilemma: live cast vote commits the wallet AND the pepe — no arming
+    error VoteLocksCancel(); // prisoner's dilemma: while a vote is live, armed exits cannot be cancelled
 
     // ─────────────── Events ───────────────
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
@@ -432,6 +434,18 @@ contract PSPStaker {
         if (pos.amount == 0) revert NotLocker();
         if (pos.requestEpoch != 0) revert RequestActive();
 
+        // Prisoner's dilemma (scoopy 2026-08-29): casting a vote is the
+        // commitment to stay. While the vote is live, the voter cannot arm
+        // a withdraw on ANY pepe (wallet guard — no hedging with unvoted
+        // pepes), and a pepe that voted cannot be armed by anyone, even
+        // after transfer (pepe guard). Watching the pack race for the
+        // exits is exactly when you vote instead.
+        if (controller.carpetVoteLive()) {
+            uint256 proposal = controller.proposalCount();
+            if (controller.castWeightOn(proposal, msg.sender) != 0
+                || controller.lastVotedPepeOn(pepeId) == proposal) revert VoteLocksArm();
+        }
+
         _settleAndPay(pepeId, msg.sender, true); // state-then-pay below is safe: request changes no balances
 
         uint256 e = _epoch();
@@ -454,6 +468,13 @@ contract PSPStaker {
         _requireOwner(pepeId);
         Position storage pos = positions[pepeId];
         if (pos.requestEpoch == 0) revert NotDecaying();
+
+        // Prisoner's dilemma (scoopy 2026-08-29): once a vote is live, an
+        // armed withdraw is committed — cancelling would reclaim vote
+        // power and re-open the denominator games. Blocked through the
+        // execution of a passing vote; a failed vote releases arms the
+        // moment its window closes.
+        if (controller.carpetVoteLive()) revert VoteLocksCancel();
 
         _settleAndPay(pepeId, msg.sender, true);
 
