@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { sampleCurve } from '../lib/curve'
 import { useRound } from '../lib/useRound'
 import { fmtAmount, fmtPrice } from '../lib/format'
+import { markerLabel } from '../lib/sine'
 
 type YMode = 'price' | 'supply'
 
@@ -12,13 +13,17 @@ const PAD = { l: 64, r: 16, t: 16, b: 40 }
 export default function CurveChart() {
   const round = useRound()
   const [yMode, setYMode] = useState<YMode>('price')
-  const [lin, setLin] = useState(true) // linear axes (2026-08-23) — sawtooth teeth read literally
+  // axis default by curve family (2026-08-29): zone teeth read literally on
+  // LINEAR axes; the tilted sine spans 4 decades — the staircase of plateaus
+  // reads on LOG. User toggle always wins.
+  const [linTouched, setLinTouched] = useState<boolean | null>(null)
+  const lin = linTouched ?? !(round.sine?.active ?? false)
   const [hover, setHover] = useState<number | null>(null)
 
-  const pts = useMemo(
-    () => (round.curve ? sampleCurve(round.curve, round.supply ?? 0n) : []),
-    [round.curve, round.supply],
-  )
+  const pts = useMemo(() => {
+    if (round.sine?.active && round.sine.points.length) return round.sine.points
+    return round.curve ? sampleCurve(round.curve, round.supply ?? 0n) : []
+  }, [round.sine, round.curve, round.supply])
 
   const live = useMemo(() => {
     if (!round.reserve || !round.supply || !round.marginalPrice) return null
@@ -172,7 +177,7 @@ export default function CurveChart() {
             {(['linear', 'log'] as const).map((m) => (
               <button
                 key={m}
-                onClick={() => setLin(m === 'linear')}
+                onClick={() => setLinTouched(m === 'linear')}
                 className={`rounded-full px-4 py-1 text-xs font-bold transition ${
                   lin === (m === 'linear') ? 'bg-white text-psp-deep shadow' : 'text-slate-400'
                 }`}
@@ -240,6 +245,33 @@ export default function CurveChart() {
               </g>
             )
           })}
+
+          {/* tilted-sine wave markers: launch tread + quarter-wave anchors;
+              tops (k=4/8/12) highlighted — the staircase of plateaus */}
+          {round.sine?.active &&
+            round.sine.markers.map((m, i) => {
+              const x = sx(m.reserve)
+              if (x < PAD.l || x > W - PAD.r) return null
+              const label = markerLabel(m, fmtPrice)
+              if (!label) return null
+              return (
+                <g key={`sm-${i}`}>
+                  <line
+                    x1={x} x2={x} y1={PAD.t} y2={H - PAD.b}
+                    stroke={m.kind === 'top' ? '#f472b6' : '#fbbf24'}
+                    strokeWidth="1" strokeDasharray="4 4" opacity="0.75"
+                  />
+                  <text
+                    x={Math.min(x + 3, W - PAD.r - 120)}
+                    y={PAD.t + 12 + (i % 3) * 13}
+                    fontSize="10"
+                    className={m.kind === 'top' ? 'fill-pink-400' : 'fill-amber-500'}
+                  >
+                    {label}
+                  </text>
+                </g>
+              )
+            })}
 
           {/* x gridlines + labels (1-2-5 decades, log x) */}
           {xTicks.map((t) => {

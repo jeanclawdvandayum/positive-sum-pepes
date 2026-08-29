@@ -441,8 +441,12 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         mixETH.safeTransfer(address(hook), totalBoot);
 
         // NK24 fix: the curve's unit of account is mixETH — the genesis buy is
-        // computed directly from the boot amount.
-        uint256 initialPSP = CurveMath.computeBuyOutput(totalBoot, 0, curveConfig);
+        // computed directly from the boot amount. Sine flavor: genesis supply
+        // is the wave's predeposit integral (closed form, no Newton); the hook
+        // materializes the identical curve in initializeCurve below.
+        uint256 initialPSP = hook.sineConfigured()
+            ? hook.sineGenesisPSP(totalBoot)
+            : CurveMath.computeBuyOutput(totalBoot, 0, curveConfig);
         if (initialPSP == 0) revert ZeroAmount();
 
         // Snapshot for proportional claims (prevents donation attacks)

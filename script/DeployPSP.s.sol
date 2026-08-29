@@ -14,6 +14,7 @@ import {LinearZonesLean} from "../src/curves/LinearZonesLean.sol";
 import {Curve1Zones} from "../src/curves/Curve1Zones.sol";
 import {Curve2Zones} from "../src/curves/Curve2Zones.sol";
 import {Curve3Zones} from "../src/curves/Curve3Zones.sol";
+import {SineMath} from "../src/libraries/SineMath.sol";
 import {PepeDescriptor} from "../src/PepeDescriptor.sol";
 import {PSPZapIn} from "../src/PSPZapIn.sol";
 import {PSPZapOut} from "../src/PSPZapOut.sol";
@@ -172,6 +173,11 @@ contract DeployPSP is Script {
         vm.stopBroadcast();
 
         vm.startBroadcast();
+        // Tilted-sine flavor (PSP_CURVE=6): arm the factory BEFORE deployRound —
+        // every round (incl. rebirths) then prices off the parametric sine.
+        if (vm.envOr("PSP_CURVE", testnet ? uint256(4) : uint256(1)) == 6) {
+            factory.configureSine(_sineParams());
+        }
         (uint256 roundId, address hookAddr) = factory.deployRound(_roundParams(testnet));
         vm.stopBroadcast();
 
@@ -203,6 +209,10 @@ contract DeployPSP is Script {
 
     function _roundParams(bool testnet) internal view returns (PSPFactory.RoundParams memory) {
         uint256 curveSel = vm.envOr("PSP_CURVE", testnet ? uint256(4) : uint256(1));
+        // NOTE: PSP_CURVE=6 (tilted sine) still passes a zone config here —
+        // the hook's constructor needs one for creation-code shape; when the
+        // factory arms the sine flavor right after, sineActive overrides all
+        // zone pricing. See _sineParams().
         CurveMath.CurveConfig memory cc = curveSel == 0
             ? LinearZones.config()
             : curveSel == 2 ? Curve2Zones.config()
@@ -215,6 +225,22 @@ contract DeployPSP is Script {
             name: "Positive Sum Pepes",
             symbol: "PSP",
             curveConfig: cc
+        });
+    }
+
+    /// @dev PSP_CURVE=6 — tilted-sine params. Defaults reproduce the dial-lab
+    ///      verified shape (p0 1e-5 → B 1e-4 at boot 500 via preK=ln(10)/500,
+    ///      magM 20 → top reserve = 21×boot, lnTop = ln(600) → top price 0.06,
+    ///      ampBps 10000 = the 45° tilt: flat treads, monotone). Env overrides:
+    ///      PSP_SINE_P0 / PSP_SINE_PREK / PSP_SINE_MAGM / PSP_SINE_LNTOP /
+    ///      PSP_SINE_AMPBPS.
+    function _sineParams() internal view returns (SineMath.Params memory) {
+        return SineMath.Params({
+            p0: vm.envOr("PSP_SINE_P0", uint256(1e13)),
+            preK: vm.envOr("PSP_SINE_PREK", uint256(4_605_170_185_988_092)),
+            magM: vm.envOr("PSP_SINE_MAGM", uint256(20e18)),
+            lnTop: vm.envOr("PSP_SINE_LNTOP", uint256(6_396_929_655_216_146_432)),
+            ampBps: uint24(vm.envOr("PSP_SINE_AMPBPS", uint256(10_000)))
         });
     }
 

@@ -34,4 +34,7 @@ interface IRoundController {
 
     // ── Curve params ──
     function getCurveConfig() external view returns (CurveMath.CurveConfig memory);
+
+    // ── Factory identity (hook's configureSine authorization) ──
+    function factory() external view returns (address);
 }

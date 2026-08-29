@@ -17,6 +17,7 @@ import {PSPToken} from "./PSPToken.sol";
 import {CurveHook} from "./CurveHook.sol";
 import {RoundController} from "./RoundController.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
+import {SineMath} from "./libraries/SineMath.sol";
 import {HookDeployer} from "./HookDeployer.sol";
 import {ControllerDeployer, TokenDeployer} from "./ControllerDeployer.sol";
 import {StakerDeployer} from "./StakerDeployer.sol";
@@ -86,6 +87,20 @@ contract PSPFactory is Ownable2Step {
     ///      explicit deployRound() call — no drift between genesis round and
     ///      its descendants.
     CurveMath.CurveConfig public gameCurve;
+
+    /// @notice Tilted-sine flavor (2026-08-29): when armed, every round's hook
+    ///         prices off the parametric sine curve (see SineMath). Survives
+    ///         rebirths like gameCurve.
+    SineMath.Params public gameSineParams;
+    bool public useSine;
+
+    /// @dev Owner arms the sine flavor for current + future rounds. Params
+    ///      validated (ampBps ≤ 10000 = 45° tilt cap). Call before deployRound.
+    function configureSine(SineMath.Params calldata p) external onlyOwner {
+        SineMath.validate(p);
+        gameSineParams = p;
+        useSine = true;
+    }
 
     /// @dev Referral graph — permanent, cross-round. Born here so every
     ///      spawned round wires into the SAME social graph: the factory
@@ -197,6 +212,10 @@ contract PSPFactory is Ownable2Step {
         );
         CurveHook hook = CurveHook(hookAddress);
         hookAddr = hookAddress;
+
+        // Sine flavor: arm THIS round's hook before pool init (guard inside
+        // configureSine enforces pre-init + factory identity).
+        if (useSine) hook.configureSine(gameSineParams);
 
         // 5. Wire hook to controller
         controller.setHook(hook);

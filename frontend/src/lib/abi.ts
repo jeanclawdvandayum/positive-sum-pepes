@@ -103,6 +103,13 @@ export const hookAbi = parseAbi([
   'function SWAP_FEE_BIPS() view returns (uint24)',
   'function curveConfig() view returns (uint256 P0)',
   'function getCurveZones() view returns ((uint256 startSupply, uint256 endSupply, uint256 rate, bool isExponential)[] zones)',
+  // tilted-sine curve (2026-08): struct-free auto-getters on the hook
+  'function sineConfigured() view returns (bool)',
+  'function sineActive() view returns (bool)',
+  'function sineParams() view returns (uint256 p0, uint256 preK, uint256 magM, uint256 lnTop, uint24 ampBps)',
+  'function sineCurve() view returns (uint256 p0, uint256 preK, uint256 boot, uint256 span, uint256 segWidth, uint256 lam, uint256 B, uint256 slope, uint256 amp, uint256 pTop, uint256 tailSlope, uint256 q0)',
+  'function getSineCheckpoints() view returns (uint256[13])',
+  'function sinePriceAt(uint256 R) view returns (uint256)',
   'event Buy(address indexed buyer, uint256 mixETHIn, uint256 pspOut, uint256 newSupply, uint256 newReserveMixETH)',
   'event Sell(address indexed seller, uint256 pspIn, uint256 mixETHOut, uint256 newSupply, uint256 newReserveMixETH)',
 ])

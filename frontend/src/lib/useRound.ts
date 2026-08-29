@@ -4,6 +4,7 @@ import { factoryAbi, controllerAbi, hookAbi, erc20Abi, stakerAbi } from './abi'
 import { ADDRESSES } from './config'
 import { rpcCall } from './rpc'
 import type { CurveConfig, Zone } from './curve'
+import { loadSineCurve, SineCurveData } from './sine'
 
 export interface RoundInfo {
   id: bigint
@@ -22,13 +23,16 @@ export interface RoundInfo {
   totalPredeposit: bigint | undefined
   predepositCap: bigint | undefined
   curve: CurveConfig | undefined
+  /// tilted-sine flavor: static geometry sampled once per hook (cached);
+  /// null when the hook runs the legacy zone curve or the RPC failed.
+  sine: SineCurveData | null
 }
 
 const EMPTY: RoundInfo = {
   id: 0n, token: undefined, controller: undefined, staker: undefined, hook: undefined, mix: undefined,
   mode: undefined, reserve: undefined, supply: undefined, marginalPrice: undefined,
   totalLocked: undefined, predepositClosed: undefined, totalPredeposit: undefined,
-  predepositCap: undefined, curve: undefined, flatTime: undefined,
+  predepositCap: undefined, curve: undefined, flatTime: undefined, sine: null,
 }
 
 const F = ADDRESSES.factory as `0x${string}`
@@ -62,6 +66,9 @@ function startRoundLoop() {
         `0x${string}`, `0x${string}`, `0x${string}`,
       ]
       const rStaker = (await rpcCall(rController, controllerAbi, 'staker')) as `0x${string}`
+      // sine geometry is static once armed — the cached sampler runs once per
+      // hook; the 4s loop below only refreshes the live scalars.
+      const sine = await loadSineCurve(rHook).catch(() => null)
       const [mode, reserve, supply, mp, cfg, zones, totalLocked, pd, flatTime] = await Promise.all([
         rpcCall(rHook, hookAbi, 'mode') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'reserveMixETH') as Promise<bigint>,
@@ -76,13 +83,20 @@ function startRoundLoop() {
         rpcCall(rController, controllerAbi, 'flatTime') as Promise<bigint>,
       ])
       if (!rHook || !rController) return
+      // sine flavor: the zone getMarginalPrice is legacy — price comes from
+      // the wave at the live reserve
+      let livePrice = mp as bigint
+      if (sine?.active && reserve) {
+        livePrice = (await rpcCall(rHook, hookAbi, 'sinePriceAt', [reserve])) as bigint
+      }
       shared = {
         id, token: rToken, controller: rController, staker: rStaker, hook: rHook, mix,
-        mode: Number(mode), reserve, supply, marginalPrice: mp,
+        mode: Number(mode), reserve, supply, marginalPrice: livePrice,
         totalLocked,
         predepositClosed: pd[3], totalPredeposit: pd[0], predepositCap: pd[1],
         flatTime,
         curve: { p0: cfg, zones: zones.map((z) => ({ ...z })) },
+        sine,
       }
       backoffMs = 0
       listeners.forEach((l) => l(shared))

@@ -15,6 +15,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {CurveMath} from "./libraries/CurveMath.sol";
+import {SineMath} from "./libraries/SineMath.sol";
 import {IRoundController} from "./interfaces/IRoundController.sol";
 import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
 
@@ -83,6 +84,16 @@ contract CurveHook is BaseHook {
     uint256 public reserveMixETH;   // mixETH backing circulating PSP (excludes fees)
     uint256 public totalSupplyPSP;  // total PSP minted by curve
     bool public poolInitialized;
+
+    // ─────────────── Sine flavor (2026-08-29, scoopy round-2 ruling) ───────────────
+    // Factory-configured BEFORE pool init; materialized at initializeCurve from
+    // the ACTUAL predeposit raise, so every wave boundary is boot-invariant.
+    // When sineActive, buy/sell price off SineMath (reserve-parametrized);
+    // the zone path below remains for legacy/gallery rounds.
+    SineMath.Params public sineParams;
+    bool public sineConfigured;
+    SineMath.Curve public sineCurve;   // NOTE: auto-getter omits cp[] — use getSineCheckpoints()
+    bool public sineActive;
 
     // ─────────────── Events ───────────────
     // All value fields mixETH-denominated (curve unit of account).
@@ -298,7 +309,9 @@ contract CurveHook is BaseHook {
         uint256 feeMixETH = (mixETHInput * SWAP_FEE_BIPS) / 10000;
         uint256 curveMixETH = mixETHInput - feeMixETH;
 
-        uint256 pspOut = CurveMath.computeBuyOutput(curveMixETH, totalSupplyPSP, curveConfig);
+        uint256 pspOut = sineActive
+            ? SineMath.buyOut(sineCurve, reserveMixETH, curveMixETH)
+            : CurveMath.computeBuyOutput(curveMixETH, totalSupplyPSP, curveConfig);
         if (pspOut == 0) revert ZeroOutput();
 
         // CEI: update state before external calls
@@ -355,7 +368,9 @@ contract CurveHook is BaseHook {
         // ETH integral at the LIVE rate, so a >1bps rate drop between buy and
         // sell extracted other holders' backing; a 95% drop underflowed the
         // reserve and bricked every sell).
-        uint256 mixETHOut = CurveMath.computeSellOutput(pspInputAmount, totalSupplyPSP, curveConfig);
+        uint256 mixETHOut = sineActive
+            ? SineMath.sellOut(sineCurve, reserveMixETH, pspInputAmount)
+            : CurveMath.computeSellOutput(pspInputAmount, totalSupplyPSP, curveConfig);
 
         // Fee split (2026-08-19, side pot retired): 5% of the out-value.
         // Referral carve-out = 50bps OF THE OUT-VALUE, paid live in mixETH;
@@ -507,11 +522,46 @@ contract CurveHook is BaseHook {
         if (msg.sender != address(controller)) revert NotController();
         if (poolInitialized) revert InvalidMode();
 
+        // Sine flavor: materialize the wave from the ACTUAL boot raised —
+        // anchors, tread positions and the top price are invariant to it.
+        if (sineConfigured) {
+            sineCurve = SineMath.materialize(sineParams, _reserveMixETH);
+            sineActive = true;
+        }
+
         reserveMixETH = _reserveMixETH;
         totalSupplyPSP = _initialSupply;
         poolInitialized = true;
 
         emit PoolInitialized();
+    }
+
+    /// @notice Factory-only: arm the tilted-sine curve for this round. Must be
+    ///         called before launch (pool init); params validated (ampBps ≤
+    ///         10000 = the 45° tilt cap ⇒ monotone wave by construction).
+    function configureSine(SineMath.Params calldata p) external {
+        if (msg.sender != controller.factory()) revert NotController();
+        if (poolInitialized || sineConfigured) revert InvalidMode();
+        SineMath.validate(p);
+        sineParams = p;
+        sineConfigured = true;
+    }
+
+    /// @notice Genesis PSP the sine curve mints for the actual boot (view —
+    ///         the controller reads this at launch; initializeCurve re-runs
+    ///         the same pure computation to store the curve).
+    function sineGenesisPSP(uint256 bootActual) external view returns (uint256) {
+        return SineMath.materialize(sineParams, bootActual).q0;
+    }
+
+    /// @notice Marginal price at cumulative reserve R (mixETH per PSP) — UI view.
+    function sinePriceAt(uint256 R) external view returns (uint256) {
+        return SineMath.priceAt(sineCurve, R);
+    }
+
+    /// @notice Quarter-wave checkpoint supplies (auto-getter omits fixed arrays).
+    function getSineCheckpoints() external view returns (uint256[13] memory) {
+        return sineCurve.cp;
     }
 
     // ─────────────── View Functions ───────────────
