@@ -2,47 +2,32 @@
 pragma solidity 0.8.26;
 
 import {CBase} from "./CBase.sol";
+import {HookDeployer} from "../../../src/HookDeployer.sol";
+import {PSPToken} from "../../../src/PSPToken.sol";
 import {PSPReferralRegistry} from "../../../src/PSPReferralRegistry.sol";
 import {CurveHook} from "../../../src/CurveHook.sol";
-import {RoundController} from "../../../src/RoundController.sol";
 import {PSPFactory} from "../../../src/PSPFactory.sol";
-import {HookDeployer} from "../../../src/HookDeployer.sol";
-
-import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {CurveMath} from "../../../src/libraries/CurveMath.sol";
+import {IRoundController} from "../../../src/interfaces/IRoundController.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 
-/// @title C-1 - Permissionless deterministic hook-address squatting permanently
-///        bricks round finalization and locks the dying round's reserve.
-///
-/// POST-FIX (2026-08-18): remediated by entropy-keyed salt mining
-/// (HookMiner.findWithEntropy) + occupied-candidate fall-through in
-/// HookDeployer.deployHook. The pre-launch squat below still deploys an
-/// orphan, but its address was derived from the SQUAT block's entropy -
-/// at finalize time (a later block) the salt space is entirely different,
-/// so the orphan is not even a candidate. The strongest surviving attack
-/// (same-block front-run of candidate 0) is pinned in
-/// test/audit/C1SquatFork.t.sol on the mainnet fork. Original root-cause
-/// chain, kept for the record:
-///
-/// Root cause chain (pre-fix):
-///   1. HookDeployer.deployHook was permissionless and fully deterministic:
-///      salt = FIRST salt (0, 1, 2, ...) whose CREATE2 address carries the
-///      flag bits for (deployer=HookDeployer, flags, initCodeHash).
-///   2. The next round's controller address is a plain CREATE address -
-///      predictable from the ControllerDeployer vessel's public nonce
-///      (next round consumes two nonces: token, then controller).
-///   3. The spawn's curve config is fully public BEFORE the spawn:
-///      gameCurve() getter + current hook's getCurveZones(). So the exact
-///      future initCode - its hash and mined salt - was on-chain public.
-///   4. An attacker pre-deployed the orphan hook at that exact address via
-///      the same vessel. When the factory later create2ed with the same
-///      salt, the target had code; create2 returned 0 and deployHook
-///      reverted DeployFailed - FOREVER, because every retry mined the
-///      identical salt (HookMiner.find had no occupied-address probe; it
-///      was removed by the H-2 gas fix). finalizeCarpet reverted
-///      FactorySpawnFailed and the dying round's reserve was locked.
+/// @title C-1 battery — hook-squat DoS, staged-spawn edition (2026-08-30)
+/// @notice History: the legacy deterministic salt scan (salt 0,1,2,...) made
+///         every future hook address computable from public state, so an
+///         orphan deployed at the predicted address collided the spawn's
+///         create2 and bricked finalizeCarpet FOREVER (fork-verified HIGH,
+///         2026-08-18). First fix: block-context entropy. Second fix
+///         (staging): the whole round address set is create2-derived from
+///         salts rooted in the reserve block's own context — nothing about
+///         round n+1 is computable before the reserve runs, and even the
+///         committed reservation can only be "helped", never hijacked
+///         (occupying a predicted create2 address requires the identical
+///         initcode). The nonce-based pre-launch prediction the original
+///         attack relied on is structurally dead: there IS no next-nonce.
 contract C1_HookSquatDoS is CBase {
 
     /// v5.1: registries are per-round — orphan deploys only need SOME
@@ -50,42 +35,59 @@ contract C1_HookSquatDoS is CBase {
     function _dummyRegistry() internal returns (address) {
         return address(new PSPReferralRegistry(address(2), 1000e18));
     }
-    /// Control: the nonce-based prediction is exact. A clean finalize spawns
-    /// round 2 at precisely the predicted controller address.
-    function test_C1_control_PredictionIsExact_CleanSpawnWorks() public {
-        address predicted = _predictedNextController();
-        // EIP-161: contracts are born with nonce 1. POST-SPLIT (2026-08-18)
-        // each round consumes exactly ONE vessel nonce (controller only —
-        // the token deploys via a fresh TokenDeployer off the factory) -
-        // proven in C4_Probe.
-        assertEq(vm.getNonce(address(controllerDeployer)), 2, "vessel nonce after round 1");
 
+    /// @dev the attacker's one-shot deploy reach, reconstituted on top of
+    ///      the production pair (mineHook + deployHookAt — the legacy
+    ///      one-shot deployHook was deleted for EIP-170 headroom; the
+    ///      permissionless surface is identical).
+    function _orphanHook(address controller, address registry, CurveMath.CurveConfig memory cfg)
+        internal
+        returns (address orphan)
+    {
+        (address cand, bytes32 salt) =
+            hookDeployer.mineHook(IPoolManager(address(poolManager)), controller, registry, cfg, 131_072);
+        orphan = hookDeployer.deployHookAt(
+            salt, IPoolManager(address(poolManager)), controller, registry, cfg
+        );
+        assertEq(orphan, cand, "orphan at mined address");
+    }
+
+    /// Control: the staged prediction is exact. A clean finalize + birth
+    /// lands every contract at its reserved address.
+    function test_C1_control_PredictionIsExact_CleanSpawnWorks() public {
         _launchRound1();
         _bombRound1();
         _warpPastFlatWindow();
         controller1.finalizeCarpet();
 
+        (,,,,, address token, address controller, address hook,, bool active) = factory.reservation();
+        assertTrue(active, "reservation live after finalize");
+
+        factory.birthRound();
+
         assertEq(factory.currentRoundId(), 2, "round 2 spawned");
         PSPFactory.Round memory r2 = factory.getRound(2);
-        assertTrue(address(r2.controller) == predicted, "controller deployed at predicted address");
+        assertTrue(address(r2.controller) == controller, "controller at reserved address");
+        assertTrue(address(r2.token) == token, "token at reserved address");
+        assertTrue(address(r2.hook) == hook, "hook at reserved address");
         assertFalse(r2.destroyed);
     }
 
-    /// MITIGATION PIN (was: the pre-launch squat brick). The attacker runs
-    /// the identical pre-launch squat, but entropy-keyed salts mean the
-    /// orphan's address belongs to the SQUAT block's salt space - finalize
-    /// runs in a later block and never looks at it. The rebirth completes
-    /// end to end; the orphan is dead weight the attacker paid for.
+    /// MITIGATION PIN (was: the pre-launch squat brick). The attacker
+    /// deploys an orphan hook aimed at a GUESSED controller address — under
+    /// staging there is no better guess available: the real controller's
+    /// salt root includes the reserve block's prevrandao. The reservation
+    /// mines its own salt in its own block; the orphan is dead weight.
     function test_C1_attack_PreLaunchSquatIsNowInert() public {
         // ---- attacker squats immediately after round 1 deploys ----
         // Everything below derives from PUBLIC state; no privileged role.
-        uint256 vesselNonce = vm.getNonce(address(controllerDeployer)); // == 2
-        address predictedController = vm.computeCreateAddress(address(controllerDeployer), vesselNonce);
-        assertEq(predictedController, _predictedNextController(), "nonce math");
-
+        // The guess is a plain address (the old next-nonce prediction is
+        // dead — create2 addresses are salt-rooted, not nonce-rooted).
+        address guessedController = makeAddr("guessed-controller");
         vm.prank(attacker);
-        (address orphan,) =
-            hookDeployer.deployHook(IPoolManager(address(poolManager)), predictedController, _dummyRegistry(), _gameCurveFromPublicState());
+        address orphan = _orphanHook(
+            guessedController, _dummyRegistry(), _gameCurveFromPublicState()
+        );
         assertTrue(orphan.code.length > 0, "orphan hook deployed (into the squat block's salt space)");
 
         // ---- honest round life: predeposit, launch, a real buy ----
@@ -105,6 +107,8 @@ contract C1_HookSquatDoS is CBase {
         assertGt(reserveBefore, 0, "hook still custodies unredeemed backing");
         vm.prank(rando); // permissionless caller, like the real flow
         controller1.finalizeCarpet();
+        vm.prank(rando);
+        factory.birthRound();
 
         // ---- the rebirth completed around the orphan ----
         assertEq(factory.currentRoundId(), 2, "round 2 spawned despite the squat");
@@ -115,14 +119,12 @@ contract C1_HookSquatDoS is CBase {
         assertEq(mixETH.balanceOf(address(hook1)), 0, "dying round fully drained - no stranded reserve");
     }
 
-    /// The orphan cannot be weaponized: its controller slot is a future
+    /// The orphan cannot be weaponized: its controller slot is a guessed
     /// address with no code, so the orphan's own guards are unreachable.
     function test_C1_orphanIsInert() public {
-        uint256 vesselNonce = vm.getNonce(address(controllerDeployer));
-        address predictedController = vm.computeCreateAddress(address(controllerDeployer), vesselNonce + 1);
         vm.prank(attacker);
-        (address orphan,) = hookDeployer.deployHook(
-            IPoolManager(address(poolManager)), predictedController, _dummyRegistry(), _gameCurveFromPublicState()
+        address orphan = _orphanHook(
+            makeAddr("guessed-controller"), _dummyRegistry(), _gameCurveFromPublicState()
         );
         // nobody can drive the orphan: the controller address has no code
         // (no owner exists to call setHook/setFactoryRoundId), and setMode
@@ -130,6 +132,100 @@ contract C1_HookSquatDoS is CBase {
         vm.prank(attacker);
         vm.expectRevert();
         CurveHook(orphan).setMode(CurveHook.Mode.Destroyed);
+    }
+
+    /// STAGED-SPECIFIC: front-running a COMMITTED reservation with an
+    /// identical pre-deploy is harmless — create2 address binding means the
+    /// occupant IS the canonical contract; birth wires it instead of failing.
+    /// Every leg (token, controller+staker, registry, hook) can be pre-
+    /// deployed by anyone — but ONLY as the byte-identical contract: the
+    /// hook's constructor has no external legs (BaseHook + three stores),
+    /// and a variant deploy with different args simply lands elsewhere.
+    function test_C1_committedReservationCannotBeHijacked() public {
+        _launchRound1();
+        _bombRound1();
+        _warpPastFlatWindow();
+        controller1.finalizeCarpet();
+
+        (
+            ,
+            ,
+            bytes32 tokenSalt, // slot 3 — was misread as hookSalt (the C-1 miss)
+            bytes32 controllerSalt,
+            bytes32 hookSalt,
+            address token,
+            address controller,
+            address hook,
+            ,
+            bool active
+        ) = factory.reservation();
+        assertTrue(active, "committed");
+
+        // byte-identical config by construction: deployRound stored exactly
+        // CBase's _curve() into gameCurve (the hook's stored zones are
+        // normalized — NOT a faithful mirror — so don't rebuild from those)
+        CurveMath.CurveConfig memory cfg = _curve();
+
+        // predicted sibling addresses, same derivations the factory used
+        bytes32 stakerSalt = keccak256(abi.encode(controller, "psp-staker"));
+        address staker = factory.stakerDeployer().predictStaker(
+            stakerSalt, IERC20(token), IRoundController(controller), factory.descriptor()
+        );
+        assertEq(staker.code.length, 0, "staker not yet born");
+        bytes32 registrySalt = keccak256(abi.encode(controller, "psp-registry"));
+        address registry = factory.controllerDeployer().predictRegistry(
+            registrySalt, staker, factory.REFERRAL_MIN_STAKE()
+        );
+
+        // ---- (a) hostile variant: same committed salt, DIFFERENT args.
+        // The hook's ctor has no external legs, but the variant's target
+        // address was never flag-mined — the salt was mined ONLY for the
+        // identical initcode. Best case for the attacker, the variant lands
+        // at a different address (inert orphan); usually the ctor's own
+        // flag self-check rejects the un-mined address outright.
+        vm.prank(attacker);
+        try hookDeployer.deployHookAt(
+            hookSalt, IPoolManager(address(poolManager)), makeAddr("rogue-controller"), registry, cfg
+        ) returns (address rogueHook) {
+            assertTrue(rogueHook != hook, "variant lands elsewhere - reserved slot untouchable");
+        } catch {
+            // the variant could not even deploy at this salt — even stronger
+        }
+
+        // ---- (b) helpful path: identical controller first, then the hook
+        vm.prank(attacker);
+        address helpedController = address(
+            factory.controllerDeployer().deployControllerAt(
+                controllerSalt,
+                PSPToken(token),
+                IERC20(address(mixETH)),
+                cfg,
+                address(factory),
+                factory.descriptor(),
+                factory.stakerDeployer()
+            )
+        );
+        assertEq(helpedController, controller, "attacker could only deploy the identical controller");
+
+        // registry: self-contained ctor (stores staker + min stake)
+        vm.prank(attacker);
+        address helpedRegistry = factory.controllerDeployer().deployRegistryAt(
+            registrySalt, IRoundController(controller).stakerAddress(), factory.REFERRAL_MIN_STAKE()
+        );
+        assertEq(helpedRegistry, registry, "identical registry");
+
+        vm.prank(attacker);
+        address helpedHook = hookDeployer.deployHookAt(
+            hookSalt, IPoolManager(address(poolManager)), controller, registry, cfg
+        );
+        assertEq(helpedHook, hook, "attacker could only deploy the identical hook");
+
+        // birth completes around the pre-deployed, identical contracts
+        vm.prank(rando);
+        factory.birthRound();
+        assertEq(address(factory.getRound(2).controller), controller, "reserved controller wired");
+        assertEq(address(factory.getRound(2).hook), hook, "reserved hook wired");
+        assertTrue(CurveHook(hook).mode() == CurveHook.Mode.Predeposit, "born in Predeposit");
     }
 
     // ---- plumbing ----

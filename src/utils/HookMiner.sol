@@ -131,6 +131,33 @@ library HookMiner {
         view
         returns (address addr, bytes32 salt, uint256 nextFrom)
     {
+        // historical 160,572-candidate cap preserved verbatim for every
+        // existing caller (deployHook); the staged-spawn path passes its
+        // own, block-limit-aware bound via nextCandidateCapped below.
+        (addr, salt, nextFrom) =
+            nextCandidateCapped(deployer, entropy, flags, creationCode, constructorArgs, fromIndex, 0x2733c);
+    }
+
+    /// @dev Identical scan, caller-supplied candidate cap. The staged-spawn
+    ///      reserve uses ~65k (≈5.7M gas @ ~87 gas/iter — comfortably inside
+    ///      Base's per-tx cap) so a flag-mine can NEVER blow the block limit:
+    ///      exhaustion reverts the (deposit-free) reserve tx and the next
+    ///      block's entropy re-rolls the salt space. First-match-wins,
+    ///      candidate ordering, and outputs are bit-identical to the
+    ///      unbounded variant run under the same cap.
+    function nextCandidateCapped(
+        address deployer,
+        bytes32 entropy,
+        uint160 flags,
+        bytes memory creationCode,
+        bytes memory constructorArgs,
+        uint256 fromIndex,
+        uint256 cap
+    )
+        internal
+        view
+        returns (address addr, bytes32 salt, uint256 nextFrom)
+    {
         flags = flags & FLAG_MASK;
         bytes32 codeHash = keccak256(abi.encodePacked(creationCode, constructorArgs));
 
@@ -156,7 +183,7 @@ library HookMiner {
             let v := add(base, fromIndex)
             let j := fromIndex
             // lapBound = cap - 7: while j < lapBound, all eight j..j+7 are < cap
-            let lapBound := sub(0x2733c, 7)
+            let lapBound := sub(cap, 7)
             for { } and(lt(j, lapBound), iszero(fa)) {
                 j := add(j, 8)
                 v := add(v, 8)
@@ -228,7 +255,7 @@ library HookMiner {
                 }
             }
             // rolled tail: the final (cap - j) < 8 candidates, in order
-            for { } and(lt(j, 0x2733c), iszero(fa)) {
+            for { } and(lt(j, cap), iszero(fa)) {
                 j := add(j, 1)
                 v := add(v, 1)
             } {

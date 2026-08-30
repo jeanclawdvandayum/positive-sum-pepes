@@ -17,95 +17,105 @@ import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
 ///         expression) on top of RoundController's and PSPToken's creation
 ///         code — 41KB runtime, well past the 24,576-byte deploy limit.
 ///         Outsourcing the hook deploy drops the factory back under budget;
-///         this contract holds the literal exactly once (mined and deployed
-///         from the same `initCode` bytes).
+///         this contract holds the literal exactly once.
+///
+///         Staged spawn (2026-08-30): the rebirth loop's gas lottery — a
+///         14-bit flag match is geometric (median ~2^13 iterations, observed
+///         tail past 60k), so an in-deploy mine could push a one-tx spawn
+///         past any per-tx cap — is split across the pair mineHook (view,
+///         bounded, called in the deposit-free reserve) and deployHookAt
+///         (deterministic, called in the birth). The legacy one-shot
+///         mine-and-deploy was deleted for EIP-170 headroom; its
+///         permissionless reach is fully preserved by the pair.
 contract HookDeployer {
     error DeployFailed();
 
-    /// @dev Per-round referral registry (v5.1 2026-08-19: the graph resets
-    ///      at every round boundary — a fresh registry is born beside each
-    ///      hook, keyed by staker position NFT IDs). Deployed here for the
-    ///      same EIP-170 reasons as the hook. Fully permissionless since
-    ///      the A-1 fix (2026-08-26): no owner, no authorized recorders —
-    ///      attribution binds only via the user-signed record(); no mining
-    ///      needed — the registry has no permissioned surface worth
-    ///      squatting.
-    function deployRegistry(address staker, uint256 minStakePSP)
-        external
-        returns (address registry)
-    {
-        registry = address(new PSPReferralRegistry(staker, minStakePSP));
-    }
-
-    /// @dev C-1 remediation: how many mined salt candidates deployHook will
-    ///      fall through before giving up. Each squatted candidate costs the
-    ///      spawn one extra ~2^14 mining pass (~2-3M gas); 4 candidates cap
-    ///      the worst-case mining at ~11M so a fully squatted block still
-    ///      reverts well inside mainnet gas. Sustaining a block requires
-    ///      occupying every candidate in the same block (same entropy), then
-    ///      re-squatting in every subsequent retry block — unbounded grief
-    ///      cost against a one-tx defense.
-    uint256 public constant MAX_SALT_CANDIDATES = 4;
-
-    /// @dev Permissionless by design: an orphan CurveHook is inert — the
-    ///      factory only ever trusts hooks it wired into a round itself.
-    ///      Returns (hookAddress, salt) so callers can verify the deployed
-    ///      address matches a candidate the caller derived from the same
-    ///      block context.
-    function deployHook(
+    /// @dev Single initCode construction shared by mineHook and deployHookAt
+    ///      — EIP-170: one encoder, one creation-code reference.
+    function _hookInitCode(
         IPoolManager pm,
         address controller,
         address referralRegistry,
-        CurveMath.CurveConfig memory config
-    ) external returns (address hookAddr, bytes32 salt) {
-        // L-2: BEFORE_INITIALIZE_FLAG gates pool initialization to the
-        // canonical {mixETH, PSP} pair (see CurveHook._beforeInitialize).
-        uint160 flags = uint160(
+        CurveMath.CurveConfig calldata config
+    ) internal view returns (bytes memory) {
+        return bytes.concat(
+            type(CurveHook).creationCode,
+            abi.encode(pm, IRoundController(controller), PSPReferralRegistry(referralRegistry), config)
+        );
+    }
+
+    /// @dev Flag set every round's hook must carry. L-2: BEFORE_INITIALIZE
+    ///      gates pool initialization to the canonical {mixETH, PSP} pair.
+    function _hookFlags() internal pure returns (uint160) {
+        return uint160(
             Hooks.BEFORE_INITIALIZE_FLAG
                 | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
                 | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
                 | Hooks.BEFORE_SWAP_FLAG
                 | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
         );
+    }
 
-        // Single embedding of the creation code — reused for mining AND deploy
-        bytes memory initCode = bytes.concat(
-            type(CurveHook).creationCode,
-            abi.encode(pm, IRoundController(controller), PSPReferralRegistry(referralRegistry), config)
-        );
+    /// @dev Entropy domain separator for the salt space — keyed to block
+    ///      context + the controller address (C-1, fork-verified 2026-08-18:
+    ///      salt candidates must be unknowable before the block that runs
+    ///      the mine, or an orphan pre-squat can collide the spawn's create2
+    ///      forever).
+    function _entropy(address controller) internal view returns (bytes32) {
+        return keccak256(abi.encode(block.prevrandao, block.timestamp, block.number, controller));
+    }
 
-        // C-1 (2026-08-18, fork-verified HIGH): the legacy deterministic scan
-        // (salt 0,1,2,...) made every future hook address computable from
-        // public state — vessel nonce -> controller address -> first salt —
-        // so an orphan deployed at the predicted address collided the create2
-        // and bricked finalizeCarpet forever. Salt candidates are now keyed
-        // to block context: unknowable before the block that runs the spawn,
-        // so pre-squatting is impossible and same-block front-runs must hit
-        // every candidate to matter.
-        bytes32 entropy =
-            keccak256(abi.encode(block.prevrandao, block.timestamp, block.number, controller));
+    /// @dev Bounded flag-mine. Pure view: computes the candidate sequence
+    ///      for THIS block's entropy, skips squatted candidates, and reverts
+    ///      with MiningExhausted after `maxIter` total candidates scanned so
+    ///      the reserve tx bounces CHEAP — no deposits exist at reserve
+    ///      time. The next block's entropy re-rolls the salt space.
+    error MiningExhausted();
 
-        // Probe-then-create2 is race-free inside one atomic call: nothing can
-        // deploy between the extcodesize probe and the create2. Each squatted
-        // candidate costs one cold probe plus one resumed mining pass.
+    function mineHook(
+        IPoolManager pm,
+        address controller,
+        address referralRegistry,
+        CurveMath.CurveConfig calldata config,
+        uint256 maxIter
+    ) external view returns (address hookAddr, bytes32 salt) {
+        bytes memory initCode = _hookInitCode(pm, controller, referralRegistry, config);
+        bytes32 entropy = _entropy(controller);
+
         uint256 scanFrom;
-        for (uint256 k; k < MAX_SALT_CANDIDATES; k++) {
-            (address cand, bytes32 s, uint256 next) =
-                HookMiner.nextCandidate(address(this), entropy, flags, initCode, "", scanFrom);
-            scanFrom = next;
-            if (cand.code.length > 0) continue; // squatted: fall through
-            assembly ("memory-safe") {
-                hookAddr := create2(0, add(initCode, 0x20), mload(initCode), s)
-            }
-            if (hookAddr != cand) {
-                // defense-in-depth: an intra-call collision is impossible
-                // after the probe; guard the create2 result regardless
-                hookAddr = address(0);
-                continue;
-            }
-            salt = s;
-            return (hookAddr, salt);
+        uint256 scanned;
+        while (true) {
+            uint256 budget = maxIter - scanned;
+            if (budget == 0) revert MiningExhausted(); // cap=0 would underflow the lap bound
+            (address cand, bytes32 s, uint256 nextFrom) = HookMiner.nextCandidateCapped(
+                address(this), entropy, _hookFlags(), initCode, "", scanFrom, budget
+            );
+            scanned += nextFrom - scanFrom;
+            scanFrom = nextFrom;
+            if (cand.code.length == 0) return (cand, s);
+            // squatted (identical initcode+salt+deployer or a 160-bit
+            // preimage collision): fall through to the next candidate
+            if (scanned >= maxIter) revert MiningExhausted();
         }
-        revert DeployFailed();
+    }
+
+    /// @dev Deploy the hook at an already-mined salt. Verifies the create2
+    ///      address equals the prediction before returning; an occupied
+    ///      prediction returns as-is (idempotent — occupancy by anything but
+    ///      the identical contract is a 160-bit preimage break).
+    function deployHookAt(
+        bytes32 salt,
+        IPoolManager pm,
+        address controller,
+        address referralRegistry,
+        CurveMath.CurveConfig calldata config
+    ) external returns (address hookAddr) {
+        bytes memory initCode = _hookInitCode(pm, controller, referralRegistry, config);
+        address expected = HookMiner.computeAddress(address(this), uint256(salt), initCode);
+        if (expected.code.length > 0) return expected; // already born, identically
+        assembly ("memory-safe") {
+            hookAddr := create2(0, add(initCode, 0x20), mload(initCode), salt)
+        }
+        if (hookAddr != expected) revert DeployFailed();
     }
 }

@@ -3,49 +3,89 @@ pragma solidity 0.8.26;
 
 import {CBase} from "./CBase.sol";
 import {PSPFactory} from "../../../src/PSPFactory.sol";
-import {CurveMath} from "../../../src/libraries/CurveMath.sol";
 
-/// Determinism probe: pin the exact vessel-nonce mechanics the C-1 prediction
-/// relies on (which create increments which nonce, and in what order).
+/// Determinism probe, staged-spawn edition (2026-08-30).
 ///
-/// POST-SPLIT (2026-08-18) topology — EIP-170 TokenDeployer split:
+/// PRE-STAGING topology (nonce CREATE, retired):
 ///   vessel  : deploys ONLY the RoundController (one nonce per round)
 ///   factory : one plain CREATE per round — a fresh TokenDeployer
 ///   token   : first CREATE of that round's TokenDeployer (nonce 1)
-/// The controller prediction is unchanged in strength: (vessel, next-nonce)
-/// is public. The token gains one indirection hop (factory nonce →
-/// TokenDeployer address → its nonce 1), equally computable off-chain.
+///   addresses publicly precomputable from (deployer, next-nonce)
+///
+/// POST-STAGING topology (create2, current):
+///   every round contract deploys via CREATE2 from salted deployers;
+///   salts root at keccak(prevrandao, timestamp, number, roundId) —
+///   unknowable before the reserve block — so NO address in the next
+///   round is publicly precomputable (the C-1 pre-squat class dies
+///   structurally). This probe pins the mechanics the SpawnStaging
+///   suite's prediction-exactness assertions rely on.
 contract C4_Probe is CBase {
     function test_C4_VesselNonceMechanics() public {
-        // setUp deployed round 1 through the factory
+        // NOTE (pinned 2026-08-30): CREATE2 increments the SENDER's nonce
+        // (Yellow Paper §7 — EIP-1014 removed it from the ADDRESS
+        // DERIVATION only). So per round: controller vessel +2 (controller
+        // + registry), hook/staker/token vessels +1 each — create counts,
+        // not create-prediction state.
         uint256 n0 = vm.getNonce(address(controllerDeployer));
-        emit log_named_uint("vessel nonce after round 1", n0);
-
-        // controller of round 1 sits at the vessel's previous nonce
-        assertTrue(address(controller1) == vm.computeCreateAddress(address(controllerDeployer), n0 - 1), "controller slot");
-
-        // token of round 1 rode the factory's TokenDeployer CREATE
         uint256 f0 = vm.getNonce(address(factory));
-        address round1TokenDeployer = vm.computeCreateAddress(address(factory), f0 - 1);
-        assertTrue(address(psp1) == vm.computeCreateAddress(round1TokenDeployer, 1), "token via per-round TokenDeployer");
 
-        // spawn round 2 through the full lifecycle and check both slots again
+        // The C-1 security property, post-staging: the legacy nonce-based
+        // prediction CANNOT land on the reserved addresses. Round n+1's
+        // salts root at the reserve block's own context; there is no
+        // public "next nonce" to squat.
+        address nonceGuess = vm.computeCreateAddress(address(controllerDeployer), n0);
+        address nonceGuess2 = vm.computeCreateAddress(address(controllerDeployer), n0 + 1);
+
         _launchRound1();
         _bombRound1();
         _warpPastFlatWindow();
-        address predicted = _predictedNextController();
-        controller1.finalizeCarpet();
+        controller1.finalizeCarpet(); // reserves
 
-        uint256 n1 = vm.getNonce(address(controllerDeployer));
-        emit log_named_uint("vessel nonce after round 2", n1);
-        assertEq(n1, n0 + 1, "one vessel nonce per round (controller)");
-        assertTrue(address(factory.getRound(2).controller) == predicted, "prediction exact");
+        PSPFactory.SpawnReservation memory r = _reservation();
+        assertTrue(r.active, "reservation live");
+        assertEq(uint256(r.newRoundId), 2, "round id");
+        assertTrue(r.token != address(0) && r.controller != address(0) && r.hook != address(0));
+        assertTrue(r.controller != nonceGuess && r.controller != nonceGuess2, "nonce prediction misses (C-1 dead)");
 
-        uint256 f1 = vm.getNonce(address(factory));
-        address round2TokenDeployer = vm.computeCreateAddress(address(factory), f1 - 1);
-        assertTrue(
-            address(factory.getRound(2).token) == vm.computeCreateAddress(round2TokenDeployer, 1),
-            "round-2 token via fresh TokenDeployer"
-        );
+        vm.prank(rando);
+        factory.birthRound();
+
+        // Factory never deploys per-round contracts itself (the ctor's
+        // TokenDeployer was its only create, ever).
+        assertEq(vm.getNonce(address(factory)), f0, "factory nonce frozen after ctor");
+        // Per-round vessel create counts (nonce bumps from create2 sends)
+        assertEq(vm.getNonce(address(controllerDeployer)), n0 + 2, "controller + registry");
+        // Predictions exact
+        PSPFactory.Round memory r2 = factory.getRound(2);
+        assertTrue(address(r2.controller) == r.controller, "controller at predicted create2 address");
+        assertTrue(address(r2.token) == r.token, "token at predicted create2 address");
+        assertTrue(address(r2.hook) == r.hook, "hook at mined create2 address");
+    }
+
+    function _reservation() internal view returns (PSPFactory.SpawnReservation memory r) {
+        (
+            uint128 fromRoundId,
+            uint128 newRoundId,
+            bytes32 tokenSalt,
+            bytes32 controllerSalt,
+            bytes32 hookSalt,
+            address token,
+            address controller,
+            address hook,
+            bytes32 contextHash,
+            bool active
+        ) = factory.reservation();
+        r = PSPFactory.SpawnReservation({
+            fromRoundId: fromRoundId,
+            newRoundId: newRoundId,
+            tokenSalt: tokenSalt,
+            controllerSalt: controllerSalt,
+            hookSalt: hookSalt,
+            token: token,
+            controller: controller,
+            hook: hook,
+            contextHash: contextHash,
+            active: active
+        });
     }
 }

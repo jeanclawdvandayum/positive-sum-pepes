@@ -27,4 +27,40 @@ contract StakerDeployer {
         staker = new PSPStaker(psp, controller, descriptor);
         if (address(staker) == address(0)) revert DeployFailed();
     }
+
+    // ─────────────── staged spawn (2026-08-30) ───────────────
+    // Salted CREATE2 + prediction so the factory can know every round
+    // contract's address BEFORE deploying any of them. The controller
+    // derives its staker salt from its own (create2-predicted) address,
+    // keeping the whole round's address set computable from one root.
+
+    /// @dev CREATE2 variant. Occupied-address create2 reverts; callers
+    ///      probe `predictStaker(...).code.length` first (idempotent birth).
+    function deployStakerAt(
+        bytes32 salt,
+        IERC20 psp,
+        IRoundController controller,
+        address descriptor
+    ) external returns (PSPStaker staker) {
+        staker = new PSPStaker{salt: salt}(psp, controller, descriptor);
+    }
+
+    /// @dev Pure create2 address prediction — must be called on the SAME
+    ///      deployer instance that will run deployStakerAt.
+    function predictStaker(
+        bytes32 salt,
+        IERC20 psp,
+        IRoundController controller,
+        address descriptor
+    ) external view returns (address) {
+        return address(uint160(uint256(keccak256(abi.encodePacked(
+            bytes1(0xff),
+            address(this),
+            salt,
+            keccak256(abi.encodePacked(
+                type(PSPStaker).creationCode,
+                abi.encode(psp, controller, descriptor)
+            ))
+        )))));
+    }
 }

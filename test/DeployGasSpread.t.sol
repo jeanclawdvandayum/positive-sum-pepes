@@ -81,12 +81,18 @@ contract DeployGasSpread is Test {
             vm.roll(block.number + 11 + i);
             vm.warp(block.timestamp + 97 + i * 7);
             uint256 g0 = gasleft();
-            (address ha, bytes32 s) = hookDeployer.deployHook(
+            (address p, bytes32 s) = hookDeployer.mineHook(
                 IPoolManager(address(poolManager)),
                 address(ctl),
                 registry,
-                _params().curveConfig
-            );            uint256 g = g0 - gasleft();
+                _params().curveConfig,
+                131_072
+            );
+            address ha = hookDeployer.deployHookAt(
+                s, IPoolManager(address(poolManager)), address(ctl), registry, _params().curveConfig
+            );
+            p;
+            uint256 g = g0 - gasleft();
             ha; s;
             if (g < lo) lo = g;
             if (g > hi) hi = g;
@@ -126,7 +132,7 @@ contract DeployGasSpread is Test {
             if (gCtl > hiCtl) hiCtl = gCtl;
 
             g0 = gasleft();
-            address reg = hookDeployer.deployRegistry(ctl.stakerAddress(), factory.REFERRAL_MIN_STAKE());
+            address reg = factory.controllerDeployer().deployRegistry(ctl.stakerAddress(), factory.REFERRAL_MIN_STAKE());
             uint256 gReg = g0 - gasleft();
             if (gReg < loReg) loReg = gReg;
             if (gReg > hiReg) hiReg = gReg;
@@ -135,11 +141,14 @@ contract DeployGasSpread is Test {
             // mirrors deployRound's context exactly (constructor args differ
             // per round, entropy keyed to controller address)
             g0 = gasleft();
-            (address h2, bytes32 s2) = hookDeployer.deployHook(
-                IPoolManager(address(poolManager)), address(ctl), reg, cfg
+            (address p2, bytes32 s2) = hookDeployer.mineHook(
+                IPoolManager(address(poolManager)), address(ctl), reg, cfg, 131_072
+            );
+            address h2 = hookDeployer.deployHookAt(
+                s2, IPoolManager(address(poolManager)), address(ctl), reg, cfg
             );
             uint256 gHook = g0 - gasleft();
-            h2; s2;
+            h2; p2;
 
             console2.log("iter", i, "token / controller / registry / hook-mining gas:");
             console2.log("    tok/ctl/reg:", gTok, gCtl, gReg);

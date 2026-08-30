@@ -62,15 +62,17 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///                --fork-url $SEPOLIA_RPC_URL) with any throwaway key and
 ///                zero gas. Never set this for a real deployment.
 ///   PSP_CURVE    0|1|2|3 rolling curves (staircase/glide/longswell/switchback)
-///                4 = minimal 2-zone S-curve (the ONLY one that fits Ethereum
-///                Sepolia's 2^24 = 16.7M per-tx cap: deployRound floor is
-///                ~12.6M fixed + ~600k/zone + on-chain mining luck)
-///                5 = LEAN anchor-ladder staircase (10 zones, ~17.5M floor —
-///                fits OP-stack testnets like Base Sepolia's 1.2B block limit
-///                but NOT Ethereum Sepolia; kept for mid-cap chains)
-///                0 = the canonical 34-zone anchor-ladder staircase (27.5M —
-///                mainnet or OP-stack testnets only; rebirth spawnNextRound
-///                is single-tx so over-cap curves can never be reborn)
+///                4 = minimal 2-zone S-curve — the ONLY profile whose whole
+///                lifecycle fits every per-tx cap incl. alchemy's ~15M on
+///                Ethereum Sepolia (staged legs, forge-measured 2026-08-30:
+///                reserveSpawn 1.29M, birthRound 11.08M; see FatCurveSpawn)
+///                5 = LEAN anchor-ladder staircase (10 zones)
+///                0 = the canonical 34-zone anchor-ladder staircase —
+///                measured staged legs: reserveSpawn 1.45M, birthRound
+///                16.08M (fits Sepolia's 2^24 network cap but NOT
+///                alchemy's ~15M provider cap; at home on OP stacks like
+///                Base Sepolia with 1.2B blocks), composed one-tx genesis
+///                21.44M (mainnet / OP-stack only)
 ///   testnet default: 4 (safe everywhere). For Base Sepolia round 2 set
 ///   PSP_CURVE=0 explicitly for the full staircase.
 contract DeployPSP is Script {
@@ -157,12 +159,18 @@ contract DeployPSP is Script {
         string memory htmlPath = vm.envOr("PSP_HTML", string("script/app.html"));
 
         // Sepolia blocks cap at 60M gas and providers cap per-tx lower still
-        // (alchemy ~15M, publicnode 2^24) — the deploy as ONE tx measured
-        // 19.6M on this branch and is unsendable. Split into per-broadcast
-        // segments so forge sends separate txs (owner stays the broadcaster).
+        // (alchemy ~15M, publicnode 2^24). Under the staged spawn the round
+        // legs are small and split naturally (reserve ~1.3M, birth ~11.1M at
+        // the 2-zone default); per-broadcast segments keep every tx under
+        // even the strictest cap (forge sends one tx per startBroadcast).
         vm.startBroadcast();
         PSPFactory factory = new PSPFactory(
-            IPoolManager(pm), mix, new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), testnet ? _testnetTimings() : 0
+            IPoolManager(pm),
+            mix,
+            new HookDeployer(),
+            new ControllerDeployer(),
+            new StakerDeployer(),
+            (testnet || anvil) ? _testnetTimings() : 0 // anvil e2e: fast, env-tunable profile
         );
 
         // wire the on-chain pepe art FIRST — it's global on the factory and
@@ -245,9 +253,11 @@ contract DeployPSP is Script {
     }
 
     /// @dev PSP_CURVE=4 — minimal 2-zone S-curve for gas-capped testnets.
-    ///      Sepolia enforces a network-wide per-tx cap of 2^24 = 16,777,216
-    ///      gas (every major EL client); the full curves' deployRound runs
-    ///      17.4M+ and is unmineable there. Two zones fit with headroom.
+    ///      Ethereum Sepolia caps per-tx gas at 2^24 = 16,777,216 network-
+    ///      wide and alchemy at ~15M; the 34-zone staircase's birthRound
+    ///      alone measures 16.08M (FatCurveSpawn) and cannot ride those
+    ///      caps, while this profile's whole lifecycle fits everywhere:
+    ///      reserveSpawn 1.29M, birthRound 11.08M.
     ///      Shape: e^7 (≈1096x price run) across the first 3.5M PSP — the
     ///      widest legal exp leg (k·width = 7 WAD, the NK24 bound) — then a
     ///      gentle log tail. Mechanics (vest, votes, referrals, bombs) are

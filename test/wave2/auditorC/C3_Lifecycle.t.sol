@@ -21,6 +21,10 @@ contract C3_Lifecycle is CBase {
     /// targets, i.e. ok=false) - either way, verify them mathematically.
     function test_C3_SelectorConstants() public pure {
         assertEq(bytes4(keccak256("markDestroyed(uint256)")), bytes4(0x723c5612), "markDestroyed selector");
+        // staged spawn (2026-08-30): finalizeCarpet reserves; birth is a
+        // separate permissionless tx. spawnNextRound remains as the
+        // composed one-tx variant.
+        assertEq(bytes4(keccak256("reserveSpawn(uint256)")), bytes4(0x551313f7), "reserveSpawn selector");
         assertEq(bytes4(keccak256("spawnNextRound(uint256)")), bytes4(0x1c9424dc), "spawnNextRound selector");
         assertEq(bytes4(keccak256("creditSidePot(uint256)")), bytes4(0xada2e425), "creditSidePot selector");
     }
@@ -146,6 +150,7 @@ contract C3_Lifecycle is CBase {
         _bombRound1();
         _warpPastFlatWindow();
         controller1.finalizeCarpet();
+        factory.birthRound(); // staged: birth is the second, permissionless tx
 
         CurveHook hook2 = factory.getRound(2).hook;
         (uint256 p0After,) = factory.gameCurve();
@@ -166,6 +171,7 @@ contract C3_Lifecycle is CBase {
         _bombRound1();
         _warpPastFlatWindow();
         controller1.finalizeCarpet();
+        factory.birthRound(); // staged: birth is the second, permissionless tx
 
         PSPFactory.Round memory r2 = factory.getRound(2);
         assertEq(r2.name, "Positive Sum Pepes 2");

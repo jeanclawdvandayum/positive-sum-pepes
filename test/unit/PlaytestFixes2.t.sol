@@ -233,6 +233,7 @@ contract PlaytestFixes2 is Test {
         // ── exit window closes → finalize births round 2 ──
         vm.warp(block.timestamp + 3 days + 1);
         controller.finalizeCarpet();
+        factory.birthRound(); // staged: birth is the second, permissionless tx
 
         assertEq(factory.currentRound(), 2, "round 2 is current");
 

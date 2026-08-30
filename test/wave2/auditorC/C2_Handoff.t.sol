@@ -37,6 +37,7 @@ contract C2_Handoff is CBase {
         assertGt(carry, 0, "unredeemed backing remains (backing of kept PSP + dust)");
 
         controller1.finalizeCarpet();
+        factory.birthRound(); // staged: birth is the second, permissionless tx
 
         // ── conservation: everything left the factory into round 2 ──
         assertEq(factory.currentRoundId(), 2);
@@ -80,6 +81,7 @@ contract C2_Handoff is CBase {
         _warpPastFlatWindow();
         uint256 carry = mixETH.balanceOf(address(hook1));
         controller1.finalizeCarpet();
+        factory.birthRound(); // staged: birth is the second, permissionless tx
 
         PSPFactory.Round memory r2 = factory.getRound(2);
         assertEq(r2.controller.totalPredepositMixETH(), carry);
@@ -115,6 +117,7 @@ contract C2_Handoff is CBase {
         _warpPastFlatWindow();
         uint256 reserve = mixETH.balanceOf(address(hook1));
         controller1.finalizeCarpet();
+        factory.birthRound(); // staged: birth is the second, permissionless tx
 
         // donated + reserve all became round-2 predeposit carry
         PSPFactory.Round memory r2 = factory.getRound(2);

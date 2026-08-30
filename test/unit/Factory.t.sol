@@ -240,6 +240,7 @@ contract FactoryTest is Test {
         controller.carpetBomb();
         skip(3 days + 1);
         controller.finalizeCarpet();
+        factory.birthRound(); // staged: birth is the second, permissionless tx
 
         (,,,,, bool canExecute) = controller.getCarpetBombState();
         assertFalse(canExecute, "proposal already executed");

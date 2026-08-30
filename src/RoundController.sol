@@ -223,7 +223,16 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // it as stakerClaimant at its own construction. Deployed through the
         // StakerDeployer vessel (EIP-170, 2026-08-23): PSPStaker's creation
         // code no longer embeds in this contract's creation program.
-        staker = _stakerDeployer.deployStaker(IERC20(address(_pspToken)), IRoundController(address(this)), _descriptor);
+        // Salted create2 (2026-08-30): the salt derives from this
+        // controller's own address, which is itself create2-predicted by
+        // the factory — the whole round's address set (token, controller,
+        // staker, registry, hook) is computable before anything deploys.
+        staker = _stakerDeployer.deployStakerAt(
+            keccak256(abi.encode(address(this), "psp-staker")),
+            IERC20(address(_pspToken)),
+            IRoundController(address(this)),
+            _descriptor
+        );
     }
 
     // ─────────────── Modifiers ───────────────
@@ -665,12 +674,16 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         (bool ok,) = factory.call(abi.encodeWithSelector(bytes4(0x723c5612), factoryRoundId));
         if (!ok) revert FactoryMarkFailed();
 
-        // Birth the next iteration, seeded with the carry as its opening
-        // predeposit offer — death, inheritance, rebirth in one
-        // permissionless call.
-        // EIP-170: precomputed selector for spawnNextRound(uint256)
+        // Reserve the next iteration's slot (staged spawn, 2026-08-30) —
+        // death, inheritance, rebirth commitment in one permissionless
+        // call, with the bounded flag-mine isolated in the deposit-free
+        // reserve. BIRTHING the reserved round is open to anyone
+        // (birthRound) — bundle it with the first buy to capture the
+        // launch edge. If the reserve fails the entire tx reverts
+        // atomically, so this can never leave a half-destroyed round.
+        // EIP-170: precomputed selector for reserveSpawn(uint256)
         (bool okSpawn,) =
-            factory.call(abi.encodeWithSelector(bytes4(0x1c9424dc), factoryRoundId));
+            factory.call(abi.encodeWithSelector(bytes4(0x551313f7), factoryRoundId));
         if (!okSpawn) revert FactorySpawnFailed();
 
         emit RoundFinalized(mixETHCarried);
