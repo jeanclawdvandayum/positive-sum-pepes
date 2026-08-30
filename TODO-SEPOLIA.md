@@ -49,6 +49,28 @@ while testing a deployment version of this, I encountered something I REALLY DO 
 > `test/unit/FeeImmediacy.t.sol` and `docs/VESTING-DESIGN.md`. Requires a
 > fresh deploy (round 2) — the live round-1 contracts keep the old engine.
 
+**2026-08-30 STAGED SPAWN LANDED (sepolia-fixes @ dcea9a09 + e2e 91e8a353).**
+The one-tx spawn lottery is gone: finalizeCarpet RESERVES (permissionless,
+bounded mine, cheap-fail, no deposits exist), anyone BIRTHS (all create2s
+from committed salts — zero variance). deployRound/spawnNextRound remain
+as composed one-tx shims; UI + scripts unbroken (RoundDeployed still
+fires at birth; new SpawnReserved event for "round n+1 reserved").
+Suite 353/353. Measured legs: reserve 1.29M (2-zone) / 1.45M (34-zone);
+birth 11.08M (2-zone) / 16,573,924 EXACT on-chain (34-zone, two
+independent anvil runs — byte-identical); genesis 34-zone composed
+21.44M. **This kills the "over-cap curves can never be reborn" note
+below** — the 34-zone ladder's birth (16.57M) fits Sepolia's network
+2^24 cap (not alchemy's ~15M provider cap) and is trivially at home on
+Base Sepolia. Full-lifecycle receipts: `bash scripts/anvil-e2e.sh`
+(deploy → governance kill → reserve → birth → round-2 alive, every tx
+status-checked). Deploy-script gotcha found + fixed: staged addresses
+are entropy-salted, so a forge script's sim state ≠ its broadcast —
+round-dependent ctor args (reinvestor) now come from a second pass
+(script/DeployReinvestor.s.sol) that reads the real chain. Round-2
+deploy checklist unchanged EXCEPT: run DeployReinvestor after DeployPSP
+(988k gas), and expect DeployPSP's console to no longer print round
+addresses (read them from the factory post-broadcast).
+
 **2026-08-28 CURVE NOTE (scoopy: "ensure the curve is still the staircase").**
 Round 1 on-chain is the PSP_CURVE=4 two-zone S-curve, NOT the anchor-ladder
 staircase (chain-verified: controller 0x1666…0903, P0=1e-4, exp k=2e-6 over
