@@ -61,7 +61,28 @@ contract CurveHook is BaseHook {
     /// @dev lazy cache — the hook may be deployed against a PREDICTED
     /// (still codeless) controller, so the constructor must never call it
     address public stakerClaimant;
-    uint24 public constant SWAP_FEE_BIPS = 500; // 5% total swap fee
+    uint24 public constant SWAP_FEE_BIPS = 500; // 5% flat swap fee — ZONE-curve rounds (sine rounds slide, see swapFeeBps)
+
+    /// @dev Sliding fee (scoopy 2026-08-30), sine rounds only, anchored to the
+    ///      wave's reserve domain [0, boot | boot, top | > top]:
+    ///        R ≤ boot          → 10%   (pre-wave raise — the early game)
+    ///        boot < R < top     → linear decay 10% → 2.5% across the wave
+    ///        R ≥ top            → 2.5%  (above the sine — deep reserve)
+    ///      Zone-curve rounds keep the flat 5% (SWAP_FEE_BIPS).
+    uint24 public constant FEE_BPS_PRE_WAVE = 1000;
+    uint24 public constant FEE_BPS_ABOVE_WAVE = 250;
+
+    /// @notice The swap fee this round charges right now, in bps.
+    function swapFeeBps() public view returns (uint24) {
+        if (!sineActive) return SWAP_FEE_BIPS;
+        uint256 boot = sineCurve.boot;
+        uint256 span = sineCurve.span;
+        uint256 r = reserveMixETH;
+        if (r <= boot) return FEE_BPS_PRE_WAVE;
+        if (r >= boot + span) return FEE_BPS_ABOVE_WAVE;
+        // floor → the fee slice rounds UP in the reserve's favor
+        return uint24(FEE_BPS_PRE_WAVE - ((FEE_BPS_PRE_WAVE - FEE_BPS_ABOVE_WAVE) * (r - boot)) / span);
+    }
     /// @dev Referral carve-out of the swap fee (2026-08-19, replaces the
     ///      side pot): paid LIVE in mixETH to the trader's attribution chain
     ///      (up to 5 tiers, registry-weighted). Unattributed trades — and any
@@ -102,7 +123,6 @@ contract CurveHook is BaseHook {
     event ModeChanged(Mode newMode);
     event PoolInitialized();
     event FeesSent(address indexed to, uint256 mixETHAmount);
-    event Drained(address indexed to, uint256 mixETHAmount);
     event ReferralPaid(address indexed trader, address indexed referrer, uint256 tier, uint256 mixETHAmount);
 
     // ─────────────── Constructor ───────────────
@@ -303,10 +323,12 @@ contract CurveHook is BaseHook {
         // NK24 fix: mixETH is the unit of account — the curve is solved
         // directly in mixETH. No vault-rate read anywhere in this path.
         //
-        // Fee split (2026-08-19, side pot retired): 5% total. 50bps referral
-        // carve-out paid live to the trader's chain; the remainder — plus
-        // every unpaid tier weight — to the staker accumulator.
-        uint256 feeMixETH = (mixETHInput * SWAP_FEE_BIPS) / 10000;
+        // Fee split (2026-08-19, side pot retired; sliding 2026-08-30):
+        // sine rounds charge swapFeeBps() (10% pre-wave → 2.5% above), zone
+        // rounds the flat 5%. 50bps referral carve-out paid live to the
+        // trader's chain; the remainder — plus every unpaid tier weight —
+        // to the staker accumulator.
+        uint256 feeMixETH = (mixETHInput * swapFeeBps()) / 10000;
         uint256 curveMixETH = mixETHInput - feeMixETH;
 
         uint256 pspOut = sineActive
@@ -372,11 +394,11 @@ contract CurveHook is BaseHook {
             ? SineMath.sellOut(sineCurve, reserveMixETH, pspInputAmount)
             : CurveMath.computeSellOutput(pspInputAmount, totalSupplyPSP, curveConfig);
 
-        // Fee split (2026-08-19, side pot retired): 5% of the out-value.
-        // Referral carve-out = 50bps OF THE OUT-VALUE, paid live in mixETH;
-        // remainder of the 5% to stakers. The ENTIRE sold PSP is burned —
-        // no pot skim, backing stays clean.
-        uint256 feeMixETH = (mixETHOut * SWAP_FEE_BIPS) / 10000;
+        // Fee split (2026-08-19, side pot retired; sliding 2026-08-30):
+        // swapFeeBps() of the out-value. Referral carve-out = 50bps OF THE
+        // OUT-VALUE, paid live in mixETH; remainder to stakers. The ENTIRE
+        // sold PSP is burned — no pot skim, backing stays clean.
+        uint256 feeMixETH = (mixETHOut * swapFeeBps()) / 10000;
         uint256 mixETHToUser = mixETHOut - feeMixETH;
         if (mixETHToUser == 0) revert ZeroOutput();
 
@@ -484,21 +506,40 @@ contract CurveHook is BaseHook {
 
     // (redeemPotBacking removed 2026-08-19 with the side pot — the pot no
     // longer exists; carpetBomb flattens straight to the exit window.)
+    //
+    // (drainAll removed 2026-08-30, scoopy: "people should always be able to
+    // come back to retrieve it" — redemption is INDEFINITE. The dead hook
+    // custodies the backing of unredeemed PSP forever; finalizeCarpet no
+    // longer drains anything, and death no longer endows the next round: the
+    // factory's carry is whatever actually sits on the factory (normally
+    // zero). Abandoned value doesn't evaporate or roll — it waits.)
 
-    /// @notice Drain ALL mixETH (reserve + fees) for round carry-over
-    /// @return mixETHAmount Total mixETH transferred to `to`
-    function drainAll(address to) external returns (uint256) {
-        if (msg.sender != address(controller)) revert NotController();
+    event Redeemed(address indexed who, uint256 pspIn, uint256 mixETHOut);
 
-        address mixETHAddr = Currency.unwrap(controller.getMixETH());
-        uint256 balance = IERC20(mixETHAddr).balanceOf(address(this));
-        if (balance > 0) {
-            IERC20(mixETHAddr).safeTransfer(to, balance);
+    /// @notice Burn PSP for its pro-rata reserve backing — INDEFINITELY.
+    ///         Available from the carpet bomb onward, in Flat AND Destroyed
+    ///         modes: a holder who returns a year later can still redeem.
+    ///         Fee-free (same F-9 principle as flat exits): this is not a
+    ///         trade, it's retrieving what's yours.
+    /// @dev Same floor math as _handleFlatSell (out = floor(in·R/S)) — the
+    ///      invariant R/S is preserved across redemptions, so the payout
+    ///      per PSP never changes after death. CEI: state before externals.
+    function redeemBacking(uint256 pspAmount) external returns (uint256 mixETHOut) {
+        if (mode != Mode.Flat && mode != Mode.Destroyed) revert NotActive();
+        if (pspAmount == 0) revert BuyZeroAmount();
+        if (pspAmount > totalSupplyPSP) revert SellExceedsSupply();
+
+        mixETHOut = (pspAmount * reserveMixETH) / totalSupplyPSP;
+        reserveMixETH -= mixETHOut;
+        totalSupplyPSP -= pspAmount;
+
+        emit Redeemed(msg.sender, pspAmount, mixETHOut);
+
+        IERC20(address(controller.getPSP())).safeTransferFrom(msg.sender, address(this), pspAmount);
+        controller.burnPSPForSwap(pspAmount);
+        if (mixETHOut > 0) {
+            IERC20(Currency.unwrap(controller.getMixETH())).safeTransfer(msg.sender, mixETHOut);
         }
-        reserveMixETH = 0;
-
-        emit Drained(to, balance);
-        return balance;
     }
 
     // ─────────────── Mode Management ───────────────
@@ -585,26 +626,30 @@ contract CurveHook is BaseHook {
     /// @param mixETHInput mixETH to spend on the curve
     /// @return PSP output for a mixETH input (curve unit of account)
     function getBuyOutput(uint256 mixETHInput) external view returns (uint256) {
-        // B7b catch (2026-08-19): the view must mirror execution. In curve
-        // mode the curve only ever sees the POST-FEE input (95%); quoting the
-        // raw input overstated output by ~5%. Flat mode has NO buys at all
+        // B7b catch (2026-08-19): the view must mirror execution — the curve
+        // only ever sees the POST-FEE input. Flat mode has NO buys at all
         // (scoopy 2026-08-29) — the view reverts like the swap path.
+        // Sine-aware + sliding-fee-aware (2026-08-30): this used to quote the
+        // ZONE math on sine rounds — wrong curve, wrong fee.
         if (mode == Mode.Flat) revert BuyingDisabled();
-        uint256 fee = (mixETHInput * SWAP_FEE_BIPS) / 10000;
-        return CurveMath.computeBuyOutput(mixETHInput - fee, totalSupplyPSP, curveConfig);
+        uint256 fee = (mixETHInput * swapFeeBps()) / 10000;
+        uint256 curveMix = mixETHInput - fee;
+        return sineActive
+            ? SineMath.buyOut(sineCurve, reserveMixETH, curveMix)
+            : CurveMath.computeBuyOutput(curveMix, totalSupplyPSP, curveConfig);
     }
 
     /// @return mixETH output for a PSP sell (curve unit of account)
     function getSellOutput(uint256 pspInput) external view returns (uint256) {
-        // Mirror execution (the B7b principle, sell side): curve-mode sellers
-        // receive mixETHOut MINUS the SWAP_FEE_BIPS slice — quoting the raw
-        // integral overstated output by exactly the fee, so every UI sell
-        // with less-than-fee slippage reverted on minOut. Flat exits are
-        // fee-free pro-rata (F-9).
+        // Mirror execution (the B7b principle, sell side): sellers receive
+        // mixETHOut MINUS the fee slice; sine-aware since 2026-08-30. Flat
+        // exits are fee-free pro-rata (F-9).
         if (mode == Mode.Flat) {
             return (pspInput * reserveMixETH) / totalSupplyPSP;
         }
-        uint256 out = CurveMath.computeSellOutput(pspInput, totalSupplyPSP, curveConfig);
-        return out - (out * SWAP_FEE_BIPS) / 10000;
+        uint256 out = sineActive
+            ? SineMath.sellOut(sineCurve, reserveMixETH, pspInput)
+            : CurveMath.computeSellOutput(pspInput, totalSupplyPSP, curveConfig);
+        return out - (out * swapFeeBps()) / 10000;
     }
 }

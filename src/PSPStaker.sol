@@ -102,6 +102,14 @@ contract PSPStaker {
 
     mapping(uint256 => GlobalPoint) public points; // epoch => point
     uint256 public lastPointEpoch;                 // latest stored point
+    /// @dev disambiguates the anchor state: epoch 0 is a REAL epoch (any
+    ///      block with ts < epochSize — foundry ts≈1, a fresh chain's first
+    ///      days), so `lastPointEpoch == 0` alone cannot signal "never
+    ///      anchored" (2026-08-30 fix: an epoch-0 first write used to leave
+    ///      the sentinel armed, and the next write-side call re-anchored at
+    ///      the CURRENT epoch with weight 0 — silently wiping all staked
+    ///      weight and panicking later flat-path withdraws).
+    bool public anchored;
 
     // per-epoch deltas, applied when advancing epoch e -> e+1:
     mapping(uint256 => uint256) public biasAdd;  // +weight (stakes, cancels)
@@ -294,7 +302,7 @@ contract PSPStaker {
     /// @dev The global point at the current epoch (lazy extrapolation).
     function _pointNow() private view returns (GlobalPoint memory) {
         uint256 e = _epoch();
-        if (lastPointEpoch == 0) {
+        if (!anchored) {
             // no write-side use yet: nothing is staked, weight is honestly 0.
             // Deltas cannot predate the first _anchorNow (every delta-writer
             // runs through an anchor path or a storing path first).
@@ -309,10 +317,11 @@ contract PSPStaker {
     ///      extrapolations apply every registered delta correctly.
     function _anchorNow() private returns (GlobalPoint memory p) {
         uint256 e = _epoch();
-        if (lastPointEpoch == 0) {
+        if (!anchored) {
             p = GlobalPoint({epoch: e, weight: 0, slope: 0});
             points[e] = p;
             lastPointEpoch = e;
+            anchored = true;
             return p;
         }
         return _pointNow();
@@ -323,6 +332,7 @@ contract PSPStaker {
         p = _pointNow();
         points[p.epoch] = p;
         lastPointEpoch = p.epoch;
+        anchored = true; // storing path anchors too (genesis locks arrive here)
     }
 
     // ─────────────── Fee settlement (O(1) accumulator delta) ───────────────

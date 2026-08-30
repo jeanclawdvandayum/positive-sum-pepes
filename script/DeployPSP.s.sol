@@ -9,11 +9,7 @@ import {PSPFactory} from "../src/PSPFactory.sol";
 import {HookDeployer} from "../src/HookDeployer.sol";
 import {ControllerDeployer} from "../src/ControllerDeployer.sol";
 import {CurveMath} from "../src/libraries/CurveMath.sol";
-import {LinearZones} from "../src/curves/LinearZones.sol";
-import {LinearZonesLean} from "../src/curves/LinearZonesLean.sol";
 import {Curve1Zones} from "../src/curves/Curve1Zones.sol";
-import {Curve2Zones} from "../src/curves/Curve2Zones.sol";
-import {Curve3Zones} from "../src/curves/Curve3Zones.sol";
 import {SineMath} from "../src/libraries/SineMath.sol";
 import {PepeDescriptor} from "../src/PepeDescriptor.sol";
 import {PSPZapIn} from "../src/PSPZapIn.sol";
@@ -27,19 +23,22 @@ import {MockPoolManager} from "../test/mocks/MockPoolManager.sol";
 import {StakerDeployer} from "../src/StakerDeployer.sol";
 
 
-/// @title DeployPSP — genesis deployment with the anchor-ladder curve
+/// @title DeployPSP — genesis deployment with the tilted-sine curve
 /// @notice Deploys the factory, round 1 ("Positive Sum Pepes" / PSP), and
 ///         publishes the walk-away UI via factory.setHtml(). The UI source is
 ///         script/app.html with __FACTORY__ substituted for the real address.
 ///
-///         The curve is the anchor-ladder solve (scoopy anchors 2026-08-19):
-///         one price decade per x4 reserve — 2k/8k/32k/128k mixETH at
-///         0.001/0.01/0.1/1, P0=0.0001. 16 S-legs (4+4x3), uniform lift
-///         Q=10^(1/4)=1.778 per leg, cliffs 1.40→1.77, islands 35% of every
-///         span, 34 zones. Zone ints are GENERATED into
-///         src/curves/LinearZones.sol by ~/clawd/psp-linear.py (which also
-///         forge-verifies them against CurveMath) — regenerate there, don't
-///         hand-edit.
+///         THE CURVE is the tilted sine (scoopy 2026-08-30 — sine-only, for
+///         genesis AND every rebirth): parametric price wave over the mixETH
+///         reserve, p0·e^(preK·R) pre-wave, then a 3-wave monotone climb
+///         (45°-tilt cap = flat treads, never a dip), then a linear tail.
+///         Params env-tunable (PSP_SINE_*); defaults reproduce the dial-lab
+///         verified shape (p0 1e-5 → B 1e-4 at boot 500, top reserve 21×
+///         boot, top price 0.06). The swap fee SLIDES with reserve depth:
+///         10% pre-wave, linear decay to 2.5% by the wave top, 2.5% above.
+///
+///         The zone-curve family (anchor-ladder staircase & friends) is
+///         RETIRED from deployment but stashed — src/curves/CURVES-STASH.md.
 ///
 /// Env:
 ///   PSP_PM       pool manager (default: Base mainnet v4; REQUIRED with PSP_TESTNET)
@@ -58,25 +57,7 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///                dry-run the FULL testnet path (PSP_TESTNET + PSP_PM +
 ///                --fork-url $SEPOLIA_RPC_URL) with any throwaway key and
 ///                zero gas. Never set this for a real deployment.
-///   PSP_CURVE    6 = tilted sine — THE DEFAULT (scoopy 2026-08-30): parametric
-///                p0 1e-5 → B 1e-4 at boot 500, top reserve 21×boot, top price
-///                0.06, amp 10000bps (45° tilt: flat treads, monotone). Every
-///                round incl. rebirths prices off it once armed. Env-tunable
-///                (PSP_SINE_*). Zone curves remain selectable:
-///                0|1|2|3 rolling curves (staircase/glide/longswell/switchback)
-///                4 = minimal 2-zone S-curve — the ONLY profile whose whole
-///                lifecycle fits every per-tx cap incl. alchemy's ~15M on
-///                Ethereum Sepolia (staged legs, forge-measured 2026-08-30:
-///                reserveSpawn 1.29M, birthRound 11.08M; see FatCurveSpawn)
-///                5 = LEAN anchor-ladder staircase (10 zones)
-///                0 = the canonical 34-zone anchor-ladder staircase —
-///                measured staged legs: reserveSpawn 1.45M, birthRound
-///                16.08M (fits Sepolia's 2^24 network cap but NOT
-///                alchemy's ~15M provider cap; at home on OP stacks like
-///                Base Sepolia with 1.2B blocks), composed one-tx genesis
-///                21.44M (mainnet / OP-stack only)
-///   DEFAULT: 6 (tilted sine, everywhere). For an explicit 34-zone
-///   staircase round set PSP_CURVE=0.
+///   PSP_SINE_*   sine shape overrides (see _sineParams)
 contract DeployPSP is Script {
     // Base mainnet Uniswap v4 PoolManager (canonical v4 deployment; code
     // verified on-chain 2026-08-28 — the previous constant 0x498581fF… had
@@ -183,13 +164,13 @@ contract DeployPSP is Script {
         vm.stopBroadcast();
 
         vm.startBroadcast();
-        // Tilted-sine flavor is the DEFAULT (scoopy 2026-08-30): arm the
-        // factory BEFORE deployRound — every round (incl. rebirths) then
-        // prices off the parametric sine. Zone curves (PSP_CURVE 0-5) remain
-        // selectable for players who want them.
-        if (vm.envOr("PSP_CURVE", uint256(6)) == 6) {
-            factory.configureSine(_sineParams());
-        }
+        // THE curve is the tilted sine (scoopy 2026-08-30: "just for
+        // simplicity have the rebirth just be the sine curve"). Armed once
+        // on the factory, EVERY round — genesis and every rebirth — prices
+        // off the parametric wave; the zone config below is creation-code
+        // shape only. The zone-curve libraries stay stashed in src/curves/
+        // (see CURVES-STASH.md) for possible future flavors.
+        factory.configureSine(_sineParams());
         // roundId/hookAddr discarded on purpose: staged addresses are
         // entropy-salted, so the sim's values differ from the chain's —
         // read real state from the RPC after broadcast instead
@@ -223,18 +204,11 @@ contract DeployPSP is Script {
     }
 
     function _roundParams(bool testnet) internal view returns (PSPFactory.RoundParams memory) {
-        uint256 curveSel = vm.envOr("PSP_CURVE", uint256(6)); // sine default (scoopy 2026-08-30)
-        // NOTE: PSP_CURVE=6 (tilted sine) still passes a zone config here —
-        // the hook's constructor needs one for creation-code shape; when the
-        // factory arms the sine flavor right after, sineActive overrides all
-        // zone pricing. See _sineParams().
-        CurveMath.CurveConfig memory cc = curveSel == 0
-            ? LinearZones.config()
-            : curveSel == 2 ? Curve2Zones.config()
-            : curveSel == 3 ? Curve3Zones.config()
-            : curveSel == 4 ? _playtestCurve()
-            : curveSel == 5 ? LinearZonesLean.config()
-            : Curve1Zones.config();
+        // Sine-only (scoopy 2026-08-30): the zone config is creation-code
+        // SHAPE — the armed sine overrides all zone pricing at launch. The
+        // 1-zone shape is the smallest legal config, keeping the staged
+        // create2 initcodes (and birth gas) lean.
+        CurveMath.CurveConfig memory cc = Curve1Zones.config();
         cc.timings = testnet ? _testnetTimings() : 0; // anvil/mainnet: mainnet defaults
         return PSPFactory.RoundParams({
             name: "Positive Sum Pepes",
@@ -257,28 +231,5 @@ contract DeployPSP is Script {
             lnTop: vm.envOr("PSP_SINE_LNTOP", uint256(6_396_929_655_216_146_432)),
             ampBps: uint24(vm.envOr("PSP_SINE_AMPBPS", uint256(10_000)))
         });
-    }
-
-    /// @dev PSP_CURVE=4 — minimal 2-zone S-curve for gas-capped testnets.
-    ///      Ethereum Sepolia caps per-tx gas at 2^24 = 16,777,216 network-
-    ///      wide and alchemy at ~15M; the 34-zone staircase's birthRound
-    ///      alone measures 16.08M (FatCurveSpawn) and cannot ride those
-    ///      caps, while this profile's whole lifecycle fits everywhere:
-    ///      reserveSpawn 1.29M, birthRound 11.08M.
-    ///      Shape: e^7 (≈1096x price run) across the first 3.5M PSP — the
-    ///      widest legal exp leg (k·width = 7 WAD, the NK24 bound) — then a
-    ///      gentle log tail. Mechanics (vest, votes, referrals, bombs) are
-    ///      identical; only the curve shape is simpler.
-    function _playtestCurve() internal pure returns (CurveMath.CurveConfig memory) {
-        uint256[] memory b = new uint256[](2);
-        b[0] = 0;
-        b[1] = 3_500_000e18;
-        uint256[] memory r = new uint256[](2);
-        r[0] = 2_000_000_000_000; // k = 2e-6 → k·width = 7e18 exactly
-        r[1] = 250_000_000_000_000_000; // log tail, same rate as longswell's islands
-        bool[] memory e = new bool[](2);
-        e[0] = true;
-        e[1] = false;
-        return CurveMath.multiCurve(100000000000000, b, r, e); // P0 = 1e-4, matches the real curves
     }
 }

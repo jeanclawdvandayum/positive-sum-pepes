@@ -27,32 +27,20 @@ contract B6_AdminAPI is BBase {
         hook.initializeCurve(1, 1);
     }
 
-    // ── F-B6c: drainAll mid-Active leaves curve sells to underflow-panic
-    //    (not a graceful revert). Current controller only drains after
-    //    setMode(Destroyed) atomically — pins the sequencing dependency.
-    function test_B6c_drainMidActiveThenSellPanics() public {
+    // ── F-B6c (updated 2026-08-30): the admin drain surface is GONE —
+    //    drainAll was removed entirely (indefinite-redemption redesign):
+    //    the dead hook custodies backing forever and pays it out only via
+    //    the permissionless redeemBacking. The mid-Active-drain panic class
+    //    this test originally pinned is now structurally unreachable.
+    function test_B6c_drainSurfaceRemoved() public {
         _launch(100e18);
-        uint256 out = _buy(alice, 10e18);
+        _buy(alice, 10e18);
+        assertGt(hook.reserveMixETH(), 0, "reserve live");
 
+        // the retired selector must not exist — controller or not
         vm.prank(address(controller));
-        hook.drainAll(address(controller)); // mode still Active
-        assertEq(hook.reserveMixETH(), 0);
-
-        // through the PM the panic arrives wrapped by IHooks.WrappedError;
-        // the hook PM-gates beforeSwap (NotPoolManager on direct calls), so
-        // pin the exact panic via revert-data containment
-        vm.startPrank(alice);
-        psp.approve(address(router), out);
-        BRouter.Call[] memory calls = new BRouter.Call[](1);
-        calls[0] = BRouter.Call({isBuy: false, amount: out, settleMode: 0, takeMode: 0});
-        (bool ok, bytes memory data) =
-            address(router).call(abi.encodeCall(BRouter.execute, (key, calls, alice)));
-        vm.stopPrank();
-        assertFalse(ok, "post-drain sell should revert");
-        assertTrue(
-            _contains(data, abi.encodeWithSignature("Panic(uint256)", 0x11)),
-            "expected reserve-underflow panic"
-        );
+        (bool ok,) = address(hook).call(abi.encodeWithSignature("drainAll(address)", address(controller)));
+        assertFalse(ok, "drainAll is gone for good");
     }
 
     // ── F-B6d: flat buys are DISABLED outright (scoopy 2026-08-29) ──
@@ -117,8 +105,6 @@ contract B6_AdminAPI is BBase {
         vm.startPrank(carol);
         vm.expectRevert(CurveHook.NotController.selector);
         hook.sendFees(carol, 1);
-        vm.expectRevert(CurveHook.NotController.selector);
-        hook.drainAll(carol);
         vm.expectRevert(CurveHook.NotController.selector);
         hook.initializeCurve(1, 1);
         vm.stopPrank();

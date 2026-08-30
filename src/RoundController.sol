@@ -666,8 +666,13 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // Mark destroyed
         hook.setMode(CurveHook.Mode.Destroyed);
 
-        // Drain ALL remaining mixETH (unredeemed backing) to the factory
-        uint256 mixETHCarried = hook.drainAll(factory);
+        // (drain removed 2026-08-30, scoopy: redemption is INDEFINITE — the
+        // dead hook custodies the backing of unredeemed PSP forever, payable
+        // via hook.redeemBacking whenever its holder returns. Death no longer
+        // endows the next generation: the factory's carry is whatever mixETH
+        // actually sits on the factory (normally zero), so the next boot is
+        // its own predeposit. Abandoned value doesn't roll — it waits.)
+        uint256 unredeemedBacking = hook.reserveMixETH();
 
         // Notify factory that this round is destroyed
         // EIP-170: precomputed selector for markDestroyed(uint256)
@@ -686,7 +691,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             factory.call(abi.encodeWithSelector(bytes4(0x551313f7), factoryRoundId));
         if (!okSpawn) revert FactorySpawnFailed();
 
-        emit RoundFinalized(mixETHCarried);
+        emit RoundFinalized(unredeemedBacking);
     }
 
     /// @notice True while a carpet-bomb vote COMMITS its participants

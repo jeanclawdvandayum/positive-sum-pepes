@@ -249,8 +249,10 @@ contract PlaytestFixes2 is Test {
         assertEq(uint8(hook2.mode()), uint8(CurveHook.Mode.Predeposit));
         assertFalse(c2.predepositClosed());
 
-        // the carry seeded round 2's predeposit (round 1's whole reserve)
-        assertGt(c2.totalPredepositMixETH(), 0, "carry seeded the new predeposit");
+        // 2026-08-30 indefinite redemption: round 2 starts EMPTY — death
+        // no longer endows the sequel; round 1's backing waits in its dead
+        // hook for holders to redeem whenever they return
+        assertEq(c2.totalPredepositMixETH(), 0, "no carry - round 2 boots from its own raise");
 
         // roundInfo(2) exposes everything the UI needs
         (,,,,, string memory n2, string memory s2, bool destroyed2,,,,) = factory.roundInfo(2);

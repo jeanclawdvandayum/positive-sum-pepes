@@ -116,7 +116,9 @@ contract C1_HookSquatDoS is CBase {
         assertTrue(address(r2.controller) != address(0), "round-2 controller exists");
         assertTrue(address(r2.hook) != orphan, "round-2 hook dodged the orphan");
         assertTrue(CurveHook(address(r2.hook)).mode() == CurveHook.Mode.Predeposit, "round 2 born in Predeposit");
-        assertEq(mixETH.balanceOf(address(hook1)), 0, "dying round fully drained - no stranded reserve");
+        // 2026-08-30 indefinite redemption: the dying hook KEEPS the
+        // unclaimed backing — payable via redeemBacking forever
+        assertEq(mixETH.balanceOf(address(hook1)), reserveBefore, "dead hook still custodies the backing");
     }
 
     /// The orphan cannot be weaponized: its controller slot is a guessed

@@ -246,11 +246,14 @@ contract FactoryTest is Test {
         assertFalse(canExecute, "proposal already executed");
         assertEq(uint8(hook.mode()), uint8(CurveHook.Mode.Destroyed), "round destroyed");
 
-        // carpetBomb birthed round 2 and seeded it with the entire carry
+        // carpetBomb birthed round 2 — under indefinite redemption (2026-08-30)
+        // the dead hook KEEPS its backing; round 2 carries NOTHING unless the
+        // factory was donated mixETH. The birth must still complete cleanly.
         assertEq(factory.currentRoundId(), 2, "round 2 spawned");
         PSPFactory.Round memory r2 = factory.getRound(2);
         uint256 carried = mixETH.balanceOf(address(r2.controller));
-        assertGt(carried, 0, "carry seeded as round-2 predeposit");
+        assertEq(carried, 0, "no drain - no carry");
+        assertGt(mixETH.balanceOf(address(hook)), 0, "dying hook keeps the backing");
         assertEq(mixETH.balanceOf(address(factory)), 0, "factory drained");
         assertFalse(r2.controller.predepositClosed(), "round 2 awaiting its own window");
         (uint256 factoryDeposit,) = r2.controller.predeposits(address(factory));

@@ -32,21 +32,26 @@ contract C2_Handoff is CBase {
 
         _warpPastFlatWindow();
 
-        // What the dying hook custodies at finalize time = the carry
-        uint256 carry = mixETH.balanceOf(address(hook1));
-        assertGt(carry, 0, "unredeemed backing remains (backing of kept PSP + dust)");
+        // What the dying hook custodies at finalize time — under indefinite
+        // redemption (2026-08-30) this STAYS PUT: the backing of unredeemed
+        // PSP, payable via hook.redeemBacking forever
+        uint256 backing = mixETH.balanceOf(address(hook1));
+        assertGt(backing, 0, "unredeemed backing remains (backing of kept PSP + dust)");
 
         controller1.finalizeCarpet();
         factory.birthRound(); // staged: birth is the second, permissionless tx
 
-        // ── conservation: everything left the factory into round 2 ──
+        // ── the new model: death does not endow. The dead hook keeps every
+        //    wei; round 2's boot is its own predeposit (factory held nothing
+        //    here). Abandoned value waits for its owner, indefinitely. ──
         assertEq(factory.currentRoundId(), 2);
         assertEq(mixETH.balanceOf(address(factory)), 0, "no mixETH stranded at factory");
+        assertEq(mixETH.balanceOf(address(hook1)), backing, "dead hook kept the backing - redemption is indefinite");
 
         PSPFactory.Round memory r2 = factory.getRound(2);
-        assertEq(r2.controller.totalPredepositMixETH(), carry, "carry - round-2 predeposit, exact");
+        assertEq(r2.controller.totalPredepositMixETH(), 0, "no carry - round 2 starts from its own raise");
         (uint256 factoryDeposit,) = r2.controller.predeposits(address(factory));
-        assertEq(factoryDeposit, carry, "earmarked to factory");
+        assertEq(factoryDeposit, 0, "nothing earmarked to factory");
 
         // v5.1: the referral graph resets — round 2 runs a FRESH registry
         assertTrue(
@@ -73,19 +78,19 @@ contract C2_Handoff is CBase {
         factory.spawnNextRound(99);
     }
 
-    /// No-buy branch: no swap flow at all — spawn forwards the whole
-    /// reserve as carry (v5.1: there is no pot branch anymore).
+    /// No-buy branch: no swap flow at all — the reserve simply waits.
     function test_C2_NoBuyBranch() public {
         _launchRound1();
         _bombRound1();
         _warpPastFlatWindow();
-        uint256 carry = mixETH.balanceOf(address(hook1));
+        uint256 backing = mixETH.balanceOf(address(hook1));
         controller1.finalizeCarpet();
         factory.birthRound(); // staged: birth is the second, permissionless tx
 
         PSPFactory.Round memory r2 = factory.getRound(2);
-        assertEq(r2.controller.totalPredepositMixETH(), carry);
+        assertEq(r2.controller.totalPredepositMixETH(), 0, "no carry");
         assertEq(mixETH.balanceOf(address(factory)), 0);
+        assertEq(mixETH.balanceOf(address(hook1)), backing, "backing waits in the dead hook");
     }
 
     /// Guards on the destroy flag: only a round's own controller flips it.
@@ -106,8 +111,9 @@ contract C2_Handoff is CBase {
     }
 
     /// Donation accounting: mixETH airdropped straight to the factory rides
-    /// the generic carry into the next round (v5.1: no pot earmark path
-    /// exists anymore — the credit surface was deleted).
+    /// the generic carry into the next round. Under indefinite redemption
+    /// (2026-08-30) this is the ONLY carry: the dead hook's reserve stays
+    /// with the dead hook, waiting for its holders.
     function test_C2_DonationsRideTheCarry() public {
         _launchRound1();
         _bombRound1();
@@ -115,14 +121,15 @@ contract C2_Handoff is CBase {
         mixETH.transfer(address(factory), donated);
 
         _warpPastFlatWindow();
-        uint256 reserve = mixETH.balanceOf(address(hook1));
+        uint256 backing = mixETH.balanceOf(address(hook1));
         controller1.finalizeCarpet();
         factory.birthRound(); // staged: birth is the second, permissionless tx
 
-        // donated + reserve all became round-2 predeposit carry
+        // only the donation became round-2 predeposit carry
         PSPFactory.Round memory r2 = factory.getRound(2);
-        assertEq(r2.controller.totalPredepositMixETH(), reserve + donated, "donation joined the carry");
+        assertEq(r2.controller.totalPredepositMixETH(), donated, "donation joined the carry");
         assertEq(mixETH.balanceOf(address(factory)), 0);
+        assertEq(mixETH.balanceOf(address(hook1)), backing, "hook reserve untouched by the donation");
     }
 
     function _key() internal view returns (PoolKey memory) {

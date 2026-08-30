@@ -143,13 +143,19 @@ contract SpawnStaging is CBase {
         assertEq(r2.symbol, "PSP2");
     }
 
-    /// The carry (drained backing) reaches round 2's predeposit at birth.
+    /// Under indefinite redemption (2026-08-30) death no longer drains — the
+    /// ONLY carry is mixETH actually held by the factory (donations). A
+    /// donated carry reaches round 2's predeposit at birth; the dying hook's
+    /// reserve stays put, waiting for its holders.
     function test_carry_flows_through_birth() public {
+        uint256 donated = 7e18;
+        mixETH.transfer(address(factory), donated);
+
         _kill(controller1);
         controller1.finalizeCarpet();
 
         uint256 carry = mixETH.balanceOf(address(factory));
-        assertTrue(carry > 0, "round 1 drain left a carry");
+        assertEq(carry, donated, "factory-held donation is the carry");
 
         vm.expectEmit(true, true, true, true, address(factory));
         emit PSPFactory.ETHCarried(1, 2, carry);
@@ -157,6 +163,7 @@ contract SpawnStaging is CBase {
         factory.birthRound();
 
         assertEq(mixETH.balanceOf(address(factory)), 0, "carry fully seeded");
+        assertGt(mixETH.balanceOf(address(hook1)), 0, "dying hook keeps its backing");
     }
 
     /// staker + registry predictions (derived from the predicted controller)

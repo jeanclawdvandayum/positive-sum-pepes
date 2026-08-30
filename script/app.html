@@ -65,6 +65,11 @@ a{color:var(--acc)}
     <button onclick="claim()">claim predeposit PSP</button>
   </div>
 
+  <div class="card" id="graveCard" style="display:none">
+    <div class="row"><span class="k">💀 dead rounds — redeemable backing</span><span class="k">yours forever, redeem any time</span></div>
+    <div id="grave"></div>
+  </div>
+
   <div class="card">
     <div class="row"><span class="k">rounds</span><span class="k" id="rcount"></span></div>
     <div id="rounds"></div>
@@ -83,7 +88,7 @@ a{color:var(--acc)}
 "use strict";
 // factory address is injected at deploy (vm.replace __FACTORY__)
 var FACTORY="__FACTORY__";
-var SEL={cur:"0x9cbe5efd",rounds:"0x8c65c81f",pstate:"0xa81c1eed",pdep:"0xaed1af6b",claim:"0x6989bb72",launch:"0x2ffc07fe",dep:"0xf2a89c35",getPSP:"0x345634ce",staker:"0x5ebaf1db",staked:"0xb2f160fb",appr:"0x095ea7b3",bal:"0x70a08231",allow:"0xdd62ed3e",sym:"0x95d89b41",mixETH:"0x762d8140",name:"0x06fdde03",fees:"0xd294f093"};
+var SEL={cur:"0x9cbe5efd",rounds:"0x8c65c81f",pstate:"0xa81c1eed",pdep:"0xaed1af6b",claim:"0x6989bb72",launch:"0x2ffc07fe",dep:"0xf2a89c35",getPSP:"0x345634ce",staker:"0x5ebaf1db",staked:"0xb2f160fb",appr:"0x095ea7b3",bal:"0x70a08231",allow:"0xdd62ed3e",sym:"0x95d89b41",mixETH:"0x762d8140",name:"0x06fdde03",fees:"0xd294f093",mode:"0x295a5212",flatPx:"0xae3969f3",redeem:"0xf9f1e474"};
 var RPC={8453:"https://mainnet.base.org",84532:"https://sepolia.base.org",1:"https://eth.llamarpc.com",11155111:"https://ethereum-sepolia-rpc.publicnode.com"};
 var acct=null,cid=null,MIX=null,sel={id:0,tok:"",ctl:"",hk:"",name:"",sym:"",psp:""};
 var $=function(i){return document.getElementById(i)};
@@ -173,6 +178,9 @@ async function refresh(){
       $("headroom").textContent="headroom "+fmt(cap>total?cap-total:0n)+" mixETH";
       $("claimCard").style.display=amt>0n&&!claimed&&!sel.dead?"":"none";
       $("depCard").style.display=!closed&&!sel.dead?"":"none";
+      await graveScan(cur);
+    }else{
+      $("graveCard").style.display="none";
     }
     // rounds list
     var h="";
@@ -222,6 +230,51 @@ async function deposit(){
   await doSend(sel.ctl,SEL.dep,padN(wei),"deposit "+a+" mixETH");
 }
 async function claim(){await doSend(sel.ctl,SEL.claim,"0x","claim")}
+
+// ── graveyard: PSP → reserveBacking redemptions, INDEFINITELY (2026-08-30)
+// A carpet-bombed round keeps its backing in the dead hook forever. Scan
+// every prior round for a wallet balance of flat/dead tokens and offer a
+// one-click redeem regardless of which round is selected.
+var GRAVE={}; // roundId -> {tok,hk,sym,bal}
+async function graveScan(cur){
+  var found={};
+  for(var i=1;i<=cur;i++){
+    try{
+      var r=await loadRound(i);
+      var bal=n16(await callRaw(r.tok,SEL.bal+pad(acct)));
+      if(bal<=0n)continue;
+      // redeemable only once the round is flat (2) or destroyed (3)
+      var mode=Number(n16(await callRaw(r.hk,SEL.mode)));
+      if(mode<2)continue;
+      var px=mode>=2?n16(await callRaw(r.hk,SEL.flatPx)):0n; // mixETH per PSP (1e18)
+      found[i]={tok:r.tok,hk:r.hk,sym:r.sym,bal:bal,px:px};
+    }catch(_){} // unborn/edge rounds just skip
+  }
+  GRAVE=found;
+  var ks=Object.keys(found);
+  $("graveCard").style.display=ks.length?"":"none";
+  if(!ks.length)return;
+  var h="";
+  for(var k=0;k<ks.length;k++){
+    var g=found[ks[k]];
+    var out=g.px>0n?fmt(g.bal*g.px/10n**18n):"?";
+    h+='<div class="round"><span>#'+ks[k]+" · "+fmt(g.bal)+" "+g.sym+" → ≈"+out+' mixETH</span>'
+      +'<button style="width:auto;margin:0" onclick="redeem('+ks[k]+')">redeem</button></div>';
+  }
+  $("grave").innerHTML=h;
+}
+async function redeem(i){
+  var g=GRAVE[i];
+  if(!g||!acct){msg("connect a wallet first","err");return}
+  try{
+    var al=n16(await callRaw(g.tok,SEL.allow+enc(acct,g.hk)));
+    if(al<g.bal){
+      msg("approving "+g.sym+" …","ok");
+      await doSend(g.tok,SEL.appr,enc(g.hk,"0x"+g.bal.toString(16)),"approve");
+    }
+    await doSend(g.hk,SEL.redeem,padN(g.bal),"redeem #"+i+" backing");
+  }catch(e){msg(e.message||String(e),"err")}
+}
 
 window.addEventListener("load",function(){
   if(eth){eth.on&&eth.on("accountsChanged",function(){location.reload()})}
