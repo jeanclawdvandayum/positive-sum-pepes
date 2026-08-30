@@ -27,18 +27,21 @@ VEST_SEC=360                   # ÷6 = 60s epochs
 VOTE_SEC=60
 FLAT_SEC=60
 
-# anvil deterministic accounts (public throwaway keys, local node only)
+# anvil deterministic accounts — keys derived from the canonical anvil
+# mnemonic (verified: cast wallet address matches the funded accounts)
 K_OWNER=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 K_ALICE=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
-K_BOB=0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348ec8d3cbd9c9df
-K_RANDO=0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e
+K_BOB=0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
+K_RANDO=0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6
 ALICE=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 BOB=0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
 
 # ── node ────────────────────────────────────────────────────────────────────
 if ! cast block-number --rpc-url "$RPC" >/dev/null 2>&1; then
   echo "▪ starting anvil"
-  anvil --port 8545 >/tmp/psp-anvil.log 2>&1 &
+  # explicit generous gas limit: the 34-zone genesis deployRound alone runs
+  # 21.4M, and some anvil builds default the block limit far too low
+  anvil --port 8545 --gas-limit 80000000 >/tmp/psp-anvil.log 2>&1 &
   ANVIL_PID=$!
   trap '[ -n "${ANVIL_PID:-}" ] && kill $ANVIL_PID 2>/dev/null || true' EXIT
   sleep 2
@@ -61,15 +64,23 @@ warp_to() { # warp_to <absolute-seconds>
 RECEIPTS=/tmp/psp-e2e-receipts.txt
 : > "$RECEIPTS"
 receipt() { # receipt <label> <txhash>
-  local gas
+  local gas status
   gas=$(cast receipt "$2" --rpc-url "$RPC" --json | jq -r '.gasUsed')
+  status=$(cast receipt "$2" --rpc-url "$RPC" --json | jq -r '.status')
+  if [ "$status" != "0x1" ]; then
+    printf '%-36s %s  ✗ REVERTED (status %s)\n' "$1" "$2" "$status" | tee -a "$RECEIPTS"
+    exit 1
+  fi
   printf '%-36s %s  gas=%d\n' "$1" "$2" "$((gas))" | tee -a "$RECEIPTS"
 }
 send() { # send <label> <key> <to> [--value eth] <sig> [args...]
   local label=$1 key=$2 to=$3; shift 3
   local extra=() tx
   if [ "${1:-}" = "--value" ]; then extra=(--value "$2"); shift 2; fi
-  tx=$(cast send "$to" "$@" "${extra[@]}" --rpc-url "$RPC" --private-key "$key" --json | jq -r '.transactionHash')
+  tx=$(cast send "$to" "$@" ${extra[@]+"${extra[@]}"} --rpc-url "$RPC" --private-key "$key" --json 2>/tmp/psp-e2e-send-err.log | jq -r '.transactionHash // empty') || true
+  if [ -z "$tx" ] || [ "$tx" = "null" ]; then
+    echo "✗ send failed: $label"; cat /tmp/psp-e2e-send-err.log; exit 1
+  fi
   receipt "$label" "$tx"
 }
 sort_pair() { # sort_pair <a> <b> → echoes "low high"
@@ -84,27 +95,40 @@ PSP_PREDEPOSIT_SEC=$PRE_SEC PSP_VEST_SEC=$VEST_SEC PSP_VOTE_SEC=$VOTE_SEC \
 PSP_FLAT_EXIT_SEC=$FLAT_SEC PSP_WALLET_CAP_MIX=10 \
   forge script DeployPSP --rpc-url "$RPC" --broadcast --private-key "$K_OWNER" 2>&1 | tee "$DEPLOY_LOG" >/dev/null
 FACTORY=$(grep -o 'factory: 0x[0-9a-fA-F]*' "$DEPLOY_LOG" | tail -1 | awk '{print $2}')
-MIX=$(grep -o 'ANVIL mock mixETH: 0x[0-9a-fA-F]*' "$DEPLOY_LOG" | tail -1 | awk '{print $3}')
+MIX=$(grep -o 'ANVIL mock mixETH: 0x[0-9a-fA-F]*' "$DEPLOY_LOG" | tail -1 | awk '{print $4}')
 ZAPIN=$(grep -o 'zapIn: 0x[0-9a-fA-F]*' "$DEPLOY_LOG" | tail -1 | awk '{print $2}')
 echo "  factory=$FACTORY mix=$MIX zapIn=$ZAPIN"
 
-# genesis receipt: the FIRST call to the factory in broadcast order is
-# deployRound (setDescriptor/setHtml come after it in the script)
+# genesis receipt: calls to the factory in broadcast order are
+# [setDescriptor, deployRound, setHtml] — deployRound is index 1
 RD_TX=$(jq -r --arg f "$(echo "$FACTORY" | tr '[:upper:]' '[:lower:]')" \
-  '.transactions | map(select((.to // "") | ascii_downcase == $f)) | .[0].hash' \
+  '.transactions | map(select((.to // "") | ascii_downcase == $f)) | .[1].hash' \
   broadcast/DeployPSP.s.sol/31337/run-latest.json)
-[ -n "$RD_TX" ] && [ "$RD_TX" != "null" ] && receipt "genesis deployRound (R1)" "$RD_TX"
+if [ -n "$RD_TX" ] && [ "$RD_TX" != "null" ]; then receipt "genesis deployRound (R1)" "$RD_TX"; fi
 
-round() { cast call "$FACTORY" "getRound(uint256)(address,address,address,bool)" "$1" --rpc-url "$RPC"; }
-R1_TOKEN=$(round 1 | awk 'NR==1{print $1}' | tr -d '"')
-R1_CTRL=$(round 1 | awk 'NR==2{print $1}' | tr -d '"')
-R1_HOOK=$(round 1 | awk 'NR==3{print $1}' | tr -d '"')
+# second pass: the reinvestor reads the REAL round from the RPC (staged
+# addresses are entropy-salted — the deploying script's sim state diverges
+# from the broadcast, so round-dependent ctor args must come from chain)
+PSP_FACTORY="$FACTORY" PSP_ZAPIN="$ZAPIN" \
+  forge script DeployReinvestor --rpc-url "$RPC" --broadcast --private-key "$K_OWNER" \
+  2>&1 | tee /tmp/psp-e2e-reinvestor.log >/dev/null
+RI_TX=$(jq -r '.transactions[0].hash // empty' broadcast/DeployReinvestor.s.sol/31337/run-latest.json 2>/dev/null)
+if [ -n "${RI_TX:-}" ]; then receipt "reinvestor (2nd-pass, real state)" "$RI_TX"; fi
+
+round() { # round <id> → echoes "token ctrl hook"; raw hex, 64-char words,
+  # low-20-byte sliced (words are left-padded addresses)
+  local hex w out=""
+  hex=$(cast call "$FACTORY" "getRound(uint256)" "$1" --rpc-url "$RPC" | grep -v Warning | tr -d '\n')
+  for w in $(echo "${hex:2}" | fold -w64 | awk 'NR>=2 && NR<=4'); do out+="0x${w: -40} "; done
+  echo "$out"
+}
+read -r R1_TOKEN R1_CTRL R1_HOOK _ <<< "$(round 1)"
 R1_STAKER=$(cast call "$R1_CTRL" "stakerAddress()(address)" --rpc-url "$RPC")
 echo "  R1 token=$R1_TOKEN ctrl=$R1_CTRL hook=$R1_HOOK"
 
 # ── 2. predeposit ×2 (zap wraps ETH → mixETH → predepositFor) ───────────────
-send "predeposit alice (10 mix)" "$K_ALICE" "$ZAPIN" --value 10 "zapInPredeposit(address,uint256)" "$R1_CTRL" 0
-send "predeposit bob (10 mix)" "$K_BOB" "$ZAPIN" --value 10 "zapInPredeposit(address,uint256)" "$R1_CTRL" 0
+send "predeposit alice (10 mix)" "$K_ALICE" "$ZAPIN" --value 10ether "zapInPredeposit(address,uint256)" "$R1_CTRL" 0
+send "predeposit bob (10 mix)" "$K_BOB" "$ZAPIN" --value 10ether "zapInPredeposit(address,uint256)" "$R1_CTRL" 0
 
 # ── 3. window over → permissionless launch ─────────────────────────────────
 warp_to $(( $(TS) + PRE_SEC + 5 ))
@@ -112,7 +136,7 @@ send "launchPooledBuy (rando)" "$K_RANDO" "$R1_CTRL" "launchPooledBuy()"
 
 # ── 4. round-1 buy (real curve flow; seeds the reserve the bomb drains) ────
 read -r C0 C1 <<< "$(sort_pair "$MIX" "$R1_TOKEN")"
-send "R1 buy 1 ETH via zapIn (rando)" "$K_RANDO" "$ZAPIN" --value 1 \
+send "R1 buy 1 ETH via zapIn (rando)" "$K_RANDO" "$ZAPIN" --value 1ether \
   "zapInBuy((address,address,uint24,int24,address),uint256,uint256)" "($C0,$C1,8388608,60,$R1_HOOK)" 0 0
 
 # ── 5. claims ───────────────────────────────────────────────────────────────
@@ -141,19 +165,30 @@ warp_to $(( PROPOSE_TS + VOTE_SEC + 2 ))
 send "carpetBomb (alice)" "$K_ALICE" "$R1_CTRL" "carpetBomb()"
 
 # ── 7. flat window → THE STAGED LEGS ────────────────────────────────────────
-FLAT_TS=$(cast call "$R1_CTRL" "flatTime()(uint256)" --rpc-url "$RPC")
+FLAT_TS=$(cast call "$R1_CTRL" "flatTime()(uint256)" --rpc-url "$RPC" | awk '{print $1}')
 warp_to $(( FLAT_TS + FLAT_SEC + 2 ))
-send "finalizeCarpet→RESERVE (rando)" "$K_RANDO" "$R1_CTRL" "finalizeCarpet()"
+# finalizeCarpet = drain + mark + RESERVE (bounded mine). The ~0.03% tail:
+# no flag match inside the cap → revert CHEAP → production retries next
+# block with fresh entropy. Mirror those semantics.
+FIN_TX=""
+for attempt in 1 2 3 4 5; do
+  FIN_TX=$(cast send "$R1_CTRL" "finalizeCarpet()" --rpc-url "$RPC" --private-key "$K_RANDO" --json 2>/tmp/psp-e2e-fin-err.log | jq -r '.transactionHash')
+  if [ -n "$FIN_TX" ] && [ "$FIN_TX" != "null" ]; then break; fi
+  echo "  finalize attempt $attempt bounced (next block re-rolls entropy): $(tail -1 /tmp/psp-e2e-fin-err.log | head -c 120)"
+  cast rpc evm_mine --rpc-url "$RPC" >/dev/null
+done
+[ -n "$FIN_TX" ] && [ "$FIN_TX" != "null" ] || { echo "✗ finalize never landed"; cat /tmp/psp-e2e-fin-err.log; exit 1; }
+receipt "finalizeCarpet→RESERVE (rando)" "$FIN_TX"
 send "birthRound (rando)" "$K_RANDO" "$FACTORY" "birthRound()"
 
 # ── 8. verify round 2 landed on the reservation ─────────────────────────────
-R2_TOKEN=$(round 2 | awk 'NR==1{print $1}' | tr -d '"')
-R2_CTRL=$(round 2 | awk 'NR==2{print $1}' | tr -d '"')
-R2_HOOK=$(round 2 | awk 'NR==3{print $1}' | tr -d '"')
-RES=$(cast call "$FACTORY" "reservation()(uint128,uint128,bytes32,bytes32,bytes32,address,address,address,bytes32,bool)" --rpc-url "$RPC")
-RES_TOKEN=$(echo "$RES" | awk 'NR==6{print $1}' | tr -d '"')
-RES_CTRL=$(echo "$RES" | awk 'NR==7{print $1}' | tr -d '"')
-RES_HOOK=$(echo "$RES" | awk 'NR==8{print $1}' | tr -d '"')
+read -r R2_TOKEN R2_CTRL R2_HOOK _ <<< "$(round 2)"
+# static struct → NO outer offset: [from, new, tSalt, cSalt, hSalt, token,
+# ctrl, hook, contextHash, active] → token=word6, ctrl=7, hook=8
+RES_HEX=$(cast call "$FACTORY" "reservation()" --rpc-url "$RPC" | grep -v Warning | tr -d '\n')
+RES_TOKEN="0x$(echo "${RES_HEX:2}" | fold -w64 | awk 'NR==6{print substr($1,25)}')"
+RES_CTRL="0x$(echo "${RES_HEX:2}" | fold -w64 | awk 'NR==7{print substr($1,25)}')"
+RES_HOOK="0x$(echo "${RES_HEX:2}" | fold -w64 | awk 'NR==8{print substr($1,25)}')"
 if [ "$R2_TOKEN" = "$RES_TOKEN" ] && [ "$R2_CTRL" = "$RES_CTRL" ] && [ "$R2_HOOK" = "$RES_HOOK" ]; then
   echo "✓ round 2 == reservation (token/ctrl/hook all match)"
 else
@@ -162,9 +197,12 @@ fi
 MODE=$(cast call "$R2_HOOK" "mode()(uint8)" --rpc-url "$RPC")
 echo "  R2 hook mode=$MODE (0 = Predeposit expected)"
 
-# ── 9. round-2 is ALIVE: buy on the newborn curve ───────────────────────────
+# ── 9. round 2 is ALIVE: drive its lifecycle — predeposit → launch → buy ────
+send "R2 predeposit alice (10 mix)" "$K_ALICE" "$ZAPIN" --value 10ether "zapInPredeposit(address,uint256)" "$R2_CTRL" 0
+warp_to $(( $(TS) + PRE_SEC + 5 ))
+send "R2 launchPooledBuy (rando)" "$K_RANDO" "$R2_CTRL" "launchPooledBuy()"
 read -r C0 C1 <<< "$(sort_pair "$MIX" "$R2_TOKEN")"
-send "R2 buy 1 ETH via zapIn (rando)" "$K_RANDO" "$ZAPIN" --value 1 \
+send "R2 buy 1 ETH via zapIn (rando)" "$K_RANDO" "$ZAPIN" --value 1ether \
   "zapInBuy((address,address,uint24,int24,address),uint256,uint256)" "($C0,$C1,8388608,60,$R2_HOOK)" 0 0
 
 echo

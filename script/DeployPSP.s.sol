@@ -18,9 +18,6 @@ import {SineMath} from "../src/libraries/SineMath.sol";
 import {PepeDescriptor} from "../src/PepeDescriptor.sol";
 import {PSPZapIn} from "../src/PSPZapIn.sol";
 import {PSPZapOut} from "../src/PSPZapOut.sol";
-import {PSPReinvestor} from "../src/PSPReinvestor.sol";
-import {IPSPStaker} from "../src/interfaces/IPSPStaker.sol";
-import {IPSPZapIn} from "../src/interfaces/IPSPZapIn.sol";
 import {IMixETH} from "../src/interfaces/IMixETH.sol";
 import {SepoliaMixETH} from "../src/testnet/SepoliaMixETH.sol";
 import {MixETHFaucet} from "../src/testnet/MixETHFaucet.sol";
@@ -186,7 +183,10 @@ contract DeployPSP is Script {
         if (vm.envOr("PSP_CURVE", testnet ? uint256(4) : uint256(1)) == 6) {
             factory.configureSine(_sineParams());
         }
-        (uint256 roundId, address hookAddr) = factory.deployRound(_roundParams(testnet));
+        // roundId/hookAddr discarded on purpose: staged addresses are
+        // entropy-salted, so the sim's values differ from the chain's —
+        // read real state from the RPC after broadcast instead
+        factory.deployRound(_roundParams(testnet));
         vm.stopBroadcast();
 
         // publish the walk-away UI (fetch factory.html() from any rpc)
@@ -200,18 +200,18 @@ contract DeployPSP is Script {
         vm.startBroadcast();
         PSPZapIn zapIn = new PSPZapIn(IMixETH(address(mix)), IPoolManager(pm));
         PSPZapOut zapOut = new PSPZapOut(IMixETH(address(mix)), IPoolManager(pm));
-        // claim-and-compound router: fees -> curve buy -> back into the stake
-        PSPFactory.Round memory r = factory.getRound(roundId);
-        PSPReinvestor reinvestor =
-            new PSPReinvestor(IPSPStaker(r.controller.stakerAddress()), IPSPZapIn(address(zapIn)), IERC20(address(mix)), IERC20(address(r.token)));
         vm.stopBroadcast();
 
+        // NOTE (staging, 2026-08-30): the reinvestor ctor needs the round's
+        // staker + PSP token, but staged addresses are salted from BLOCK
+        // ENTROPY — forge's local sim mines different salts than the
+        // broadcast, so in-script reads of round state DO NOT match the
+        // chain. It now deploys in a second pass (script/DeployReinvestor)
+        // that reads the REAL post-broadcast round from the RPC. Same reason
+        // the hook/round addresses are not consoled here anymore.
         console.log("factory:", address(factory));
-        console.log("round 1 id:", roundId);
-        console.log("hook:", hookAddr);
         console.log("zapIn:", address(zapIn));
         console.log("zapOut:", address(zapOut));
-        console.log("reinvestor:", address(reinvestor));
         console.log("ui bytes:", bytes(h).length);
     }
 
