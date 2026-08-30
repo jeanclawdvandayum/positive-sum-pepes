@@ -49,6 +49,26 @@ while testing a deployment version of this, I encountered something I REALLY DO 
 > `test/unit/FeeImmediacy.t.sol` and `docs/VESTING-DESIGN.md`. Requires a
 > fresh deploy (round 2) — the live round-1 contracts keep the old engine.
 
+**2026-08-30 (II) DEATH NO LONGER ENDOWS — redemption is indefinite, fee slides, sine-only (scoopy, @ 77a528d4).**
+Three directives, landed:
+1. **PSP → reserveBacking forever**: finalizeCarpet no longer drains; the
+   dead hook custodies unredeemed backing indefinitely, payable via the
+   fee-free `hook.redeemBacking` (floor pro-rata, R/S invariant — payout
+   per PSP frozen at death). Carry = only mixETH actually on the factory
+   (donations); each generation boots from its OWN raise. UI: graveyard
+   panel detects redeemable PSP across all dead rounds + one-click redeem.
+2. **Sine-only**: DeployPSP always arms the tilted sine (genesis + every
+   rebirth); PSP_CURVE selector retired; zone curves stashed
+   (src/curves/CURVES-STASH.md).
+3. **Sliding fee** (sine rounds): 10% pre-wave (R ≤ boot) → linear decay
+   → 2.5% at the wave top → 2.5% above. Zone rounds keep flat 5%.
+BONUS FIX (real pre-existing bug, surfaced by the redemption tests):
+epoch-0 anchor collision in PSPStaker — `lastPointEpoch == 0` doubled as
+the "never anchored" sentinel, so a first write at ts < epochSize left it
+armed and the NEXT write re-anchored at weight 0 (wiping all staked
+weight, orphaning fees, panicking flat withdraws). Explicit `anchored`
+flag now. Suite 362/362.
+
 **2026-08-30 STAGED SPAWN LANDED (sepolia-fixes @ dcea9a09 + e2e 91e8a353).**
 The one-tx spawn lottery is gone: finalizeCarpet RESERVES (permissionless,
 bounded mine, cheap-fail, no deposits exist), anyone BIRTHS (all create2s
