@@ -58,7 +58,12 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///                dry-run the FULL testnet path (PSP_TESTNET + PSP_PM +
 ///                --fork-url $SEPOLIA_RPC_URL) with any throwaway key and
 ///                zero gas. Never set this for a real deployment.
-///   PSP_CURVE    0|1|2|3 rolling curves (staircase/glide/longswell/switchback)
+///   PSP_CURVE    6 = tilted sine — THE DEFAULT (scoopy 2026-08-30): parametric
+///                p0 1e-5 → B 1e-4 at boot 500, top reserve 21×boot, top price
+///                0.06, amp 10000bps (45° tilt: flat treads, monotone). Every
+///                round incl. rebirths prices off it once armed. Env-tunable
+///                (PSP_SINE_*). Zone curves remain selectable:
+///                0|1|2|3 rolling curves (staircase/glide/longswell/switchback)
 ///                4 = minimal 2-zone S-curve — the ONLY profile whose whole
 ///                lifecycle fits every per-tx cap incl. alchemy's ~15M on
 ///                Ethereum Sepolia (staged legs, forge-measured 2026-08-30:
@@ -70,8 +75,8 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///                alchemy's ~15M provider cap; at home on OP stacks like
 ///                Base Sepolia with 1.2B blocks), composed one-tx genesis
 ///                21.44M (mainnet / OP-stack only)
-///   testnet default: 4 (safe everywhere). For Base Sepolia round 2 set
-///   PSP_CURVE=0 explicitly for the full staircase.
+///   DEFAULT: 6 (tilted sine, everywhere). For an explicit 34-zone
+///   staircase round set PSP_CURVE=0.
 contract DeployPSP is Script {
     // Base mainnet Uniswap v4 PoolManager (canonical v4 deployment; code
     // verified on-chain 2026-08-28 — the previous constant 0x498581fF… had
@@ -178,9 +183,11 @@ contract DeployPSP is Script {
         vm.stopBroadcast();
 
         vm.startBroadcast();
-        // Tilted-sine flavor (PSP_CURVE=6): arm the factory BEFORE deployRound —
-        // every round (incl. rebirths) then prices off the parametric sine.
-        if (vm.envOr("PSP_CURVE", testnet ? uint256(4) : uint256(1)) == 6) {
+        // Tilted-sine flavor is the DEFAULT (scoopy 2026-08-30): arm the
+        // factory BEFORE deployRound — every round (incl. rebirths) then
+        // prices off the parametric sine. Zone curves (PSP_CURVE 0-5) remain
+        // selectable for players who want them.
+        if (vm.envOr("PSP_CURVE", uint256(6)) == 6) {
             factory.configureSine(_sineParams());
         }
         // roundId/hookAddr discarded on purpose: staged addresses are
@@ -216,7 +223,7 @@ contract DeployPSP is Script {
     }
 
     function _roundParams(bool testnet) internal view returns (PSPFactory.RoundParams memory) {
-        uint256 curveSel = vm.envOr("PSP_CURVE", testnet ? uint256(4) : uint256(1));
+        uint256 curveSel = vm.envOr("PSP_CURVE", uint256(6)); // sine default (scoopy 2026-08-30)
         // NOTE: PSP_CURVE=6 (tilted sine) still passes a zone config here —
         // the hook's constructor needs one for creation-code shape; when the
         // factory arms the sine flavor right after, sineActive overrides all
