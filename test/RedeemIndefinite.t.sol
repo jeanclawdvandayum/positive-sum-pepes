@@ -30,14 +30,14 @@ contract RedeemIndefinite is CBase {
         });
     }
 
-    /// Redeem WHILE FLAT (the bomb just landed — the flat window is open).
+    /// Redeem WHILE FLAT (the clock struck zero and detonate just ran).
     function test_RedeemWhileFlat_ExactProRata() public {
         _launchRound1();
         vm.startPrank(alice);
         mixETH.approve(address(swapper), 10e18);
         swapper.buy(_key(), 10e18, alice);
         vm.stopPrank();
-        _bombRound1();
+        _detonateRound1();
 
         uint256 pspBal = psp1.balanceOf(alice);
         uint256 R = hook1.reserveMixETH();
@@ -64,19 +64,18 @@ contract RedeemIndefinite is CBase {
         );
     }
 
-    /// The full comeback: finalize, round 2 lives, then a YEAR passes and a
-    /// holder still redeems. Flat sells during the window shrink the pie
-    /// pro-rata; redemption afterwards keeps paying the same backing/PSP.
+    /// The full comeback: the clock struck zero, detonate birthed round 2 in
+    /// the same tx, then a YEAR passes and a holder still redeems. Flat sells
+    /// shrink the pie pro-rata; redemption afterwards keeps paying the same
+    /// backing/PSP. The pot ladder and the deployer rake are pulled too —
+    /// every wei the dead hook custodies leaves with an owner.
     function test_RedeemOneYearLate_AfterRebirth() public {
         _launchRound1();
         vm.startPrank(alice);
         mixETH.approve(address(swapper), 10e18);
         swapper.buy(_key(), 10e18, alice);
         vm.stopPrank();
-        _bombRound1();
-        _warpPastFlatWindow();
-        controller1.finalizeCarpet();
-        factory.birthRound();
+        _detonateRound1();
         assertEq(factory.currentRoundId(), 2, "round 2 exists");
 
         // a year goes by
@@ -85,15 +84,16 @@ contract RedeemIndefinite is CBase {
         // Claims AUTO-LOCK as pepe NFTs — the comeback path for every wallet
         // is: open each pepe (flat bypass, forever) -> withdraw -> redeem
         PSPStaker staker = PSPStaker(controller1.stakerAddress());
-        uint256 preTotal = mixETH.balanceOf(address(hook1)); // reserve + fee surplus
+        uint256 preTotal = mixETH.balanceOf(address(hook1)); // reserve + escrows + fee surplus
         address[2] memory wallets = [alice, bob];
-        uint256 mixBefore = mixETH.balanceOf(alice) + mixETH.balanceOf(bob);
+        uint256 mixBefore = mixETH.balanceOf(alice) + mixETH.balanceOf(bob)
+            + mixETH.balanceOf(address(this)); // deployerCutTo = this harness
         for (uint256 i; i < 2; ++i) {
             uint256 n = staker.balanceOf(wallets[i]);
             for (uint256 j; j < n; ++j) {
                 uint256 id = staker.tokenOfOwnerByIndex(wallets[i], j);
                 vm.prank(wallets[i]);
-                staker.withdraw(id); // locks open forever post-bomb
+                staker.withdraw(id); // locks open forever post-detonation
             }
             uint256 pspBal = psp1.balanceOf(wallets[i]);
             if (pspBal > 0) {
@@ -104,9 +104,19 @@ contract RedeemIndefinite is CBase {
             }
         }
 
-        // conservation: backing + accrued fee credits — every wei the dead
-        // hook custodied left with its owners (rounding dust ≤ 10 wei)
-        uint256 redeemed = mixETH.balanceOf(alice) + mixETH.balanceOf(bob) - mixBefore;
+        // CLOCK-REDESIGN §2/§3: the ladder pot (alice holds the only buy
+        // ticket — a 1-seat board renormalizes to 100%) and the 1% rake
+        // (unattributed buy → deployerCredit, deployerCutTo = this harness)
+        // are PULL claims. Nobody but alice/this can hold them here.
+        vm.prank(alice);
+        hook1.claimPot();
+        hook1.claimDeployerCredit();
+
+        // conservation: backing + pot + rake + accrued fee credits — every
+        // wei the dead hook custodied left with its owners (rounding dust
+        // ≤ 10 wei)
+        uint256 redeemed = mixETH.balanceOf(alice) + mixETH.balanceOf(bob)
+            + mixETH.balanceOf(address(this)) - mixBefore;
         assertApproxEqAbs(redeemed, preTotal, 10, "every wei of custody accounted for");
         assertLe(hook1.reserveMixETH(), 1, "last holder drains the reserve (<=1 wei floor dust)");
         assertLe(hook1.totalSupplyPSP(), 1, "supply fully retired (<=1 wei dust)");
@@ -128,13 +138,11 @@ contract RedeemIndefinite is CBase {
         psp1.approve(address(staker), pspOut);
         staker.lock(pspOut);
         uint256 pepeId = staker.primaryOf(alice); // her FIRST pepe (genesis claim)
-        (uint256 principal,,,,,) = staker.positions(pepeId);
+        (uint256 principal,,,,) = staker.positions(pepeId);
         vm.stopPrank();
         assertGt(principal, 0);
 
-        _bombRound1();
-        _warpPastFlatWindow();
-        controller1.finalizeCarpet();
+        _detonateRound1();
         vm.warp(block.timestamp + 365 days);
 
         // the comeback: open lock → PSP → backing
@@ -158,7 +166,7 @@ contract RedeemIndefinite is CBase {
         vm.expectRevert(CurveHook.NotActive.selector);
         hook1.redeemBacking(1);
 
-        _bombRound1();
+        _detonateRound1();
 
         uint256 over = hook1.totalSupplyPSP() + 1; // read BEFORE arming expectRevert
         vm.prank(alice);

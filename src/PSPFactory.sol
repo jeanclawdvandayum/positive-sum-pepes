@@ -119,8 +119,9 @@ contract PSPFactory is Ownable2Step {
     uint256 public constant REFERRAL_MIN_STAKE = 1000e18;
 
     /// @dev Ring-fenced side pot REMOVED (2026-08-19) — the 25bps pot fee is
-    ///      dead; the 50bps referral carve-out pays out live in mixETH. The
-    ///      whole factory balance is now the generic carry.
+    ///      dead; the referral leg (5% of the fee, §3 REVISED 2026-09-01)
+    ///      pays out live in mixETH. The whole factory balance is the
+    ///      generic carry.
 
     /// @dev Naming for spawned rounds: "<baseName> <id>" / "<baseSymbol><id>".
     string public baseName = "Positive Sum Pepes";
@@ -134,7 +135,11 @@ contract PSPFactory is Ownable2Step {
 
     /// @dev `_timings == 0` → mainnet defaults, forwarded to every round's
     ///      RoundController. See RoundController "Timing profile".
-    constructor(IPoolManager _poolManager, IERC20 _mixETH, HookDeployer _hookDeployer, ControllerDeployer _controllerDeployer, StakerDeployer _stakerDeployer, uint256 _timings)
+    ///      `deployerCutTo` (CLOCK-REDESIGN §3): the recipient of every
+    ///      spawned hook's immutable 1% unattributed-fee rake — wired from
+    ///      the deploy script's broadcaster (testnet: the throwaway
+    ///      deployer; mainnet: scoopy's address, documented in DeployPSP).
+    constructor(IPoolManager _poolManager, IERC20 _mixETH, HookDeployer _hookDeployer, ControllerDeployer _controllerDeployer, StakerDeployer _stakerDeployer, uint256 _timings, address _deployerCutTo)
         Ownable(msg.sender)
     {
         if (address(_poolManager) == address(0)) revert ZeroAddress();
@@ -142,6 +147,7 @@ contract PSPFactory is Ownable2Step {
         if (address(_hookDeployer) == address(0)) revert ZeroAddress();
         if (address(_controllerDeployer) == address(0)) revert ZeroAddress();
         if (address(_stakerDeployer) == address(0)) revert ZeroAddress();
+        if (_deployerCutTo == address(0)) revert ZeroAddress(); // the 1% rake needs a home
         poolManager = _poolManager;
         mixETH = _mixETH;
         hookDeployer = _hookDeployer;
@@ -149,9 +155,11 @@ contract PSPFactory is Ownable2Step {
         controllerDeployer = _controllerDeployer;
         stakerDeployer = _stakerDeployer;
         roundTimings = _timings;
+        deployerCutTo = _deployerCutTo;
     }
 
     uint256 public immutable roundTimings;
+    address public immutable deployerCutTo;
 
     // ─────────────── Walk-away UI ───────────────
 
@@ -169,8 +177,9 @@ contract PSPFactory is Ownable2Step {
     ///      flag-mine tail (~0.03% of draws exhaust the 131k bound and
     ///      revert the whole tx — retry with fresh block entropy; state
     ///      rolls back clean). The PERMISSIONLESS rebirth path avoids the
-    ///      lottery entirely: finalizeCarpet reserves (bounded, deposit-
-    ///      free), anyone births (zero variance).
+    ///      lottery entirely: detonate() bounces clean on exhaustion
+    ///      (bounded, deposit-free reserve) and retries, anyone can birth
+    ///      (zero variance).
     function deployRound(RoundParams calldata params)
         external
         onlyOwner
@@ -314,7 +323,7 @@ contract PSPFactory is Ownable2Step {
         address registry = controllerDeployer.predictRegistry(registrySalt, staker, REFERRAL_MIN_STAKE);
 
         (address hook, bytes32 hookSalt) =
-            hookDeployer.mineHook(poolManager, controller, registry, cfg, HOOK_SCAN_CAP);
+            hookDeployer.mineHook(poolManager, controller, registry, cfg, deployerCutTo, HOOK_SCAN_CAP);
 
         reservation = SpawnReservation({
             fromRoundId: fromRoundId,
@@ -390,7 +399,9 @@ contract PSPFactory is Ownable2Step {
         // 4. hook at the mined salt
         CurveHook hook = CurveHook(r.hook);
         if (address(hook).code.length == 0) {
-            address h = hookDeployer.deployHookAt(r.hookSalt, poolManager, address(controller), registry, cfg);
+            address h = hookDeployer.deployHookAt(
+                r.hookSalt, poolManager, address(controller), registry, cfg, deployerCutTo
+            );
             if (h != r.hook) revert PredictMismatch();
         }
         hookAddr = r.hook;
@@ -455,7 +466,9 @@ contract PSPFactory is Ownable2Step {
     /// @dev Kept for callers that want atomic death→playable-successor
     ///      semantics in a single tx and accept the ~2% mining-exhaustion
     ///      bounce (clean revert, retry with fresh entropy). The default
-    ///      rebirth flow is reserveSpawn (from finalizeCarpet) + birthRound.
+    ///      rebirth flow under the clock redesign: the dying round's
+    ///      detonate() (RoundController) calls this; reserveSpawn +
+    ///      birthRound remain the split stages.
     function spawnNextRound(uint256 fromRoundId) external returns (uint256 newRoundId, address hookAddr) {
         Round storage from = rounds[fromRoundId];
         if (address(from.token) == address(0)) revert RoundNotFound();
@@ -477,10 +490,9 @@ contract PSPFactory is Ownable2Step {
 
     /// @notice Spawn the next round from the latest destroyed one — permissionless.
     /// @dev The game loop's rebirth step, now staged by default: the dying
-    ///      round's carpetBomb() reserves the successor (see reserveSpawn),
-    ///      and birthRound() — callable by anyone — executes it. The
-    ///      composed one-tx variant remains for callers that want atomic
-    ///      death→playable-successor semantics (see spawnNextRound above).
+    ///      round's detonate() composes markDestroyed + spawnNextRound (see
+    ///      RoundController), and reserveSpawn/birthRound remain callable
+    ///      by anyone for split or retry flows.
 
     /// @dev Minimal uint → decimal string (round ids are small; loop is short)
     function _itoa(uint256 v) internal pure returns (string memory) {
@@ -545,7 +557,9 @@ contract PSPFactory is Ownable2Step {
 
     /// @notice One-call round summary for UIs: every contract + lifecycle
     ///         flag for a round, including the live phase timings the
-    ///         controller carries (predeposit/vest/vote/flatExit).
+    ///         controller carries (predeposit/vest — CLOCK-REDESIGN §4
+    ///         dropped the vote/flat-exit slots with governance and the
+    ///         exit window).
     function roundInfo(uint256 roundId)
         external
         view
@@ -559,9 +573,7 @@ contract PSPFactory is Ownable2Step {
             string memory symbol,
             bool destroyed,
             uint256 predepositDuration,
-            uint256 vestDuration,
-            uint256 voteDuration,
-            uint256 flatExitWindow
+            uint256 vestDuration
         )
     {
         Round storage r = rounds[roundId];
@@ -577,9 +589,7 @@ contract PSPFactory is Ownable2Step {
             r.symbol,
             r.destroyed,
             c.PREDEPOSIT_DURATION(),
-            c.VEST_DURATION(),
-            c.VOTE_DURATION(),
-            c.FLAT_EXIT_WINDOW()
+            c.VEST_DURATION()
         );
     }
 }

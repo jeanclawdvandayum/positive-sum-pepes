@@ -186,10 +186,20 @@ contract B7_Supplemental is BBase {
         assertEq(hook.reserveMixETH(), reserveBeforeDonation, "donation moved the reserve");
         uint256 ledger = mixETH.balanceOf(address(hook)) - hook.reserveMixETH();
         assertGe(ledger, feesBefore + 5e18, "donation not credited to sweepable ledger");
-        // controller can sweep it
+        // CLOCK-REDESIGN §2/§3: the ledger now carries two ESCROWS (ladder
+        // pot + deployer rake) that sendFees must never leak to stakers —
+        // the sweepable surplus is the ledger MINUS both outstanding legs
+        uint256 escrow = (hook.potBalance() - hook.potPaid())
+            + (hook.deployerCredit() - hook.deployerCreditPaid());
+        uint256 sweepable = ledger - escrow;
+        // controller can sweep exactly the surplus
         vm.prank(address(controller));
-        hook.sendFees(alice, ledger);
-        assertEq(mixETH.balanceOf(address(hook)), hook.reserveMixETH(), "sweep left dust");
+        hook.sendFees(alice, sweepable);
+        assertEq(
+            mixETH.balanceOf(address(hook)),
+            hook.reserveMixETH() + escrow,
+            "sweep left anything but the escrows"
+        );
 
         // (ii) PSP donated to the hook is STUCK: swaps never touch a pre-existing
         //      PSP balance (burn + pot cut always come from the taken input)

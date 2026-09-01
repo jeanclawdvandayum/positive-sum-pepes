@@ -190,14 +190,14 @@ contract VestingTest is Test {
         vm.prank(alice);
         stakerV.withdraw(101);
         assertEq(pspToken.balanceOf(alice) - pspBefore, 1000e18);
-        (uint256 amt,,,,,) = stakerV.positions(101);
+        (uint256 amt,,,,) = stakerV.positions(101);
         assertEq(amt, 0);
         assertEq(stakerV.ownerOf(101), alice, "NFT kept as husk");
 
         // husk re-stakeable
         vm.prank(alice);
         stakerV.stakeFor(alice, 101, 5e18);
-        (uint256 amt2,,,,,) = stakerV.positions(101);
+        (uint256 amt2,,,,) = stakerV.positions(101);
         assertEq(amt2, 5e18);
     }
 
@@ -266,33 +266,37 @@ contract VestingTest is Test {
         assertEq(mixETH.balanceOf(alice), exp101 + exp1);
     }
 
-    // ── vote weights: propose-time snapshot semantics ──
+    // ── decay timeline + instant cancel: the fee-engine successor of the old
+    //    vote-snapshot section (CLOCK-REDESIGN §4 retired the vote reader;
+    //    the weight VIEWS it used to serve live on for FEES) ──
 
-    function test_VoteWeightSnapshot() public {
+    function test_DecayTimelineAndInstantCancel() public {
         vm.prank(alice);
         stakerV.requestWithdraw(101); // r=2
-        uint256 propose = t0 + 1; // still epoch 2
-        // 2026-08-29 semantics: an armed withdraw request HARD-EXCLUDES the
-        // position from voting — no more same-epoch full-weight grace
-        assertEq(stakerV.voteWeight(alice, propose), 0, "unstaking = no vote");
-        assertEq(stakerV.pepeVoteWeight(101, propose), 0, "per-pepe view agrees");
-        // while the fee engine still decays it step-for-step
+        uint256 snap = t0 + 1; // still epoch 2
+        // full weight through the request epoch — reads at ANY timestamp,
+        // past or future, answer exactly
+        assertEq(stakerV.biasOf(101, snap), 1000e18, "full at request epoch");
+        // while the fee engine decays it step-for-step
         assertEq(stakerV.biasOf(101, block.timestamp), 1000e18, "fee weight full at request");
 
         vm.warp(t0 + 3 * EPOCH); // epoch 5
-        assertEq(stakerV.voteWeight(alice, propose), 0, "still excluded");
-        assertEq(stakerV.biasOf(101, block.timestamp), _wAt(1000e18, 3));
+        assertEq(stakerV.biasOf(101, snap), 1000e18, "historical read still exact");
+        assertEq(stakerV.biasOf(101, block.timestamp), _wAt(1000e18, 3), "live read decaying");
 
-        // cancel restores the vote INSTANTLY (scoopy 2026-08-29)
+        // cancel restores the fee weight INSTANTLY (scoopy 2026-08-29) and
+        // re-anchors — the position is full-amount from THIS epoch on
         vm.prank(alice);
         stakerV.cancelWithdraw(101);
-        assertEq(stakerV.voteWeight(alice, block.timestamp), 1000e18, "cancel restored full power");
+        assertEq(stakerV.biasOf(101, block.timestamp), 1000e18, "cancel restored full power");
+        assertEq(stakerV.weightAt(101, (block.timestamp / EPOCH) + 1), 1000e18, "stays full next epoch");
 
-        // post-propose action excluded: bob tops up AFTER propose
-        vm.warp(propose + 1);
+        // a later top-up re-anchors and goes live instantly (2026-08-28b:
+        // fresh stake earns on the subsequent trade)
         vm.prank(bob);
         stakerV.stakeFor(bob, 202, 1e18);
-        assertEq(stakerV.voteWeight(bob, propose), 0);
+        assertEq(stakerV.biasOf(202, block.timestamp), 1001e18, "topup live instantly");
+        assertEq(stakerV.totalWeight(), 2001e18, "global honest");
     }
 
     // ── dust: amounts not divisible by 6 still hit exactly zero ──
@@ -346,7 +350,7 @@ contract VestingTest is Test {
         stakerV.claimGenesisShare(alice, 500e18); // 1/4 of genesis → 1/4 of its cut
 
         assertEq(mixETH.balanceOf(alice) - mixBefore, genesisCut * 500e18 / 2000e18);
-        (uint256 amt,,,,,) = stakerV.positions(1);
+        (uint256 amt,,,,) = stakerV.positions(1);
         assertEq(amt, 500e18, "fresh pepe carries the share");
         assertEq(stakerV.ownerOf(1), alice);
     }

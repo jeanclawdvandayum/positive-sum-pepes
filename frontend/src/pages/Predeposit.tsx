@@ -5,6 +5,7 @@ import { controllerAbi, erc20Abi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
 import { CHAIN_ID, FAUCET_ENABLED, NATIVE_ETH_FAUCET_URL, TESTNET_ETH_FAUCET } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
+import { useNow } from '../phase/PhaseEngine'
 import { fmtAmount, fmtCountdown, parseAmountToWad, wadToExact } from '../lib/format'
 import ReferralCard, { RefBanner } from '../components/ReferralCard'
 import { FaucetButton } from '../components/Topbar'
@@ -110,12 +111,9 @@ export default function Predeposit() {
     }
   }, [address, round.mix, round.controller, nonce])
 
-  /// 1s heartbeat for the countdown
-  const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000))
-  useEffect(() => {
-    const t = setInterval(() => setNowSec(Math.floor(Date.now() / 1000)), 1000)
-    return () => clearInterval(t)
-  }, [])
+  /// 1s heartbeat for the countdown — shared PhaseEngine tick (B0 refactor:
+  /// one app-wide heartbeat instead of a per-page setInterval)
+  const nowSec = useNow()
 
   const [amount, setAmount] = useState('')
   const [step, setStep] = useState<Step>('idle')

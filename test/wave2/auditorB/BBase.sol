@@ -51,7 +51,9 @@ abstract contract BBase is Test {
         poolManager = new PoolManager(address(this)); // REAL v4-core PM
         factory = new PSPFactory(
             IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer()
-        , 0);
+        , 0,
+            address(this) // deployerCutTo (CLOCK-REDESIGN §3)
+        );
 
         PSPFactory.RoundParams memory params =
             PSPFactory.RoundParams({name: "B", symbol: "AUD", curveConfig: _curve()});
@@ -116,36 +118,15 @@ abstract contract BBase is Test {
         vm.stopPrank();
     }
 
+    /// @dev CLOCK-REDESIGN §4: the kill is the detonation clock. Warp past
+    ///      the hook's zero and let any rando detonate — one tx flattens the
+    ///      round, opens every lock, and births the successor. The
+    ///      governance round-trip (propose/vote/execute) died 2026-09-01;
+    ///      its coverage lives in the clock tests.
     function _bomb() internal {
-        // M-1 fix: vote weight must come from locks with lockTime < proposeTime.
-        // All locks in this harness happen at the same warp instant as the
-        // proposal unless we advance — advance first. Epoch-point liveness:
-        // locks made this epoch only carry weight NEXT epoch, so hop the
-        // boundary (+1s), not just +1s.
-        skip((((block.timestamp / 7 days) + 1) * 7 days + 1) - block.timestamp);
-        vm.prank(alice);
-        controller.proposeCarpetBomb();
-        _voteAll(alice, true);
-        _voteAll(bob, true);
-        skip(3 days + 1);
-        controller.carpetBomb(); // → Mode.Flat, pot redeemed+burned
-    }
-
-    /// @dev Vote with every VOTABLE pepe `who` owns (husks and unstaking
-    ///      pepes sit out — same as the UI's default selection).
-    function _voteAll(address who, bool support) internal {
-        uint256 n = stakerV.balanceOf(who);
-        uint256[] memory ids = new uint256[](n);
-        uint256 k;
-        for (uint256 i; i < n; ++i) {
-            uint256 id = stakerV.tokenOfOwnerByIndex(who, i);
-            if (stakerV.pepeVoteWeight(id, block.timestamp) == 0) continue;
-            ids[k++] = id;
-        }
-        assembly { mstore(ids, k) }
-        if (k == 0) return;
-        vm.prank(who);
-        controller.voteCarpetBomb(ids, support);
+        vm.warp(hook.detonationAt() + 1);
+        vm.prank(carol);
+        controller.detonate(); // → Mode.Flat, locks open, round 2 born in-tx
     }
 
     /// @dev true if `needle` occurs anywhere in `haystack` (revert-data containment)

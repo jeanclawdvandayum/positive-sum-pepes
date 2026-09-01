@@ -43,7 +43,7 @@ contract PredepositWindowTest is Test {
         mixETH = new MockMixETH();
         mixETH.depositETH{value: 100_000e18}();
         poolManager = new MockPoolManager();
-        factory = new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), 0);
+        factory = new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), 0, address(this));
 
         PSPFactory.RoundParams memory params = PSPFactory.RoundParams({
             name: "Positive Sum Pepes",

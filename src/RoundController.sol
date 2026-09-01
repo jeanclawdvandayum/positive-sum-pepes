@@ -17,9 +17,11 @@ import {CurveMath} from "./libraries/CurveMath.sol";
 import {IRoundController} from "./interfaces/IRoundController.sol";
 
 /// @title RoundController — Lifecycle management for one PSP round
-/// @notice Handles predeposit, locking, fee distribution, yield reinvestment, and destruction governance.
+/// @notice Handles predeposit, locking, fee distribution, yield reinvestment, and detonation.
 ///         Staking itself lives in PSPStaker (ERC-721 positions) — born in
-///         this contract's constructor, read by governance, fed by addFees.
+///         this contract's constructor, fed by addFees. Death is the clock's
+///         (CLOCK-REDESIGN §4): at detonationAt zero, detonate() is the one
+///         permissionless kill switch — governance is gone.
 contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using CurveMath for CurveMath.CurveConfig;
@@ -27,32 +29,20 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // ─────────────── Errors ───────────────
     error NotHook();
     error NotActive();
+    error ClockStillLive(); // CLOCK-REDESIGN §4: detonate() before the clock struck zero
     error NotPredeposit();
     error PredepositClosed();
     error ZeroAmount();
     error ZeroAddress();
-    error NotLocker();
     error FactoryMarkFailed();
     error FactorySpawnFailed();
-    error ProposalExists();
-    error VotingEnded();
-    error AlreadyVoted();
-    error QuorumNotReached();
-    error MajorityNotReached();
-    error AlreadyExecuted();
-    error RoundDestroyed();
-    error NotFlattened();
-    error ExitWindowOpen();
-    error VoteLockedAfterPropose();
-    error TimingsIncomplete(); // 2026-08-19: packed profile must fill all five slots
+    error TimingsIncomplete(); // 2026-08-19: packed profile must fill every timing slot
     error ProtectedToken(); // L-3: sweep() protection has its own error, not ZeroAddress
     error ZeroShare(); // L-4: predeposit share rounded to 0 — claim refused, flag not set
     error PredepositOpen(); // window still live and cap not reached — only owner may launch early
     error CapExceeded(); // public predeposit would push total past PREDEPOSIT_CAP
     error WalletCapExceeded(); // per-wallet predeposit cap (scoopy 2026-08-29 — sybil friction)
     error NotFactory(); // carry seeding is factory-only
-    error NotPepeOwner(); // per-NFT vote: pepes must belong to the voter
-    error NothingVoted(); // per-NFT vote batch carried zero votable weight
 
     // ─────────────── Events ───────────────
     event Predeposited(address indexed user, uint256 ethAmount, uint256 mixETHAmount);
@@ -60,10 +50,12 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     event Launched(uint256 totalMixETH, uint256 totalPSP);
     // Locked/Unlocked/Relocked/FeesClaimed/FeesForfeited moved to PSPStaker
     // (2026-08-19) with the position NFTs. Pot events removed with the pot.
-    event CarpetBombProposed(address indexed proposer);
-    event Voted(address indexed voter, bool support, uint256 weight);
-    event CarpetBombExecuted();
-    event RoundFinalized(uint256 mixETHCarried);
+    //
+    // CLOCK-REDESIGN §4 (2026-09-01): the carpet-bomb governance events
+    // (CarpetBombProposed/Voted/CarpetBombExecuted/RoundFinalized) died with
+    // the vote — the detonation clock replaced them. Detonated is the one
+    // death event now.
+    event Detonated(address indexed by, uint256 potDistributed, address nextRound);
     event FeesAdded(uint256 mixETHAmount);
 
     // ─────────────── Immutables ───────────────
@@ -102,13 +94,15 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // ─────────────── Timing profile ───────────────
     // Constants → constructor-set immutables (2026-08-18): packed `_timings`
     // arg allows a fast testnet profile; 0 (mainnet default) keeps the
-    // original values. Slots are 51 bits (2026-08-19: the original 5x64
-    // layout overflowed uint256 — the [256] vote slot silently truncated
-    // to zero, closing the vote window instantly on every custom profile).
-    // Slots: [0] predeposit [51] vest [102] vote
+    // original values. CLOCK-REDESIGN §4 (2026-09-01) repacked the profile
+    // WITHOUT the vote slot (governance is dead) and WITHOUT the flat-exit
+    // slot (redemption is indefinite): THREE slots now — [0] predeposit,
+    // [85] vest, [170] per-wallet cap — each TIMINGS_WIDTH = 256/3 = 85
+    // bits, widths DERIVED from the field count in CurveMath (LESSONS
+    // 2026-08-24/2026-08-18: hand-set widths drift from data reality).
     uint256 public immutable PREDEPOSIT_DURATION; // default 7 days
     uint256 public constant PREDEPOSIT_CAP = 500e18; // 500 mixETH
-    /// @dev Per-wallet predeposit cap, WHOLE mixETH from the 5th packed
+    /// @dev Per-wallet predeposit cap, WHOLE mixETH from the 3rd packed
     ///      timing slot (scoopy 2026-08-29: "10 mixETH per wallet — can be
     ///      sybilled but at least that adds some friction"). 0 = uncapped
     ///      (mainnet default). Applies to the PUBLIC path only (predeposit /
@@ -124,10 +118,11 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     uint256 public immutable VEST_DURATION; // 6 weeks (decay horizon)
     uint256 public constant PRECISION = 1e18;
 
-    /// @dev bomb time — nonzero means the round is flat and every lock is
-    ///      open for immediate exit at average backing. (No separate
-    ///      finalized flag: setMode(Destroyed) makes finalizeCarpet
-    ///      idempotently reverting on its own.)
+    /// @dev detonation time — nonzero means the round is flat and every
+    ///      lock is open for immediate exit at average backing. Set by
+    ///      detonate(); STAYS as the analytics anchor (exit-window
+    ///      reporting) now that the 3d FLAT_EXIT_WINDOW concept is
+    ///      superseded by indefinite redemption (CLOCK-REDESIGN §4).
     uint256 public flatTime;
 
     // ─────────────── (side pot removed 2026-08-19) ───────────────
@@ -140,40 +135,23 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // ─────────────── Factory round tracking ───────────────
     uint256 public factoryRoundId;
 
-    // ─────────────── Governance ───────────────
-    struct CarpetBombProposal {
-        address proposer;
-        uint256 proposeTime;
-        uint256 yesVotes;
-        uint256 noVotes;
-        bool executed;
-    }
-    CarpetBombProposal public currentProposal;
-    /// @dev G-3 fix: epoch per proposal. Voters compare lastVotedPepeOn ==
-    ///      proposalCount, so a new proposal re-enfranchises every pepe
-    ///      without iterating a mapping (per-pepe dedup, scoopy 2026-08-29:
-    ///      votes are cast BY NFT — a wallet votes each pepe it owns).
-    uint256 public proposalCount;
-    mapping(uint256 => uint256) public lastVotedPepeOn; // pepeId => proposalCount
-    /// @dev Prisoner's dilemma (scoopy 2026-08-29): weight this wallet has
-    ///      cast on proposal #`n`. While that vote is live the voter cannot
-    ///      arm ANY withdraw (wallet-level commitment — no hedging with
-    ///      unvoted pepes). Keyed by proposal epoch: a new proposal starts
-    ///      every wallet clean.
-    mapping(uint256 => mapping(address => uint256)) public castWeightOn; // n => voter => weight
-    uint256 public immutable VOTE_DURATION; // default 3 days
-    /// @dev Flat-exit window after a carpet bomb — became the 4th packed
-    ///      timing slot (2026-08-28); mainnet default stays 3 days.
-    uint256 public immutable FLAT_EXIT_WINDOW;
-    uint256 public constant QUORUM_BIPS = 6900;  // 69% of locked PSP (nice)
-    uint256 public constant MAJORITY_BIPS = 5001; // >50% of cast votes
+    // ─────────────── Governance — REMOVED (CLOCK-REDESIGN §4, 2026-09-01) ───────────────
+    // The propose/vote/execute kill trio, the proposal bookkeeping (struct,
+    // epoch counter, per-pepe and per-wallet vote maps), and the vote /
+    // flat-exit timing slots + quorum/majority constants all died here
+    // (names deliberately unrepeatable — the no-governance grep gate hunts
+    // them). The detonation clock (CurveHook.detonationAt) is the ONLY
+    // death authority: at zero, detonate() flattens the round, opens every
+    // lock, and births the successor. No quorum, no votes, no window.
 
     // ─────────────── Constructor ───────────────
-    /// @dev `_config.timings == 0` → mainnet defaults (7d/90d/90d/7d/3d).
-    ///      Non-zero: five 51-bit slots decode verbatim (CurveMath.packTimings)
-    ///      and all five must be non-zero — a zero slot reverts
-    ///      TimingsIncomplete (2026-08-19: the pre-guard 5x64 layout let the
-    ///      vote slot truncate to zero silently). See "Timing profile" above.
+    /// @dev `_config.timings == 0` → mainnet defaults (7d/42d, uncapped).
+    ///      Non-zero: three TIMINGS_WIDTH-bit slots decode verbatim
+    ///      (CurveMath.packTimings / packTimingsCapped) and both timing
+    ///      fields must be non-zero — a zero slot reverts
+    ///      TimingsIncomplete (2026-08-19 lesson: the pre-guard 5x64 layout
+    ///      let a slot truncate to zero silently). The wallet-cap slot is
+    ///      exempt: 0 = uncapped is a legal (mainnet) value.
     constructor(
         PSPToken _pspToken,
         IERC20 _mixETH,
@@ -189,22 +167,20 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         if (t == 0) {
             PREDEPOSIT_DURATION = 7 days;
             VEST_DURATION = 42 days;
-            VOTE_DURATION = 3 days;
-            FLAT_EXIT_WINDOW = 3 days;
             PREDEPOSIT_CAP_PER_WALLET = 0; // uncapped (mainnet)
         } else {
+            // Widths DERIVED in CurveMath (TIMINGS_COUNT=3, TIMINGS_WIDTH=85):
+            // [0] predeposit, [1] vest, [2] wallet cap (whole mixETH). The
+            // layout guard + roundtrip test pin the packing (LESSONS
+            // 2026-08-24 / 2026-08-18).
             PREDEPOSIT_DURATION = t & CurveMath.TIMINGS_MASK;
-            VEST_DURATION = (t >> 51) & CurveMath.TIMINGS_MASK;
-            VOTE_DURATION = (t >> 102) & CurveMath.TIMINGS_MASK;
-            FLAT_EXIT_WINDOW = (t >> 153) & CurveMath.TIMINGS_MASK;
-            // 5th slot (2026-08-29): per-wallet predeposit cap, whole mixETH
-            PREDEPOSIT_CAP_PER_WALLET = ((t >> 204) & CurveMath.TIMINGS_MASK) * 1e18;
-            // 2026-08-19 tripwire: the vote-slot truncation deployed silently
-            // on the first sepolia dry-run — never again.
-            if (
-                PREDEPOSIT_DURATION == 0 || VEST_DURATION == 0 || VOTE_DURATION == 0
-                    || FLAT_EXIT_WINDOW == 0
-            ) revert TimingsIncomplete();
+            VEST_DURATION = (t >> CurveMath.TIMINGS_WIDTH) & CurveMath.TIMINGS_MASK;
+            // 3rd slot (2026-08-29): per-wallet predeposit cap, whole mixETH
+            PREDEPOSIT_CAP_PER_WALLET =
+                ((t >> (2 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK) * 1e18;
+            // 2026-08-19 tripwire: a truncated slot deployed silently once —
+            // never again. (Wallet cap exempt: zero = uncapped is legal.)
+            if (PREDEPOSIT_DURATION == 0 || VEST_DURATION == 0) revert TimingsIncomplete();
         }
         if (address(_pspToken) == address(0)) revert ZeroAddress();
         if (address(_mixETH) == address(0)) revert ZeroAddress();
@@ -529,212 +505,53 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // born in this controller's constructor. This contract no longer touches
     // PSP after moving the genesis pool to the staker at launch.
 
-    // ─────────────── Destruction Governance ───────────────
+    // ─────────────── Detonation (CLOCK-REDESIGN §4 — replaces governance) ───────────────
 
-    function proposeCarpetBomb() external nonReentrant {
-        if (staker.voteWeight(msg.sender, block.timestamp) == 0) revert NotLocker();
+    /// @notice Kill the round at zero: flatten, open every lock, birth the
+    ///         successor. PERMISSIONLESS, one tx, no quorum — the clock is
+    ///         the only authority.
+    /// @dev Gated by the hook's detonation clock and idempotent via the
+    ///      mode check (after detonation the hook is Flat, so a second call
+    ///      reverts at setMode's transition guard — nothing double-spends).
+    ///      In one tx:
+    ///        1. pot frozen — the mode leaves Active (curve trades already
+    ///           halted at zero by the hook; Flat sells are fee-free), so
+    ///           potBalance becomes the final distribution base forever;
+    ///        2. hook.setMode(Flat) — the curve flattens to average backing;
+    ///        3. flatTime set — every staker lock opens immediately (the
+    ///           staker's withdraw bypasses the vest decay while flat);
+    ///        4. factory markDestroyed + spawnNextRound — the next round's
+    ///           predeposit window is live before the tx ends (the hook
+    ///           itself stays Flat forever: redemption is indefinite).
+    ///      If the spawn bounces on the ~0.03% reserve-mine tail the whole
+    ///      tx reverts atomically — retry next block with fresh entropy;
+    ///      the clock never un-strikes zero.
+    function detonate() external nonReentrant {
+        CurveHook h = hook;
+        if (address(h) == address(0) || h.mode() != CurveHook.Mode.Active) revert NotActive();
+        if (block.timestamp < h.detonationAt()) revert ClockStillLive();
 
-        // No governance theater on a destroyed round
-        if (address(hook) != address(0)
-            && (hook.mode() == CurveHook.Mode.Destroyed || hook.mode() == CurveHook.Mode.Flat)) {
-            revert RoundDestroyed();
-        }
-
-        // G-2 fix: a proposal only blocks new ones during its live voting window.
-        // After the window passes unexecuted, the next propose replaces it —
-        // governance can never be permanently bricked by a dead proposal.
-        //
-        // G-4 fix: BUT a PASSING proposal (quorum + majority met) must be
-        // EXECUTED, not replaced — otherwise an attacker front-runs the
-        // execute tx with propose() to wipe the votes and force endless
-        // re-vote cycles. Only FAILED proposals are replaceable.
-        if (currentProposal.proposeTime != 0 && !currentProposal.executed) {
-            if (block.timestamp <= currentProposal.proposeTime + VOTE_DURATION) {
-                revert ProposalExists();
-            }
-            // Window closed, unexecuted: replaceable only if it failed
-            // (quorum evaluated against the LIVE votable denominator —
-            // scoopy 2026-08-29 semantics, same as carpetBomb())
-            uint256 totalVotes = currentProposal.yesVotes + currentProposal.noVotes;
-            bool quorumPassed =
-                totalVotes * 10000 >= staker.totalVotableWeight() * QUORUM_BIPS;
-            bool majorityPassed = currentProposal.yesVotes * 10000 > totalVotes * MAJORITY_BIPS;
-            if (quorumPassed && majorityPassed) {
-                revert ProposalExists(); // passing — go execute it (permissionless)
-            }
-        }
-
-        proposalCount++;
-        currentProposal = CarpetBombProposal({
-            proposer: msg.sender,
-            proposeTime: block.timestamp,
-            yesVotes: 0,
-            noVotes: 0,
-            executed: false
-        });
-
-        emit CarpetBombProposed(msg.sender);
-    }
-
-    /// @notice Vote on the carpet bomb WITH SPECIFIC PEPES (scoopy
-    ///         2026-08-29: the UI picks the NFT(s); pass every owned pepe
-    ///         to vote the whole bag).
-    /// @dev Per-pepe dedup (lastVotedPepeOn): each NFT votes once per
-    ///      proposal; a new proposal re-enfranchises all pepes. Weight per
-    ///      pepe is its full principal if no withdraw request is armed —
-    ///      unstaking PSP cannot vote, canceling the request restores the
-    ///      vote (all scoopy 2026-08-29).
-    function voteCarpetBomb(uint256[] calldata pepeIds, bool support) external nonReentrant {
-        if (currentProposal.proposeTime == 0) revert ProposalExists();
-        if (block.timestamp > currentProposal.proposeTime + VOTE_DURATION) revert VotingEnded();
-
-        uint256 weight;
-        for (uint256 i; i < pepeIds.length; ++i) {
-            uint256 pepeId = pepeIds[i];
-            if (staker.ownerOf(pepeId) != msg.sender) revert NotPepeOwner();
-            if (lastVotedPepeOn[pepeId] == proposalCount) revert AlreadyVoted();
-            uint256 w = staker.pepeVoteWeight(pepeId, block.timestamp);
-            if (w == 0) revert NotLocker(); // unstaking or empty — this pepe can't vote
-            lastVotedPepeOn[pepeId] = proposalCount;
-            weight += w;
-        }
-        if (weight == 0) revert NothingVoted();
-
-        if (support) {
-            currentProposal.yesVotes += weight;
-        } else {
-            currentProposal.noVotes += weight;
-        }
-        // Prisoner's dilemma (scoopy 2026-08-29): casting is committing —
-        // the voter cannot arm a withdraw while this vote is live.
-        castWeightOn[proposalCount][msg.sender] += weight;
-
-        emit Voted(msg.sender, support, weight);
-    }
-
-    function carpetBomb() external nonReentrant {
-        CarpetBombProposal storage prop = currentProposal;
-        if (prop.proposeTime == 0) revert ProposalExists();
-        if (prop.executed) revert AlreadyExecuted();
-        if (block.timestamp <= prop.proposeTime + VOTE_DURATION) revert VotingEnded();
-
-        // LIVE quorum denominator (scoopy 2026-08-29): Σ locked PSP not
-        // currently awaiting a withdraw cooldown, evaluated at execution —
-        // new stakes during the vote both widen the denominator AND can
-        // themselves vote, so the bar tracks the round's live staking set.
-        // (Supersedes the G-1 propose-time snapshot: an attacker staking
-        // mid-vote to inflate the denominator adds weight they could have
-        // voted with anyway — the trade is accepted deliberately.)
-        uint256 denominator = staker.totalVotableWeight();
-
-        // Check quorum
-        uint256 totalVotes = prop.yesVotes + prop.noVotes;
-        if (totalVotes * 10000 < denominator * QUORUM_BIPS) revert QuorumNotReached();
-
-        // Check majority
-        if (prop.yesVotes * 10000 <= totalVotes * MAJORITY_BIPS) revert MajorityNotReached();
-
-        prop.executed = true;
-
-        // (side-pot exit removed 2026-08-19 — the pot is gone; the referral
-        // carve-out pays live and nothing accumulates to redeem here)
-
-        // ── Flatten and open the exit window ──
-        // The round is NOT destroyed here. Every staker lock opens
-        // immediately (unlock() bypasses the 90-day expiry while flat) and
-        // the flat curve pays average backing (reserve/supply) on every
-        // sell. Stakers feed themselves, not round 2: whatever they leave
-        // on the table is what the next round inherits.
-        hook.setMode(CurveHook.Mode.Flat);
+        // 1+2. flatten — the pot freezes with the mode change (snapshot for
+        // the event before it does)
+        uint256 pot = h.potBalance();
+        h.setMode(CurveHook.Mode.Flat);
         flatTime = block.timestamp;
 
-        emit CarpetBombExecuted();
-    }
+        // 3. mark destroyed on the factory (the spawn chain needs the flag;
+        //    EIP-170: precomputed selector for markDestroyed(uint256))
+        (bool okMark,) = factory.call(abi.encodeWithSelector(bytes4(0x723c5612), factoryRoundId));
+        if (!okMark) revert FactoryMarkFailed();
 
-    /// @notice Close the exit window: destroy the round, drain the
-    ///         remainder, and birth the next one.
-    /// @dev Permissionless once FLAT_EXIT_WINDOW has elapsed; idempotently
-    ///      reverting afterwards (the hook refuses Destroyed → Destroyed).
-    ///      The carry is the backing of unredeemed PSP — holders who chose
-    ///      to keep playing — plus any dust. If the spawn fails for any
-    ///      reason the entire tx reverts atomically, so this can never
-    ///      leave a half-destroyed round behind.
-    function finalizeCarpet() external nonReentrant {
-        if (flatTime == 0) revert NotFlattened();
-        if (block.timestamp <= flatTime + FLAT_EXIT_WINDOW) revert ExitWindowOpen();
-
-        // Mark destroyed
-        hook.setMode(CurveHook.Mode.Destroyed);
-
-        // (drain removed 2026-08-30, scoopy: redemption is INDEFINITE — the
-        // dead hook custodies the backing of unredeemed PSP forever, payable
-        // via hook.redeemBacking whenever its holder returns. Death no longer
-        // endows the next generation: the factory's carry is whatever mixETH
-        // actually sits on the factory (normally zero), so the next boot is
-        // its own predeposit. Abandoned value doesn't roll — it waits.)
-        uint256 unredeemedBacking = hook.reserveMixETH();
-
-        // Notify factory that this round is destroyed
-        // EIP-170: precomputed selector for markDestroyed(uint256)
-        (bool ok,) = factory.call(abi.encodeWithSelector(bytes4(0x723c5612), factoryRoundId));
-        if (!ok) revert FactoryMarkFailed();
-
-        // Reserve the next iteration's slot (staged spawn, 2026-08-30) —
-        // death, inheritance, rebirth commitment in one permissionless
-        // call, with the bounded flag-mine isolated in the deposit-free
-        // reserve. BIRTHING the reserved round is open to anyone
-        // (birthRound) — bundle it with the first buy to capture the
-        // launch edge. If the reserve fails the entire tx reverts
-        // atomically, so this can never leave a half-destroyed round.
-        // EIP-170: precomputed selector for reserveSpawn(uint256)
-        (bool okSpawn,) =
-            factory.call(abi.encodeWithSelector(bytes4(0x551313f7), factoryRoundId));
+        // 4. birth the successor: the factory's composed reserve+birth shim
+        //    (EIP-170: precomputed selector for spawnNextRound(uint256)).
+        //    Returns (newRoundId, nextHook) — the event carries the live
+        //    successor hook, the address the next game trades against.
+        (bool okSpawn, bytes memory spawned) =
+            factory.call(abi.encodeWithSelector(bytes4(0x1c9424dc), factoryRoundId));
         if (!okSpawn) revert FactorySpawnFailed();
+        (, address nextRound) = abi.decode(spawned, (uint256, address));
 
-        emit RoundFinalized(unredeemedBacking);
-    }
-
-    /// @notice True while a carpet-bomb vote COMMITS its participants
-    ///         (scoopy 2026-08-29 — the prisoner's dilemma): the voting
-    ///         window itself, plus — for a passing proposal — the gap until
-    ///         it is executed. While live, in the staker:
-    ///           · a wallet that cast votes cannot arm a withdraw, and a
-    ///             pepe that voted cannot be armed by anyone (even after
-    ///             transfer) — requestWithdraw reverts
-    ///           · NO ONE can cancel an armed withdraw — cancelWithdraw
-    ///             reverts (an armed racer is committed: no reclaiming vote
-    ///             power, no dodging the flat)
-    ///         Voting is the commitment to stay; arming is the exit. A vote
-    ///         that closes without passing releases everyone immediately.
-    function carpetVoteLive() public view returns (bool) {
-        CarpetBombProposal storage prop = currentProposal;
-        if (prop.proposeTime == 0 || prop.executed) return false;
-        if (block.timestamp <= prop.proposeTime + VOTE_DURATION) return true;
-        // Window closed, unexecuted: still live iff it would execute right
-        // now (live-denominator quorum, same math as carpetBomb()). A
-        // failed proposal is dead — arms and voters are released.
-        uint256 totalVotes = prop.yesVotes + prop.noVotes;
-        return totalVotes * 10000 >= staker.totalVotableWeight() * QUORUM_BIPS
-            && prop.yesVotes * 10000 > totalVotes * MAJORITY_BIPS;
-    }
-
-    function getCarpetBombState() external view returns (
-        address proposer,
-        uint256 proposeTime,
-        uint256 yesVotes,
-        uint256 noVotes,
-        bool executed,
-        bool canExecute
-    ) {
-        CarpetBombProposal storage prop = currentProposal;
-        proposer = prop.proposer;
-        proposeTime = prop.proposeTime;
-        yesVotes = prop.yesVotes;
-        noVotes = prop.noVotes;
-        executed = prop.executed;
-        canExecute = prop.proposeTime != 0
-            && !prop.executed
-            && block.timestamp > prop.proposeTime + VOTE_DURATION;
+        emit Detonated(msg.sender, pot, nextRound);
     }
 
     // ─────────────── Safety ───────────────

@@ -37,7 +37,8 @@ const EMPTY_PROFILE: RefProfile = { registry: undefined, pepeIds: [], attributed
 
 /// shared poll: registry address for the round, the wallet's staked pepe ids,
 /// and its attribution state. 4s cadence like every other read in the app.
-function useReferral(): RefProfile {
+/// (exported for the stake page's referrals card — B3; presentation stays here)
+export function useReferral(): RefProfile {
   const round = useRound()
   const { address } = useAccount()
   const [profile, setProfile] = useState<RefProfile>(EMPTY_PROFILE)
@@ -83,7 +84,7 @@ function useReferral(): RefProfile {
 }
 
 /// canReferNft(nftId) poll — whether a pepe id is a valid referrer target.
-function useCanRefer(registry: `0x${string}` | undefined, nftId: bigint | null): boolean | undefined {
+export function useCanRefer(registry: `0x${string}` | undefined, nftId: bigint | null): boolean | undefined {
   const [ok, setOk] = useState<boolean | undefined>(undefined)
   useEffect(() => {
     if (!registry || nftId === null) {

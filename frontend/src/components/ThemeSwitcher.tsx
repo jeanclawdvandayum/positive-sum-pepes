@@ -40,7 +40,7 @@ export default function ThemeSwitcher() {
     <div
       role="group"
       aria-label="theme"
-      className="flex items-center gap-0.5 rounded-full border border-sky-100 bg-white/70 p-0.5 backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/70"
+      className="flex items-center gap-0.5 rounded-full border border-line bg-bg-1/70 p-0.5"
     >
       {OPTIONS.map((o) => (
         <button
@@ -50,10 +50,10 @@ export default function ThemeSwitcher() {
           aria-label={o.label}
           aria-pressed={mode === o.key}
           onClick={() => setMode(o.key)}
-          className={`grid h-7 w-7 place-items-center rounded-full transition ${
+          className={`grid h-7 w-7 place-items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
             mode === o.key
-              ? 'bg-gradient-to-r from-sky-400 to-emerald-400 text-[#fff] shadow-md shadow-sky-200 dark:shadow-sky-900'
-              : 'text-slate-400 hover:bg-sky-50 hover:text-psp-deep dark:hover:bg-slate-700 dark:hover:text-psp-deep'
+              ? 'bg-accent text-bg-0'
+              : 'text-text-lo hover:bg-bg-2 hover:text-text-hi'
           }`}
         >
           {o.icon}

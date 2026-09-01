@@ -24,13 +24,10 @@ interface IRoundController {
     function flatTime() external view returns (uint256);
     function VEST_DURATION() external view returns (uint256);
 
-    // ── Destruction-governance withdraw locks (prisoner's dilemma,
-    //    scoopy 2026-08-29 — PSPStaker consults these before arming or
-    //    cancelling a withdraw) ──
-    function carpetVoteLive() external view returns (bool);
-    function proposalCount() external view returns (uint256);
-    function castWeightOn(uint256 proposal, address voter) external view returns (uint256);
-    function lastVotedPepeOn(uint256 pepeId) external view returns (uint256);
+    // ── Destruction-governance withdraw locks — REMOVED (CLOCK-REDESIGN
+    //    §4): the vote-liveness view, the proposal counter, and both
+    //    vote-commitment maps died with the carpet vote. The detonation
+    //    clock replaced the whole commitment surface. ──
 
     // ── Curve params ──
     function getCurveConfig() external view returns (CurveMath.CurveConfig memory);

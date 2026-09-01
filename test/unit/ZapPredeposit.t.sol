@@ -42,7 +42,9 @@ contract ZapPredepositTest is Test {
         poolManager = new MockPoolManager();
         factory = new PSPFactory(
             IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer()
-        , 0);
+        , 0,
+            address(this) // deployerCutTo (CLOCK-REDESIGN §3)
+        );
         zapIn = new PSPZapIn(IMixETH(address(mixETH)), IPoolManager(address(poolManager)));
 
         PSPFactory.RoundParams memory params = PSPFactory.RoundParams({

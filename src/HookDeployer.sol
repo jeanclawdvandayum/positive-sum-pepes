@@ -32,15 +32,20 @@ contract HookDeployer {
 
     /// @dev Single initCode construction shared by mineHook and deployHookAt
     ///      — EIP-170: one encoder, one creation-code reference.
+    ///      deployerCutTo (CLOCK-REDESIGN §3): the 1% unattributed-fee rake
+    ///      recipient, immutable on every hook the factory births.
     function _hookInitCode(
         IPoolManager pm,
         address controller,
         address referralRegistry,
-        CurveMath.CurveConfig calldata config
+        CurveMath.CurveConfig calldata config,
+        address deployerCutTo
     ) internal view returns (bytes memory) {
         return bytes.concat(
             type(CurveHook).creationCode,
-            abi.encode(pm, IRoundController(controller), PSPReferralRegistry(referralRegistry), config)
+            abi.encode(
+                pm, IRoundController(controller), PSPReferralRegistry(referralRegistry), config, deployerCutTo
+            )
         );
     }
 
@@ -77,9 +82,10 @@ contract HookDeployer {
         address controller,
         address referralRegistry,
         CurveMath.CurveConfig calldata config,
+        address deployerCutTo,
         uint256 maxIter
     ) external view returns (address hookAddr, bytes32 salt) {
-        bytes memory initCode = _hookInitCode(pm, controller, referralRegistry, config);
+        bytes memory initCode = _hookInitCode(pm, controller, referralRegistry, config, deployerCutTo);
         bytes32 entropy = _entropy(controller);
 
         uint256 scanFrom;
@@ -108,9 +114,10 @@ contract HookDeployer {
         IPoolManager pm,
         address controller,
         address referralRegistry,
-        CurveMath.CurveConfig calldata config
+        CurveMath.CurveConfig calldata config,
+        address deployerCutTo
     ) external returns (address hookAddr) {
-        bytes memory initCode = _hookInitCode(pm, controller, referralRegistry, config);
+        bytes memory initCode = _hookInitCode(pm, controller, referralRegistry, config, deployerCutTo);
         address expected = HookMiner.computeAddress(address(this), uint256(salt), initCode);
         if (expected.code.length > 0) return expected; // already born, identically
         assembly ("memory-safe") {

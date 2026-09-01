@@ -322,4 +322,76 @@ contract CurveMathTest is Test {
         assertTrue(ethOut > 0, "Fuzz buy-at: out > 0");
         assertTrue(ethOut < ethInput, "Fuzz buy-at: out must be < in (no arb)");
     }
+
+    // ═════════════════════════════════════════════════════════
+    //  TIMINGS PACK — CLOCK-REDESIGN §4 (vote slot out, widths derived)
+    // ═════════════════════════════════════════════════════════
+
+    /// Layout contract: THREE 85-bit slots derived from the field count —
+    /// [0] predeposit, [1] vest, [2] wallet cap — and the compile-time
+    /// layout guard proves they exactly fill the word (LESSONS 2026-08-24:
+    /// hand-set widths drift; 2026-08-18: the 5x64 vote-slot truncation
+    /// deployed silently once).
+    function test_TimingsLayout() public pure {
+        assertEq(CurveMath.TIMINGS_COUNT, 3, "three fields");
+        assertEq(CurveMath.TIMINGS_WIDTH, 85, "width derived from count (256/3)");
+        assertEq(CurveMath.TIMINGS_COUNT * CurveMath.TIMINGS_WIDTH, 255, "fits with headroom");
+        // the layout guard constant exists and is a legal shift (compiling
+        // already proves it; pin its value so nobody quietly widens a slot)
+        assertEq(CurveMath.TIMINGS_LAYOUT_GUARD, 1 << (255 - 1), "guard = top bit of slot 2");
+    }
+
+    /// packTimings roundtrip: field i lands at i * TIMINGS_WIDTH and
+    /// decodes back exactly.
+    function test_TimingsPackRoundtrip() public {
+        uint256 p = 7 days;
+        uint256 v = 42 days;
+        uint256 packed = CurveMath.packTimings(p, v);
+        assertEq(packed & CurveMath.TIMINGS_MASK, p, "slot 0 = predeposit");
+        assertEq((packed >> CurveMath.TIMINGS_WIDTH) & CurveMath.TIMINGS_MASK, v, "slot 1 = vest");
+        // prefix property: an uncapped pack leaves slot 2 reading zero
+        assertEq((packed >> (2 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK, 0, "slot 2 empty");
+    }
+
+    /// packTimingsCapped roundtrip + the prefix equivalence.
+    function test_TimingsPackCappedRoundtrip() public {
+        uint256 p = 2 hours;
+        uint256 v = 1 hours;
+        uint256 cap = 10;
+        uint256 packed = CurveMath.packTimingsCapped(p, v, cap);
+        assertEq(packed & CurveMath.TIMINGS_MASK, p, "slot 0 = predeposit");
+        assertEq((packed >> CurveMath.TIMINGS_WIDTH) & CurveMath.TIMINGS_MASK, v, "slot 1 = vest");
+        assertEq((packed >> (2 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK, cap, "slot 2 = wallet cap");
+        assertEq(packed & CurveMath.packTimings(p, v), CurveMath.packTimings(p, v), "capped pack = capped-prefix of plain");
+        // cap 0 is legal (uncapped mainnet semantics)
+        assertEq(CurveMath.packTimingsCapped(p, v, 0), CurveMath.packTimings(p, v), "cap 0 == plain");
+    }
+
+    /// Full-axis roundtrip: every field at its MAXIMUM width (2^85 - 1)
+    /// still packs and decodes without spill.
+    function test_TimingsFullAxisRoundtrip() public {
+        uint256 max = (1 << CurveMath.TIMINGS_WIDTH) - 1;
+        uint256 v = max - (max % 6); // vest must stay epochal (÷6)
+        uint256 packed = CurveMath.packTimingsCapped(max, v, max);
+        assertEq(packed & CurveMath.TIMINGS_MASK, max, "slot 0 max");
+        assertEq((packed >> CurveMath.TIMINGS_WIDTH) & CurveMath.TIMINGS_MASK, v, "slot 1 max");
+        assertEq((packed >> (2 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK, max, "slot 2 max");
+        // zero axis: everything zero is a legal (if degenerate) pack — the
+        // CONTROLLER's TimingsIncomplete guard is what rejects it at deploy
+        assertEq(CurveMath.packTimings(0, 0), 0, "zero pack");
+    }
+
+    /// Guards: oversized fields revert TimingsOverflow (never spill into a
+    /// neighbor); non-epochal vests revert VestNotEpochal.
+    function test_TimingsGuards() public {
+        uint256 max = (1 << CurveMath.TIMINGS_WIDTH) - 1;
+        vm.expectRevert(CurveMath.TimingsOverflow.selector);
+        CurveMath.packTimings(max + 1, 42 days);
+        vm.expectRevert(CurveMath.TimingsOverflow.selector);
+        CurveMath.packTimings(7 days, max + 1);
+        vm.expectRevert(CurveMath.TimingsOverflow.selector);
+        CurveMath.packTimingsCapped(7 days, 42 days, max + 1);
+        vm.expectRevert(CurveMath.VestNotEpochal.selector);
+        CurveMath.packTimings(7 days, 42 days + 1); // not divisible by 6
+    }
 }

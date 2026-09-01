@@ -37,9 +37,12 @@ contract C4_Probe is CBase {
         address nonceGuess2 = vm.computeCreateAddress(address(controllerDeployer), n0 + 1);
 
         _launchRound1();
-        _bombRound1();
-        _warpPastFlatWindow();
-        controller1.finalizeCarpet(); // reserves
+        // CLOCK-REDESIGN: this probe pins the STAGED primitives, so it takes
+        // the split path (controller markDestroyed → permissionless
+        // reserveSpawn) rather than detonate()'s composed one-tx birth.
+        vm.prank(address(controller1));
+        factory.markDestroyed(1);
+        factory.reserveSpawn(1); // reserves
 
         PSPFactory.SpawnReservation memory r = _reservation();
         assertTrue(r.active, "reservation live");

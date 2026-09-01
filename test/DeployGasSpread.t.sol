@@ -38,7 +38,8 @@ contract DeployGasSpread is Test {
             hookDeployer,
             new ControllerDeployer(),
             new StakerDeployer(),
-            0
+            0,
+            address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );
     }
 
@@ -86,10 +87,11 @@ contract DeployGasSpread is Test {
                 address(ctl),
                 registry,
                 _params().curveConfig,
+                address(this), // deployerCutTo (CLOCK-REDESIGN §3)
                 131_072
             );
             address ha = hookDeployer.deployHookAt(
-                s, IPoolManager(address(poolManager)), address(ctl), registry, _params().curveConfig
+                s, IPoolManager(address(poolManager)), address(ctl), registry, _params().curveConfig, address(this)
             );
             p;
             uint256 g = g0 - gasleft();
@@ -142,10 +144,10 @@ contract DeployGasSpread is Test {
             // per round, entropy keyed to controller address)
             g0 = gasleft();
             (address p2, bytes32 s2) = hookDeployer.mineHook(
-                IPoolManager(address(poolManager)), address(ctl), reg, cfg, 131_072
+                IPoolManager(address(poolManager)), address(ctl), reg, cfg, address(this), 131_072
             );
             address h2 = hookDeployer.deployHookAt(
-                s2, IPoolManager(address(poolManager)), address(ctl), reg, cfg
+                s2, IPoolManager(address(poolManager)), address(ctl), reg, cfg, address(this)
             );
             uint256 gHook = g0 - gasleft();
             h2; p2;

@@ -46,6 +46,11 @@ contract CurveHook is BaseHook {
     error ZeroOutput(); // a swap must deliver a nonzero user output — never absorb input silently
     error WrongPoolCurrencies(); // L-2 fix: pool-key gate on initialization
     error WrongPoolParams(); // NK24: canonical fee/tickSpacing gate — no decoy pools
+    error ZeroDeployerCut(); // CLOCK-REDESIGN §3: deployerCutTo must be a real address
+    error TradingHalted(); // CLOCK-REDESIGN §1: block.timestamp >= detonationAt — the round is dead
+    error NotDetonated(); // claims open only once the clock struck zero and detonate() ran
+    error BadSeatIndex(); // board(i) out of the seated window
+    error NothingToClaim(); // claimPot/claimDeployerCredit with an empty purse
 
     // ─────────────── Types ───────────────
     enum Mode { Predeposit, Active, Flat, Destroyed }
@@ -83,13 +88,14 @@ contract CurveHook is BaseHook {
         // floor → the fee slice rounds UP in the reserve's favor
         return uint24(FEE_BPS_PRE_WAVE - ((FEE_BPS_PRE_WAVE - FEE_BPS_ABOVE_WAVE) * (r - boot)) / span);
     }
-    /// @dev Referral carve-out of the swap fee (2026-08-19, replaces the
-    ///      side pot): paid LIVE in mixETH to the trader's attribution chain
-    ///      (up to 5 tiers, registry-weighted). Unattributed trades — and any
-    ///      tier weight left on the table by a short chain — fall through to
-    ///      the staker accumulator by subtraction. Stakers take 500bps
-    ///      unattributed, 450bps under a full chain.
-    uint24 public constant REFERRAL_FEE_BIPS = 50; // 0.50% OF TRADE VOLUME (spec fix 2026-08-19: was computed on the fee slice — 2.5bps of volume — economically negligible)
+    /// @dev Referral leg of the swap fee (CLOCK-REDESIGN §3 REVISED
+    ///      2026-09-01): referral attribution pays 5% OF THE FEE, tier-split
+    ///      across the trader's chain by the registry's existing tier
+    ///      weights (payoutFor's who[5]/bps[5] — no new tier math). The
+    ///      2026-08-19 fixed-50bps-of-VOLUME referral is RETIRED. Unpaid
+    ///      tier weight (short chains) and every rounding remainder fall to
+    ///      the pot escrow — one deterministic destination.
+    uint24 public constant REFERRAL_LEG_BPS = 500; // 5% OF THE FEE
     /// @dev Canonical V4 pool parameters — the only pool this hook serves.
     ///      0x800000 = dynamic-fee flag (hook-priced; fee field unused).
     uint24 public constant CANONICAL_FEE = 0x800000;
@@ -99,6 +105,25 @@ contract CurveHook is BaseHook {
     ///      conservative haircut, making dust round-trips profitable in wei
     /// terms. Economically nil, but the invariant violation is real — block it.
     uint256 public constant MIN_SWAP_INPUT = 1e12; // 0.000001 tokens
+
+    // ─────────────── Detonation clock (CLOCK-REDESIGN §1) ───────────────
+    /// @dev Armed at the Active transition: detonationAt = now + DET_WINDOW.
+    ///      Buys add TIME_PER_PSP per WHOLE PSP out (discrete), capped so
+    ///      remaining never exceeds DET_WINDOW. At zero the round is DEAD —
+    ///      buys AND sells revert TradingHalted; nothing resurrects the clock.
+    uint256 public constant DET_WINDOW = 72 hours;
+    uint256 public constant TIME_PER_PSP = 5 minutes;
+
+    /// @dev Fee split, in bps OF THE FEE amount (CLOCK-REDESIGN §3 REVISED
+    ///      2026-09-01 — supersedes the same-day 60-pot/40-staker-of-net
+    ///      draft): 60% stakers / 35% pot / 5% referrer chain when
+    ///      attributed; with NO attribution the 5% leg re-splits 4% pot /
+    ///      1% deployer (pull-based deployerCredit). Every remainder
+    ///      (cross-leg rounding, unpaid tier weight) lands in the pot
+    ///      escrow deterministically.
+    uint24 public constant STAKER_BPS = 6000; // 60% of the fee → staker accumulator
+    uint24 public constant POT_BPS = 3500; // 35% of the fee → ladder pot escrow
+    uint24 public constant DEPLOYER_BPS = 100; // 1% of the fee → deployerCredit (unattributed flow only)
 
     // ─────────────── State ───────────────
     Mode public mode = Mode.Predeposit;
@@ -116,6 +141,55 @@ contract CurveHook is BaseHook {
     SineMath.Curve public sineCurve;   // NOTE: auto-getter omits cp[] — use getSineCheckpoints()
     bool public sineActive;
 
+    // ─────────────── Clock + tickets + pot (CLOCK-REDESIGN §1-3) ───────────────
+    /// @dev The detonation clock, in SECONDS (block.timestamp domain). Zero
+    ///      while Predeposit; armed at the Active transition.
+    uint256 public detonationAt;
+
+    /// @dev One seat per curve BUY tx (no dedup — a wallet can hold many).
+    ///      Circular buffer: seat t lives at tickets[t % 10]; only the newest
+    ///      10 seats exist once ticketCount passes 10.
+    struct Ticket {
+        address buyer;     // refTrader when attributed, else the swap sender
+        uint64 ts;         // buy timestamp
+        uint128 pspAmount; // PSP out of that buy (1e18 precision)
+        uint128 mixPaid;   // mixETH volume in
+    }
+    Ticket[10] public tickets;
+    uint256 public ticketCount; // total buys ever — absolute seat numbering
+    mapping(uint256 => bool) public seatClaimed; // seat => paid (claims-forever bookkeeping)
+
+    /// @dev Ladder pot escrow, mixETH. Accrues the pot legs of the fee split
+    ///      during Active; FROZEN at detonation — it is the distribution base
+    ///      forever, never mutated afterwards. potPaid tracks what claims
+    ///      have drained.
+    uint256 public potBalance;
+    uint256 public potPaid;
+
+    // ─────────────── Deployer credit (CLOCK-REDESIGN §3 REVISED) ───────────────
+    /// @dev Recipient of the 1% unattributed rake — set once at deploy
+    ///      (testnet: the throwaway deployer; mainnet: scoopy's address).
+    address public immutable deployerCutTo;
+    /// @dev Accrued 1% legs of unattributed fees, mixETH. PULL-based claim,
+    ///      no deadline, no sweep — deployerCreditPaid tracks the drain.
+    uint256 public deployerCredit;
+    uint256 public deployerCreditPaid;
+
+    /// @dev Ladder weights (bps) from NEWEST seat to OLDEST: 25/18/14/10/8/7/6/5/4/3.
+    ///      Fewer than 10 seats → renormalized to 100% (nobody gets dusted).
+    function _ladderBps(uint256 age) internal pure returns (uint256) {
+        if (age == 0) return 2500;
+        if (age == 1) return 1800;
+        if (age == 2) return 1400;
+        if (age == 3) return 1000;
+        if (age == 4) return 800;
+        if (age == 5) return 700;
+        if (age == 6) return 600;
+        if (age == 7) return 500;
+        if (age == 8) return 400;
+        return 300;
+    }
+
     // ─────────────── Events ───────────────
     // All value fields mixETH-denominated (curve unit of account).
     event Buy(address indexed buyer, uint256 mixETHIn, uint256 pspOut, uint256 newSupply, uint256 newReserveMixETH);
@@ -124,14 +198,19 @@ contract CurveHook is BaseHook {
     event PoolInitialized();
     event FeesSent(address indexed to, uint256 mixETHAmount);
     event ReferralPaid(address indexed trader, address indexed referrer, uint256 tier, uint256 mixETHAmount);
+    event TimeAdded(address indexed buyer, uint256 wholePsp, uint256 newDetonationAt); // the tape
+    event PotClaimed(address indexed who, uint256 mixETHAmount);
+    event DeployerCreditClaimed(address indexed who, uint256 mixETHAmount);
 
     // ─────────────── Constructor ───────────────
-    constructor(IPoolManager _poolManager, IRoundController _controller, PSPReferralRegistry _referralRegistry, CurveMath.CurveConfig memory _config)
+    constructor(IPoolManager _poolManager, IRoundController _controller, PSPReferralRegistry _referralRegistry, CurveMath.CurveConfig memory _config, address _deployerCutTo)
         BaseHook(_poolManager)
     {
+        if (_deployerCutTo == address(0)) revert ZeroDeployerCut(); // CLOCK-REDESIGN §3: the 1% rake needs a home
         controller = _controller;
         curveConfig = _config;
         referralRegistry = _referralRegistry;
+        deployerCutTo = _deployerCutTo;
     }
 
     /// @dev resolves the staker on first privileged use; cached thereafter
@@ -224,10 +303,17 @@ contract CurveHook is BaseHook {
         internal pure override returns (bytes4)
     { revert("NoStandardLiquidity"); }
 
-    function _beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
+    function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
         internal override returns (bytes4, BeforeSwapDelta, uint24)
     {
         if (mode != Mode.Active && mode != Mode.Flat) revert NotActive();
+
+        // CLOCK-REDESIGN §1: at zero the round is DEAD — both directions
+        // halt BEFORE anything else (a tx that starts after zero can never
+        // resurrect the clock, even a buy that would have extended it).
+        // Predeposit never gets here (NotActive above); Flat only via
+        // detonate(), whose exits are flat sells / redemption, not curve.
+        if (mode == Mode.Active && block.timestamp >= detonationAt) revert TradingHalted();
 
         Currency mixETH = controller.getMixETH();
         Currency psp = Currency.wrap(address(controller.getPSP()));
@@ -256,15 +342,15 @@ contract CurveHook is BaseHook {
         // bind let such a caller poison a victim's one-time attribution),
         // so attribution binds exclusively via the user-signed
         // registry.record(refNft). Exactly 32 bytes decodes; anything else
-        // (router-direct swaps, empty) trades unattributed — the 50bps
-        // carve-out then lands entirely with stakers (D6).
+        // (router-direct swaps, empty) trades unattributed — the 5%-of-fee
+        // referral leg then re-splits 4% pot / 1% deployerCredit (§3 REVISED).
         address refTrader;
         if (hookData.length == 32) {
             refTrader = abi.decode(hookData, (address));
         }
 
         if (isBuy) {
-            return _handleBuy(key, params, inputAmount, mixETH, psp, refTrader);
+            return _handleBuy(sender, key, params, inputAmount, mixETH, psp, refTrader);
         } else {
             return _handleSell(key, params, inputAmount, mixETH, psp, refTrader);
         }
@@ -272,32 +358,32 @@ contract CurveHook is BaseHook {
 
     // ─────────────── Referral payouts ───────────────
 
-    /// @dev Live tier payouts on the trader's RECORDED attribution. Returns
-    ///      the total actually paid out of the fee slice — the caller's
-    ///      staker fee is feeMixETH - paid (subtraction: rounding dust and
-    ///      any unpaid tier weight always land with stakers, never vanish).
-    ///      An unattributed trader simply pays nothing here (payoutFor
-    ///      returns an empty walk) and the whole carve-out joins the staker
-    ///      fee. No recording ever happens in this path (A-1 fix).
+    /// @dev Live tier payouts on the trader's RECORDED attribution, paid out
+    ///      of the 5% referral LEG of the fee (§3 REVISED 2026-09-01 — the
+    ///      2026-08-19 fixed-50bps-of-volume carve-out is RETIRED). Tier
+    ///      cuts use the registry's existing tier weights UNCHANGED
+    ///      (payoutFor's who[5]/bps[5] — no new tier math); the caller sweeps
+    ///      the unpaid remainder (short chains, rounding) into the pot
+    ///      escrow. Returns 0 for unattributed traders (empty walk) — the
+    ///      caller then re-splits the leg 4% pot / 1% deployerCredit.
+    ///      No recording ever happens in this path (A-1 fix).
     function _payReferrals(
         address trader,
-        uint256 tradeVolumeMixETH,
+        uint256 legMixETH,
         Currency mixETH
     )
         internal
         returns (uint256 paid)
     {
-        if (trader == address(0)) return 0;
+        if (trader == address(0) || legMixETH == 0) return 0;
         PSPReferralRegistry reg = referralRegistry;
 
         (address[5] memory who, uint24[5] memory bps) = reg.payoutFor(trader);
-        // 50bps of TRADE VOLUME (one tenth of the 5% fee). Unpaid tier
-        // weight stays in the fee slice → stakers.
-        uint256 budget = (tradeVolumeMixETH * REFERRAL_FEE_BIPS) / 10000;
+        if (who[0] == address(0)) return 0; // unattributed — caller re-splits
         IERC20 mix = IERC20(Currency.unwrap(mixETH));
         for (uint256 i = 0; i < 5; i++) {
             if (who[i] == address(0)) break;
-            uint256 cut = (budget * bps[i]) / 10000;
+            uint256 cut = (legMixETH * bps[i]) / 10000;
             if (cut > 0) {
                 mix.safeTransfer(who[i], cut);
                 paid += cut;
@@ -306,9 +392,34 @@ contract CurveHook is BaseHook {
         }
     }
 
+    /// @dev §3 REVISED fee router — splits ONE fee (already sliced off the
+    ///      trade by swapFeeBps()) into its legs, bps of the exact fee:
+    ///        stakers 6000 / pot 3500 / referral leg ~500 (the subtraction
+    ///        remainder, so cross-leg rounding dust rides it deterministically)
+    ///      attributed   → the leg pays the chain per tier weights; unpaid
+    ///                     tier weight + rounding → pot escrow
+    ///      unattributed → 1% (100bps) accrues to deployerCredit, the rest of
+    ///                     the leg (4% + dust) → pot escrow
+    ///      Returns the staker leg for the accumulator feed. Invariant:
+    ///      stakerLeg + potΔ + deployerCreditΔ + referralPaid == feeMixETH.
+    function _splitFee(address trader, uint256 feeMixETH, Currency mixETH) internal returns (uint256 stakerLeg) {
+        stakerLeg = (feeMixETH * STAKER_BPS) / 10000;
+        uint256 potLeg = (feeMixETH * POT_BPS) / 10000;
+        uint256 refLeg = feeMixETH - stakerLeg - potLeg; // ~5% + rounding dust
+
+        uint256 paid = _payReferrals(trader, refLeg, mixETH);
+        if (paid != 0) {
+            potBalance += potLeg + (refLeg - paid); // unpaid tier weight + dust → pot
+        } else {
+            uint256 deployerLeg = (feeMixETH * DEPLOYER_BPS) / 10000;
+            deployerCredit += deployerLeg;
+            potBalance += potLeg + (refLeg - deployerLeg); // 4% + dust → pot
+        }
+    }
+
     // ─────────────── Buy Logic ───────────────
 
-    function _handleBuy(PoolKey calldata key, SwapParams calldata params, uint256 mixETHInput,
+    function _handleBuy(address sender, PoolKey calldata key, SwapParams calldata params, uint256 mixETHInput,
         Currency mixETH, Currency psp, address refTrader)
         internal returns (bytes4, BeforeSwapDelta, uint24)
     {
@@ -323,11 +434,11 @@ contract CurveHook is BaseHook {
         // NK24 fix: mixETH is the unit of account — the curve is solved
         // directly in mixETH. No vault-rate read anywhere in this path.
         //
-        // Fee split (2026-08-19, side pot retired; sliding 2026-08-30):
-        // sine rounds charge swapFeeBps() (10% pre-wave → 2.5% above), zone
-        // rounds the flat 5%. 50bps referral carve-out paid live to the
-        // trader's chain; the remainder — plus every unpaid tier weight —
-        // to the staker accumulator.
+        // Fee split (CLOCK-REDESIGN §3 REVISED): swapFeeBps() slice (10%
+        // pre-wave → 2.5% above on sine rounds, flat 5% on zone rounds)
+        // routed by _splitFee — 60% stakers / 35% pot / 5% referral chain
+        // (attributed) or 4% pot / 1% deployerCredit (unattributed);
+        // remainders → pot escrow.
         uint256 feeMixETH = (mixETHInput * swapFeeBps()) / 10000;
         uint256 curveMixETH = mixETHInput - feeMixETH;
 
@@ -340,6 +451,31 @@ contract CurveHook is BaseHook {
         reserveMixETH += curveMixETH;
         totalSupplyPSP += pspOut;
 
+        // ── the clock eats time, discrete (CLOCK-REDESIGN §1) ──
+        // +TIME_PER_PSP per WHOLE PSP out, floored. The halt gate above
+        // guarantees the clock was alive at tx start. Cap: remaining time
+        // may never exceed DET_WINDOW.
+        uint256 wholePSP = pspOut / 1e18;
+        if (wholePSP != 0) {
+            uint256 newDet = detonationAt + TIME_PER_PSP * wholePSP;
+            uint256 cap = block.timestamp + DET_WINDOW;
+            detonationAt = newDet > cap ? cap : newDet;
+            emit TimeAdded(sender, wholePSP, detonationAt);
+        }
+
+        // ── one ticket per buy tx, no dedup (CLOCK-REDESIGN §2) ──
+        // Seat identity: the attributed trader when the zap forwarded one,
+        // else the swap sender. Same wallet buying twice holds two seats.
+        address buyer = refTrader != address(0) ? refTrader : sender;
+        uint256 seat = ticketCount; // absolute seat number
+        tickets[seat % 10] = Ticket({
+            buyer: buyer,
+            ts: uint64(block.timestamp),
+            pspAmount: uint128(pspOut),
+            mixPaid: uint128(mixETHInput)
+        });
+        ticketCount = seat + 1;
+
         emit Buy(msg.sender, mixETHInput, pspOut, totalSupplyPSP, reserveMixETH);
 
         // Take mixETH from PoolManager to hook custody
@@ -348,10 +484,9 @@ contract CurveHook is BaseHook {
         // Mint PSP for the buyer
         controller.mintPSPForSwap(pspOut);
 
-        // Referral cuts leave custody immediately; staker fee joins the
-        // claimable surplus. paid <= feeMixETH always (subtraction is exact).
-        uint256 refPaid = _payReferrals(refTrader, mixETHInput, mixETH);
-        uint256 stakerFeeMixETH = feeMixETH - refPaid;
+        // §3 REVISED fee routing (referral chain leaves custody live; the
+        // staker accumulator feeds; the pot escrows; remainders → pot).
+        uint256 stakerFeeMixETH = _splitFee(refTrader, feeMixETH, mixETH);
         if (stakerFeeMixETH > 0) {
             controller.addFees(stakerFeeMixETH);
         }
@@ -394,10 +529,11 @@ contract CurveHook is BaseHook {
             ? SineMath.sellOut(sineCurve, reserveMixETH, pspInputAmount)
             : CurveMath.computeSellOutput(pspInputAmount, totalSupplyPSP, curveConfig);
 
-        // Fee split (2026-08-19, side pot retired; sliding 2026-08-30):
-        // swapFeeBps() of the out-value. Referral carve-out = 50bps OF THE
-        // OUT-VALUE, paid live in mixETH; remainder to stakers. The ENTIRE
-        // sold PSP is burned — no pot skim, backing stays clean.
+        // Fee split (CLOCK-REDESIGN §3 REVISED): swapFeeBps() of the
+        // out-value, routed by _splitFee — 60/35/5 (or 60/39/1) of THE FEE.
+        // The ENTIRE sold PSP is burned — backing stays clean. Sells mint
+        // NO ticket and add NO time (only buys do); they only pass the
+        // halt gate at zero.
         uint256 feeMixETH = (mixETHOut * swapFeeBps()) / 10000;
         uint256 mixETHToUser = mixETHOut - feeMixETH;
         if (mixETHToUser == 0) revert ZeroOutput();
@@ -418,9 +554,8 @@ contract CurveHook is BaseHook {
         // Send mixETH to user via PoolManager
         _settleCurrency(mixETH, mixETHToUser);
 
-        // Referral cuts (50bps of the out-value); remainder to stakers
-        uint256 refPaid = _payReferrals(refTrader, mixETHOut, mixETH);
-        uint256 stakerFeeMixETH = feeMixETH - refPaid;
+        // §3 REVISED fee routing (sell side — same legs as buys)
+        uint256 stakerFeeMixETH = _splitFee(refTrader, feeMixETH, mixETH);
         if (stakerFeeMixETH > 0) {
             controller.addFees(stakerFeeMixETH);
         }
@@ -482,9 +617,12 @@ contract CurveHook is BaseHook {
 
     /// @notice Send accumulated fees to a position holder (called by the
     ///         staker during claims, or the controller in legacy paths)
-    /// @dev Available fees = hook's mixETH balance - reserveMixETH.
-    ///      No separate counter needed: the invariant is
-    ///      balanceOf(hook) = reserveMixETH + availableFees.
+    /// @dev Available fees = hook's mixETH balance - reserveMixETH - the
+    ///      unclaimed ladder pot - the unclaimed deployer credit. The pot
+    ///      and the deployer leg are escrowed (CLOCK-REDESIGN §2/§3) and
+    ///      must never leak into staker payouts: invariant
+    ///      balanceOf(hook) = reserveMixETH + (potBalance - potPaid)
+    ///      + (deployerCredit - deployerCreditPaid) + availableFees.
     function sendFees(address to, uint256 mixETHAmount) external {
         // 2026-08-19: fee claims moved to PSPStaker — it pulls payouts for
         // its positions directly. Controller retains access (genesis share
@@ -493,8 +631,8 @@ contract CurveHook is BaseHook {
 
         address mixETHAddr = Currency.unwrap(controller.getMixETH());
         uint256 balance = IERC20(mixETHAddr).balanceOf(address(this));
-        // Solidity 0.8 reverts on underflow if balance < reserveMixETH
-        uint256 available = balance - reserveMixETH;
+        // Solidity 0.8 reverts on underflow if escrows exceed the balance
+        uint256 available = balance - reserveMixETH - (potBalance - potPaid) - (deployerCredit - deployerCreditPaid);
         if (mixETHAmount > available) revert InsufficientFees();
 
         IERC20(mixETHAddr).safeTransfer(to, mixETHAmount);
@@ -542,6 +680,86 @@ contract CurveHook is BaseHook {
         }
     }
 
+    // ─────────────── Ladder board + pot claims (CLOCK-REDESIGN §2) ───────────────
+
+    /// @notice Seats currently on the board (≤ 10).
+    function seatedCount() public view returns (uint256) {
+        return ticketCount < 10 ? ticketCount : 10;
+    }
+
+    /// @notice The rolling last-10 ticket board.
+    /// @param i seat age, 0 = NEWEST (the top ladder rung) … seatedCount()-1 = OLDEST
+    /// @return (buyer, pspAmount, mixPaid, ts) of that buy tx
+    function board(uint256 i) external view returns (address, uint256, uint256, uint256) {
+        if (i >= seatedCount()) revert BadSeatIndex();
+        uint256 seat = ticketCount - 1 - i;
+        Ticket storage t = tickets[seat % 10];
+        return (t.buyer, t.pspAmount, t.mixPaid, t.ts);
+    }
+
+    /// @dev Distribution denominator for a board of `n` seated tickets:
+    ///      the partial ladder sum (renormalizes to 100% when n < 10).
+    function _ladderDenom(uint256 n) internal pure returns (uint256 denom) {
+        for (uint256 a; a < n; ++a) {
+            denom += _ladderBps(a);
+        }
+    }
+
+    /// @notice Everything `who` can claim right now: every unclaimed seat they
+    ///         hold across the frozen distribution. Exact floor math off the
+    ///      frozen potBalance, independent of other claimants' ordering.
+    function claimablePot(address who) public view returns (uint256 amount) {
+        uint256 n = seatedCount();
+        if (n == 0 || mode == Mode.Predeposit || mode == Mode.Active) return 0;
+        uint256 denom = _ladderDenom(n);
+        for (uint256 i; i < n; ++i) {
+            uint256 seat = ticketCount - 1 - i;
+            if (tickets[seat % 10].buyer == who && !seatClaimed[seat]) {
+                amount += (potBalance * _ladderBps(i)) / denom;
+            }
+        }
+    }
+
+    /// @notice Claim every seat the caller owns on the frozen board. PULL-based,
+    ///         forever: no deadline, no sweep — a claimant returning a year
+    ///         (or a century) later is still paid in full.
+    function claimPot() external {
+        if (mode == Mode.Predeposit || mode == Mode.Active) revert NotDetonated();
+
+        uint256 n = seatedCount();
+        uint256 denom = _ladderDenom(n);
+        uint256 amount;
+        for (uint256 i; i < n; ++i) {
+            uint256 seat = ticketCount - 1 - i;
+            if (tickets[seat % 10].buyer == msg.sender && !seatClaimed[seat]) {
+                seatClaimed[seat] = true;
+                amount += (potBalance * _ladderBps(i)) / denom;
+            }
+        }
+        if (amount == 0) revert NothingToClaim();
+
+        // CEI: books updated before the transfer; potBalance stays FROZEN as
+        // the distribution base — potPaid tracks the drain.
+        potPaid += amount;
+        IERC20(Currency.unwrap(controller.getMixETH())).safeTransfer(msg.sender, amount);
+
+        emit PotClaimed(msg.sender, amount);
+    }
+
+    /// @notice Claim the accrued deployer rake (1% legs of unattributed
+    ///         fees). PULL-based, forever: no deadline, no sweep.
+    function claimDeployerCredit() external {
+        uint256 outstanding = deployerCredit - deployerCreditPaid;
+        if (outstanding == 0) revert NothingToClaim();
+
+        // CEI: books updated before the transfer; deployerCredit stays as
+        // the gross accrual record — deployerCreditPaid tracks the drain.
+        deployerCreditPaid += outstanding;
+        IERC20(Currency.unwrap(controller.getMixETH())).safeTransfer(deployerCutTo, outstanding);
+
+        emit DeployerCreditClaimed(deployerCutTo, outstanding);
+    }
+
     // ─────────────── Mode Management ───────────────
 
     function setMode(Mode newMode) external {
@@ -554,6 +772,15 @@ contract CurveHook is BaseHook {
         if (mode == Mode.Destroyed) revert InvalidMode();
 
         mode = newMode;
+
+        // CLOCK-REDESIGN §1: the clock is ARMED at the Active transition —
+        // the launch buy that flips the round live starts the 72h countdown.
+        // Predeposit never touches it; the Active→Flat transition (detonate)
+        // leaves detonationAt as the frozen historical zero point.
+        if (newMode == Mode.Active) {
+            detonationAt = block.timestamp + DET_WINDOW;
+        }
+
         emit ModeChanged(newMode);
     }
 
@@ -630,8 +857,10 @@ contract CurveHook is BaseHook {
         // only ever sees the POST-FEE input. Flat mode has NO buys at all
         // (scoopy 2026-08-29) — the view reverts like the swap path.
         // Sine-aware + sliding-fee-aware (2026-08-30): this used to quote the
-        // ZONE math on sine rounds — wrong curve, wrong fee.
+        // ZONE math on sine rounds — wrong curve, wrong fee. CLOCK-REDESIGN:
+        // at zero the view reverts TradingHalted exactly like the swap path.
         if (mode == Mode.Flat) revert BuyingDisabled();
+        if (block.timestamp >= detonationAt) revert TradingHalted();
         uint256 fee = (mixETHInput * swapFeeBps()) / 10000;
         uint256 curveMix = mixETHInput - fee;
         return sineActive
@@ -643,10 +872,12 @@ contract CurveHook is BaseHook {
     function getSellOutput(uint256 pspInput) external view returns (uint256) {
         // Mirror execution (the B7b principle, sell side): sellers receive
         // mixETHOut MINUS the fee slice; sine-aware since 2026-08-30. Flat
-        // exits are fee-free pro-rata (F-9).
+        // exits are fee-free pro-rata (F-9) and stay open forever. Curve
+        // sells halt at zero exactly like the swap path (CLOCK-REDESIGN §1).
         if (mode == Mode.Flat) {
             return (pspInput * reserveMixETH) / totalSupplyPSP;
         }
+        if (block.timestamp >= detonationAt) revert TradingHalted();
         uint256 out = sineActive
             ? SineMath.sellOut(sineCurve, reserveMixETH, pspInput)
             : CurveMath.computeSellOutput(pspInput, totalSupplyPSP, curveConfig);

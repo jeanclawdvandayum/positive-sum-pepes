@@ -49,10 +49,12 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 ///                free mint) + MixETHFaucet (free unlimited drip, no ETH)
 ///                against a canonical v4 testnet PoolManager + playtest
 ///                profile (2h predeposit offer, 1h unstake vest decaying
-///                in 6 × 10m epochs, 30m bomb vote, 10m flat exit, and a
-///                10-mixETH per-wallet predeposit cap — all five tunable:
-///                PSP_PREDEPOSIT_SEC / PSP_VEST_SEC / PSP_VOTE_SEC /
-///                PSP_FLAT_EXIT_SEC / PSP_WALLET_CAP_MIX; vest % 6 == 0)
+///                in 6 × 10m epochs, and a 10-mixETH per-wallet predeposit
+///                cap — all tunable: PSP_PREDEPOSIT_SEC / PSP_VEST_SEC /
+///                PSP_WALLET_CAP_MIX; vest % 6 == 0)
+///   PSP_DEPLOYER_CUT_TO  deployerCutTo override (default: the broadcaster;
+///                mainnet value = scoopy's address — see the factory
+///                constructor call below)
 ///   PSP_FORK     =1 to vm.deal the broadcaster 5 ETH first — lets you
 ///                dry-run the FULL testnet path (PSP_TESTNET + PSP_PM +
 ///                --fork-url $SEPOLIA_RPC_URL) with any throwaway key and
@@ -85,19 +87,17 @@ contract DeployPSP is Script {
     //   DEPLOYED on 84532 (0 bytes on three RPCs; unused by PSP anyway)
 
     /// @dev Packed playtest timing profile (see RoundController "Timing
-    ///      profile"): predeposit window · unstake vest · bomb vote · flat
-    ///      exit · per-wallet predeposit cap (whole mixETH, 0 = uncapped),
-    ///      all env-tunable (PSP_PREDEPOSIT_SEC / PSP_VEST_SEC /
-    ///      PSP_VOTE_SEC / PSP_FLAT_EXIT_SEC / PSP_WALLET_CAP_MIX; defaults
-    ///      2h / 1h / 30m / 10m / 10 — scoopy's 2026-08-28+29 fast-playtest
-    ///      profiles). VEST must be divisible by 6 — six decay epochs
+    ///      profile"): predeposit window · unstake vest · per-wallet
+    ///      predeposit cap (whole mixETH, 0 = uncapped), all env-tunable
+    ///      (PSP_PREDEPOSIT_SEC / PSP_VEST_SEC / PSP_WALLET_CAP_MIX;
+    ///      defaults 2h / 1h / 10 — scoopy's fast-playtest profiles; the
+    ///      vote + flat-exit slots died with governance, CLOCK-REDESIGN
+    ///      §4). VEST must be divisible by 6 — six decay epochs
     ///      (packTimings guards).
     function _testnetTimings() internal view returns (uint256) {
         return CurveMath.packTimingsCapped(
             vm.envOr("PSP_PREDEPOSIT_SEC", uint256(2 hours)),
             vm.envOr("PSP_VEST_SEC", uint256(1 hours)),
-            vm.envOr("PSP_VOTE_SEC", uint256(30 minutes)),
-            vm.envOr("PSP_FLAT_EXIT_SEC", uint256(10 minutes)),
             vm.envOr("PSP_WALLET_CAP_MIX", uint256(10))
         );
     }
@@ -147,14 +147,25 @@ contract DeployPSP is Script {
         // the 2-zone default); per-broadcast segments keep every tx under
         // even the strictest cap (forge sends one tx per startBroadcast).
         vm.startBroadcast();
+        // deployerCutTo (CLOCK-REDESIGN §3): the 1% rake on unattributed
+        // fees, immutable on the factory and every hook it births — wired
+        // from the BROADCASTER. Testnet/anvil: the throwaway deployer
+        // (burnable, matches "nobody rakes the playtest"). MAINNET: scoopy
+        // executes this script from his own address, so the broadcaster IS
+        // the documented mainnet value — scoopy's wallet. (If a different
+        // broadcaster ever runs mainnet, pass PSP_DEPLOYER_CUT_TO
+        // explicitly or the rake lands on the wrong wallet.)
+        address deployerCut = vm.envOr("PSP_DEPLOYER_CUT_TO", msg.sender);
         PSPFactory factory = new PSPFactory(
             IPoolManager(pm),
             mix,
             new HookDeployer(),
             new ControllerDeployer(),
             new StakerDeployer(),
-            (testnet || anvil) ? _testnetTimings() : 0 // anvil e2e: fast, env-tunable profile
+            (testnet || anvil) ? _testnetTimings() : 0, // anvil e2e: fast, env-tunable profile
+            deployerCut
         );
+        console.log("deployerCutTo (1% unattributed rake):", deployerCut);
 
         // wire the on-chain pepe art FIRST — it's global on the factory and
         // every round's staker is born with it (rides deployController's

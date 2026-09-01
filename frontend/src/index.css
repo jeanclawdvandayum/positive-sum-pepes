@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./tokens.css"; /* redesign Phase 0 tokens + core component CSS (B0) */
 
 @font-face {
   font-family: "Geist Pixel";

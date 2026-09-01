@@ -1,0 +1,436 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   PSP redesign tokens — Phase 0 keystone (REDESIGN-SPEC v1 §1–§3, B0 item 1)
+
+   Imported from index.css right after `@import "tailwindcss"`. Owns:
+   · the redesign palette as plain custom properties (theme-mapped)
+   · @theme registrations so utilities like bg-bg-0 / text-text-hi / border-line
+     / text-phase-calm / bg-accent exist with zero config (Tailwind v4 CSS-first)
+   · --accent resolution from html[data-phase] (set by src/phase/PhaseEngine) —
+     attribute selectors sit after the theme blocks so they win in BOTH themes
+   · font roles: DISPLAY stays GeistPixel (the ELSH dial is load-bearing),
+     NUMERALS = DSEG7 (clock only), DATA = IBM Plex Mono (tabular),
+     BODY = IBM Plex Sans (page copy adopts it in later phases)
+   · core component CSS: clock instrument, pot odometer, ticker, skeleton,
+     scanlines — all prefers-reduced-motion aware
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* DSEG7 — countdown numerals ONLY (freeware; license ships beside the font) */
+@font-face {
+  font-family: "DSEG7 Classic";
+  src: url("/fonts/DSEG7Classic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  /* palette — indirect so utilities follow the light/dark remap below */
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-line: var(--line);
+  --color-text-hi: var(--text-hi);
+  --color-text-lo: var(--text-lo);
+  --color-phase-calm: var(--phase-calm);
+  --color-phase-heat: var(--phase-heat);
+  --color-phase-critical: var(--phase-critical);
+  --color-pot-gold: var(--pot-gold);
+  --color-pepe: var(--pepe);
+  --color-accent: var(--accent);
+
+  /* font roles (GeistPixel keeps --font-display; body{} in index.css untouched) */
+  --font-body: "IBM Plex Sans Variable", "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-clock: "DSEG7 Classic", "IBM Plex Mono", monospace;
+}
+
+/* dark = primary identity (spec §0); these are the §1 values verbatim.
+   .dark inherits them; html:not(.dark) remaps below (existing remap pattern). */
+:root {
+  --bg-0: #0b1424;
+  --bg-1: #101c30;
+  --bg-2: #16253d;
+  --line: #22344f;
+  --text-hi: #e8f0f7;
+  --text-lo: #8ba3bd;
+  --phase-calm: #3ddc97;
+  --phase-heat: #ffb347;
+  --phase-critical: #ff4d5e;
+  --pot-gold: #ffd75e; /* pot number + pot wins ONLY. never decorative */
+  --pepe: #58c470;     /* pepe-adjacent UI only */
+
+  /* luminous constants: the clock instrument stays dark in BOTH themes (§1),
+     so it must not ride the paper-theme remap */
+  --lum-calm: #3ddc97;
+  --lum-heat: #ffb347;
+  --lum-critical: #ff4d5e;
+  --lum-gold: #ffd75e;
+  --lum-hi: #e8f0f7;
+
+  --skeleton-sheen: rgba(232, 240, 247, 0.07);
+
+  /* glow breathing rate — phase-scaled (§2); overridden per data-phase below */
+  --clock-breathe: 6s;
+}
+
+/* light = same tokens inverted on paper-white, phase system intact (§1) */
+html:not(.dark) {
+  --bg-0: #f2f6fb;
+  --bg-1: #ffffff;
+  --bg-2: #e7edf5;
+  --line: #c6d3e2;
+  --text-hi: #0d1a2b;
+  --text-lo: #4f6478;
+  --phase-calm: #0d8a5f;
+  --phase-heat: #9a5b00;
+  --phase-critical: #cf2438;
+  --pot-gold: #8a6600;
+  --pepe: #277a45;
+  --skeleton-sheen: rgba(13, 26, 43, 0.06);
+}
+
+/* --accent = phase color. PhaseEngine sets data-phase on <html>; these rules
+   come after the theme blocks on purpose so they resolve in both themes. */
+:root {
+  --accent: var(--phase-calm);
+}
+html[data-phase="heat"] {
+  --accent: var(--phase-heat);
+  --clock-breathe: 2.4s;
+}
+html[data-phase="critical"] {
+  --accent: var(--phase-critical);
+  --clock-breathe: 1s;
+}
+
+/* numbers never reflow (§3) — pair with font-data/font-clock */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── the clock instrument (B0 item 3) ──────────────────────────────────────
+   Dark in both themes — it's the machine's screen. The radial phosphor glow
+   is the ONLY sanctioned gradient in the whole design system (§1). */
+.clock {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  background: #0b1424;
+  border: 1px solid #22344f;
+  border-radius: 0.75rem;
+  padding: 1.1rem 1.6rem 1.25rem;
+  overflow: hidden;
+  isolation: isolate;
+  --clock-glow: rgba(232, 240, 247, 0.6);
+  --clock-accent: var(--lum-hi);
+}
+html[data-phase="calm"] .clock {
+  --clock-glow: var(--lum-calm);
+  --clock-accent: var(--lum-calm);
+}
+html[data-phase="heat"] .clock {
+  --clock-glow: var(--lum-heat);
+  --clock-accent: var(--lum-heat);
+}
+html[data-phase="critical"] .clock {
+  --clock-glow: var(--lum-critical);
+  --clock-accent: var(--lum-critical);
+}
+
+.clock-glow {
+  position: absolute;
+  inset: -35%;
+  z-index: -1;
+  background: radial-gradient(closest-side at 50% 55%, var(--clock-glow), transparent 72%);
+  opacity: 0.14;
+  animation: clock-breathe var(--clock-breathe, 6s) ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes clock-breathe {
+  0%, 100% { opacity: 0.07; }
+  50% { opacity: 0.22; }
+}
+
+.clock-numerals-wrap {
+  position: relative;
+  display: inline-block;
+}
+/* sub-10: slow breathing scale 1.00 → 1.015 on time + pot (§2) */
+html[data-sub10] .clock-numerals-wrap {
+  animation: clock-sub10 2.4s ease-in-out infinite;
+}
+@keyframes clock-sub10 {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.015); }
+}
+
+.clock-numerals {
+  position: relative;
+  display: inline-block;
+  font-family: var(--font-clock);
+  font-size: clamp(2.1rem, 8.5vw, 5rem);
+  line-height: 1;
+  /* audit r1 fix 1: digits are accent-FILLED (phase-bound: calm teal / heat
+     amber / critical red) with a soft accent glow — the clock out-shouts the
+     pot. Rides --clock-accent (the luminous phase constant), never a hardcoded
+     phase color, and never --accent (paper remap would ink dark-on-dark in
+     light theme — the panel stays dark in both themes). */
+  color: var(--clock-accent);
+  letter-spacing: 0.02em;
+  white-space: nowrap; /* 360px: it scales via clamp, it never wraps (§9) */
+  text-shadow: 0 0 16px color-mix(in srgb, var(--clock-accent) 45%, transparent);
+}
+/* unlit segments behind the value — the instrument's ghost */
+.clock-ghost {
+  position: absolute;
+  inset: 0;
+  color: rgba(232, 240, 247, 0.08);
+  pointer-events: none;
+  text-shadow: none;
+}
+.clock-digit,
+.clock-colon {
+  display: inline-block;
+}
+.clock-colon {
+  transform: translateY(-0.05em);
+  opacity: 0.85;
+}
+.clock--idle .clock-numerals {
+  color: rgba(232, 240, 247, 0.4); /* pre-launch: dimmed 72:00:00 (§8) */
+  text-shadow: none;
+}
+.clock--idle .clock-glow {
+  animation: none;
+  opacity: 0.05;
+}
+
+.clock-word {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: var(--clock-accent); /* meaning never rides on color alone (§2) */
+}
+
+/* audit r2 fix 3: the idle "armed" tag breathes faintly in HEAT — the machine
+   idles warm. Opacity-only; settles into base opacity under reduced motion. */
+html[data-phase="heat"] .clock-word--armed {
+  animation: armed-breathe 3.2s ease-in-out infinite;
+}
+@keyframes armed-breathe {
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 1; }
+}
+
+/* time injection (§4.3): changed digits flash brighter accent; "+5:00" chip
+   floats off. Settles back INTO the accent fill (not white). */
+.clock-digit.clock-flash {
+  animation: clock-flash 0.9s ease-out;
+}
+@keyframes clock-flash {
+  0% {
+    color: var(--lum-hi);
+    text-shadow: 0 0 20px var(--clock-accent);
+  }
+  100% {
+    color: var(--clock-accent);
+  }
+}
+.clock-chip {
+  position: absolute;
+  left: 50%;
+  top: -0.2rem;
+  transform: translateX(-50%);
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--clock-accent);
+  background: rgba(11, 20, 36, 0.92);
+  border: 1px solid var(--clock-accent);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  opacity: 0;
+  animation: clock-chip 1.8s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes clock-chip {
+  0% { opacity: 0; transform: translate(-50%, 8px); }
+  15% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -26px); }
+}
+
+/* mini variant — header chip / explainer embed */
+.clock--mini {
+  gap: 0.55rem;
+  padding: 0.3rem 0.7rem 0.35rem;
+  border-radius: 0.55rem;
+}
+.clock--mini .clock-numerals {
+  font-size: 1.15rem;
+  letter-spacing: 0;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--clock-accent) 45%, transparent);
+}
+.clock--mini .clock-glow {
+  inset: -65%;
+}
+.clock--mini .clock-word {
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+}
+
+/* ── pot odometer (B0 item 4, spec §4.2) ───────────────────────────────────
+   Mechanical digit roll + brief gold flash on changed digits. */
+.odo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  color: var(--pot-gold); /* the pot number rides pot-gold (§1) */
+  line-height: 1;
+}
+.odo-digit {
+  display: inline-block;
+  height: 1em;
+  overflow: hidden;
+  vertical-align: top;
+}
+.odo-track {
+  display: block;
+  transition: transform 0.55s cubic-bezier(0.2, 0.7, 0.15, 1);
+  will-change: transform;
+}
+.odo-track > span {
+  display: block;
+  height: 1em;
+}
+.odo-sep {
+  display: inline-block;
+}
+.odo-unit {
+  font-size: 0.5em;
+  color: var(--text-lo);
+}
+.odo-digit.odo-flash .odo-track {
+  animation: odo-gold 0.75s ease-out;
+}
+@keyframes odo-gold {
+  0% { color: #fff3c4; } /* one beat hotter than pot-gold */
+  100% { color: inherit; }
+}
+
+/* ── ticker bar (B0 item 5, spec §6 play/stake) ────────────────────────────
+   Continuous horizontal stat ticker; two identical groups → seamless -50%. */
+.ticker-bar {
+  overflow: hidden;
+}
+/* audit r1 fix 5: when one copy of the items fits the bar, the strip goes
+   static — each stat rendered exactly once (no marquee seam duplicates). */
+.ticker-bar--static .ticker-track {
+  animation: none;
+}
+.ticker-track {
+  display: inline-flex;
+  width: max-content;
+  animation: ticker-scroll var(--ticker-duration, 36s) linear infinite;
+}
+.ticker-group {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2.25rem;
+  padding-right: 2.25rem;
+  white-space: nowrap;
+}
+.ticker-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.ticker-label {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--text-lo);
+}
+.ticker-value {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--text-hi);
+}
+@keyframes ticker-scroll {
+  to { transform: translateX(-50%); }
+}
+
+/* ── skeleton (B0 item 5, spec §8) ─────────────────────────────────────────
+   Loading = shimmer in bg-2. The sheen sweep is the gradient §8 explicitly
+   calls for; decorative gradients remain banned everywhere else. */
+.skeleton {
+  background-color: var(--bg-2);
+  background-image: linear-gradient(100deg, transparent 30%, var(--skeleton-sheen) 50%, transparent 70%);
+  background-size: 200% 100%;
+  border-radius: 0.5rem;
+  color: transparent;
+  animation: skeleton-sheen 1.5s linear infinite;
+}
+@keyframes skeleton-sheen {
+  to { background-position: -200% 0; }
+}
+
+/* ── scanline overlay (B0 item 6, spec §9) ─────────────────────────────────
+   2–3% repeating scanlines; visible only in dark theme, killed under
+   prefers-reduced-motion; pointer-transparent by construction. */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  display: none;
+  background: repeating-linear-gradient(0deg, rgba(232, 240, 247, 0.6) 0 1px, transparent 1px 3px);
+  opacity: 0.028;
+}
+html.dark .scanlines {
+  display: block;
+}
+
+/* ── pepe identity chip (B0 item 5, spec §5/§7) ──────────────────────────── */
+.pepe-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pepe-chip-art {
+  display: inline-flex;
+  image-rendering: pixelated; /* crisp pepes (§5) */
+}
+.pepe-chip-art > svg {
+  width: 100%;
+  height: 100%;
+}
+.pepe-chip-name {
+  font-family: var(--font-data);
+  font-size: 0.8rem;
+  color: var(--text-hi);
+}
+
+/* ── prefers-reduced-motion (spec §4/§9) ───────────────────────────────────
+   Everything above degrades to instant state changes + color flashes only. */
+@media (prefers-reduced-motion: reduce) {
+  .clock-glow,
+  .clock-numerals-wrap,
+  .clock-word--armed,
+  .clock-chip,
+  .ticker-track,
+  .skeleton {
+    animation: none !important;
+  }
+  .odo-track {
+    transition: none !important;
+  }
+  .scanlines {
+    display: none !important;
+  }
+}

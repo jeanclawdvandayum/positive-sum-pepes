@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount, useWriteContract } from 'wagmi'
 import { useRpcReads } from '../lib/useRpcReads'
 import { erc20Abi, hookAbi, controllerAbi, zapInAbi, zapOutAbi, buildPoolKey } from '../lib/abi'
@@ -6,8 +6,11 @@ import { rpcCall } from '../lib/rpc'
 import { ADDRESSES } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
 import { fmtAmount, parseAmountToWad, wadToExact } from '../lib/format'
+import { injectTime, usePhase } from '../phase/PhaseEngine'
 import MixLogo from './MixLogo'
 import { PspIcon } from './TokenIcon'
+import { PixelIcon } from './PixelIcon'
+import PixelBurst, { type BurstHandle } from './PixelBurst'
 
 /// mixETH-only swap card (testnet): the mock mixETH has no ETH backing, so
 /// every ETH leg (zapInBuy / zapOut / zapInPredeposit) is off the table —
@@ -17,6 +20,7 @@ type Step = 'idle' | 'approve' | 'swap' | 'waiting' | 'done'
 
 export default function SwapCard() {
   const round = useRound()
+  const { zero: clockZero } = usePhase()
   const { address, isConnected } = useAccount()
   const { psp: pspBal, mix: mixBal } = useBalances(round.token, round.mix)
 
@@ -27,6 +31,7 @@ export default function SwapCard() {
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
   const { writeContractAsync } = useWriteContract()
+  const burstRef = useRef<BurstHandle>(null)
 
   /// Flat mode = one-way exit (scoopy 2026-08-29, fix #3): buying is
   /// disabled at the hook (BuyingDisabled) — force the sell side and lock
@@ -39,6 +44,11 @@ export default function SwapCard() {
   const amountWad = parseAmountToWad(amount)
   const live = round.mode === 1 || round.mode === 2
   const predepositPhase = round.mode === 0
+  /// CLOCK-REDESIGN §1/§6.2: at zero the hook reverts every trade
+  /// (TradingHalted) — the tabs hard-disable and the card goes deadpan.
+  /// Mode stays Active until someone presses detonate, so this is the
+  /// between-zero-and-boom state exactly.
+  const halted = clockZero && round.mode === 1
 
   /// mixETH entering the curve for this input
   const mixIn = useMemo(() => {
@@ -212,6 +222,16 @@ export default function SwapCard() {
           args: [poolKey, mixIn, await freshMinOut(), 0n],
         })
         setStep('done')
+        // B2 §4 wiring — VISUAL ONLY until round wiring lands: a whole-PSP
+        // buy feeds the machine. +5:00 per WHOLE psp, discrete (quote-based
+        // estimate; injectTime flashes the clock digits + floats the chip).
+        // Predeposit genesis buys are excluded — the clock isn't armed yet.
+        {
+          const wholePsp = quoteRaw !== undefined ? Number(quoteRaw) / 1e18 : 0
+          const minutes = Math.floor(wholePsp) * 5
+          if (minutes > 0) injectTime(minutes * 60_000)
+          burstRef.current?.fire()
+        }
         return
       }
       // sell
@@ -248,7 +268,7 @@ export default function SwapCard() {
 
   const busy = step === 'approve' || step === 'swap' || step === 'waiting'
   const canSubmit =
-    isConnected && !!poolKey && amountWad > 0n && payBalanceOk && !busy && (live || predepositPhase)
+    isConnected && !!poolKey && amountWad > 0n && payBalanceOk && !busy && !halted && (live || predepositPhase)
 
   const cta = !isConnected
     ? 'connect wallet'
@@ -269,30 +289,38 @@ export default function SwapCard() {
                 : 'sell for mixETH'
 
   return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-black text-slate-900">
+    <div className="flex h-full flex-col rounded-xl border border-line bg-bg-1 p-5 font-body">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="font-display text-lg text-text-hi">
           {predepositPhase ? 'predeposit' : 'swap'}
         </h2>
         {round.mode === 2 && (
-          <span className="chip bg-slate-100 text-slate-500">flat — pro-rata, fee-free</span>
+          <span className="rounded-full border border-line px-2.5 py-0.5 text-xs text-text-lo">
+            flat — pro-rata, fee-free
+          </span>
         )}
-        <div className="flex rounded-full bg-sky-50 p-1">
+        <div className="flex rounded-full bg-bg-2 p-1">
           <button
             onClick={() => setSide('buy')}
-            disabled={round.mode === 2}
-            title={round.mode === 2 ? 'buying is disabled while the round is flat' : undefined}
-            className={`rounded-full px-4 py-1 text-sm font-bold transition disabled:opacity-30 ${
-              side === 'buy' ? 'bg-white text-psp-deep shadow' : 'text-slate-400'
+            disabled={round.mode === 2 || halted}
+            title={
+              halted
+                ? 'the clock is at zero — no more moves'
+                : round.mode === 2
+                  ? 'buying is disabled while the round is flat'
+                  : undefined
+            }
+            className={`rounded-full px-4 py-1 text-sm font-semibold transition disabled:opacity-30 ${
+              side === 'buy' ? 'bg-accent text-bg-0' : 'text-text-lo hover:text-text-hi'
             }`}
           >
             buy
           </button>
           <button
             onClick={() => setSide('sell')}
-            disabled={predepositPhase}
-            className={`rounded-full px-4 py-1 text-sm font-bold transition disabled:opacity-30 ${
-              side === 'sell' ? 'bg-white text-psp-deep shadow' : 'text-slate-400'
+            disabled={predepositPhase || halted}
+            className={`rounded-full px-4 py-1 text-sm font-semibold transition disabled:opacity-30 ${
+              side === 'sell' ? 'bg-accent text-bg-0' : 'text-text-lo hover:text-text-hi'
             }`}
           >
             sell
@@ -302,15 +330,15 @@ export default function SwapCard() {
 
       {predepositPhase && round.totalPredeposit !== undefined && round.predepositCap && (
         <div className="mt-3">
-          <div className="mb-1 flex justify-between text-[11px] font-bold text-slate-400">
+          <div className="mb-1 flex justify-between text-[11px] font-semibold text-text-lo">
             <span>window fill</span>
-            <span>
+            <span className="tabular font-data">
               {fmtAmount(round.totalPredeposit)} / {fmtAmount(round.predepositCap)} mix
             </span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-sky-100">
+          <div className="h-2 overflow-hidden rounded-full bg-bg-2">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400"
+              className="h-full rounded-full bg-accent transition-[width]"
               style={{
                 width: `${Math.min(100, Number(round.totalPredeposit * 10000n / round.predepositCap) / 100)}%`,
               }}
@@ -319,63 +347,79 @@ export default function SwapCard() {
         </div>
       )}
 
+      {halted ? (
+        <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-2.5 rounded-lg border border-phase-critical/40 p-6 text-center">
+          <PixelIcon name="bomb" size={22} />
+          <p className="font-display text-lg text-text-hi">
+            the clock struck zero. no more moves.
+          </p>
+          <p className="max-w-xs text-xs leading-relaxed text-text-lo">
+            the next move is detonation — the pot settles, the curve flattens, the exits open. nothing left to buy, nothing left to sell.
+          </p>
+        </div>
+      ) : (
+      <>
       {/* pay box */}
-      <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+      <div className="mt-4 rounded-lg border border-line bg-bg-2 p-4">
+        <div className="flex items-center justify-between text-xs font-semibold text-text-lo">
           <span>{side === 'buy' ? 'pay' : 'sell'}</span>
           <button
             type="button"
             title="fill your full balance"
             onClick={() => setAmount(wadToExact(side === 'buy' ? mixBal : pspBal))}
-            className="rounded-md px-1.5 py-0.5 transition hover:bg-sky-100 hover:text-sky-600"
+            className="rounded-md px-1.5 py-0.5 transition hover:bg-bg-1 hover:text-text-hi"
           >
             balance{' '}
-            {side === 'buy' ? fmtAmount(mixBal) : fmtAmount(pspBal)}
+            <span className="tabular font-data">
+              {side === 'buy' ? fmtAmount(mixBal) : fmtAmount(pspBal)}
+            </span>
             {((side === 'buy' ? mixBal : pspBal) ?? 0n) > 0n && (
-              <span className="ml-1 text-[10px] text-sky-500">MAX</span>
+              <span className="ml-1 text-[10px] text-accent">MAX</span>
             )}
           </button>
         </div>
         <div className="mt-2 flex items-center gap-2">
           <input
-            className="input-amount flex-1"
+            className="tabular w-full flex-1 rounded-lg border border-line bg-bg-0 px-4 py-3 font-data text-2xl text-text-hi outline-none transition placeholder:text-text-lo/60 focus:border-accent"
             placeholder="0.0"
             value={amount}
             inputMode="decimal"
             onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
           />
           {side === 'buy' ? (
-            <div className="shrink-0 rounded-2xl bg-white px-4 py-3 text-lg font-black text-slate-700 shadow-sm">
+            <div className="shrink-0 rounded-lg border border-line bg-bg-1 px-4 py-3 text-lg font-semibold text-text-hi">
               <MixLogo px={20} /> mix
             </div>
           ) : (
-            <div className="shrink-0 rounded-2xl bg-white px-4 py-3 text-lg font-black text-slate-700 shadow-sm">
+            <div className="shrink-0 rounded-lg border border-line bg-bg-1 px-4 py-3 text-lg font-semibold text-text-hi">
               <PspIcon px={20} /> PSP
             </div>
           )}
         </div>
         {payBalance !== undefined && amountWad > payBalance && (
-          <div className="mt-1 text-xs font-bold text-rose-500">insufficient balance</div>
+          <div className="mt-1 text-xs font-semibold text-phase-critical">insufficient balance</div>
         )}
       </div>
 
-      <div className="flex justify-center py-1 text-xl text-sky-300">↓</div>
+      <div className="flex justify-center py-1 text-lg text-text-lo" aria-hidden="true">
+        ↓
+      </div>
 
       {/* receive box */}
-      <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+      <div className="rounded-lg border border-line bg-bg-2 p-4">
+        <div className="flex items-center justify-between text-xs font-semibold text-text-lo">
           <span>receive (est.)</span>
         </div>
         <div className="mt-2 flex items-center gap-2">
-          <div className="input-amount flex-1 bg-transparent">
+          <div className="tabular flex-1 font-data text-2xl text-text-hi">
             {side === 'buy' ? fmtAmount(quoteRaw, 4) : fmtAmount(quoteMixOut, 4)}
           </div>
           {side === 'buy' ? (
-            <div className="shrink-0 rounded-2xl bg-white px-4 py-3 text-lg font-black text-slate-700 shadow-sm">
+            <div className="shrink-0 rounded-lg border border-line bg-bg-1 px-4 py-3 text-lg font-semibold text-text-hi">
               <PspIcon px={20} /> PSP
             </div>
           ) : (
-            <div className="shrink-0 rounded-2xl bg-white px-4 py-3 text-lg font-black text-slate-700 shadow-sm">
+            <div className="shrink-0 rounded-lg border border-line bg-bg-1 px-4 py-3 text-lg font-semibold text-text-hi">
               <MixLogo px={20} /> mix
             </div>
           )}
@@ -384,16 +428,16 @@ export default function SwapCard() {
 
       {/* slippage */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="font-bold text-slate-400">slippage</span>
+        <span className="font-semibold text-text-lo">slippage</span>
         <div className="flex items-center gap-1">
           {[0.005, 0.01, 0.03, 0.05, 0.1].map((s) => (
             <button
               key={s}
               onClick={() => { setSlippage(s); setCustomSlip('') }}
-              className={`rounded-lg px-2 py-1 font-bold transition ${
+              className={`rounded-lg px-2 py-1 font-semibold transition ${
                 slippage === s && customSlip === ''
-                  ? 'bg-sky-400 text-[#fff]'
-                  : 'bg-sky-50 text-slate-500'
+                  ? 'bg-accent text-bg-0'
+                  : 'bg-bg-2 text-text-lo hover:text-text-hi'
               }`}
             >
               {s * 100}%
@@ -409,42 +453,75 @@ export default function SwapCard() {
             }}
             inputMode="decimal"
             placeholder="custom %"
-            className="w-20 rounded-lg border border-sky-100 bg-white px-2 py-1 text-right font-bold text-slate-600 outline-none focus:border-sky-300"
+            className="tabular w-20 rounded-lg border border-line bg-bg-0 px-2 py-1 text-right font-data text-text-hi outline-none focus:border-accent"
           />
         </div>
       </div>
 
       {live && quoteRaw !== undefined && quoteRaw > 0n && (
         <div className="mt-2 space-y-1">
-          <div className="flex justify-between text-xs text-slate-400">
+          <div className="flex justify-between text-xs text-text-lo">
             <span>{side === 'sell' ? 'expected out (after fee)' : 'expected out'}</span>
-            <span className="font-bold text-slate-500">
+            <span className="tabular font-data font-semibold text-text-hi">
               {side === 'buy'
                 ? `${fmtAmount(quoteRaw, 4)} PSP`
                 : `${fmtAmount(quoteMixAfterFee, 4)} mix`}
             </span>
           </div>
-          <div className="flex justify-between text-xs text-slate-400">
+          <div className="flex justify-between text-xs text-text-lo">
             <span>min out (fresh at submit)</span>
-            <span className="font-bold text-slate-500">
+            <span className="tabular font-data font-semibold text-text-hi">
               {side === 'buy' ? `${fmtAmount(minOut, 4)} PSP` : `${fmtAmount(minOut, 4)} mix`}
             </span>
           </div>
         </div>
       )}
 
-      <button className="btn-primary mt-4 w-full" disabled={!canSubmit} onClick={run}>
-        {step === 'done' ? '✅ confirmed' : step === 'waiting' ? 'confirm in wallet…' : cta}
-      </button>
-      {error && <div className="mt-2 break-words text-xs text-rose-500">{error}</div>}
+      </>
+      )}
+
+      {!halted && (
+      <div className="relative mt-auto">
+        {/* audit r1 fix 6: the dead zone between the slippage row and the CTA
+            gets ONE quiet on-voice line — the real fee routing (stakers + pot
+            + a fixed 0.5%-of-volume referral carve-out, stated without
+            numbers so it stays true across the fee's wave regimes). Curve
+            mode only: flat exits are fee-free (F-9) and predeposit has no
+            swaps, so the line never lies. Panel height untouched. */}
+        {round.mode === 1 && (
+          <p className="mb-2 text-center text-xs text-text-lo">
+            swap fees feed the pot, the stakers, and whoever's link brought you
+          </p>
+        )}
+        <button
+          data-pending={busy || undefined}
+          className={`relative mt-4 w-full overflow-hidden rounded-xl px-5 py-3 font-semibold transition active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40 ${
+            busy || step === 'done'
+              ? 'bg-accent text-bg-0'
+              : 'border border-line bg-bg-2 text-text-hi hover:border-accent'
+          }`}
+          disabled={!canSubmit}
+          onClick={run}
+        >
+          <span className="pl-btn-fill" aria-hidden="true" />
+          <span className="relative">
+            {step === 'done' ? '✓ confirmed' : step === 'waiting' ? 'confirm in wallet…' : cta}
+          </span>
+        </button>
+        <PixelBurst ref={burstRef} />
+      </div>
+      )}
+      {error && <div className="mt-2 break-words text-xs text-phase-critical">{error}</div>}
       {round.mode === 3 && (
-        <div className="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-600">
-          💀 this round was carpet-bombed. wait for round n+1.
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-phase-critical/40 p-3 text-xs font-semibold text-phase-critical">
+          <PixelIcon name="bomb" size={16} />
+          <span>this round was carpet-bombed. wait for round n+1.</span>
         </div>
       )}
       {round.mode === 2 && (
-        <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-600">
-          ⚪ round is dying — exits are toll-free at exact average backing. buying is disabled.
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-line p-3 text-xs font-semibold text-text-lo">
+          <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-[2px] bg-accent" aria-hidden="true" />
+          <span>round is dying — exits are toll-free at exact average backing. buying is disabled.</span>
         </div>
       )}
     </div>

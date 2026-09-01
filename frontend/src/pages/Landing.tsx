@@ -1,168 +1,157 @@
-import type { ReactNode } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { PixelIcon } from '../components/PixelIcon'
-import MixLogo from '../components/MixLogo'
-import { useRound } from '../lib/useRound'
-import { fmtAmount, fmtPrice } from '../lib/format'
+import Clock from '../components/Clock'
+import { randomDna, renderPepeSvg } from '../lib/pepeRender'
+import { BeatDiagram, DiagramStyles } from './explainer/diagrams'
+import PayoutSlider from './explainer/PayoutSlider'
 
-const mechanics = [
+// ─────────────────────────────────────────────────────────────────────────────
+// / — the explainer (REDESIGN-B1 §1–§4). Narrative, not a card wall:
+// hero → one round, five beats → the math, straight → no rug, ever.
+//
+// Copy policy: every sentence below is existing lineage copy kept verbatim
+// (sigmabf Explainer + inventory §5 claims) — the numbers mirror the
+// contracts; do not paraphrase them. Voice stays lowercase, wry.
+//
+// The hero Clock is the REAL instrument. No deadline is wired yet (the
+// contract exposes no round timer), so PhaseEngine idles and the Clock runs
+// its spec §8 pre-launch state: dimmed 72:00:00, "armed the moment the round
+// launches." setDeadline() stays ready for contract wiring — no invented
+// chain reads, no fake liveness (B0 conflict #1, DECIDED).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SUBHEAD =
+  'positive sum pepes is FOMO3D with the rug surgically removed. buy PSP → buy time → hold a ladder spot → split the pot. staking pays you to stay. redemption means you can always walk away whole'
+
+const BEATS: { n: string; name: string; copy: string; kind: 'arm' | 'buy' | 'climb' | 'detonate' | 'claim' }[] = [
   {
-    icon: 'chart',
-    title: 'bonding curve',
-    color: 'from-sky-400 to-sky-500',
-    body: 'every buy climbs a preset price curve; every sell walks it back down. no LPs to farm you, no rug to pull — the curve is the market and it never sleeps. it runs as a uniswap v4 hook on a real v4 pool: battle-tested plumbing, zero custodians.',
+    n: '01',
+    name: 'arm',
+    copy: 'the clock arms at launch with 72:00:00 on it. hit zero and trading halts.',
+    kind: 'arm',
   },
   {
-    icon: 'window',
-    title: 'predeposit window',
-    color: 'from-emerald-400 to-emerald-500',
-    body: 'each round opens with a short predeposit window. up to 500 mixETH gets first position at the seed price and PSP auto-locks at launch. miss it and you buy on the open curve.',
+    n: '02',
+    name: 'buy',
+    copy: 'every WHOLE PSP bought adds +5:00 — but never more than a full clock.',
+    kind: 'buy',
   },
   {
-    icon: 'diamond',
-    title: 'stake & earn fees',
-    color: 'from-teal-400 to-emerald-400',
-    body: 'lock PSP and every curve fee flows to stakers pro-rata, in mixETH. your bag yield-farms the degens. extend anytime in the final week.',
+    n: '03',
+    name: 'climb',
+    copy: 'fees stream to the stakers and pile into the pot — plus a fixed 0.5% of every trade to whoever\'s link brought you.',
+    kind: 'climb',
   },
   {
-    icon: 'bomb',
-    title: 'carpet bomb',
-    color: 'from-amber-400 to-orange-500',
-    body: 'if stakers vote with 69% quorum and a majority, the round is flattened: every lock opens immediately and the curve goes flat so stakers can exit at average backing. after the exit window closes, whatever remains drains to the factory and the next round is born with the treasure.',
+    n: '04',
+    name: 'detonate',
+    copy: 'clock at zero? anyone — yes, you — can push the button and carpetBomb().',
+    kind: 'detonate',
   },
   {
-    icon: 'sum',
-    title: 'positive sum',
-    color: 'from-sky-400 to-emerald-400',
-    body: 'the whole reserve sits in mixETH, an ETH yield token curated by alchemix dao — defi OGs running trusted infrastructure since 2021 — so the pot earns from outside the game and your backing compounds even when nobody trades. fees recycle to stakers instead of extracting. the math tilts positive for everyone who stays.',
-  },
-  {
-    icon: 'shield',
-    title: 'your keys, your pepes',
-    color: 'from-cyan-400 to-sky-500',
-    body: 'non-custodial end to end. mixETH in, mixETH out — every trade settles against the round pool in a single transaction. no admin keys on the curve, no pausing, no upgrades mid-game.',
+    n: '05',
+    name: 'claim or redeem',
+    copy: 'winners claim their share via claimPot() whenever they want — pull-based, no deadline, no sweep.',
+    kind: 'claim',
   },
 ]
 
+const MATH: [string, string][] = [
+  ['ladder', 'at detonation the pot splits 25/18/14/10/8/7/6/5/4/3% from newest ticket to oldest.'],
+  ['renormalization', 'fewer than 10 entries? shares renormalize, nobody gets dusted.'],
+  ['bonding curve', 'PSP price rides a bonding curve: buys push it up, sells glide it down.'],
+  ['fee routing', 'fees stream to the stakers and pile into the pot — plus a fixed 0.5% of every trade to whoever\'s link brought you.'],
+]
+
+// stepped timeline: each beat steps further right (staircase, not a card wall)
+const STEP_PAD = ['', 'lg:pl-6', 'lg:pl-12', 'lg:pl-18', 'lg:pl-24']
+
 export default function Landing() {
-  const round = useRound()
+  // one greeter pepe per load — the same "the header IS the art" lane
+  const greeter = useMemo(() => renderPepeSvg(randomDna()), [])
 
   return (
-    <div>
-      {/* hero */}
-      <section className="relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-100 via-white to-emerald-100 px-6 py-14 text-center sm:py-20">
-        <div className="blob left-[-80px] top-[-60px] h-64 w-64 bg-psp-sky" />
-        <div className="blob right-[-60px] bottom-[-80px] h-64 w-64 bg-psp-mint" />
-        <div className="relative">
-          <div className="flex flex-col items-center justify-center gap-2 sm:flex-row">
-            <span className="chip bg-white/80 text-psp-deep shadow-sm">
-              round #{round.id.toString()} · {round.mode === 1 ? 'live' : round.mode === 0 ? 'predeposit open' : round.mode === 3 ? 'destroyed' : 'flat'}
-            </span>
-            <span className="chip bg-white/80 text-psp-deep shadow-sm">built on uniswap v4</span>
+    <div className="xd-page font-body text-text-hi">
+      <DiagramStyles />
+
+      {/* ── 1. hero ── */}
+      <section className="pt-10 pb-4 sm:pt-14">
+        <div className="flex flex-wrap items-end gap-x-10 gap-y-6">
+          <div>
+            {/* the REAL clock, embedded live — prelaunch idle state per §8 */}
+            <Clock variant="mini" />
+            <p className="mt-2 text-xs text-text-lo">armed the moment the round launches.</p>
           </div>
-          <h1 className="mt-4 text-4xl font-black leading-tight text-slate-900 sm:text-6xl">
-            the game that pays you{' '}
-            <span className="bg-gradient-to-r from-sky-500 to-emerald-500 bg-clip-text text-transparent">
-              to stay
-            </span>
-          </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-base text-slate-600 sm:text-lg">
-            positive sum pepes is a fully on-chain bonding curve game. buy the dip on the
-            curve, stake for a cut of every trade, and vote to carpet-bomb the round when
-            the cycle is done — the treasury inherits into round n+1.
-          </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link to="/trade" className="btn-primary w-full sm:w-auto">
-              start trading →
-            </Link>
-            <Link to="/stake" className="btn-ghost w-full sm:w-auto">
-              stake your pepes
-            </Link>
-          </div>
-          <div className="mx-auto mt-10 grid max-w-2xl grid-cols-3 gap-2 sm:gap-4">
-            <HeroStat
-              label="reserve"
-              value={
-                <>
-                  {fmtAmount(round.reserve)} <MixLogo px={28} /> mix
-                </>
-              }
-            />
-            <HeroStat label="supply" value={`${fmtAmount(round.supply)} PSP`} />
-            <HeroStat label="price" value={`${fmtPrice(round.marginalPrice)}`} />
-          </div>
+          <span
+            className="block h-[138px] w-[138px] shrink-0 overflow-hidden rounded-lg border border-line sm:h-[207px] sm:w-[207px] [&>svg]:h-full [&>svg]:w-full"
+            style={{ imageRendering: 'pixelated' }}
+            aria-label="a greeter pepe"
+            dangerouslySetInnerHTML={{ __html: greeter }}
+          />
+        </div>
+
+        <h1 className="mt-10 font-display text-[clamp(4rem,8vw,6rem)] leading-[1.05] tracking-tight">
+          a bomb, a clock, and a pot that only grows
+        </h1>
+
+        <p className="mt-6 max-w-2xl text-base leading-relaxed text-text-lo">{SUBHEAD}</p>
+
+        <div className="mt-8">
+          <Link
+            to="/play"
+            className="inline-flex items-center justify-center rounded-xl bg-accent px-7 py-3 text-base font-semibold text-bg-0 transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-[1px]"
+          >
+            buy psp
+          </Link>
         </div>
       </section>
 
-      {/* what is this */}
-      <section className="mt-10">
-        <h2 className="text-2xl font-black text-slate-900 sm:text-3xl">what is this?</h2>
-        <p className="mt-3 text-slate-600">
-          a memecoin with a mechanical soul. PSP mints and burns along a deterministic
-          price curve denominated in mixETH — an ETH yield token. sells on the curve pay
-          a toll that accrues to everyone who stakes, and because the entire reserve
-          sits in mixETH, its yield keeps flowing into the pot from outside the game:
-          your backing compounds whether the chart is green or not. that outside yield
-          is what makes this positive sum — most memecoins recycle nothing. when a
-          round is dying, exits are toll-free at exact average backing — nobody pays to
-          leave a loser. and there is no team allocation silently diluting
-          you: the only way new PSP exists is someone paying real reserves
-          in. and the whole engine is a uniswap v4 hook — the curve lives
-          inside a real v4 pool, so this is v4-grade plumbing under a meme
-          hood, not an erc-20 with a website.
+      {/* ── 2. one round, five beats ── */}
+      <section className="mt-20">
+        <h2 className="font-display text-2xl sm:text-3xl">one round, five beats</h2>
+        <ol className="mt-8">
+          {BEATS.map((b, i) => (
+            <li
+              key={b.n}
+              className={`flex flex-col items-start gap-6 border-t border-line py-8 sm:flex-row sm:items-center ${STEP_PAD[i]}`}
+            >
+              <BeatDiagram kind={b.kind} />
+              <div className="max-w-md">
+                <div className="tabular font-data text-sm text-text-lo">
+                  {b.n} · {b.name}
+                </div>
+                <p className="mt-2 leading-relaxed">{b.copy}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* ── 3. the math, straight ── */}
+      <section className="mt-20 rounded-2xl border border-line bg-bg-1 p-6 sm:p-10">
+        <h2 className="font-display text-2xl sm:text-3xl">the math, straight</h2>
+        <dl className="mt-8">
+          {MATH.map(([term, def]) => (
+            <div key={term} className="grid gap-1 border-t border-line py-4 sm:grid-cols-[12rem_1fr] sm:gap-6">
+              <dt className="font-data text-sm text-text-lo">{term}</dt>
+              <dd className="leading-relaxed">{def}</dd>
+            </div>
+          ))}
+        </dl>
+        <PayoutSlider />
+      </section>
+
+      {/* ── 4. no rug, ever ── */}
+      <section className="mt-24 pb-20 text-center">
+        <p className="text-sm text-text-lo">no rug, ever</p>
+        <p className="mx-auto mt-4 max-w-4xl font-display text-[clamp(2.25rem,5vw,4rem)] leading-[1.1]">
+          worst case you redeem, best case you win the pot.
+        </p>
+        <p className="mx-auto mt-6 max-w-xl leading-relaxed text-text-lo">
+          redemption and flat settlement are always available — PSP can always be exited for its
+          backing.
         </p>
       </section>
-
-      {/* mechanics */}
-      <section className="mt-10">
-        <h2 className="text-2xl font-black text-slate-900 sm:text-3xl">the mechanics</h2>
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {mechanics.map((m) => (
-            <div key={m.title} className="card p-5">
-              <div
-                className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${m.color} shadow-md`}
-              >
-                <PixelIcon name={m.icon} />
-              </div>
-              <h3 className="mt-3 text-lg font-extrabold text-slate-900">{m.title}</h3>
-              <p className="mt-1 text-sm leading-relaxed text-slate-600">{m.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* lifecycle strip */}
-      <section className="card mt-10 overflow-hidden">
-        <div className="bg-gradient-to-r from-sky-400 via-cyan-400 to-emerald-400 px-6 py-3 text-sm font-black uppercase tracking-wide text-[#fff]">
-          round lifecycle
-        </div>
-        <div className="grid grid-cols-1 divide-y divide-sky-50 sm:grid-cols-5 sm:divide-x sm:divide-y-0">
-          {[
-            ['1', 'predeposit', 'capped window, pooled genesis buy'],
-            ['2', 'launch', 'seed buys mint initial PSP'],
-            ['3', 'trade', 'curve market, fees accrue'],
-            ['4', 'carpet bomb', '69% quorum ends it'],
-            ['5', 'rebirth', 'treasure seeds round n+1'],
-          ].map(([n, t, d]) => (
-            <div key={n} className="p-4">
-              <div className="text-xs font-black text-sky-400">step {n}</div>
-              <div className="font-extrabold text-slate-900">{t}</div>
-              <div className="text-xs text-slate-500">{d}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function HeroStat({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-2xl bg-white/80 px-3 py-3 shadow-sm backdrop-blur">
-      <div className="text-lg font-black text-slate-900 sm:text-2xl">{value}</div>
-      <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
-        {label}
-      </div>
     </div>
   )
 }

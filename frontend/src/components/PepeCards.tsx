@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAccount, useWriteContract } from 'wagmi'
 import { ADDRESSES, REINVEST_ENABLED } from '../lib/config'
 import { stakerAbi, reinvestorAbi, buildPoolKey } from '../lib/abi'
 import { fmtAmount, fmtCountdown } from '../lib/format'
+import { useNow } from '../phase/PhaseEngine'
 import { renderPepeSvg } from '../lib/pepeRender'
 import { dnaOfId } from './PepePicker'
 import MixLogo from './MixLogo'
@@ -24,7 +25,7 @@ function Art({ id }: { id: bigint }) {
   const svg = useMemo(() => renderPepeSvg(dnaOfId(id)), [id])
   return (
     <div
-      className="flex h-32 items-center justify-center rounded-2xl bg-gradient-to-b from-sky-50 to-emerald-50 dark:from-slate-800 dark:to-slate-900 [&>svg]:h-28 [&>svg]:w-28"
+      className="flex h-32 items-center justify-center rounded-xl bg-bg-2 [&>svg]:h-28 [&>svg]:w-28"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   )
@@ -52,12 +53,8 @@ export function PepeCard({
   const ethUsd = useEthUsd()
   const [step, setStep] = useState<CardStep>('idle')
   const [error, setError] = useState<string | null>(null)
-  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000)
-    return () => clearInterval(t)
-  }, [])
+  /// shared PhaseEngine heartbeat (B0 refactor — was its own 1s setInterval)
+  const now = useNow()
 
   const { id, amount, requestEpoch } = entry
   const epoch = vest ? vest / 6n : undefined // VEST_EPOCHS = 6 in the staker
@@ -130,45 +127,45 @@ export function PepeCard({
   const dateStr = (ts: number) => new Date(ts * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
-    <div className="card flex flex-col gap-3 p-4">
+    <div className="flex flex-col gap-3 rounded-2xl border border-line bg-bg-1 p-4">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-black uppercase tracking-wide text-slate-400">pepe #{id.toString()}</span>
-        {amount === 0n && <span className="badge-ghost text-[10px]">unstaked pepe</span>}
+        <span className="font-data text-xs text-text-lo">pepe #{id.toString()}</span>
+        {amount === 0n && <span className="text-[10px] text-text-lo">unstaked pepe</span>}
         {decaying && !decayed && (
-          <span className="text-[10px] font-black text-amber-600">{powerLeft !== undefined ? `${powerLeft}% power` : 'decaying'}</span>
+          <span className="text-[10px] font-semibold text-phase-heat">{powerLeft !== undefined ? `${powerLeft}% power` : 'decaying'}</span>
         )}
-        {decayed && <span className="text-[10px] font-black text-emerald-600">fully unlocked</span>}
+        {decayed && <span className="text-[10px] font-semibold text-pepe">fully unlocked</span>}
       </div>
 
       <Art id={id} />
 
       <div className="grid grid-cols-2 gap-2 text-sm">
         <div>
-          <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">staked</div>
-          <div className="font-black text-slate-900 dark:text-slate-100">{fmtAmount(amount)}</div>
+          <div className="text-[10px] text-text-lo">staked</div>
+          <div className="font-data text-text-hi">{fmtAmount(amount)}</div>
         </div>
         <div className="text-right">
-          <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">value</div>
-          <div className="font-black text-slate-900 dark:text-slate-100">
+          <div className="text-[10px] text-text-lo">value</div>
+          <div className="font-data text-text-hi">
             {valueMix !== undefined ? (
               <>
                 ≈{fmtAmount(valueMix, 4)} <MixLogo />
               </>
             ) : (
-              '—'
+              '…'
             )}
           </div>
           {valueUsd !== undefined && (
-            <div className="text-[10px] font-bold text-slate-400">≈ ${valueUsd < 1 ? valueUsd.toFixed(4) : valueUsd.toFixed(2)}</div>
+            <div className="text-[10px] text-text-lo">≈ ${valueUsd < 1 ? valueUsd.toFixed(4) : valueUsd.toFixed(2)}</div>
           )}
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-xl bg-slate-50 dark:bg-slate-800/60 px-3 py-2 text-xs">
-        <span className="font-bold text-slate-500">
-          {isFlat ? '🚨 bomb opened all locks' : decaying ? (decayed ? 'unlocked' : 'unlocks (vesting)') : 'indefinite lock'}
+      <div className="flex items-center justify-between rounded-lg bg-bg-2 px-3 py-2 text-xs">
+        <span className="text-text-lo">
+          {isFlat ? 'bomb opened all locks' : decaying ? (decayed ? 'unlocked' : 'unlocks (vesting)') : 'indefinite lock'}
         </span>
-        <span className="font-black text-psp-deep dark:text-sky-300">
+        <span className="font-semibold text-accent">
           {isFlat
             ? 'withdraw anytime'
             : decaying
@@ -183,15 +180,15 @@ export function PepeCard({
 
       <div className="grid grid-cols-2 gap-2">
         <button
-          className="btn-ghost text-xs"
+          className="st-btn text-xs"
           disabled={busy || (decaying ? !canCancel : !canRequest)}
           onClick={() => act(decaying ? 'cancelWithdraw' : 'requestWithdraw')}
           title={decaying ? 'stop the decay, restore full power' : 'start the 6-week exit ramp'}
         >
-          {decaying ? '↩ keep staking' : '⛏ request withdraw'}
+          {decaying ? '↩ keep staking' : 'request withdraw'}
         </button>
         <button
-          className="btn-ghost text-xs"
+          className="st-btn text-xs"
           disabled={busy || !canWithdraw}
           onClick={() => act('withdraw')}
           title={decaying ? (decayed || isFlat ? 'withdraw principal' : 'withdrawable after the vest') : 'request a withdraw first'}
@@ -201,17 +198,17 @@ export function PepeCard({
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <button className="btn-primary text-xs" disabled={busy || !canClaim} onClick={() => act('claimFees')}>
-          {step === 'done' ? '✅ claimed' : `claim — ${fmtAmount(pending, 4) || '0'} mixETH`}
+        <button className="st-btn st-btn-primary text-xs" disabled={busy || !canClaim} onClick={() => act('claimFees')}>
+          {step === 'done' ? '✓ claimed' : `claim — ${fmtAmount(pending, 4) || '0'} mixETH`}
         </button>
         {REINVEST_ENABLED && (
-          <button className="btn-ghost text-xs" disabled={busy || !canReinvest} onClick={reinvest}>
-            {step === 'done' ? '✅' : busy ? 'confirm…' : approved ? '↻ reinvest' : 'approve & reinvest'}
+          <button className="st-btn text-xs" disabled={busy || !canReinvest} onClick={reinvest}>
+            {step === 'done' ? '✓' : busy ? 'confirm…' : approved ? '↻ reinvest' : 'approve & reinvest'}
           </button>
         )}
       </div>
 
-      {error && <div className="break-words text-[10px] text-rose-500">{error}</div>}
+      {error && <div className="break-words text-[10px] text-phase-critical">{error}</div>}
     </div>
   )
 }

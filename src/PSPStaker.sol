@@ -14,7 +14,7 @@ interface IPepeDescriptor {
 
 /// @title PSPStaker — epoch-point staking with InfiniFi-style linear unwinding.
 /// @notice Design (after InfiniFi-Labs/infinifi-protocol `UnwindingModule`):
-///         All dividend/voting weight lives in a lazily-checkpointed global
+///         All dividend weight lives in a lazily-checkpointed global
 ///         point {weight, slope}. UPWARD weight changes (stake, top-up,
 ///         cancel, genesis lock) land INSTANTLY via direct point correction
 ///         (scoopy 2026-08-28b: a fresh stake earns on the subsequent trade —
@@ -23,9 +23,9 @@ interface IPepeDescriptor {
 ///         bias + slope) — full weight through the request epoch, then
 ///         5/6, 4/6, … 0 at each boundary — implemented as per-epoch slope
 ///         deltas. Accepted trade: front-running a known fee event with
-///         stake capital (JIT-LP style) earns that event's pro-rata share;
-///         governance is unaffected (voteWeight ignores post-snapshot
-///         actionTime).
+///         stake capital (JIT-LP style) earns that event's pro-rata share.
+///         (The vote-weight overlay died with governance — CLOCK-REDESIGN
+///         §4, 2026-09-01; this is a pure fee engine now.)
 ///
 ///         Fee credits are NOT epoch-based (2026-08-28 redesign, scoopy's
 ///         must-fix): a single monotonic `creditPerWeight` accumulator is
@@ -61,8 +61,6 @@ contract PSPStaker {
     error NotDecaying();     // cancel/withdraw without an active request
     error VestNotComplete(); // withdraw before the decay ran out
     error BadOwnerIndex();   // enumeration out of range
-    error VoteLocksArm();    // prisoner's dilemma: live cast vote commits the wallet AND the pepe — no arming
-    error VoteLocksCancel(); // prisoner's dilemma: while a vote is live, armed exits cannot be cancelled
 
     // ─────────────── Events ───────────────
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
@@ -93,7 +91,6 @@ contract PSPStaker {
         uint256 requestEpoch;    // 0 = indefinite lock; E = decay armed at E (full through E)
         uint256 creditCheckpoint; // creditPerWeight at last settle (claims are O(1) deltas)
         uint256 feesPaid;        // cumulative fees paid out
-        uint256 actionTime;      // last weight-mutating action (vote guard)
     }
 
     /// @dev pepeId-keyed: one position per NFT, many NFTs per user.
@@ -127,15 +124,15 @@ contract PSPStaker {
     uint256 public pendingFeesMixETH; // orphaned (zero-weight) fees + rolling remainder
     uint256 public totalLocked;       // Σ principal (display)
 
-    /// @dev Σ principal of positions with NO armed withdraw request — the
-    ///      carpet-vote denominator (scoopy 2026-08-29: quorum must reflect
-    ///      the LIVE locked PSP that is not awaiting the withdraw vest).
-    ///      Maintained incrementally at every mutation site; genesis (id 0)
-    ///      counts (it is always request-free).
-    uint256 public totalVotable;
-
     /// @dev decay steps per vest window: weight(e) = base - k·slope, k = e - requestEpoch
     uint256 public constant VEST_EPOCHS = 6;
+
+    // ─────────────── Governance weight — REMOVED (CLOCK-REDESIGN §4) ───────────────
+    // totalVotable / totalVotableWeight / voteWeight / pepeVoteWeight /
+    // _votableAt / Position.actionTime died with the carpet vote: they
+    // existed solely for quorum + the prisoner's-dilemma commitment, and
+    // the detonation clock needs none of them. The staker keeps the weight
+    // views FEES need (weightAt / biasOf / totalWeight / pendingFeesOf).
 
     // ─────────────── Immutables ───────────────
     IERC20 public immutable psp;
@@ -428,14 +425,12 @@ contract PSPStaker {
         p.weight += amount;
         points[p.epoch] = p;
         pos.amount += amount;
-        pos.actionTime = block.timestamp;
         totalLocked += amount;
-        totalVotable += amount; // staking always lands on a request-free position (RequestActive guard)
 
         emit Locked(user, pepeId, amount);
     }
 
-    /// @notice Arm the 6-epoch linear decay (dividends + votes). Weight stays
+    /// @notice Arm the 6-epoch linear decay (dividends). Weight stays
     ///         full through the request epoch, then steps down each boundary:
     ///         5/6 after one week, 1/2 after three, 0 after six (mainnet).
     function requestWithdraw(uint256 pepeId) external {
@@ -444,30 +439,14 @@ contract PSPStaker {
         if (pos.amount == 0) revert NotLocker();
         if (pos.requestEpoch != 0) revert RequestActive();
 
-        // Prisoner's dilemma (scoopy 2026-08-29): casting a vote is the
-        // commitment to stay. While the vote is live, the voter cannot arm
-        // a withdraw on ANY pepe (wallet guard — no hedging with unvoted
-        // pepes), and a pepe that voted cannot be armed by anyone, even
-        // after transfer (pepe guard). Watching the pack race for the
-        // exits is exactly when you vote instead.
-        if (controller.carpetVoteLive()) {
-            uint256 proposal = controller.proposalCount();
-            if (controller.castWeightOn(proposal, msg.sender) != 0
-                || controller.lastVotedPepeOn(pepeId) == proposal) revert VoteLocksArm();
-        }
-
         _settleAndPay(pepeId, msg.sender, true); // state-then-pay below is safe: request changes no balances
 
         uint256 e = _epoch();
         (uint256 base, uint256 slope) = _decay(pos);
         pos.requestEpoch = e;
-        pos.actionTime = block.timestamp;
         slopeAdd[e] += slope;              // decay starts at the next boundary
         slopeSub[e + VEST_EPOCHS] += slope; // slope retires after the final step
         if (base != pos.amount) biasSub[e] += pos.amount - base; // dust now, exact zero later
-        // Votes leave the pool the moment the request arms (scoopy
-        // 2026-08-29: unstaking PSP must not vote; canceling restores).
-        totalVotable -= pos.amount;
 
         emit WithdrawRequested(msg.sender, pepeId);
     }
@@ -478,13 +457,6 @@ contract PSPStaker {
         _requireOwner(pepeId);
         Position storage pos = positions[pepeId];
         if (pos.requestEpoch == 0) revert NotDecaying();
-
-        // Prisoner's dilemma (scoopy 2026-08-29): once a vote is live, an
-        // armed withdraw is committed — cancelling would reclaim vote
-        // power and re-open the denominator games. Blocked through the
-        // execution of a passing vote; a failed vote releases arms the
-        // moment its window closes.
-        if (controller.carpetVoteLive()) revert VoteLocksCancel();
 
         _settleAndPay(pepeId, msg.sender, true);
 
@@ -510,14 +482,12 @@ contract PSPStaker {
 
         pos.requestEpoch = 0;
         pos.startEpoch = f; // re-anchor at full amount, live from f+1
-        pos.actionTime = block.timestamp;
-        totalVotable += pos.amount; // full vote power restored (scoopy 2026-08-29)
 
         emit WithdrawCancelled(msg.sender, pepeId);
     }
 
     /// @notice Withdraw principal after the decay ran out (or any time once
-    ///         the round is flat — carpet-bomb opens all locks). The NFT
+    ///         the round is flat — detonation opens all locks). The NFT
     ///         survives as a husk: the pepe stays with its owner forever,
     ///         re-stakeable.
     function withdraw(uint256 pepeId) external {
@@ -537,7 +507,6 @@ contract PSPStaker {
         if (pos.requestEpoch != 0) {
             // slope retires at r+6 via slopeSub (lazy) — no correction needed;
             // the position's weight is already zero by construction.
-            // (totalVotable already excluded this at request time.)
         } else {
             // flat-path exit: keep the global honest, instantly
             GlobalPoint memory p = _checkpoint();
@@ -545,7 +514,6 @@ contract PSPStaker {
             points[p.epoch] = p;
         }
         totalLocked -= amount;
-        if (pos.requestEpoch == 0) totalVotable -= amount; // flat-path exit was still votable
         delete positions[pepeId];
 
         psp.safeTransfer(msg.sender, amount);
@@ -601,9 +569,7 @@ contract PSPStaker {
         p.weight += amount;
         points[p.epoch] = p;
         genesis.amount += amount;
-        genesis.actionTime = block.timestamp;
         totalLocked += amount;
-        totalVotable += amount; // genesis never carries a withdraw request
     }
 
     /// @dev Predeposit share claim: move `share` out of the genesis position
@@ -619,7 +585,6 @@ contract PSPStaker {
         genesis.creditCheckpoint = creditPerWeight;
         genesis.feesPaid += shareFees;
         genesis.amount = genesisAmount - share;
-        genesis.actionTime = block.timestamp;
 
         uint256 e = _epoch();
         // weight moves between positions (genesis → fresh pepe), both live
@@ -631,7 +596,6 @@ contract PSPStaker {
         pos.amount = share;
         pos.startEpoch = e;
         pos.creditCheckpoint = creditPerWeight;
-        pos.actionTime = block.timestamp;
 
         if (shareFees != 0) _payFees(user, shareFees, true);
 
@@ -723,45 +687,10 @@ contract PSPStaker {
         return r == 0 ? type(uint256).max : (r + VEST_EPOCHS) * epochSize();
     }
 
-    /// @notice Voting weight at instant `at`: Σ live position power over the
-    ///         caller's pepes that existed by `at`. Governance-only view —
-    ///         a position carries FULL voting power from its creation
-    ///         instant, so new stakes can always join a live vote
-    ///         (scoopy 2026-08-29). A position with an ARMED withdraw
-    ///         request contributes NOTHING — unstaking PSP does not vote;
-    ///         canceling the request restores full power instantly
-    ///         (scoopy 2026-08-29, supersedes the old decay-mirrored vote
-    ///         weight: hard exclusion is simpler to reason about and to
-    ///         display than a sliding 5/6, 4/6 … vote).
-    function voteWeight(address user, uint256 at) external view returns (uint256) {
-        uint256 e = at / epochSize();
-        uint256[] storage ids = _owned[user];
-        uint256 total;
-        for (uint256 i; i < ids.length; ++i) {
-            total += _votableAt(ids[i], e, at);
-        }
-        return total;
-    }
-
-    /// @notice Voting weight of ONE pepe at instant `at` (per-NFT voting —
-    ///         scoopy 2026-08-29). Same rules as voteWeight, single position.
-    function pepeVoteWeight(uint256 pepeId, uint256 at) external view returns (uint256) {
-        return _votableAt(pepeId, at / epochSize(), at);
-    }
-
-    /// @dev votable weight of a position: full principal while request-free,
-    ///      ZERO the moment a withdraw request arms (restored on cancel).
-    function _votableAt(uint256 pepeId, uint256 e, uint256 at) private view returns (uint256) {
-        Position storage pos = positions[pepeId];
-        if (pos.amount == 0) return 0;
-        if (pos.actionTime > at || e < pos.startEpoch) return 0;
-        if (pos.requestEpoch != 0) return 0; // unstaking = not voting
-        return pos.amount;
-    }
-
-    /// @notice Live carpet-vote denominator: Σ locked PSP not awaiting a
-    ///         withdraw cooldown (maintained incrementally — O(1)).
-    function totalVotableWeight() external view returns (uint256) {
-        return totalVotable;
-    }
+    // ─────────────── Vote views — REMOVED (CLOCK-REDESIGN §4, 2026-09-01) ───────────────
+    // voteWeight / pepeVoteWeight / totalVotableWeight served the carpet
+    // vote's quorum + the prisoner's-dilemma commitment exclusively. With
+    // governance dead there is no reader; the detonation clock needs no
+    // stake-weighted anything. Fee-weight views (weightAt / biasOf /
+    // totalWeight / pendingFeesOf) remain above, untouched.
 }

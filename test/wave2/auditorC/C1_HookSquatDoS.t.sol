@@ -45,20 +45,30 @@ contract C1_HookSquatDoS is CBase {
         returns (address orphan)
     {
         (address cand, bytes32 salt) =
-            hookDeployer.mineHook(IPoolManager(address(poolManager)), controller, registry, cfg, 131_072);
+            hookDeployer.mineHook(IPoolManager(address(poolManager)), controller, registry, cfg, address(this), 131_072);
         orphan = hookDeployer.deployHookAt(
-            salt, IPoolManager(address(poolManager)), controller, registry, cfg
+            salt, IPoolManager(address(poolManager)), controller, registry, cfg, address(this)
         );
         assertEq(orphan, cand, "orphan at mined address");
     }
 
-    /// Control: the staged prediction is exact. A clean finalize + birth
+    /// @dev CLOCK-REDESIGN: the staging battery keeps the SPLIT factory
+    ///      primitives alive on purpose — detonate() composes markDestroyed +
+    ///      spawnNextRound (reserve+birth) in one tx, which would consume the
+    ///      reservation before this suite can observe it. The staged path is
+    ///      controller markDestroyed → permissionless reserveSpawn →
+    ///      permissionless birthRound.
+    function _stageNextRound() internal {
+        vm.prank(address(controller1));
+        factory.markDestroyed(1);
+        factory.reserveSpawn(1);
+    }
+
+    /// Control: the staged prediction is exact. A clean stage + birth
     /// lands every contract at its reserved address.
     function test_C1_control_PredictionIsExact_CleanSpawnWorks() public {
         _launchRound1();
-        _bombRound1();
-        _warpPastFlatWindow();
-        controller1.finalizeCarpet();
+        _stageNextRound();
 
         (,,,,, address token, address controller, address hook,, bool active) = factory.reservation();
         assertTrue(active, "reservation live after finalize");
@@ -97,18 +107,13 @@ contract C1_HookSquatDoS is CBase {
         swapper.buy(_key(), 10e18, alice);
         vm.stopPrank();
 
-        // ---- governance kills the round; flat window opens and passes ----
-        _bombRound1();
-        assertGt(controller1.flatTime(), 0, "round is flat");
-        _warpPastFlatWindow();
-
-        // ---- finalize: later block => different entropy => orphan missed ----
+        // ---- the clock strikes zero; anyone detonates (one tx: flat +
+        //      locks open + successor birthed around the orphan). Later
+        //      block => fresh entropy => the orphan's salt space missed. ----
         uint256 reserveBefore = mixETH.balanceOf(address(hook1));
         assertGt(reserveBefore, 0, "hook still custodies unredeemed backing");
-        vm.prank(rando); // permissionless caller, like the real flow
-        controller1.finalizeCarpet();
-        vm.prank(rando);
-        factory.birthRound();
+        _detonateRound1();
+        assertGt(controller1.flatTime(), 0, "round is flat");
 
         // ---- the rebirth completed around the orphan ----
         assertEq(factory.currentRoundId(), 2, "round 2 spawned despite the squat");
@@ -145,9 +150,7 @@ contract C1_HookSquatDoS is CBase {
     /// and a variant deploy with different args simply lands elsewhere.
     function test_C1_committedReservationCannotBeHijacked() public {
         _launchRound1();
-        _bombRound1();
-        _warpPastFlatWindow();
-        controller1.finalizeCarpet();
+        _stageNextRound();
 
         (
             ,
@@ -187,7 +190,7 @@ contract C1_HookSquatDoS is CBase {
         // flag self-check rejects the un-mined address outright.
         vm.prank(attacker);
         try hookDeployer.deployHookAt(
-            hookSalt, IPoolManager(address(poolManager)), makeAddr("rogue-controller"), registry, cfg
+            hookSalt, IPoolManager(address(poolManager)), makeAddr("rogue-controller"), registry, cfg, address(this)
         ) returns (address rogueHook) {
             assertTrue(rogueHook != hook, "variant lands elsewhere - reserved slot untouchable");
         } catch {
@@ -218,7 +221,7 @@ contract C1_HookSquatDoS is CBase {
 
         vm.prank(attacker);
         address helpedHook = hookDeployer.deployHookAt(
-            hookSalt, IPoolManager(address(poolManager)), controller, registry, cfg
+            hookSalt, IPoolManager(address(poolManager)), controller, registry, cfg, address(this)
         );
         assertEq(helpedHook, hook, "attacker could only deploy the identical hook");
 

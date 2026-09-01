@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# anvil-e2e.sh — staged-spawn end-to-end with REAL receipts (2026-08-30)
+# anvil-e2e.sh — clock-detonation end-to-end with REAL receipts
+# (staged-spawn receipts kept; governance-kill leg replaced 2026-09-01)
 #
 # Drives the full production lifecycle against a local anvil node, one
-# broadcast per action, so every staged leg gets a real tx + gas receipt:
+# broadcast per action, so every leg gets a real tx + gas receipt:
 #
 #   genesis deployRound (composed reserve+birth)
 #   → predeposit ×2 → launch → round-1 buy → claims
-#   → propose → vote ×2 → carpetBomb → finalizeCarpet  [RESERVE receipt]
-#   → birthRound (permissionless rando)                [BIRTH receipt]
+#   → warp past detonationAt → detonate (permissionless rando)
+#     [mark + RESERVE + BIRTH inside the one detonate tx]
 #   → verify round 2 landed on the reserved addresses
 #   → round-2 buy via PSPZapIn                         [round-2 ALIVE]
 #
-# Timings: fast playtest profile — 2m predeposit, 6×60s vest epochs, 60s
-# vote window, 60s flat exit, 10-mix wallet cap.
+# Timings: fast playtest profile — 2m predeposit, 6×60s vest epochs,
+# 10-mix wallet cap. The clock is the mainnet-real 72h (warped past).
 # Usage: bash scripts/anvil-e2e.sh   (expects anvil on 8545; starts one if absent)
 # Env:   PSP_CURVE (default 0 = full 34-zone staircase, the round-2 shape)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -24,8 +25,6 @@ RPC="${RPC:-http://127.0.0.1:8545}"
 CURVE="${PSP_CURVE:-0}"
 PRE_SEC=120
 VEST_SEC=360                   # ÷6 = 60s epochs
-VOTE_SEC=60
-FLAT_SEC=60
 
 # anvil deterministic accounts — keys derived from the canonical anvil
 # mnemonic (verified: cast wallet address matches the funded accounts)
@@ -91,8 +90,8 @@ sort_pair() { # sort_pair <a> <b> → echoes "low high"
 echo "▪ DeployPSP (PSP_ANVIL=1 PSP_CURVE=$CURVE)"
 DEPLOY_LOG=/tmp/psp-e2e-deploy.log
 PSP_ANVIL=1 PSP_CURVE="$CURVE" \
-PSP_PREDEPOSIT_SEC=$PRE_SEC PSP_VEST_SEC=$VEST_SEC PSP_VOTE_SEC=$VOTE_SEC \
-PSP_FLAT_EXIT_SEC=$FLAT_SEC PSP_WALLET_CAP_MIX=10 \
+PSP_PREDEPOSIT_SEC=$PRE_SEC PSP_VEST_SEC=$VEST_SEC \
+PSP_WALLET_CAP_MIX=10 \
   forge script DeployPSP --rpc-url "$RPC" --broadcast --private-key "$K_OWNER" 2>&1 | tee "$DEPLOY_LOG" >/dev/null
 FACTORY=$(grep -o 'factory: 0x[0-9a-fA-F]*' "$DEPLOY_LOG" | tail -1 | awk '{print $2}')
 MIX=$(grep -o 'ANVIL mock mixETH: 0x[0-9a-fA-F]*' "$DEPLOY_LOG" | tail -1 | awk '{print $4}')
@@ -143,43 +142,31 @@ send "R1 buy 1 ETH via zapIn (rando)" "$K_RANDO" "$ZAPIN" --value 1ether \
 send "claim PSP alice" "$K_ALICE" "$R1_CTRL" "claimPredepositPSP()"
 send "claim PSP bob" "$K_BOB" "$R1_CTRL" "claimPredepositPSP()"
 
-# ── 6. epoch boundary → governance kill ────────────────────────────────────
-EPOCH=$((VEST_SEC / 6))
-warp_to $(( (( $(TS) / EPOCH) + 1) * EPOCH + 2 ))
-send "proposeCarpetBomb (alice)" "$K_ALICE" "$R1_CTRL" "proposeCarpetBomb()"
-PROPOSE_TS=$(cast call "$R1_CTRL" "currentProposal()(uint256,uint256,uint256,uint256,uint256)" --rpc-url "$RPC" | awk 'NR==2{print $1}')
+# ── 6. THE CLOCK KILLS THE ROUND (governance died 2026-09-01) ───────────────
+# detonationAt was armed at launch (72h window, mainnet-real). Buys extend
+# it; nothing here does, so warp past it and let any rando detonate: one tx
+# = pot frozen + flat + all locks open + mark + RESERVE + BIRTH of round 2.
+DET_AT=$(cast call "$R1_HOOK" "detonationAt()(uint256)" --rpc-url "$RPC" | awk '{print $1}')
+warp_to $(( DET_AT + 2 ))
 
-ids_of() { # ids_of <wallet> → "[id,id,...]"
-  local n id i out=""
-  n=$(( $(cast call "$R1_STAKER" "balanceOf(address)(uint256)" "$1" --rpc-url "$RPC") ))
-  for ((i = 0; i < n; i++)); do
-    id=$(( $(cast call "$R1_STAKER" "tokenOfOwnerByIndex(address,uint256)(uint256)" "$1" "$i" --rpc-url "$RPC") ))
-    out+="${id},"
-  done
-  echo "[${out%,}]"
-}
-send "vote YES alice (all pepes)" "$K_ALICE" "$R1_CTRL" "voteCarpetBomb(uint256[],bool)" "$(ids_of "$ALICE")" true
-send "vote YES bob (all pepes)" "$K_BOB" "$R1_CTRL" "voteCarpetBomb(uint256[],bool)" "$(ids_of "$BOB")" true
-
-warp_to $(( PROPOSE_TS + VOTE_SEC + 2 ))
-send "carpetBomb (alice)" "$K_ALICE" "$R1_CTRL" "carpetBomb()"
-
-# ── 7. flat window → THE STAGED LEGS ────────────────────────────────────────
-FLAT_TS=$(cast call "$R1_CTRL" "flatTime()(uint256)" --rpc-url "$RPC" | awk '{print $1}')
-warp_to $(( FLAT_TS + FLAT_SEC + 2 ))
-# finalizeCarpet = drain + mark + RESERVE (bounded mine). The ~0.03% tail:
-# no flag match inside the cap → revert CHEAP → production retries next
-# block with fresh entropy. Mirror those semantics.
-FIN_TX=""
+# detonate wraps spawnNextRound → the ~0.03% reserve-mine tail can bounce
+# the whole tx CLEAN (atomic revert; clock stays at zero). Production
+# semantics: retry next block with fresh entropy. Mirror them.
+DET_TX=""
 for attempt in 1 2 3 4 5; do
-  FIN_TX=$(cast send "$R1_CTRL" "finalizeCarpet()" --rpc-url "$RPC" --private-key "$K_RANDO" --json 2>/tmp/psp-e2e-fin-err.log | jq -r '.transactionHash')
-  if [ -n "$FIN_TX" ] && [ "$FIN_TX" != "null" ]; then break; fi
-  echo "  finalize attempt $attempt bounced (next block re-rolls entropy): $(tail -1 /tmp/psp-e2e-fin-err.log | head -c 120)"
+  DET_TX=$(cast send "$R1_CTRL" "detonate()" --rpc-url "$RPC" --private-key "$K_RANDO" --json 2>/tmp/psp-e2e-det-err.log | jq -r '.transactionHash')
+  if [ -n "$DET_TX" ] && [ "$DET_TX" != "null" ]; then break; fi
+  echo "  detonate attempt $attempt bounced (next block re-rolls entropy): $(tail -1 /tmp/psp-e2e-det-err.log | head -c 120)"
   cast rpc evm_mine --rpc-url "$RPC" >/dev/null
 done
-[ -n "$FIN_TX" ] && [ "$FIN_TX" != "null" ] || { echo "✗ finalize never landed"; cat /tmp/psp-e2e-fin-err.log; exit 1; }
-receipt "finalizeCarpet→RESERVE (rando)" "$FIN_TX"
-send "birthRound (rando)" "$K_RANDO" "$FACTORY" "birthRound()"
+[ -n "$DET_TX" ] && [ "$DET_TX" != "null" ] || { echo "✗ detonate never landed"; cat /tmp/psp-e2e-det-err.log; exit 1; }
+receipt "detonate→RESERVE+BIRTH (rando)" "$DET_TX"
+
+# post-detonation invariants: flat mode, locks open, round 2 already born
+MODE=$(cast call "$R1_HOOK" "mode()(uint8)" --rpc-url "$RPC")
+echo "  R1 hook mode=$MODE (2 = Flat expected)"
+FLAT_TS=$(cast call "$R1_CTRL" "flatTime()(uint256)" --rpc-url "$RPC" | awk '{print $1}')
+[ "$FLAT_TS" != "0" ] || { echo "✗ flatTime not set"; exit 1; }
 
 # ── 8. verify round 2 landed on the reservation ─────────────────────────────
 read -r R2_TOKEN R2_CTRL R2_HOOK _ <<< "$(round 2)"

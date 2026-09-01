@@ -19,6 +19,10 @@ export interface RoundInfo {
   marginalPrice: bigint | undefined
   totalLocked: bigint | undefined
   flatTime: bigint | undefined // bomb timestamp — nonzero = flat, locks open
+  /// CLOCK-REDESIGN §1: the round's detonation time (SECONDS). undefined =
+  /// not armed yet (predeposit), round not in Active mode, or the hook
+  /// predates the clock (read reverts — caught, reported as undefined).
+  detonationAt: bigint | undefined
   predepositClosed: boolean | undefined
   totalPredeposit: bigint | undefined
   predepositCap: bigint | undefined
@@ -33,6 +37,7 @@ const EMPTY: RoundInfo = {
   mode: undefined, reserve: undefined, supply: undefined, marginalPrice: undefined,
   totalLocked: undefined, predepositClosed: undefined, totalPredeposit: undefined,
   predepositCap: undefined, curve: undefined, flatTime: undefined, sine: null,
+  detonationAt: undefined,
 }
 
 const F = ADDRESSES.factory as `0x${string}`
@@ -89,6 +94,15 @@ function startRoundLoop() {
       if (sine?.active && reserve) {
         livePrice = (await rpcCall(rHook, hookAbi, 'sinePriceAt', [reserve])) as bigint
       }
+      // CLOCK-REDESIGN §6.1: the detonation clock rides THIS lane (no new
+      // cadence). Active rounds only, and a hook without the clock reverts
+      // the read — isolated so one unknown selector can't sink the batch.
+      let detonationAt: bigint | undefined
+      if (Number(mode) === 1) {
+        detonationAt = await (
+          rpcCall(rHook, hookAbi, 'detonationAt') as Promise<bigint>
+        ).catch(() => undefined)
+      }
       shared = {
         id, token: rToken, controller: rController, staker: rStaker, hook: rHook, mix,
         mode: Number(mode), reserve, supply, marginalPrice: livePrice,
@@ -97,6 +111,7 @@ function startRoundLoop() {
         flatTime,
         curve: { p0: cfg, zones: zones.map((z) => ({ ...z })) },
         sine,
+        detonationAt,
       }
       backoffMs = 0
       listeners.forEach((l) => l(shared))

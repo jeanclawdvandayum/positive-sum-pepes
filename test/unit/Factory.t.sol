@@ -49,21 +49,11 @@ contract FactoryTest is Test {
 
     uint160 constant SQRT_RATIO_1_1 = 79228162514264337593543950336;
 
-    /// @dev Vote with EVERY pepe `who` owns (2026-08-29 per-NFT voting).
-    function _voteAll(address who, bool support) internal {
-        PSPStaker s = controller.staker();
-        uint256 n = s.balanceOf(who);
-        uint256[] memory ids = new uint256[](n);
-        for (uint256 i; i < n; ++i) ids[i] = s.tokenOfOwnerByIndex(who, i);
-        vm.prank(who);
-        controller.voteCarpetBomb(ids, support);
-    }
-
     function setUp() public {
         mixETH = new MockMixETH();
         mixETH.depositETH{value: 100_000e18}();
         poolManager = new MockPoolManager();
-        factory = new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), 0);
+        factory = new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), 0, address(this));
 
         _deployRound1();
     }
@@ -201,11 +191,11 @@ contract FactoryTest is Test {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  L-1 evolution: carpetBomb births the next round automatically
+    //  L-1 evolution: detonate births the next round automatically
     // ═══════════════════════════════════════════════════════════════
 
     function test_L1_CarrySpawnsNextRoundAutomatically() public {
-        // Destroy round 1 through the real governance flow
+        // Kill round 1 through the real clock flow
         mixETH.transfer(alice, 200e18);
         mixETH.transfer(bob, 200e18);
 
@@ -227,26 +217,17 @@ contract FactoryTest is Test {
         vm.prank(bob);
         controller.claimPredepositPSP();
 
-        // M-1 convention: locks must predate the proposal — and fresh claims
-        // go live at the next epoch boundary (epoch-point liveness)
-        vm.warp(((block.timestamp / 7 days) + 1) * 7 days + 1);
+        // CLOCK-REDESIGN: the clock armed at launch is the only death
+        // authority. Strike zero and detonate — one permissionless tx.
+        vm.warp(hook.detonationAt() + 1);
+        vm.prank(attacker); // anyone
+        controller.detonate();
 
-        vm.prank(alice);
-        controller.proposeCarpetBomb();
-        _voteAll(alice, true);
-        _voteAll(bob, true);
+        assertEq(uint8(hook.mode()), uint8(CurveHook.Mode.Flat), "round flat (hook stays Flat; redemption is indefinite)");
+        assertGt(controller.flatTime(), 0, "flatTime set (locks open)");
+        assertTrue(factory.getRound(1).destroyed, "round 1 flagged destroyed on the factory");
 
-        skip(3 days + 1);
-        controller.carpetBomb();
-        skip(3 days + 1);
-        controller.finalizeCarpet();
-        factory.birthRound(); // staged: birth is the second, permissionless tx
-
-        (,,,,, bool canExecute) = controller.getCarpetBombState();
-        assertFalse(canExecute, "proposal already executed");
-        assertEq(uint8(hook.mode()), uint8(CurveHook.Mode.Destroyed), "round destroyed");
-
-        // carpetBomb birthed round 2 — under indefinite redemption (2026-08-30)
+        // detonate birthed round 2 — under indefinite redemption (2026-08-30)
         // the dead hook KEEPS its backing; round 2 carries NOTHING unless the
         // factory was donated mixETH. The birth must still complete cleanly.
         assertEq(factory.currentRoundId(), 2, "round 2 spawned");

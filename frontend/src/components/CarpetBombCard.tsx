@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAccount, useWriteContract } from 'wagmi'
 import { useRpcReads } from '../lib/useRpcReads'
 import { controllerAbi, stakerAbi } from '../lib/abi'
+import { useNow } from '../phase/PhaseEngine'
 import { rpcCall } from '../lib/rpc'
 import { useRound } from '../lib/useRound'
 import { fmtAmount, fmtCountdown } from '../lib/format'
@@ -23,18 +24,14 @@ export default function CarpetBombCard() {
   const { address, isConnected } = useAccount()
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
-  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
+  /// shared PhaseEngine heartbeat (B0 refactor — was its own 1s setInterval)
+  const now = useNow()
   const { writeContractAsync } = useWriteContract()
 
   /// selected pepes for the vote (id-KEYED — indices reshuffle when the
   /// list reorders on mint/transfer, ids never do; shaggoth finding 1)
   const [pepes, setPepes] = useState<Pepe[] | undefined>(undefined)
   const [selected, setSelected] = useState<Set<string>>(new Set())
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000)
-    return () => clearInterval(t)
-  }, [])
 
   /// poll: proposal + my pepes + per-pepe vote state + live denominator
   const ZERO = '0x0000000000000000000000000000000000000000' as const

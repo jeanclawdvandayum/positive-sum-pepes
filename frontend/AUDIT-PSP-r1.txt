@@ -1,0 +1,19 @@
+AUDIT ROUND 1 — Positive Sum Pepes app redesign, "a machine with a heartbeat" (dark-first arcade terminal). Four full-page screenshots, in order:
+[1] EXPLAINER in CRITICAL phase (<1h remaining, red accent)
+[2] EXPLAINER in CALM phase (>12h, teal-green accent)
+[3] PLAY in HEAT phase (amber accent)
+[4] STAKE in CALM phase
+
+The design thesis you are grading against: discipline everywhere so the clock can be loud; the app FEELS the clock via color temperature (calm teal / heat amber / critical red driving one accent variable); tension + "no rug" safety as the personality. The previous version of this app was rejected for being "emotionally inert" and "a meditation app costume" (pastel, card walls).
+
+Grade:
+1. Does [1] vs [2] prove the phase engine — is the CRITICAL explainer visibly a different temperature/moment than CALM (accent on CTA, clock glow, nav pill)? Would a returning visitor notice the app changed?
+2. Is the CLOCK the loud element on each page, with everything else quiet? Or does anything compete with it?
+3. Typography roles: chunky pixel display headline + clean sans body + seven-segment/tabloid numerals — distinct and correct? Any body copy still in a pixel face (banned)?
+4. Explainer [1][2]: narrative (hero w/ live clock + greeter pepe -> "one round, five beats" timeline -> "the math, straight" table + payout slider -> "no rug, ever" closing) — does it read as a STORY with hierarchy, or still a reference sheet? Is "no rug, ever" given display treatment?
+5. Play [3]: clock+pot as one instrument, swap left / ladder right, live tape, curve in accent — does it read as a command center? Are ladder rows hierarchical (#1 larger, gold edge, % as bars)?
+6. Stake [4]: "your pepe works here" — identity panel lead, ticking fee accumulator visible, referrals + hall of detonations — does the page have a soul?
+7. Banned-list scan: identical rounded cards w/ soft shadows? decorative gradients? all-caps tracked labels above headings? emoji?
+8. Empty/loading states: designed states in the lowercase deadpan voice ("nobody's sitting in it", "armed the moment the round launches") present and charming, or absent?
+9. SCORE /10 per page + overall, VERDICT per page (MASTERPIECE / ONE PASS AWAY / NEEDS WORK).
+10. Max 8 numbered surgical fixes total, highest impact first, element + exact change. Fewer is better.

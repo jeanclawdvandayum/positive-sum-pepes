@@ -44,7 +44,8 @@ contract PlaytestFixes2 is Test {
             new HookDeployer(),
             new ControllerDeployer(),
             new StakerDeployer(),
-            0
+            0,
+            address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );
 
         PSPFactory.RoundParams memory params;
@@ -72,7 +73,8 @@ contract PlaytestFixes2 is Test {
             new HookDeployer(),
             new ControllerDeployer(),
             new StakerDeployer(),
-            CurveMath.packTimingsCapped(2 hours, 1 hours, 30 minutes, 10 minutes, 10)
+            CurveMath.packTimingsCapped(2 hours, 1 hours, 10),
+            address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );
         PSPFactory.RoundParams memory params;
         params.name = "Capped";
@@ -168,9 +170,7 @@ contract PlaytestFixes2 is Test {
             string memory symbol,
             bool destroyed,
             uint256 pd,
-            uint256 vest,
-            uint256 vote,
-            uint256 flatExit
+            uint256 vest
         ) = factory.roundInfo(1);
         assertEq(token, tok);
         assertEq(ctl, address(ctlR1));
@@ -180,11 +180,11 @@ contract PlaytestFixes2 is Test {
         assertEq(name, "Positive Sum Pepes");
         assertEq(symbol, "PSP");
         assertFalse(destroyed);
-        // mainnet-default timings (factory constructed with _timings == 0)
+        // mainnet-default timings (factory constructed with _timings == 0).
+        // CLOCK-REDESIGN §4: the vote + flat-exit slots died with governance
+        // and the exit window — roundInfo carries predeposit/vest only.
         assertEq(pd, 7 days);
         assertEq(vest, 42 days);
-        assertEq(vote, 3 days);
-        assertEq(flatExit, 3 days);
     }
 
     function test_FactoryViews_UnknownRoundReverts() public {
@@ -197,10 +197,9 @@ contract PlaytestFixes2 is Test {
     }
 
     /// @dev The full rebirth loop, exercising the views at every hop:
-    ///      predeposit → launch → stake → bomb → exit window → finalize
-    ///      → round 2 exists as "Positive Sum Pepes 2"/"PSP2" with the
-    ///      carry seeded and its own fresh token, starting from ITS
-    ///      predeposit phase.
+    ///      predeposit → launch → clock strikes zero → detonate → round 2
+    ///      exists as "Positive Sum Pepes 2"/"PSP2" with the carry seeded
+    ///      and its own fresh token, starting from ITS predeposit phase.
     function test_Rebirth_Round2IsPSP2_FromPredeposit() public {
         // ── round 1 lifecycle ──
         vm.startPrank(alice);
@@ -212,28 +211,19 @@ contract PlaytestFixes2 is Test {
 
         vm.prank(alice);
         controller.claimPredepositPSP();
-        // epoch boundary so the claim carries vote weight
-        vm.warp(((block.timestamp / 7 days) + 1) * 7 days + 1);
 
         address psp1Addr = address(psp1);
+        (,, CurveHook hook1,,,) = factory.rounds(1);
 
-        // ── bomb: propose + unanimous vote + execute ──
-        vm.prank(alice);
-        controller.proposeCarpetBomb();
-        _voteAll(alice, true);
-        (, uint256 proposeTime,,,) = controller.currentProposal();
-        vm.warp(proposeTime + 3 days + 1);
-        controller.carpetBomb(); // → Flat
+        // ── the clock armed at launch strikes zero — detonate (permissionless,
+        //    one tx: flat + locks open + round 2 birthed) ──
+        vm.warp(hook1.detonationAt() + 1);
+        vm.prank(bob);
+        controller.detonate(); // → Flat + round 2 born in-tx
 
         // flat: buys dead, sells open (exit at average backing)
-        (,, CurveHook hook1,,,) = factory.rounds(1);
         vm.expectRevert(CurveHook.BuyingDisabled.selector);
         hook1.getBuyOutput(1e18);
-
-        // ── exit window closes → finalize births round 2 ──
-        vm.warp(block.timestamp + 3 days + 1);
-        controller.finalizeCarpet();
-        factory.birthRound(); // staged: birth is the second, permissionless tx
 
         assertEq(factory.currentRound(), 2, "round 2 is current");
 
@@ -255,13 +245,13 @@ contract PlaytestFixes2 is Test {
         assertEq(c2.totalPredepositMixETH(), 0, "no carry - round 2 boots from its own raise");
 
         // roundInfo(2) exposes everything the UI needs
-        (,,,,, string memory n2, string memory s2, bool destroyed2,,,,) = factory.roundInfo(2);
+        (,,,,, string memory n2, string memory s2, bool destroyed2,,) = factory.roundInfo(2);
         assertEq(n2, "Positive Sum Pepes 2");
         assertEq(s2, "PSP2");
         assertFalse(destroyed2);
 
         // ...and round 1 is flagged destroyed in the same view
-        (,,,,,,, bool destroyed1,,,,) = factory.roundInfo(1);
+        (,,,,,,, bool destroyed1,,) = factory.roundInfo(1);
         assertTrue(destroyed1);
 
         // a wallet can predeposit into round 2 immediately (per-wallet cap fresh)
@@ -269,13 +259,5 @@ contract PlaytestFixes2 is Test {
         mixETH.approve(address(c2), type(uint256).max);
         c2.predeposit(10e18);
         vm.stopPrank();
-    }
-
-    function _voteAll(address who, bool support) internal {
-        uint256 n = stakerV.balanceOf(who);
-        uint256[] memory ids = new uint256[](n);
-        for (uint256 i; i < n; ++i) ids[i] = stakerV.tokenOfOwnerByIndex(who, i);
-        vm.prank(who);
-        controller.voteCarpetBomb(ids, support);
     }
 }

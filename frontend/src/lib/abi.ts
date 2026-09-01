@@ -112,6 +112,22 @@ export const hookAbi = parseAbi([
   'function sinePriceAt(uint256 R) view returns (uint256)',
   'event Buy(address indexed buyer, uint256 mixETHIn, uint256 pspOut, uint256 newSupply, uint256 newReserveMixETH)',
   'event Sell(address indexed seller, uint256 pspIn, uint256 mixETHOut, uint256 newSupply, uint256 newReserveMixETH)',
+  // CLOCK-REDESIGN §1/§2/§4/§5 — BINDING read/write surface (scoopy, 2026-08-31).
+  // Declared here so the frontend typechecks before the contracts sibling
+  // lands src/; signatures come straight from the spec, nothing invented.
+  // detonationAt is SECONDS (block.timestamp domain) — the UI multiplies to ms.
+  'function detonationAt() view returns (uint256)',
+  // rolling last-10 ticket board: (buyer, pspAmount, mixPaid, ts), newest first
+  'function board(uint256) view returns (address, uint256, uint256, uint256)',
+  'function potBalance() view returns (uint256)',
+  'function claimablePot(address) view returns (uint256)',
+  'function claimPot()',
+  // permissionless; gated block.timestamp >= detonationAt; idempotent via mode
+  'function detonate()',
+  // burn PSP for floor pro-rata backing — payout per PSP frozen at detonation
+  'function redeemBacking(uint256)',
+  'event TimeAdded(address indexed buyer, uint256 wholePsp, uint256 newDetonationAt)',
+  'event Detonated(address indexed by, uint256 potDistributed, address nextRound)',
 ])
 
 export const erc20Abi = parseAbi([

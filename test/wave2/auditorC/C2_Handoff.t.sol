@@ -25,21 +25,17 @@ contract C2_Handoff is CBase {
         swapper.buy(_key(), 10e18, alice);
         vm.stopPrank();
 
-        _bombRound1();
+        _detonateRound1();
 
-        // v5.1: bomb flattens only — nothing redeemed, nothing ring-fenced
-        assertEq(mixETH.balanceOf(address(factory)), 0, "factory holds nothing post-bomb");
+        // v5.1+: detonate flattens + births in one tx — nothing redeemed,
+        // nothing ring-fenced, nothing left at the factory
+        assertEq(mixETH.balanceOf(address(factory)), 0, "factory holds nothing post-detonate");
 
-        _warpPastFlatWindow();
-
-        // What the dying hook custodies at finalize time — under indefinite
-        // redemption (2026-08-30) this STAYS PUT: the backing of unredeemed
-        // PSP, payable via hook.redeemBacking forever
+        // What the dying hook custodies — under indefinite redemption
+        // (2026-08-30) this STAYS PUT: the backing of unredeemed PSP,
+        // payable via hook.redeemBacking forever
         uint256 backing = mixETH.balanceOf(address(hook1));
         assertGt(backing, 0, "unredeemed backing remains (backing of kept PSP + dust)");
-
-        controller1.finalizeCarpet();
-        factory.birthRound(); // staged: birth is the second, permissionless tx
 
         // ── the new model: death does not endow. The dead hook keeps every
         //    wei; round 2's boot is its own predeposit (factory held nothing
@@ -81,11 +77,8 @@ contract C2_Handoff is CBase {
     /// No-buy branch: no swap flow at all — the reserve simply waits.
     function test_C2_NoBuyBranch() public {
         _launchRound1();
-        _bombRound1();
-        _warpPastFlatWindow();
         uint256 backing = mixETH.balanceOf(address(hook1));
-        controller1.finalizeCarpet();
-        factory.birthRound(); // staged: birth is the second, permissionless tx
+        _detonateRound1();
 
         PSPFactory.Round memory r2 = factory.getRound(2);
         assertEq(r2.controller.totalPredepositMixETH(), 0, "no carry");
@@ -116,14 +109,10 @@ contract C2_Handoff is CBase {
     /// with the dead hook, waiting for its holders.
     function test_C2_DonationsRideTheCarry() public {
         _launchRound1();
-        _bombRound1();
         uint256 donated = 7e18;
         mixETH.transfer(address(factory), donated);
-
-        _warpPastFlatWindow();
         uint256 backing = mixETH.balanceOf(address(hook1));
-        controller1.finalizeCarpet();
-        factory.birthRound(); // staged: birth is the second, permissionless tx
+        _detonateRound1(); // births round 2 in-tx — the donation rides along
 
         // only the donation became round-2 predeposit carry
         PSPFactory.Round memory r2 = factory.getRound(2);

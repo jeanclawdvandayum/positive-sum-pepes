@@ -513,48 +513,51 @@ library CurveMath {
     uint256 internal constant MAX_EXP_K_WIDTH = 7e18 * 1e18; // = 7e36
 
     // ─────────────── Timing-profile packing ───────────────
-    /// @dev Five 51-bit fields, 255 bits total. (The naive 5x64 layout
-    ///      needs 320 bits: the fifth slot silently truncated to zero —
-    ///      found on the sepolia dry-run 2026-08-19, vote window closed
-    ///      instantly. 51 bits still caps each field at ~71M years.)
-    ///      timings == 0 encodes "mainnet defaults" in RoundController.
-    uint256 internal constant TIMINGS_MASK = (1 << 51) - 1;
+    /// @dev Widths are DERIVED from the field count (CLOCK-REDESIGN 2026-09-01,
+    ///      per LESSONS 2026-08-24 / 2026-08-18): TIMINGS_COUNT fields, each
+    ///      TIMINGS_WIDTH = 256 / TIMINGS_COUNT bits wide, laid out at
+    ///      k * TIMINGS_WIDTH. Fields: [0] predeposit window, [1] unstake vest,
+    ///      [2] per-wallet predeposit cap (whole mixETH). The vote slot died
+    ///      with governance; the flat-exit window died with indefinite
+    ///      redemption. timings == 0 encodes "mainnet defaults" in
+    ///      RoundController.
+    uint256 internal constant TIMINGS_COUNT = 3;
+    uint256 internal constant TIMINGS_WIDTH = 256 / TIMINGS_COUNT; // 85 bits — ~10^25 years
+    uint256 internal constant TIMINGS_MASK = (1 << TIMINGS_WIDTH) - 1;
+
+    /// @dev COMPILE-TIME LAYOUT ASSERT (do not remove): the last field must
+    ///      end inside the word. If a future field push makes
+    ///      TIMINGS_COUNT * TIMINGS_WIDTH exceed 256, this constant's shift
+    ///      goes out of range and the BUILD fails — the exact hole the 5x64
+    ///      vote-slot truncation slipped through (silent deploy, window=0).
+    uint256 internal constant TIMINGS_LAYOUT_GUARD = 1 << (TIMINGS_COUNT * TIMINGS_WIDTH - 1);
 
     /// @notice Pack a timing profile into the CurveConfig.timings slot.
-    ///         All fields MUST be non-zero (zero encodes defaults).
-    ///         Reverts on any field >= 2^51 — an oversized field would
-    ///         otherwise spill nonzero garbage into the next slot, which
-    ///         the deploy-side TimingsIncomplete guard cannot see.
-    ///         (2026-08-28: lock/extend/relock retired with the ve-decay
-    ///         redesign; three slots remained. Same day: flat-exit added as
-    ///         a FOURTH slot — the hardcoded 3d window made playtest rebirth
-    ///         cycles unbearably slow and wasn't env-tunable.)
+    ///         Reverts on any field >= 2^TIMINGS_WIDTH — an oversized field
+    ///         would otherwise spill nonzero garbage into the next slot,
+    ///         which the deploy-side TimingsIncomplete guard cannot see.
     function packTimings(
         uint256 predeposit,
-        uint256 vest,
-        uint256 vote,
-        uint256 flatExit
+        uint256 vest
     ) internal pure returns (uint256) {
-        if (predeposit >= (1 << 51) || vest >= (1 << 51) || vote >= (1 << 51) || flatExit >= (1 << 51)) {
+        if (predeposit >= (1 << TIMINGS_WIDTH) || vest >= (1 << TIMINGS_WIDTH)) {
             revert TimingsOverflow();
         }
         if (vest % 6 != 0) revert VestNotEpochal(); // staker splits the vest into 6 decay epochs
-        return predeposit | (vest << 51) | (vote << 102) | (flatExit << 153);
+        return predeposit | (vest << TIMINGS_WIDTH);
     }
 
-    /// @dev 5-slot profile (scoopy 2026-08-29): the four timing slots plus a
-    ///      per-wallet predeposit cap in WHOLE mixETH (slot 204 — wad values
-    ///      don't fit 51 bits; 10 = 10e18 wei). 0 = uncapped. packTimings
-    ///      output is a valid prefix (its slot-5 reads zero).
+    /// @dev 3-slot profile: the two timing slots plus a per-wallet predeposit
+    ///      cap in WHOLE mixETH (wad values don't fit the width; 10 = 10e18
+    ///      wei). 0 = uncapped. packTimings output is a valid prefix (its
+    ///      slot-3 reads zero).
     function packTimingsCapped(
         uint256 predeposit,
         uint256 vest,
-        uint256 vote,
-        uint256 flatExit,
         uint256 walletCapMix
     ) internal pure returns (uint256) {
-        if (walletCapMix >= (1 << 51)) revert TimingsOverflow();
-        return packTimings(predeposit, vest, vote, flatExit) | (walletCapMix << 204);
+        if (walletCapMix >= (1 << TIMINGS_WIDTH)) revert TimingsOverflow();
+        return packTimings(predeposit, vest) | (walletCapMix << (2 * TIMINGS_WIDTH));
     }
 
     error TimingsOverflow();

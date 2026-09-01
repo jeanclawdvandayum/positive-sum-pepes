@@ -39,7 +39,8 @@ contract FatCurveSpawn is Test {
             new HookDeployer(),
             new ControllerDeployer(),
             new StakerDeployer(),
-            0
+            0,
+            address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );
     }
 

@@ -1,0 +1,27 @@
+AUDIT ROUND 2 — Positive Sum Pepes app redesign, "a machine with a heartbeat" (dark-first arcade terminal). Four full-page screenshots, in order:
+[1] EXPLAINER in CRITICAL phase (<1h remaining, red accent)
+[2] EXPLAINER in CALM phase (>12h, teal-green accent)
+[3] PLAY in HEAT phase (amber accent)
+[4] STAKE in CALM phase
+
+Context: round 1 scored 8.5/10 overall — "one pass away" — with a clean banned-list sweep. Six surgical fixes were applied since. Your job: verify each fix landed AND re-grade the whole.
+
+Regression checks (fix number → what changed → what to look for):
+1. Play clock digits: were dark-gray → now accent-filled with soft glow in HEAT. The clock must out-shout the pot. Did it land?
+2. Play "the curve" line: was gray dashed → now solid accent with soft glow; only the ghost/projected segment stays dashed. Visible?
+3. Explainer beat illustrations (esp. beat 02 "1 psp = 1 ticket"): contrast raised ~2 steps, diagrams stroked in the current phase accent. Do the timeline diagrams read as drawn-intentional now, not placeholder?
+4. Stake referrals card: line 2 was redundant ("pays you 0.5%" twice) → now a mechanism detail (fees per block from the round's fee stream). Fixed?
+5. Play footer ticker: "price 1.05e-5 mix / psp" appeared twice → deduped?
+6. Play swap panel dead zone between slippage row and connect button → filled with one quiet on-voice line or panel shortened. Gone?
+
+Then re-grade the full rubric:
+1. Phase engine proof: [1] CRITICAL vs [2] CALM — visibly different temperature/moment (accent on CTA, clock glow, nav pill)?
+2. Is the CLOCK still the loud element on every page, nothing competing?
+3. Typography roles: pixel display headline / clean sans body / seven-seg numerals — distinct, no pixel body copy?
+4. Explainer reads as STORY with hierarchy; "no rug, ever" gets display treatment?
+5. Play reads as command center: clock+pot instrument, swap/ladder split, live tape, curve in accent, ladder hierarchy (#1 larger, gold edge, % bars)?
+6. Stake has a soul: identity panel lead, ticking accumulator, referrals + hall of detonations?
+7. Banned-list scan: rounded card walls / decorative gradients / all-caps tracked labels / emoji — any present?
+8. Empty states in lowercase deadpan voice still charming?
+9. SCORE /10 per page + overall, VERDICT per page (MASTERPIECE / ONE PASS AWAY / NEEDS WORK).
+10. Max 8 surgical fixes, highest impact first — fewer is better. If nothing meaningful remains, say SHIP IT.

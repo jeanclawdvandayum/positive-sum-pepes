@@ -90,20 +90,18 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
   }, [descriptor, candidates])
 
   return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="flex items-center gap-1.5 text-lg font-black text-slate-900">
-            choose your pepe
-          </h2>
-          <p className="text-xs text-slate-400">
+    <div className="rounded-2xl border border-line bg-bg-1 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-display text-lg text-text-hi">choose your pepe</h2>
+          <p className="truncate text-xs text-text-lo">
             {localMode
               ? 'rolled locally — same art data the contract renders'
               : 'rolled fresh from the on-chain renderer · the one you pick is the one you mint'}
           </p>
         </div>
         <button
-          className="btn-ghost shrink-0"
+          className="st-btn shrink-0 text-xs"
           onClick={() => {
             onSelect(null)
             onReroll()
@@ -113,7 +111,8 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3">
+      {/* compact horizontal strip — not a grid (B3 item 2) */}
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
         {candidates.map((id) => {
           const isSel = selected === id
           const svg = svgs[id.toString()]
@@ -121,21 +120,21 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
             <button
               key={id.toString()}
               onClick={() => onSelect(isSel ? null : id)}
-              className={`relative aspect-square rounded-2xl border-2 p-1 transition ${
+              className={`relative h-24 w-24 shrink-0 rounded-xl border p-1 transition sm:h-28 sm:w-28 ${
                 isSel
-                  ? 'border-emerald-400 bg-emerald-50 shadow-lg shadow-emerald-100 ring-2 ring-emerald-300'
-                  : 'border-sky-100 bg-white hover:border-sky-300 hover:shadow'
+                  ? 'border-pepe bg-bg-2 ring-1 ring-pepe'
+                  : 'border-line bg-bg-2/50 hover:border-text-lo'
               }`}
             >
               <div className="h-full w-full [&>svg]:h-full [&>svg]:w-full">
                 {svg ? (
                   <div dangerouslySetInnerHTML={{ __html: svg }} className="h-full w-full" />
                 ) : (
-                  <div className="grid h-full w-full place-items-center text-3xl opacity-40">🐸</div>
+                  <div className="skeleton h-full w-full rounded-lg" />
                 )}
               </div>
               {isSel && (
-                <span className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-emerald-500 text-xs text-[#fff] shadow">
+                <span className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-pepe text-xs text-bg-0">
                   ✓
                 </span>
               )}
@@ -144,7 +143,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
         })}
       </div>
 
-      <p className="mt-3 text-center text-xs font-bold text-slate-400">
+      <p className="mt-2 text-xs text-text-lo">
         {selected
           ? `pepe #${selected.toString()} locked in — pick another or stake below`
           : 'tap a pepe to select it'}

@@ -10,7 +10,15 @@ const W = 640
 const H = 440
 const PAD = { l: 64, r: 16, t: 16, b: 40 }
 
-export default function CurveChart() {
+export default function CurveChart({
+  hasTrades = true,
+  entryPrice,
+}: {
+  /** any trade logged this round? false → dotted ghost theoretical curve (§8) */
+  hasTrades?: boolean
+  /** connected user's vw avg buy price (mixETH per PSP) — from the Buy log lane */
+  entryPrice?: number
+}) {
   const round = useRound()
   const [yMode, setYMode] = useState<YMode>('price')
   // axis default by curve family (2026-08-29): zone teeth read literally on
@@ -108,6 +116,10 @@ export default function CurveChart() {
   const liveX = live ? sx(live.reserve) : 0
   const liveScreenY = live ? sy(liveY) : 0
 
+  // §8 empty curve: the deterministic curve is real geometry, but no trade
+  // has drawn it yet → render it as a dotted ghost with the designed copy.
+  const ghost = pts.length > 0 && !hasTrades
+
   // y tick values: log 1-2-5 decades (log price mode), quarters otherwise
   const yTicks = useMemo(() => {
     if (yMode !== 'price' || lin || yMin <= 0) return [0.25, 0.5, 0.75, 1].map((f) => f * yMax)
@@ -163,36 +175,36 @@ export default function CurveChart() {
   }
 
   return (
-    <div className="card p-5">
+    <div className="rounded-xl border border-line bg-bg-1 p-5 font-body">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-black text-slate-900">the curve</h2>
-          <p className="text-xs text-slate-400">
+          <h2 className="font-display text-lg text-text-hi">the curve</h2>
+          <p className="text-xs text-text-lo">
             x: mixETH reserve ({lin ? 'linear' : 'log'}) · y:{' '}
             {yMode === 'price' ? ` price (${lin ? 'linear' : 'log'})` : ' supply (linear)'}
           </p>
         </div>
         <div className="flex gap-2">
-          <div className="flex rounded-full bg-sky-50 p-1">
+          <div className="flex rounded-full bg-bg-2 p-1">
             {(['linear', 'log'] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setLinTouched(m === 'linear')}
-                className={`rounded-full px-4 py-1 text-xs font-bold transition ${
-                  lin === (m === 'linear') ? 'bg-white text-psp-deep shadow' : 'text-slate-400'
+                className={`rounded-full px-4 py-1 text-xs font-semibold transition ${
+                  lin === (m === 'linear') ? 'bg-accent text-bg-0' : 'text-text-lo hover:text-text-hi'
                 }`}
               >
                 {m}
               </button>
             ))}
           </div>
-          <div className="flex rounded-full bg-sky-50 p-1">
+          <div className="flex rounded-full bg-bg-2 p-1">
             {(['price', 'supply'] as YMode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => setYMode(m)}
-                className={`rounded-full px-4 py-1 text-xs font-bold transition ${
-                  yMode === m ? 'bg-white text-psp-deep shadow' : 'text-slate-400'
+                className={`rounded-full px-4 py-1 text-xs font-semibold transition ${
+                  yMode === m ? 'bg-accent text-bg-0' : 'text-text-lo hover:text-text-hi'
                 }`}
               >
                 {m === 'price' ? 'price' : 'supply'}
@@ -210,15 +222,8 @@ export default function CurveChart() {
           onMouseLeave={() => setHover(null)}
         >
           <defs>
-            <linearGradient id="curveStroke" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#38bdf8" />
-              <stop offset="100%" stopColor="#4ade80" />
-            </linearGradient>
-            <linearGradient id="curveFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#4ade80" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.03" />
-            </linearGradient>
-            {/* clip: linear window cuts the curve mid-flight at xMax */}
+            {/* phase accent carries the stroke (B2 §5); the clip stays —
+                linear windows cut the curve mid-flight at xMax */}
             <clipPath id="plotClip">
               <rect x={PAD.l} y={PAD.t} width={W - PAD.l - PAD.r} height={H - PAD.t - PAD.b} />
             </clipPath>
@@ -235,7 +240,7 @@ export default function CurveChart() {
                   x={PAD.l - 6}
                   y={y + 4}
                   textAnchor="end"
-                  className="fill-slate-400"
+                  className="fill-text-lo"
                   fontSize="11"
                 >
                   {yMode === 'price'
@@ -283,7 +288,7 @@ export default function CurveChart() {
                   x={x}
                   y={H - PAD.b + 18}
                   textAnchor="middle"
-                  className="fill-slate-400"
+                  className="fill-text-lo"
                   fontSize="11"
                 >
                   {fmtAmount(BigInt(Math.round(t * 1e18)))}
@@ -293,32 +298,74 @@ export default function CurveChart() {
           })}
 
           <g clipPath="url(#plotClip)">
-            <path d={area} fill="url(#curveFill)" />
-            <path d={path} fill="none" stroke="url(#curveStroke)" strokeWidth="3" strokeLinecap="round" />
+            {!ghost && <path d={area} fill="var(--accent)" fillOpacity="0.05" />}
+            {/* audit r1 fix 2: the drawn curve is SOLID phase accent with a soft
+                accent glow; only the ghost (no trades yet) stays gray + dashed.
+                Stroke rides an inline STYLE — var() is not reliable in SVG
+                presentation attributes, and this line must never fall back to
+                a neutral. Scale math untouched. */}
+            <path
+              d={path}
+              fill="none"
+              strokeWidth={ghost ? 2 : 3}
+              strokeDasharray={ghost ? '2 6' : undefined}
+              strokeLinecap="round"
+              opacity={ghost ? 0.8 : 1}
+              style={{
+                stroke: ghost ? 'var(--text-lo)' : 'var(--accent)',
+                filter: ghost
+                  ? undefined
+                  : 'drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent))',
+              }}
+            />
           </g>
 
+          {ghost && (
+            <text
+              x={W / 2}
+              y={H / 2}
+              textAnchor="middle"
+              className="fill-text-lo text-[13px] font-semibold"
+            >
+              no trades yet — the first buy draws this for real.
+            </text>
+          )}
+
           {pts.length === 0 && (
-            <text x={W / 2} y={H / 2} textAnchor="middle" className="fill-slate-400 text-[13px] font-bold">
+            <text x={W / 2} y={H / 2} textAnchor="middle" className="fill-text-lo text-[13px] font-semibold">
               curve data unavailable — waiting for the round
             </text>
           )}
 
-          {/* live point */}
-          {live && (
+          {/* live point — phase accent with a soft glow (B2 §5) */}
+          {live && !ghost && (
             <g>
               <line
                 x1={liveX}
                 x2={liveX}
                 y1={PAD.t}
                 y2={H - PAD.b}
-                stroke="var(--chart-live)"
+                stroke="var(--accent)"
                 strokeDasharray="4 4"
                 strokeWidth="1.5"
                 opacity="0.5"
               />
-              <circle cx={liveX} cy={liveScreenY} r="7" fill="var(--chart-live)" fillOpacity="0.2" />
-              <circle cx={liveX} cy={liveScreenY} r="4" fill="var(--chart-live)" stroke="white" strokeWidth="2" />
+              <circle cx={liveX} cy={liveScreenY} r="11" fill="var(--accent)" fillOpacity="0.12" />
+              <circle cx={liveX} cy={liveScreenY} r="6" fill="var(--accent)" fillOpacity="0.25" />
+              <circle
+                cx={liveX}
+                cy={liveScreenY}
+                r="4"
+                fill="var(--accent)"
+                stroke="var(--text-hi)"
+                strokeWidth="1.5"
+              />
             </g>
+          )}
+
+          {/* your entry — vw avg buy price, Buy-log derived (B2 §5) */}
+          {yMode === 'price' && entryPrice !== undefined && entryPrice > 0 && (
+            <EntryMark price={entryPrice} sy={sy} />
           )}
 
           {/* hover crosshair */}
@@ -333,15 +380,15 @@ export default function CurveChart() {
                 strokeDasharray="3 3"
                 strokeWidth="1"
               />
-              <circle cx={hoverPt.x} cy={hoverPt.y} r="5" fill="#38bdf8" stroke="white" strokeWidth="2" />
+              <circle cx={hoverPt.x} cy={hoverPt.y} r="5" fill="var(--accent)" stroke="var(--text-hi)" strokeWidth="1.5" />
               <g
                 transform={`translate(${Math.min(hoverPt.x + 12, W - 170)},${Math.max(hoverPt.y - 44, PAD.t + 4)})`}
               >
-                <rect width="158" height="40" rx="10" fill="var(--chart-panel)" stroke="var(--chart-panel-border)" />
-                <text x="10" y="17" fontSize="11" className="fill-slate-500">
+                <rect width="158" height="40" rx="8" fill="var(--chart-panel)" stroke="var(--chart-panel-border)" />
+                <text x="10" y="17" fontSize="11" className="fill-text-lo">
                   reserve {fmtAmount(BigInt(Math.round(pts[hover].reserve * 1e18)))}
                 </text>
-                <text x="10" y="31" fontSize="11" fontWeight="bold" className="fill-psp-deep">
+                <text x="10" y="31" fontSize="11" fontWeight="bold" className="fill-text-hi">
                   {yMode === 'price'
                     ? `price ${fmtPrice(BigInt(Math.round(pts[hover].price * 1e18)))}`
                     : `supply ${fmtAmount(BigInt(Math.round(pts[hover].supply * 1e18)))}`}
@@ -351,16 +398,16 @@ export default function CurveChart() {
           )}
         </svg>
       ) : (
-        <div className="flex h-48 items-center justify-center text-sm text-slate-400">
+        <div className="flex h-48 items-center justify-center text-sm text-text-lo">
           loading curve…
         </div>
       )}
 
-      {live && (
-        <div className="mt-1 flex flex-wrap justify-between gap-2 text-xs font-bold text-slate-400">
-          <span>
+      {live && !ghost && (
+        <div className="mt-1 flex flex-wrap justify-between gap-2 text-xs font-semibold text-text-lo">
+          <span className="tabular font-data">
             live:{' '}
-            <span className="text-psp-deep">
+            <span className="text-text-hi">
               {fmtAmount(round.reserve)} mix · {fmtAmount(round.supply)} PSP ·{' '}
               {fmtPrice(round.marginalPrice)}
             </span>
@@ -369,5 +416,37 @@ export default function CurveChart() {
         </div>
       )}
     </div>
+  )
+}
+
+/// Entry mark (B2 §5): dashed pepe-green line at the connected user's vw
+/// avg buy price — drawn through the SAME sy() the curve uses, so it lands
+/// correctly in linear and log modes without touching scale math. Renders
+/// only while the price is inside the visible y window.
+function EntryMark({ price, sy }: { price: number; sy: (v: number) => number }) {
+  const y = sy(price)
+  if (!Number.isFinite(y) || y < PAD.t + 6 || y > H - PAD.b - 2) return null
+  return (
+    <g>
+      <line
+        x1={PAD.l}
+        x2={W - PAD.r}
+        y1={y}
+        y2={y}
+        stroke="var(--pepe)"
+        strokeWidth="1.5"
+        strokeDasharray="6 4"
+        opacity="0.75"
+      />
+      <text
+        x={W - PAD.r - 4}
+        y={y - 6}
+        textAnchor="end"
+        fontSize="10"
+        className="fill-pepe font-semibold"
+      >
+        your entry · {fmtPrice(BigInt(Math.round(price * 1e18)))}
+      </text>
+    </g>
   )
 }

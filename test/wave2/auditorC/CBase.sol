@@ -52,7 +52,9 @@ contract CBase is Test {
         hookDeployer = new HookDeployer();
         controllerDeployer = new ControllerDeployer();
         factory =
-            new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), hookDeployer, controllerDeployer, new StakerDeployer(), 0);
+            new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), hookDeployer, controllerDeployer, new StakerDeployer(), 0,
+            address(this) // deployerCutTo (CLOCK-REDESIGN §3)
+        );
         swapper = new CSwapper(IPoolManager(address(poolManager)), IERC20(address(mixETH)));
 
         _deployRound1();
@@ -76,7 +78,7 @@ contract CBase is Test {
     }
 
     /// @dev Predeposit 200 each from alice+bob, launch via the factory (the
-    ///      controller's owner), both claim — full quorum for governance.
+    ///      controller's owner), both claim — real staked weight + supply.
     function _launchRound1() internal {
         vm.startPrank(alice);
         mixETH.approve(address(controller1), 200e18);
@@ -95,43 +97,19 @@ contract CBase is Test {
         controller1.claimPredepositPSP();
         vm.prank(bob);
         controller1.claimPredepositPSP();
-        // locks strictly predate the proposal (M-1) AND fresh claims go live
-        // at the next epoch boundary (epoch-point liveness)
+        // locks go live at the next epoch boundary (epoch-point liveness)
         vm.warp(((block.timestamp / 7 days) + 1) * 7 days + 1);
     }
 
-    /// @dev Governance: propose + 100% yes votes, past the voting window.
-    function _bombRound1() internal {
-        vm.prank(alice);
-        controller1.proposeCarpetBomb();
-        _voteAll1(alice, true);
-        _voteAll1(bob, true);
-        (, uint256 proposeTime,,,) = controller1.currentProposal();
-        vm.warp(proposeTime + 3 days + 1);
-        controller1.carpetBomb();
-    }
-
-    /// @dev Vote with every VOTABLE round-1 pepe `who` owns (husks and
-    ///      unstaking pepes sit out — same as the UI's default selection).
-    function _voteAll1(address who, bool support) internal {
-        PSPStaker s = controller1.staker();
-        uint256 n = s.balanceOf(who);
-        uint256[] memory ids = new uint256[](n);
-        uint256 k;
-        for (uint256 i; i < n; ++i) {
-            uint256 id = s.tokenOfOwnerByIndex(who, i);
-            if (s.pepeVoteWeight(id, block.timestamp) == 0) continue;
-            ids[k++] = id;
-        }
-        assembly { mstore(ids, k) }
-        if (k == 0) return;
-        vm.prank(who);
-        controller1.voteCarpetBomb(ids, support);
-    }
-
-    /// @dev Past the flat exit window — finalizeCarpet is now unblocked.
-    function _warpPastFlatWindow() internal {
-        vm.warp(controller1.flatTime() + 3 days + 1);
+    /// @dev CLOCK-REDESIGN §4 kill: warp past the hook's detonation clock
+    ///      and let any rando detonate — one tx flattens the round, opens
+    ///      every lock, and births round 2 on the factory (the governance
+    ///      round-trip died 2026-09-01; its coverage lives in the clock
+    ///      tests). Round 2 EXISTS when this returns.
+    function _detonateRound1() internal {
+        vm.warp(hook1.detonationAt() + 1);
+        vm.prank(rando);
+        controller1.detonate();
     }
 
     /// @dev Reconstruct the factory's gameCurve from PUBLIC state only:

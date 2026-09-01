@@ -8,7 +8,7 @@ import {HookDeployer} from "../src/HookDeployer.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PSPFactory} from "../src/PSPFactory.sol";
 import {RoundController} from "../src/RoundController.sol";
-import {PSPStaker} from "../src/PSPStaker.sol";
+import {CurveHook} from "../src/CurveHook.sol";
 import {CurveMath} from "../src/libraries/CurveMath.sol";
 import {IRoundController} from "../src/interfaces/IRoundController.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -50,38 +50,17 @@ contract SpawnStaging is CBase {
         vm.warp(((block.timestamp / 7 days) + 1) * 7 days + 1);
     }
 
-    function _voteAll(RoundController c, address who) internal {
-        PSPStaker s = c.staker();
-        uint256 n = s.balanceOf(who);
-        uint256[] memory ids = new uint256[](n);
-        uint256 k;
-        for (uint256 i; i < n; ++i) {
-            uint256 id = s.tokenOfOwnerByIndex(who, i);
-            if (s.pepeVoteWeight(id, block.timestamp) == 0) continue;
-            ids[k++] = id;
-        }
-        assembly {
-            mstore(ids, k)
-        }
-        if (k == 0) return;
-        vm.prank(who);
-        c.voteCarpetBomb(ids, true);
-    }
-
-    function _bomb(RoundController c) internal {
-        vm.prank(alice);
-        c.proposeCarpetBomb();
-        _voteAll(c, alice);
-        _voteAll(c, bob);
-        (, uint256 proposeTime,,,) = c.currentProposal();
-        vm.warp(proposeTime + 3 days + 1);
-        c.carpetBomb();
-    }
-
     function _kill(RoundController c) internal {
         _launch(c);
-        _bomb(c);
-        vm.warp(c.flatTime() + 3 days + 1);
+        // CLOCK-REDESIGN (2026-09-01): death is the clock — warp past zero.
+        // The hook is halted (TradingHalted both directions) but the STAGING
+        // battery deliberately drives the SPLIT factory primitives
+        // (controller markDestroyed → permissionless reserveSpawn →
+        // permissionless birthRound) instead of detonate()'s composed
+        // one-tx birth, so the reservation stays observable between stages.
+        vm.warp(CurveHook(payable(address(c.hook()))).detonationAt() + 1);
+        vm.prank(address(c));
+        factory.markDestroyed(factory.currentRoundId());
     }
 
     function _reservation()
@@ -121,7 +100,7 @@ contract SpawnStaging is CBase {
     /// every address matches the reservation bit-for-bit.
     function test_staged_rebirth_e2e() public {
         _kill(controller1);
-        controller1.finalizeCarpet(); // reserves only
+        factory.reserveSpawn(1);
 
         PSPFactory.SpawnReservation memory r = _reservation();
         assertTrue(r.active, "reservation live");
@@ -152,7 +131,7 @@ contract SpawnStaging is CBase {
         mixETH.transfer(address(factory), donated);
 
         _kill(controller1);
-        controller1.finalizeCarpet();
+        factory.reserveSpawn(1);
 
         uint256 carry = mixETH.balanceOf(address(factory));
         assertEq(carry, donated, "factory-held donation is the carry");
@@ -171,7 +150,7 @@ contract SpawnStaging is CBase {
     /// at reserve time.
     function test_predictions_exact() public {
         _kill(controller1);
-        controller1.finalizeCarpet();
+        factory.reserveSpawn(1);
         vm.prank(rando);
         factory.birthRound();
 
@@ -197,7 +176,7 @@ contract SpawnStaging is CBase {
     /// and birth wires it instead of reverting.
     function test_birth_idempotent_when_front_run() public {
         _kill(controller1);
-        controller1.finalizeCarpet();
+        factory.reserveSpawn(1);
         PSPFactory.SpawnReservation memory r = _reservation();
 
         // attacker pre-deploys the token at the committed salt with the
@@ -226,7 +205,7 @@ contract SpawnStaging is CBase {
 
         // reserve → double reserve fenced
         _kill(controller1);
-        controller1.finalizeCarpet();
+        factory.reserveSpawn(1);
         vm.expectRevert(PSPFactory.ReservationActive.selector);
         factory.reserveSpawn(1);
 
@@ -245,7 +224,7 @@ contract SpawnStaging is CBase {
     /// owner voids and re-reserves under the new context.
     function test_stale_context_fenced() public {
         _kill(controller1);
-        controller1.finalizeCarpet();
+        factory.reserveSpawn(1);
 
         factory.setDescriptor(address(0xBEEF)); // owner, mid-flight
 
@@ -266,9 +245,7 @@ contract SpawnStaging is CBase {
 
     /// The composed one-tx rebirth still works for direct callers.
     function test_spawnNextRound_composed_compat() public {
-        _kill(controller1);
-        vm.prank(address(controller1));
-        factory.markDestroyed(1); // finalizeCarpet's job, done manually here
+        _kill(controller1); // markDestroyed included (the split stage 0)
 
         vm.prank(rando);
         (uint256 id, address h) = factory.spawnNextRound(1);
@@ -284,15 +261,7 @@ contract SpawnStaging is CBase {
     /// variance-free across rounds (no mining, all create2 from committed
     /// salts).
     function test_gas_reserve_bounded_birth_flat() public {
-        _kill(controller1);
-
-        uint256 g0 = gasleft();
-        controller1.finalizeCarpet(); // drain + mark + reserve
-        uint256 gFinalize = g0 - gasleft();
-
-        factory.voidReservation();
-        vm.roll(block.number + 3);
-        vm.warp(block.timestamp + 101); // fresh block entropy
+        _kill(controller1); // launch + clock zero + markDestroyed
 
         // The ~0.03% tail: a draw with no flag match inside HOOK_SCAN_CAP
         // reverts cheap (no deposits exist). Production semantics = retry
@@ -316,14 +285,14 @@ contract SpawnStaging is CBase {
         }
 
         vm.prank(rando);
-        g0 = gasleft();
+        uint256 g0 = gasleft();
         factory.birthRound();
         uint256 gBirth1 = g0 - gasleft();
 
-        // round 3, fresh entropy. Round 2's public kill can't reach quorum
-        // (carry 400 of the 500 cap isn't votable by alice/bob), so this
-        // second rebirth uses the direct destruction primitive — the gas
-        // properties under test are birth's, not governance's.
+        // round 3, fresh entropy. Round 2 never launched (no clock to strike
+        // zero), so this second rebirth uses the direct destruction
+        // primitive — the gas properties under test are birth's, not the
+        // clock's.
         RoundController c2 = factory.getRound(2).controller;
         vm.roll(block.number + 7);
         vm.prank(address(c2));
@@ -335,12 +304,10 @@ contract SpawnStaging is CBase {
         factory.birthRound();
         uint256 gBirth2 = g0 - gasleft();
 
-        console2.log("finalizeCarpet (drain+reserve):", gFinalize);
-        console2.log("pure reserveSpawn            :", gReserve);
-        console2.log("birthRound round 2           :", gBirth1);
-        console2.log("birthRound round 3           :", gBirth2);
+        console2.log("pure reserveSpawn :", gReserve);
+        console2.log("birthRound round 2:", gBirth1);
+        console2.log("birthRound round 3:", gBirth2);
 
-        assertLe(gFinalize, 13_000_000, "finalize over budget");
         assertLe(gReserve, 12_500_000, "reserve over cap");
         assertLe(gBirth1, 12_500_000, "birth 2 over cap");
         assertLe(gBirth2, 12_500_000, "birth 3 over cap");
@@ -357,7 +324,7 @@ contract SpawnStaging is CBase {
     /// running the historical 160k-candidate lottery.
     function test_mining_bound_enforced() public {
         _kill(controller1);
-        controller1.finalizeCarpet();
+        factory.reserveSpawn(1);
         PSPFactory.SpawnReservation memory r = _reservation();
 
         // The mined hook address must actually carry the v4 flag bits —
@@ -372,6 +339,6 @@ contract SpawnStaging is CBase {
         address reg = factory.referralRegistryOf(2);
         CurveMath.CurveConfig memory cfg = _curve();
         vm.expectRevert(HookDeployer.MiningExhausted.selector);
-        hd.mineHook(pm, r.controller, reg, cfg, 0);
+        hd.mineHook(pm, r.controller, reg, cfg, factory.deployerCutTo(), 0);
     }
 }

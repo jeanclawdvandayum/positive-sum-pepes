@@ -55,8 +55,7 @@ contract C3_Lifecycle is CBase {
     /// round's reserve is stranded and its successor never spawns.
     function test_C3_ParallelRoundBricksOldChain() public {
         _launchRound1();
-        _bombRound1();
-        _warpPastFlatWindow();
+        vm.warp(hook1.detonationAt() + 1); // clock dead, detonate armed
 
         // owner sidesteps the chain and opens a parallel game
         vm.startPrank(address(factory.owner()));
@@ -69,11 +68,13 @@ contract C3_Lifecycle is CBase {
         vm.stopPrank();
         assertEq(factory.currentRoundId(), 2, "parallel round became current");
 
-        // the dying round can never hand off now
+        // the dying round can never hand off now: detonate composes
+        // markDestroyed + spawnNextRound atomically — the spawn leg bounces
+        // NotLatestRound and the WHOLE tx reverts (hook stays Active-past-zero)
         uint256 reserveLocked = mixETH.balanceOf(address(hook1));
         vm.prank(rando);
         vm.expectRevert(RoundController.FactorySpawnFailed.selector);
-        controller1.finalizeCarpet();
+        controller1.detonate();
 
         // direct path shows the exact guard
         vm.prank(address(controller1));
@@ -147,10 +148,7 @@ contract C3_Lifecycle is CBase {
     function test_C3_CurveInheritanceExact() public {
         CurveMath.CurveConfig memory before = _gameCurveFromPublicState();
         _launchRound1();
-        _bombRound1();
-        _warpPastFlatWindow();
-        controller1.finalizeCarpet();
-        factory.birthRound(); // staged: birth is the second, permissionless tx
+        _detonateRound1();
 
         CurveHook hook2 = factory.getRound(2).hook;
         (uint256 p0After,) = factory.gameCurve();
@@ -168,10 +166,7 @@ contract C3_Lifecycle is CBase {
     /// Round-2 naming: "<baseName> <id>" / "<baseSymbol><id>".
     function test_C3_SpawnNaming() public {
         _launchRound1();
-        _bombRound1();
-        _warpPastFlatWindow();
-        controller1.finalizeCarpet();
-        factory.birthRound(); // staged: birth is the second, permissionless tx
+        _detonateRound1();
 
         PSPFactory.Round memory r2 = factory.getRound(2);
         assertEq(r2.name, "Positive Sum Pepes 2");
