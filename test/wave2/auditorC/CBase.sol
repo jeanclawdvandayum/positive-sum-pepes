@@ -51,8 +51,13 @@ contract CBase is Test {
         poolManager = new MockPoolManager();
         hookDeployer = new HookDeployer();
         controllerDeployer = new ControllerDeployer();
-        factory =
-            new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), hookDeployer, controllerDeployer, new StakerDeployer(), 0,
+        factory = new PSPFactory(
+            IPoolManager(address(poolManager)),
+            IERC20(address(mixETH)),
+            hookDeployer,
+            controllerDeployer,
+            new StakerDeployer(),
+            0,
             address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );
         swapper = new CSwapper(IPoolManager(address(poolManager)), IERC20(address(mixETH)));
@@ -79,7 +84,24 @@ contract CBase is Test {
 
     /// @dev Predeposit 200 each from alice+bob, launch via the factory (the
     ///      controller's owner), both claim — real staked weight + supply.
-    function _launchRound1() internal {
+    ///      CLOCK-REDESIGN §1 (2026-09-01): launch INSIDE a fresh epoch with
+    ///      NO terminal warp. The old shape ended with a warp past
+    ///      detonationAt (lock-liveness under governance) — every post-launch
+    ///      buy/sell then reverted TradingHalted (the dead-clock wall).
+    ///      Warping to the epoch-1 boundary BEFORE the predeposit anchors the
+    ///      claims in a nonzero epoch AND leaves block.timestamp == launch
+    ///      ts, so the clock is armed and ALIVE for the next 72h of test
+    ///      time. Timeline is explicit from here on:
+    ///        - detonation: _detonateRound1() (warps to zero, one-tx kill);
+    ///        - staker weight LIVE (epoch+1): skip to the next 7-day
+    ///          boundary AFTER trading — that warp kills the clock (a 7-day
+    ///          epoch outlives the 72h window), so trade first, warp after.
+    ///      Same shape as ClockDetonation's _launchLive (now delegating
+    ///      here); returns the launch ts.
+    function _launchRound1() internal returns (uint256 launchTs) {
+        vm.warp(7 days + 1); // epoch 1 — staker anchors cleanly (never epoch 0)
+        launchTs = block.timestamp;
+
         vm.startPrank(alice);
         mixETH.approve(address(controller1), 200e18);
         controller1.predeposit(200e18);
@@ -97,8 +119,7 @@ contract CBase is Test {
         controller1.claimPredepositPSP();
         vm.prank(bob);
         controller1.claimPredepositPSP();
-        // locks go live at the next epoch boundary (epoch-point liveness)
-        vm.warp(((block.timestamp / 7 days) + 1) * 7 days + 1);
+        // no terminal warp: detonationAt == launchTs + 72h stays in the future
     }
 
     /// @dev CLOCK-REDESIGN §4 kill: warp past the hook's detonation clock
@@ -170,6 +191,55 @@ contract CSwapper {
                 zeroForOne: mixIsZero
             }),
             ""
+        );
+        int256 pspDelta = mixIsZero ? d.amount1() : d.amount0();
+        require(pspDelta > 0, "no out");
+        uint256 out = uint256(int256(pspDelta));
+        pm.take(pspCur, to, out);
+        return abi.encode(out);
+    }
+}
+
+/// @dev CSwapper's twin that forwards the TRADER through hookData (the
+///      canonical-zap identity path) so tickets seat the human, not the
+///      router. Unattributed traders run the 60/39/1 fee branch.
+///      (Lifted here from ClockDetonation.t.sol 2026-09-01 so the
+///      redemption tests can buy on the hinted path too.)
+contract TicketSwapper {
+    IPoolManager public immutable pm;
+    IERC20 public immutable mix;
+
+    constructor(IPoolManager _pm, IERC20 _mix) {
+        pm = _pm;
+        mix = _mix;
+    }
+
+    function buy(PoolKey calldata key, uint256 mixIn, address to, address trader) external returns (uint256 pspOut) {
+        mix.transferFrom(msg.sender, address(this), mixIn);
+        bytes memory r = pm.unlock(abi.encode(key, mixIn, to, trader));
+        return abi.decode(r, (uint256));
+    }
+
+    function unlockCallback(bytes calldata data) external returns (bytes memory) {
+        require(msg.sender == address(pm), "not pm");
+        (PoolKey memory key, uint256 mixIn, address to, address trader) =
+            abi.decode(data, (PoolKey, uint256, address, address));
+        bool mixIsZero = Currency.unwrap(key.currency0) == address(mix);
+        Currency mixCur = mixIsZero ? key.currency0 : key.currency1;
+        Currency pspCur = mixIsZero ? key.currency1 : key.currency0;
+
+        pm.sync(mixCur);
+        mix.transfer(address(pm), mixIn);
+        pm.settle();
+
+        BalanceDelta d = pm.swap(
+            key,
+            SwapParams({
+                amountSpecified: -int256(mixIn),
+                sqrtPriceLimitX96: mixIsZero ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1,
+                zeroForOne: mixIsZero
+            }),
+            abi.encode(trader) // exactly 32 bytes — the hook's A-1 decode shape
         );
         int256 pspDelta = mixIsZero ? d.amount1() : d.amount0();
         require(pspDelta > 0, "no out");

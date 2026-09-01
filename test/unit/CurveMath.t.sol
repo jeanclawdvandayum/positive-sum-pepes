@@ -383,15 +383,35 @@ contract CurveMathTest is Test {
 
     /// Guards: oversized fields revert TimingsOverflow (never spill into a
     /// neighbor); non-epochal vests revert VestNotEpochal.
+    /// FIX (harness, 2026-09-01): packTimings is INTERNAL — it inlines into
+    /// the test frame, so vm.expectRevert saw no sub-call ("didn't revert at
+    /// a lower depth"). Route through the external probe below (the BBase
+    /// LibProbe pattern) so the guards revert in an observable frame.
     function test_TimingsGuards() public {
+        TimingsPacker p = new TimingsPacker();
         uint256 max = (1 << CurveMath.TIMINGS_WIDTH) - 1;
         vm.expectRevert(CurveMath.TimingsOverflow.selector);
-        CurveMath.packTimings(max + 1, 42 days);
+        p.pack(max + 1, 42 days);
         vm.expectRevert(CurveMath.TimingsOverflow.selector);
-        CurveMath.packTimings(7 days, max + 1);
+        p.pack(7 days, max + 1);
         vm.expectRevert(CurveMath.TimingsOverflow.selector);
-        CurveMath.packTimingsCapped(7 days, 42 days, max + 1);
+        p.packCapped(7 days, 42 days, max + 1);
         vm.expectRevert(CurveMath.VestNotEpochal.selector);
-        CurveMath.packTimings(7 days, 42 days + 1); // not divisible by 6
+        p.pack(7 days, 42 days + 1); // not divisible by 6
+    }
+}
+
+/// @dev External boundary for the internal packTimings guards (see above).
+contract TimingsPacker {
+    function pack(uint256 predepositSec, uint256 vestSec) external pure returns (uint256) {
+        return CurveMath.packTimings(predepositSec, vestSec);
+    }
+
+    function packCapped(uint256 predepositSec, uint256 vestSec, uint256 walletCap)
+        external
+        pure
+        returns (uint256)
+    {
+        return CurveMath.packTimingsCapped(predepositSec, vestSec, walletCap);
     }
 }

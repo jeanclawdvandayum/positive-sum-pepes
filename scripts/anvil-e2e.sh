@@ -36,7 +36,18 @@ ALICE=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 BOB=0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
 
 # ── node ────────────────────────────────────────────────────────────────────
-if ! cast block-number --rpc-url "$RPC" >/dev/null 2>&1; then
+if cast block-number --rpc-url "$RPC" >/dev/null 2>&1; then
+  # A node is ALREADY listening. A non-virgin chain is fatal here: the drive
+  # is deterministic (same accounts → same controllers → same entropy → same
+  # create2 targets), so round-2's birth collides with the previous run's
+  # artifacts and detonate() reverts DeployFailed→FactorySpawnFailed.
+  # (2026-09-01: two e2e "failures" were exactly this — a two-day-old anvil.)
+  BN=$(cast block-number --rpc-url "$RPC")
+  if [ "$BN" -gt 0 ]; then
+    echo "✗ stale node on $RPC at block $BN — kill it (pkill anvil) or point RPC at a fresh chain" >&2
+    exit 1
+  fi
+else
   echo "▪ starting anvil"
   # explicit generous gas limit: the 34-zone genesis deployRound alone runs
   # 21.4M, and some anvil builds default the block limit far too low
@@ -155,8 +166,16 @@ warp_to $(( DET_AT + 2 ))
 DET_TX=""
 for attempt in 1 2 3 4 5; do
   DET_TX=$(cast send "$R1_CTRL" "detonate()" --rpc-url "$RPC" --private-key "$K_RANDO" --json 2>/tmp/psp-e2e-det-err.log | jq -r '.transactionHash')
-  if [ -n "$DET_TX" ] && [ "$DET_TX" != "null" ]; then break; fi
-  echo "  detonate attempt $attempt bounced (next block re-rolls entropy): $(tail -1 /tmp/psp-e2e-det-err.log | head -c 120)"
+  # cast exits 0 even when the mined tx REVERTS — gate on receipt status,
+  # not hash existence (2026-09-01: a reverted hash snuck through the loop)
+  if [ -n "$DET_TX" ] && [ "$DET_TX" != "null" ]; then
+    ST=$(cast receipt "$DET_TX" --rpc-url "$RPC" --json | jq -r '.status')
+    if [ "$ST" = "0x1" ]; then break; fi
+    echo "  detonate attempt $attempt mined but REVERTED (status $ST)"
+    DET_TX=""
+  else
+    echo "  detonate attempt $attempt bounced (next block re-rolls entropy): $(tail -1 /tmp/psp-e2e-det-err.log | head -c 120)"
+  fi
   cast rpc evm_mine --rpc-url "$RPC" >/dev/null
 done
 [ -n "$DET_TX" ] && [ "$DET_TX" != "null" ] || { echo "✗ detonate never landed"; cat /tmp/psp-e2e-det-err.log; exit 1; }

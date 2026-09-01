@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {CBase} from "./wave2/auditorC/CBase.sol";
+import {CBase, TicketSwapper} from "./wave2/auditorC/CBase.sol";
 import {CurveHook} from "../src/CurveHook.sol";
 import {PSPStaker} from "../src/PSPStaker.sol";
 import {PSPToken} from "../src/PSPToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
@@ -16,6 +17,15 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 ///         payable via the permissionless, fee-free redeemBacking(). Death
 ///         does not endow the sequel — abandoned value waits for its owner.
 contract RedeemIndefinite is CBase {
+    /// @dev trader-hinted swapper (CBase.TicketSwapper): the buy ticket
+    ///      seats the HUMAN, not the router — the pot claims in these tests
+    ///      depend on it (CSwapper's empty hookData seats the router).
+    TicketSwapper tSwapper;
+
+    function setUp() public virtual override {
+        super.setUp();
+        tSwapper = new TicketSwapper(IPoolManager(address(poolManager)), IERC20(address(mixETH)));
+    }
 
     function _key() internal view returns (PoolKey memory) {
         address c0 = address(mixETH);
@@ -57,11 +67,7 @@ contract RedeemIndefinite is CBase {
         assertEq(hook1.reserveMixETH(), R - expected, "reserve debited");
         assertEq(hook1.totalSupplyPSP(), S - half, "supply dropped");
         // R/S invariant: the payout per PSP never changes after death
-        assertEq(
-            (hook1.reserveMixETH() * 1e18) / hook1.totalSupplyPSP(),
-            (R * 1e18) / S,
-            "backing per PSP preserved"
-        );
+        assertEq((hook1.reserveMixETH() * 1e18) / hook1.totalSupplyPSP(), (R * 1e18) / S, "backing per PSP preserved");
     }
 
     /// The full comeback: the clock struck zero, detonate birthed round 2 in
@@ -71,9 +77,11 @@ contract RedeemIndefinite is CBase {
     /// every wei the dead hook custodies leaves with an owner.
     function test_RedeemOneYearLate_AfterRebirth() public {
         _launchRound1();
+        // hinted buy: the one ticket on the board must seat ALICE for the
+        // pot-claim below (empty-hookData buys seat the router)
         vm.startPrank(alice);
-        mixETH.approve(address(swapper), 10e18);
-        swapper.buy(_key(), 10e18, alice);
+        mixETH.approve(address(tSwapper), 10e18);
+        tSwapper.buy(_key(), 10e18, alice, alice);
         vm.stopPrank();
         _detonateRound1();
         assertEq(factory.currentRoundId(), 2, "round 2 exists");
@@ -86,8 +94,7 @@ contract RedeemIndefinite is CBase {
         PSPStaker staker = PSPStaker(controller1.stakerAddress());
         uint256 preTotal = mixETH.balanceOf(address(hook1)); // reserve + escrows + fee surplus
         address[2] memory wallets = [alice, bob];
-        uint256 mixBefore = mixETH.balanceOf(alice) + mixETH.balanceOf(bob)
-            + mixETH.balanceOf(address(this)); // deployerCutTo = this harness
+        uint256 mixBefore = mixETH.balanceOf(alice) + mixETH.balanceOf(bob) + mixETH.balanceOf(address(this)); // deployerCutTo = this harness
         for (uint256 i; i < 2; ++i) {
             uint256 n = staker.balanceOf(wallets[i]);
             for (uint256 j; j < n; ++j) {
@@ -115,8 +122,7 @@ contract RedeemIndefinite is CBase {
         // conservation: backing + pot + rake + accrued fee credits — every
         // wei the dead hook custodied left with its owners (rounding dust
         // ≤ 10 wei)
-        uint256 redeemed = mixETH.balanceOf(alice) + mixETH.balanceOf(bob)
-            + mixETH.balanceOf(address(this)) - mixBefore;
+        uint256 redeemed = mixETH.balanceOf(alice) + mixETH.balanceOf(bob) + mixETH.balanceOf(address(this)) - mixBefore;
         assertApproxEqAbs(redeemed, preTotal, 10, "every wei of custody accounted for");
         assertLe(hook1.reserveMixETH(), 1, "last holder drains the reserve (<=1 wei floor dust)");
         assertLe(hook1.totalSupplyPSP(), 1, "supply fully retired (<=1 wei dust)");

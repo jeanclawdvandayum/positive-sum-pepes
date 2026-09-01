@@ -336,4 +336,31 @@ contract FactoryTest is Test {
             "StakerDeployer headroom < ~0.5KB; shrink before adding code"
         );
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  EIP-170 HEADROOM, hook side (2026-09-01): HookDeployer embeds
+    //  CurveHook's creation code, so its runtime silently tracks every
+    //  CurveHook feature — the CLOCK-REDESIGN clock/ladder/pot additions
+    //  pushed it to 25,266B (690 over the deploy limit) while 308 tests
+    //  stayed green: `forge test` does not enforce EIP-170, only a real
+    //  CREATE does. The literal now lives in HookInitCode (born per
+    //  vessel); BOTH must stay under 24,576 with ~500B of headroom so the
+    //  next CurveHook feature fails HERE, at the size test, instead of at
+    //  the next broadcast. The floor is a ratchet: bump it deliberately
+    //  and document the remaining budget in this comment.
+    //    current sizes (2026-09-01): HookDeployer ~1.4KB,
+    //    HookInitCode ~24.0KB, CurveHook runtime 21,738B.
+    // ═══════════════════════════════════════════════════════════════
+
+    function test_EIP170_HookSideHeadroom_500B() public {
+        HookDeployer hd = new HookDeployer();
+        assertLt(address(hd).code.length, 24_076, "HookDeployer headroom < 500B; shrink before adding code");
+        assertLt(
+            address(hd.initOracle()).code.length,
+            24_076,
+            "HookInitCode (creation-code oracle) headroom < 500B; shrink CurveHook before adding code"
+        );
+        // the product itself, for completeness (also asserted in C3 sizes)
+        assertLt(address(hook).code.length, 24_076, "CurveHook headroom < 500B");
+    }
 }

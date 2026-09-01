@@ -30,6 +30,11 @@ contract SpawnStaging is CBase {
     ///      counted against PREDEPOSIT_CAP (500 mix), so later rounds use
     ///      smaller amounts to fit the remaining headroom.
     function _launch(RoundController c, uint256 amt) internal {
+        // same live-clock conversion as CBase._launchRound1 (2026-09-01):
+        // anchor in a fresh epoch BEFORE predepositing; the staging battery
+        // never trades post-launch (it drives the SPLIT factory primitives),
+        // so this is belt-and-suspenders timeline hygiene.
+        vm.warp(7 days + 1); // epoch 1 — staker anchors cleanly (never epoch 0)
         vm.startPrank(alice);
         mixETH.approve(address(c), amt);
         c.predeposit(amt);
@@ -47,7 +52,7 @@ contract SpawnStaging is CBase {
         c.claimPredepositPSP();
         vm.prank(bob);
         c.claimPredepositPSP();
-        vm.warp(((block.timestamp / 7 days) + 1) * 7 days + 1);
+        // no terminal warp — the clock stays armed at launch + 72h
     }
 
     function _kill(RoundController c) internal {
@@ -59,15 +64,16 @@ contract SpawnStaging is CBase {
         // permissionless birthRound) instead of detonate()'s composed
         // one-tx birth, so the reservation stays observable between stages.
         vm.warp(CurveHook(payable(address(c.hook()))).detonationAt() + 1);
+        // FIX (harness, 2026-09-01): hoist the roundId BEFORE the prank —
+        // `factory.markDestroyed(factory.currentRoundId())` let the
+        // currentRoundId() staticcall eat the single prank, so markDestroyed
+        // ran as the test contract and every test died NotRoundController.
+        uint256 rid = factory.currentRoundId();
         vm.prank(address(c));
-        factory.markDestroyed(factory.currentRoundId());
+        factory.markDestroyed(rid);
     }
 
-    function _reservation()
-        internal
-        view
-        returns (PSPFactory.SpawnReservation memory r)
-    {
+    function _reservation() internal view returns (PSPFactory.SpawnReservation memory r) {
         (
             uint128 fromRoundId,
             uint128 newRoundId,
@@ -156,18 +162,15 @@ contract SpawnStaging is CBase {
 
         PSPFactory.Round memory r2 = factory.getRound(2);
         bytes32 stakerSalt = keccak256(abi.encode(address(r2.controller), "psp-staker"));
-        address stakerPred = factory.stakerDeployer().predictStaker(
-            stakerSalt,
-            IERC20(address(r2.token)),
-            IRoundController(address(r2.controller)),
-            factory.descriptor()
-        );
+        address stakerPred = factory.stakerDeployer()
+            .predictStaker(
+                stakerSalt, IERC20(address(r2.token)), IRoundController(address(r2.controller)), factory.descriptor()
+            );
         assertEq(r2.controller.stakerAddress(), stakerPred, "staker prediction");
 
         bytes32 registrySalt = keccak256(abi.encode(address(r2.controller), "psp-registry"));
-        address regPred = factory.controllerDeployer().predictRegistry(
-            registrySalt, r2.controller.stakerAddress(), factory.REFERRAL_MIN_STAKE()
-        );
+        address regPred = factory.controllerDeployer()
+            .predictRegistry(registrySalt, r2.controller.stakerAddress(), factory.REFERRAL_MIN_STAKE());
         assertEq(factory.referralRegistryOf(2), regPred, "registry prediction");
     }
 
@@ -182,9 +185,7 @@ contract SpawnStaging is CBase {
         // attacker pre-deploys the token at the committed salt with the
         // IDENTICAL args (only those hit the predicted address)
         vm.prank(attacker);
-        factory.tokenDeployer().deployTokenAt(
-            r.tokenSalt, "Positive Sum Pepes 2", "PSP2", address(factory)
-        );
+        factory.tokenDeployer().deployTokenAt(r.tokenSalt, "Positive Sum Pepes 2", "PSP2", address(factory));
 
         vm.prank(rando);
         factory.birthRound(); // must complete, not revert
@@ -338,7 +339,8 @@ contract SpawnStaging is CBase {
         IPoolManager pm = IPoolManager(address(poolManager));
         address reg = factory.referralRegistryOf(2);
         CurveMath.CurveConfig memory cfg = _curve();
+        address cutTo = factory.deployerCutTo(); // hoisted with the rest: expectRevert binds to the NEXT call — an inline getter staticcall would eat it
         vm.expectRevert(HookDeployer.MiningExhausted.selector);
-        hd.mineHook(pm, r.controller, reg, cfg, factory.deployerCutTo(), 0);
+        hd.mineHook(pm, r.controller, reg, cfg, cutTo, 0);
     }
 }

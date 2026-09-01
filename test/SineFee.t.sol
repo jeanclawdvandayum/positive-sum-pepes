@@ -192,9 +192,17 @@ contract SineFee is Test {
         assertEq(hook1.potBalance() - potBefore, potLeg, "35% + 4% + dust -> pot escrow");
 
         // conservation: staker + pot + deployer == fee, and everything but
-        // the (empty) referral leg stayed inside the hook's custody
+        // the (empty) referral leg stayed inside the hook's custody. The
+        // hook's balance grew by reserveGrowth + fee (the reserve lives in
+        // the hook too) — assert the NON-RESERVE custody grew by exactly the
+        // fee, i.e. not one wei of any leg left the hook. (The original
+        // `delta == fee` algebra forgot the reserve leg rides the same
+        // balance — actual was inAmt, off by the post-fee input.)
+        uint256 reserveGrowth = hook1.reserveMixETH() - rBefore; // == inAmt - fee (asserted above)
         assertEq(stakerLeg + potLeg + deployerLeg, fee, "legs conserve the fee exactly");
-        assertEq(mixETH.balanceOf(address(hook1)) - hookBalBefore, fee, "whole fee stayed in hook custody");
+        assertEq(
+            mixETH.balanceOf(address(hook1)) - hookBalBefore - reserveGrowth, fee, "whole fee stayed in hook custody"
+        );
     }
 
     /// §3 REVISED, ATTRIBUTED leg: 60% stakers / 35% pot / 5% referral
@@ -219,9 +227,15 @@ contract SineFee is Test {
             "referrer qualified"
         );
 
-        // rando binds his attribution to alice's pepe (the ONLY bind path)
+        // rando binds his attribution to alice's pepe (the ONLY bind path).
+        // FIX (harness, 2026-09-01): hoist the registry BEFORE the prank —
+        // `vm.prank(rando); Registry(factory.referralRegistryOf(1)).record(...)`
+        // let the referralRegistryOf() staticcall eat the single prank, so
+        // record() bound the TEST contract's slot and payoutFor(rando) walked
+        // an empty graph (alice paid 0).
+        PSPReferralRegistry regV = PSPReferralRegistry(factory.referralRegistryOf(1));
         vm.prank(rando);
-        PSPReferralRegistry(factory.referralRegistryOf(1)).record(alicePepe);
+        regV.record(alicePepe);
 
         uint256 feeBps = hook1.swapFeeBps(); // post-alice-buy depth
         uint256 inAmt = 10e18 + 3; // odd wei

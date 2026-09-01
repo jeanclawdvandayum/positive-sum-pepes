@@ -9,7 +9,8 @@ import {BalanceDelta, BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/Bala
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 
-import {CBase} from "../wave2/auditorC/CBase.sol";
+import {CBase, TicketSwapper} from "../wave2/auditorC/CBase.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {RoundController} from "../../src/RoundController.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
@@ -20,45 +21,29 @@ import {PSPToken} from "../../src/PSPToken.sol";
 /// @notice Every row of the binding spec's test matrix as a named test:
 ///         the clock (arm/extend/cap/zero-is-dead), the ticket ladder
 ///         (rolling last-10, no dedup, exact bps, renormalization, dust),
-///         claims-forever, the §3 REVISED fee split feeding the pot, the
-///         one-tx detonation (flat + locks open + successor birthed + pot
-///         frozen), frozen redemption (PSP burned, next-round trades can't
-///         move the payout), and the guard set. Governance rows are proven
-///         structurally by scripts/check-no-governance.sh (the identifiers
-///         don't compile if they exist); the timings repack row lives in
-///         CurveMath.t (layout + roundtrip + full-axis + guards).
+///         claims-forever, the §3 REVISED fee split feeding the pot, and
+///         the guard set. The §4 detonation-day rows (one-tx detonation +
+///         frozen redemption) live in ClockDetonationBoom below — the
+///         split is a via-ir codegen limit workaround, not a spec split.
+///         Governance rows are proven structurally by
+///         scripts/check-no-governance.sh (the identifiers don't compile
+///         if they exist); the timings repack row lives in CurveMath.t
+///         (layout + roundtrip + full-axis + guards).
 /// @dev REAL behavior only — no vm.mockCall anywhere. All token movement
 ///      runs through the real MockPoolManager settlement path.
 contract ClockDetonation is CBase {
     uint256 constant LADDER_DENOM_10 = 10_000; // 2500+1800+1400+1000+800+700+600+500+400+300
     uint256 constant LADDER_DENOM_3 = 5700; // 2500+1800+1400
+    uint256 constant LADDER_DENOM_2 = 4300; // 2500+1800 — 2-seat renormalization
 
     TicketSwapper tSwapper;
 
-    /// @dev CBase._launchRound1 ends with a warp PAST detonationAt (lock
-    ///      liveness) — the clock arrives dead. The clock tests need it
-    ///      ALIVE: launch inside epoch 1 and never warp past zero.
-    ///      detonationAt == launch ts + 72h; returns the launch ts.
+    /// @dev CBase._launchRound1 IS the live launch now (2026-09-01
+    ///      conversion): warp to epoch 1, predeposit, launch, claim — no
+    ///      terminal warp, detonationAt == launch ts + 72h, clock ALIVE.
+    ///      Kept as an alias so the clock-matrix rows read naturally.
     function _launchLive() internal returns (uint256 launchTs) {
-        vm.warp(7 days + 1); // epoch 1 — staker anchors cleanly (never epoch 0)
-        launchTs = block.timestamp;
-
-        vm.startPrank(alice);
-        mixETH.approve(address(controller1), 200e18);
-        controller1.predeposit(200e18);
-        vm.stopPrank();
-        vm.startPrank(bob);
-        mixETH.approve(address(controller1), 200e18);
-        controller1.predeposit(200e18);
-        vm.stopPrank();
-
-        vm.prank(address(factory));
-        controller1.launchPooledBuy();
-
-        vm.prank(alice);
-        controller1.claimPredepositPSP();
-        vm.prank(bob);
-        controller1.claimPredepositPSP();
+        return _launchRound1();
     }
 
     function setUp() public virtual override {
@@ -105,6 +90,28 @@ contract ClockDetonation is CBase {
         return 300;
     }
 
+    // ── assertion helpers (2026-09-01) ──
+    // Extracted from the pot-math tests during the via-ir stack-too-deep
+    // investigation; kept because they read well and keep the test frames
+    // thin (same calls, same order, same assertion strings).
+
+    /// @dev read a board seat and assert who + size in one frame.
+    function _assertSeat(uint256 idx, address who, uint256 pspAmt, string memory errWho, string memory errAmt)
+        internal
+    {
+        (address w, uint256 p,,) = hook1.board(idx);
+        assertEq(w, who, errWho);
+        assertEq(p, pspAmt, errAmt);
+    }
+
+    /// @dev claim as `who`, assert the exact mixETH delta paid.
+    function _claimPotAndAssertPaid(address who, uint256 expect, string memory err) internal {
+        uint256 before = mixETH.balanceOf(who);
+        vm.prank(who);
+        hook1.claimPot();
+        assertEq(mixETH.balanceOf(who) - before, expect, err);
+    }
+
     // ═════════════════════════════════════════════════════════
     //  §1 — the clock
     // ═════════════════════════════════════════════════════════
@@ -143,9 +150,17 @@ contract ClockDetonation is CBase {
         assertGe(expectOut / 1e18, 2, "calibrated to >= 2 whole");
         assertLt(expectOut / 1e18, 3, "calibrated to < 3 whole");
 
+        // FIX (harness, 2026-09-01): vm.expectEmit before _buyAs bound to
+        // the FIRST call inside (mixETH.transfer) — its Transfer event ate
+        // the slot. Fund + approve first, then bind the emit to the SWAP
+        // call itself.
+        mixETH.transfer(alice, amt);
+        vm.startPrank(alice);
+        mixETH.approve(address(tSwapper), amt);
         vm.expectEmit(true, false, false, true, address(hook1));
         emit CurveHook.TimeAdded(address(tSwapper), expectOut / 1e18, armed + 10 minutes);
-        uint256 out = _buyAs(alice, amt);
+        uint256 out = tSwapper.buy(_key(), amt, alice, alice);
+        vm.stopPrank();
         assertEq(out, expectOut, "execution matches the calibrated view");
 
         assertEq(hook1.detonationAt(), armed + 10 minutes, "+5 min per whole psp, floored at 2");
@@ -172,9 +187,14 @@ contract ClockDetonation is CBase {
         _buyAs(alice, 10e18); // live clock, seats a ticket
         vm.warp(hook1.detonationAt()); // == zero (boundary is inclusive)
 
-        vm.prank(alice);
+        // FIX (harness, 2026-09-01): TicketSwapper pulls mix via transferFrom
+        // BEFORE the pool gate fires — without a fresh allowance the ERC20
+        // revert masks TradingHalted. Approve, then expect the gate.
+        vm.startPrank(alice);
+        mixETH.approve(address(tSwapper), 10e18);
         vm.expectRevert(CurveHook.TradingHalted.selector);
         tSwapper.buy(_key(), 10e18, alice, alice); // would add time — still dead
+        vm.stopPrank();
 
         vm.prank(alice);
         vm.expectRevert(CurveHook.TradingHalted.selector);
@@ -185,9 +205,11 @@ contract ClockDetonation is CBase {
 
         // the clock never moves after zero: a day later it is still dead
         vm.warp(hook1.detonationAt() + 1 days);
-        vm.prank(alice);
+        vm.startPrank(alice);
+        mixETH.approve(address(tSwapper), 10e18);
         vm.expectRevert(CurveHook.TradingHalted.selector);
         tSwapper.buy(_key(), 10e18, alice, alice);
+        vm.stopPrank();
     }
 
     /// detonate() before zero reverts ClockStillLive; after zero it works.
@@ -215,9 +237,10 @@ contract ClockDetonation is CBase {
     function test_Board_12Buyers_OnlyNewest10Seated() public {
         _launchLive();
         address[12] memory buyers;
+        uint256[12] memory outs; // ticket pspAmount is the PSP OUT of the buy
         for (uint256 i; i < 12; ++i) {
             buyers[i] = makeAddr(string.concat("buyer-", vm.toString(i)));
-            _buyAs(buyers[i], 1e18 + i); // distinct sizes, distinct ts not needed
+            outs[i] = _buyAs(buyers[i], 1e18 + i); // distinct mix sizes
             vm.warp(block.timestamp + 60); // separate the seats in time
         }
 
@@ -226,7 +249,10 @@ contract ClockDetonation is CBase {
         for (uint256 i; i < 10; ++i) {
             (address who, uint256 pspAmt,,) = hook1.board(i);
             assertEq(who, buyers[11 - i], "seat age 0 = newest");
-            assertEq(pspAmt, 1e18 + (11 - i), "ticket carries the buy size");
+            // FIX (harness, 2026-09-01): the seat carries the buy's PSP
+            // OUTPUT (P0=0.001 mix/PSP → ~948 psp per mix, not 1:1 with the
+            // mix input) — assert against the executed out, exact.
+            assertEq(pspAmt, outs[11 - i], "ticket carries the buy size");
         }
         // buyers 0 and 1 fell off the board
         assertEq(hook1.claimablePot(buyers[0]), 0, "oldest buyer dusted off the board");
@@ -240,30 +266,28 @@ contract ClockDetonation is CBase {
     /// rungs in one call.
     function test_Board_SameAddressTwice_TwoSeatsOneClaim() public {
         _launchLive();
-        _buyAs(alice, 2e18);
+        uint256 out2e = _buyAs(alice, 2e18);
         vm.warp(block.timestamp + 60);
-        _buyAs(alice, 3e18);
+        uint256 out3e = _buyAs(alice, 3e18);
 
         assertEq(hook1.seatedCount(), 2, "alice holds both seats");
         assertEq(hook1.ticketCount(), 2, "two buy txs, two tickets");
-        (address who0, uint256 psp0,,) = hook1.board(0);
-        (address who1, uint256 psp1,,) = hook1.board(1);
-        assertEq(who0, alice, "newest seat is alice");
-        assertEq(who1, alice, "oldest seat is also alice");
-        assertEq(psp0, 3e18, "seat sizes are per-tx");
+        // FIX (harness, 2026-09-01): per-tx PSP OUTPUT, not the mix input
+        _assertSeat(0, alice, out3e, "newest seat is alice", "seat sizes are per-tx (newest = 3-mix buy out)");
+        _assertSeat(1, alice, out2e, "oldest seat is also alice", "oldest = 2-mix buy out");
 
         vm.warp(hook1.detonationAt() + 1);
         vm.prank(rando);
         controller1.detonate();
 
-        // one claimPot call sweeps BOTH rungs: 2500/5700 + 1800/5700
+        // FIX (harness, 2026-09-01): a TWO-seat board renormalizes over
+        // 2500+1800 = 4300 (spec §2: fewer than 10 tickets renormalize to
+        // 100% over the SEATED rung weights) — not over the 3-seat 5700.
+        // one claimPot call sweeps BOTH rungs: 2500/4300 + 1800/4300
         uint256 pot = hook1.potBalance();
-        uint256 expectBoth = (pot * 2500) / LADDER_DENOM_3 + (pot * 1800) / LADDER_DENOM_3;
+        uint256 expectBoth = (pot * 2500) / LADDER_DENOM_2 + (pot * 1800) / LADDER_DENOM_2;
         assertEq(hook1.claimablePot(alice), expectBoth, "both rungs claimable");
-        uint256 aliceBefore = mixETH.balanceOf(alice);
-        vm.prank(alice);
-        hook1.claimPot();
-        assertEq(mixETH.balanceOf(alice) - aliceBefore, expectBoth, "one claim paid both seats");
+        _claimPotAndAssertPaid(alice, expectBoth, "one claim paid both seats");
 
         vm.prank(alice);
         vm.expectRevert(CurveHook.NothingToClaim.selector);
@@ -345,11 +369,8 @@ contract ClockDetonation is CBase {
         controller1.detonate();
 
         uint256 pot = hook1.potBalance();
-        uint256[3] memory expect = [
-            (pot * 2500) / LADDER_DENOM_3,
-            (pot * 1800) / LADDER_DENOM_3,
-            (pot * 1400) / LADDER_DENOM_3
-        ];
+        uint256[3] memory expect =
+            [(pot * 2500) / LADDER_DENOM_3, (pot * 1800) / LADDER_DENOM_3, (pot * 1400) / LADDER_DENOM_3];
         // newest -> oldest
         address[3] memory who = [b2, b1, b0];
         uint256 paidTotal;
@@ -379,8 +400,13 @@ contract ClockDetonation is CBase {
         controller1.detonate();
 
         uint256 pot = hook1.potBalance();
-        uint256 expect0 = (pot * 2500) / LADDER_DENOM_3;
-        uint256 expect1 = (pot * 1800) / LADDER_DENOM_3;
+        // FIX (harness, 2026-09-01): TWO-seat board — renormalizes over
+        // 2500+1800 = 4300, and the NEWEST ticket (b1) takes the 2500 rung
+        // (spec §2: 25/18/14… from NEWEST to OLDEST). b0 bought first →
+        // the 1800 rung. (The old 5700 denominator + swapped rungs matched
+        // neither the spec nor the contract's exact wei.)
+        uint256 expect0 = (pot * 1800) / LADDER_DENOM_2; // b0: OLDER seat
+        uint256 expect1 = (pot * 2500) / LADDER_DENOM_2; // b1: NEWEST seat
 
         uint256 before0 = mixETH.balanceOf(b0);
         vm.prank(b0);
@@ -419,10 +445,50 @@ contract ClockDetonation is CBase {
         vm.expectRevert(CurveHook.NothingToClaim.selector);
         hook1.claimPot();
     }
+}
 
-    // ═════════════════════════════════════════════════════════
-    //  §4 — detonation
-    // ═════════════════════════════════════════════════════════
+/// @title ClockDetonationBoom — CLOCK-REDESIGN §4 (the detonation-day rows)
+/// @notice The one-tx detonation and the frozen-redemption matrix, split
+///         into their own contract (2026-09-01): the single ClockDetonation
+///         object held enough co-specialized test call-graphs that via-ir
+///         codegen hit a Yul StackTooDeepError with NO single-function
+///         culprit — every subset probed green, only the union boomed.
+///         Same harness, same CBase, behavior unchanged.
+contract ClockDetonationBoom is CBase {
+    TicketSwapper tSwapper;
+
+    function setUp() public virtual override {
+        super.setUp();
+        tSwapper = new TicketSwapper(IPoolManager(address(poolManager)), IERC20(address(mixETH)));
+    }
+
+    function _launchLive() internal returns (uint256 launchTs) {
+        return _launchRound1();
+    }
+
+    function _key() internal view returns (PoolKey memory) {
+        address c0 = address(mixETH);
+        address c1 = address(psp1);
+        if (c0 > c1) (c0, c1) = (c1, c0);
+        return PoolKey({
+            currency0: Currency.wrap(c0),
+            currency1: Currency.wrap(c1),
+            fee: 0x800000,
+            tickSpacing: 60,
+            hooks: IHooks(address(hook1))
+        });
+    }
+
+    /// @dev Buy through the trader-identity path (the zap shape): hookData
+    ///      carries the trader, so the TICKET seats `who`, not the router.
+    ///      No recorded attribution -> the fee runs the 60/39/1 branch.
+    function _buyAs(address who, uint256 amount) internal returns (uint256 pspOut) {
+        mixETH.transfer(who, amount);
+        vm.startPrank(who);
+        mixETH.approve(address(tSwapper), amount);
+        pspOut = tSwapper.buy(_key(), amount, who, who);
+        vm.stopPrank();
+    }
 
     /// ONE tx: flat + every lock open (instant full withdrawal, no decay
     /// loss) + the successor's predeposit window live + the pot frozen.
@@ -431,29 +497,34 @@ contract ClockDetonation is CBase {
 
         // alice buys and locks; NO withdraw request armed (the vest would
         // normally gate her for 6 epochs)
-        uint256 pspOut = _buyAs(alice, 20e18);
-        PSPStaker staker = PSPStaker(controller1.stakerAddress());
+        // (buy run INLINE rather than via _buyAs — carried over verbatim
+        // from the pre-split contract whose exact text probed green)
+        uint256 amt = 20e18;
+        mixETH.transfer(alice, amt);
         vm.startPrank(alice);
-        psp1.approve(address(staker), pspOut);
-        staker.lock(pspOut);
-        uint256 pepe = staker.primaryOf(alice);
+        mixETH.approve(address(tSwapper), amt);
+        uint256 pspOut = tSwapper.buy(_key(), amt, alice, alice);
         vm.stopPrank();
+        (PSPStaker staker, uint256 pepe) = _lockAll(alice, pspOut);
 
         uint256 pot = hook1.potBalance();
         assertGt(pot, 0, "fees escrowed a pot during Active");
 
         vm.warp(hook1.detonationAt() + 1);
 
-        // the one-tx kill, by a nobody, announcing the successor
+        // the one-tx kill, by a nobody, announcing the successor.
+        // FIX (harness, 2026-09-01): the successor's hook address is not
+        // computable before detonate() runs (entropy-salted reservation
+        // happens INSIDE it), so an expectEmit cannot pre-build the
+        // Detonated payload. Assert the event from the RECORDED LOGS
+        // instead — all three fields exact — which is strictly stronger
+        // than the old (never-passing) zero-filled expectation.
         address nextHook = address(0);
         try factory.getRound(2) returns (PSPFactory.Round memory r2pre) {
             nextHook = address(r2pre.hook); // round 2 not yet born: address(0)
         } catch {}
         assertEq(nextHook, address(0), "no round 2 before detonate");
-        vm.expectEmit(true, false, false, true, address(controller1));
-        emit RoundController.Detonated(rando, pot, nextHook); // re-filled below
-        vm.prank(rando);
-        controller1.detonate();
+        _detonateAssertEvent(pot);
 
         // 1. flat + flatTime (the analytics anchor)
         assertTrue(hook1.mode() == CurveHook.Mode.Flat, "hook flat");
@@ -469,18 +540,63 @@ contract ClockDetonation is CBase {
         assertEq(psp1.balanceOf(alice) - alicePspBefore, pspOut, "instant exit, zero decay loss");
 
         // 3. the successor lives: round 2 born IN THE SAME TX, predeposit open
-        PSPFactory.Round memory r2 = factory.getRound(2);
-        assertTrue(address(r2.controller) != address(0), "round 2 controller born");
-        assertTrue(CurveHook(address(r2.hook)).mode() == CurveHook.Mode.Predeposit, "round 2 in Predeposit");
-        assertFalse(r2.controller.predepositClosed(), "round 2 predeposit window open");
+        _assertSuccessorBorn();
 
         // 4. the pot is FROZEN: flat exits are fee-free, nothing accrues
         uint256 potAfter = hook1.potBalance();
         assertEq(potAfter, pot, "pot frozen at detonation");
-        vm.prank(alice);
+        // FIX (harness, 2026-09-01): startPrank — a bare prank is consumed
+        // by the approve, leaving redeemBacking unpranked (allowance 0)
+        vm.startPrank(alice);
         psp1.approve(address(hook1), 1e18);
         hook1.redeemBacking(1e18); // an exit moves backing, never the pot
+        vm.stopPrank();
         assertEq(hook1.potBalance(), pot, "post-detonation exits leave the pot alone");
+    }
+
+    /// @dev lock `pspAmt` for `who` in full; returns the staker + the FRESH
+    ///      pepe minted by lock(). Fix (harness, 2026-09-01):
+    ///      claimPredepositPSP stakes the genesis share as its own pepe
+    ///      (claimGenesisShare), so primaryOf points THERE — the buy-lock's
+    ///      pepe is the newest mint, read via owner-token enumeration.
+    function _lockAll(address who, uint256 pspAmt) internal returns (PSPStaker staker, uint256 pepe) {
+        staker = PSPStaker(controller1.stakerAddress());
+        vm.startPrank(who);
+        psp1.approve(address(staker), pspAmt);
+        uint256 nBefore = staker.balanceOf(who);
+        staker.lock(pspAmt);
+        pepe = staker.tokenOfOwnerByIndex(who, nBefore); // newest mint = index nBefore
+        vm.stopPrank();
+    }
+
+    /// @dev rando detonates; the Detonated event is asserted from the
+    ///      recorded logs (all three fields) — see the FIX note above.
+    function _detonateAssertEvent(uint256 pot) internal {
+        vm.recordLogs();
+        vm.prank(rando);
+        controller1.detonate();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool found;
+        for (uint256 i; i < logs.length; i++) {
+            if (logs[i].emitter == address(controller1) && logs[i].topics[0] == RoundController.Detonated.selector) {
+                found = true;
+                address by = address(uint160(uint256(logs[i].topics[1])));
+                (uint256 potDistributed, address nextRound) = abi.decode(logs[i].data, (uint256, address));
+                assertEq(by, rando, "Detonated.by");
+                assertEq(potDistributed, pot, "Detonated.potDistributed");
+                assertTrue(nextRound != address(0), "Detonated.nextRound announced");
+                assertEq(nextRound, address(factory.getRound(2).hook), "nextRound == born hook");
+            }
+        }
+        assertTrue(found, "Detonated emitted");
+    }
+
+    /// @dev round 2 was born inside the detonation tx, predeposit open.
+    function _assertSuccessorBorn() internal {
+        PSPFactory.Round memory r2 = factory.getRound(2);
+        assertTrue(address(r2.controller) != address(0), "round 2 controller born");
+        assertTrue(CurveHook(address(r2.hook)).mode() == CurveHook.Mode.Predeposit, "round 2 in Predeposit");
+        assertFalse(r2.controller.predepositClosed(), "round 2 predeposit window open");
     }
 
     /// Redemption is FROZEN at detonation: payout per PSP never moves again
@@ -556,52 +672,5 @@ contract ClockDetonation is CBase {
             tickSpacing: 60,
             hooks: IHooks(address(hook2))
         });
-    }
-}
-
-/// @dev CSwapper's twin that forwards the TRADER through hookData (the
-///      canonical-zap identity path) so tickets seat the human, not the
-///      router. Unattributed traders run the 60/39/1 fee branch.
-contract TicketSwapper {
-    IPoolManager public immutable pm;
-    IERC20 public immutable mix;
-
-    constructor(IPoolManager _pm, IERC20 _mix) {
-        pm = _pm;
-        mix = _mix;
-    }
-
-    function buy(PoolKey calldata key, uint256 mixIn, address to, address trader) external returns (uint256 pspOut) {
-        mix.transferFrom(msg.sender, address(this), mixIn);
-        bytes memory r = pm.unlock(abi.encode(key, mixIn, to, trader));
-        return abi.decode(r, (uint256));
-    }
-
-    function unlockCallback(bytes calldata data) external returns (bytes memory) {
-        require(msg.sender == address(pm), "not pm");
-        (PoolKey memory key, uint256 mixIn, address to, address trader) =
-            abi.decode(data, (PoolKey, uint256, address, address));
-        bool mixIsZero = Currency.unwrap(key.currency0) == address(mix);
-        Currency mixCur = mixIsZero ? key.currency0 : key.currency1;
-        Currency pspCur = mixIsZero ? key.currency1 : key.currency0;
-
-        pm.sync(mixCur);
-        mix.transfer(address(pm), mixIn);
-        pm.settle();
-
-        BalanceDelta d = pm.swap(
-            key,
-            SwapParams({
-                amountSpecified: -int256(mixIn),
-                sqrtPriceLimitX96: mixIsZero ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1,
-                zeroForOne: mixIsZero
-            }),
-            abi.encode(trader) // exactly 32 bytes — the hook's A-1 decode shape
-        );
-        int256 pspDelta = mixIsZero ? d.amount1() : d.amount0();
-        require(pspDelta > 0, "no out");
-        uint256 out = uint256(int256(pspDelta));
-        pm.take(pspCur, to, out);
-        return abi.encode(out);
     }
 }

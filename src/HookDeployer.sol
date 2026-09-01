@@ -4,11 +4,9 @@ pragma solidity 0.8.26;
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 
-import {CurveHook} from "./CurveHook.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
 import {HookMiner} from "./utils/HookMiner.sol";
-import {IRoundController} from "./interfaces/IRoundController.sol";
-import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
+import {IHookInitCode, HookInitCode} from "./HookInitCode.sol";
 
 /// @title HookDeployer — mines and CREATE2-deploys CurveHook instances
 /// @notice Exists purely for EIP-170: the factory embedded CurveHook's ~11KB
@@ -16,8 +14,21 @@ import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
 ///         literal for mining, once inside the `new CurveHook{salt}`
 ///         expression) on top of RoundController's and PSPToken's creation
 ///         code — 41KB runtime, well past the 24,576-byte deploy limit.
-///         Outsourcing the hook deploy drops the factory back under budget;
-///         this contract holds the literal exactly once.
+///         Outsourcing the hook deploy dropped the factory back under budget.
+///
+///         EIP-170, round two (2026-09-01): the CLOCK-REDESIGN additions
+///         (detonation clock, ticket ladder, pot, deployer rake) grew
+///         CurveHook's creation code to ~23.3KB, pushing this vessel's
+///         runtime to 25,266B — 690 over the deploy limit. The creation-code
+///         literal now lives in a dedicated HookInitCode contract (born in
+///         this constructor); the vessel keeps only the mining/deploy
+///         machinery. The initCode BYTES are unchanged: same creation code,
+///         same constructor-arg encoding, same create2 math against
+///         address(this) — determinism survives because there is still
+///         exactly ONE construction (the oracle's), and every consumer
+///         (factory reserve/birth, scripts, tests, attackers replicating
+///         the squat) reaches it through this vessel's unchanged external
+///         signatures.
 ///
 ///         Staged spawn (2026-08-30): the rebirth loop's gas lottery — a
 ///         14-bit flag match is geometric (median ~2^13 iterations, observed
@@ -30,10 +41,20 @@ import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
 contract HookDeployer {
     error DeployFailed();
 
+    /// @dev The one home of the CurveHook creation-code literal (EIP-170
+    ///      arithmetic above). Born here so `new HookDeployer()` — and every
+    ///      deployment script/test that constructs the vessel — is unchanged.
+    IHookInitCode public immutable initOracle;
+
+    constructor() {
+        // explicit cast: bare `new HookInitCode()` is contract-type, not
+        // implicitly convertible to the interface (solidity 7407)
+        initOracle = IHookInitCode(address(new HookInitCode()));
+    }
+
     /// @dev Single initCode construction shared by mineHook and deployHookAt
-    ///      — EIP-170: one encoder, one creation-code reference.
-    ///      deployerCutTo (CLOCK-REDESIGN §3): the 1% unattributed-fee rake
-    ///      recipient, immutable on every hook the factory births.
+    ///      — delegated to the oracle so the ~23.3KB literal never rides
+    ///      this vessel's runtime. Same bytes as the pre-split inline build.
     function _hookInitCode(
         IPoolManager pm,
         address controller,
@@ -41,12 +62,7 @@ contract HookDeployer {
         CurveMath.CurveConfig calldata config,
         address deployerCutTo
     ) internal view returns (bytes memory) {
-        return bytes.concat(
-            type(CurveHook).creationCode,
-            abi.encode(
-                pm, IRoundController(controller), PSPReferralRegistry(referralRegistry), config, deployerCutTo
-            )
-        );
+        return initOracle.hookInitCode(pm, controller, referralRegistry, config, deployerCutTo);
     }
 
     /// @dev Flag set every round's hook must carry. L-2: BEFORE_INITIALIZE
