@@ -47,6 +47,7 @@ export const stakerAbi = parseAbi([
   'function pendingFeesMixETH() view returns (uint256)',
   'function points(uint256) view returns (uint256 epoch, uint256 weight, uint256 slope)',
   'function withdrawableAt(uint256 pepeId) view returns (uint256)',
+  'function isWithdrawing(uint256 pepeId) view returns (bool)',
   'function epochSize() view returns (uint256)',
   'function biasOf(uint256 pepeId, uint256 at) view returns (uint256)',
   'function totalLocked() view returns (uint256)',

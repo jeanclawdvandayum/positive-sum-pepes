@@ -20,13 +20,17 @@ const keyOf = (reads: RpcRead[]) =>
 /// Polls every intervalMs, backs off 8s → 60s through rpc outages, and
 /// resolves undefined for undefined targets (matches the old optional
 /// `enabled` semantics when callers pass placeholders).
-export function useRpcReads(reads: RpcRead[], enabled = true, intervalMs = 6000) {
+export function useRpcReads(reads: RpcRead[], enabled = true, intervalMs = 6000, refreshKey = 0) {
   const [results, setResults] = useState<Array<unknown | undefined>>(() => reads.map(() => undefined))
   const key = keyOf(reads)
 
   useEffect(() => {
     // Account/round changes must not reuse another wallet's balances or approvals.
     setResults(reads.map(() => undefined))
+  }, [key, enabled])
+
+  useEffect(() => {
+    // Receipt-triggered refreshes retain the current cards while fetching updates.
     if (!enabled) return
     let dead = false
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -56,7 +60,7 @@ export function useRpcReads(reads: RpcRead[], enabled = true, intervalMs = 6000)
       if (timer) clearTimeout(timer)
     }
     // reads identity changes per render — the serialized key is the dep
-  }, [key, enabled])
+  }, [key, enabled, intervalMs, refreshKey])
 
   return results
 }

@@ -178,7 +178,7 @@ export function useRound(): RoundInfo {
   return info
 }
 
-export function useBalances(token: `0x${string}` | undefined, mix: `0x${string}` | undefined) {
+export function useBalances(token: `0x${string}` | undefined, mix: `0x${string}` | undefined, refreshKey = 0) {
   const { address } = useAccount()
   const [bal, setBal] = useState<{ psp: bigint | undefined; mix: bigint | undefined }>({ psp: undefined, mix: undefined })
 
@@ -201,7 +201,7 @@ export function useBalances(token: `0x${string}` | undefined, mix: `0x${string}`
     tick()
     const iv = setInterval(tick, 4000)
     return () => { dead = true; clearInterval(iv) }
-  }, [address, token, mix])
+  }, [address, token, mix, refreshKey])
 
   return bal
 }

@@ -59,7 +59,13 @@ a smaller raise becomes publicly launchable when its window ends.
    actual added time can be zero. Selling keeps existing seats.
 4. Stake into multiple pepes, trade from the other wallet, and observe fees. Claim
    once immediately; request withdrawal on another position and leave its fees
-   unclaimed across boundaries. Earned fees should remain available.
+   unclaimed across boundaries. Earned fees should remain available. Use **+ add
+   PSP** on an existing position card to top it up: enter an amount or choose Max,
+   approve only that PSP amount if prompted, then confirm the top-up. The NFT ID
+   stays the same and its stake increases after confirmation. Try a zero-stake
+   pepe too. A withdrawing position requires **keep staking** before adding PSP;
+   detonated rounds do not accept top-ups. Reject an approval, then try changing
+   wallet/network between approval and staking; the second write must not proceed.
 5. Cancel a withdrawal before and after maturity, transfer a pepe, claim its fees
    as the new owner, and reinvest fees of at least 0.005 mixETH. The wrapper needs
    explicit NFT operator approval and is specific to its deployed round.

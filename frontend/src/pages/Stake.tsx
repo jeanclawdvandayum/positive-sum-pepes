@@ -42,21 +42,16 @@ type Step = 'idle' | 'approve' | 'tx' | 'done'
 export default function Stake() {
   const round = useRound()
   const { address, isConnected } = useAccount()
-  const { psp: pspBal } = useBalances(round.token, round.mix)
+  const [pepeKey, setPepeKey] = useState(0)
+  const { psp: pspBal } = useBalances(round.token, round.mix, pepeKey)
   const [amount, setAmount] = useState('')
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
-  const [pepeKey, setPepeKey] = useState(0)
   const [pickedId, setPickedId] = useState<bigint | null>(null)
   const [pickerSeed, setPickerSeed] = useState(1)
   const [multiStep, setMultiStep] = useState<'idle' | 'tx' | 'done'>('idle')
   const { writeContractAsync } = useConfirmedWrite()
   const ethUsd = useEthUsd()
-
-  useEffect(() => {
-    const t = setInterval(() => setPepeKey((k) => k), 4000) // re-render cadence for countdowns
-    return () => clearInterval(t)
-  }, [])
 
   const ZERO = '0x0000000000000000000000000000000000000000' as const
   const baseResults = useRpcReads(
@@ -67,12 +62,14 @@ export default function Stake() {
       { to: round.staker, abi: stakerAbi, functionName: 'pendingFeesMixETH' },
     ],
     !!address && !!round.staker && !!round.token,
+    6000, pepeKey,
   )
   const apprResults = useRpcReads(
     [
       { to: round.staker, abi: stakerAbi, functionName: 'isApprovedForAll', args: [address ?? ZERO, ADDRESSES.reinvestor] },
     ],
     REINVEST_ENABLED && !!address && !!round.staker,
+    6000, pepeKey,
   )
 
   const count = baseResults[0] as bigint | undefined
@@ -98,6 +95,7 @@ export default function Stake() {
       args: [address ?? ZERO, BigInt(i)],
     })),
     !!address && n > 0,
+    6000, pepeKey,
   )
   const ids = useMemo(
     () => idResults.filter((x): x is bigint => x !== undefined),
@@ -108,16 +106,18 @@ export default function Stake() {
     ids.flatMap((id) => [
       { to: round.staker, abi: stakerAbi, functionName: 'positions', args: [id] },
       { to: round.staker, abi: stakerAbi, functionName: 'pendingFeesOf', args: [id] },
+      { to: round.staker, abi: stakerAbi, functionName: 'isWithdrawing', args: [id] },
     ]),
     ids.length > 0,
+    6000, pepeKey,
   )
 
   const entries: PepeEntry[] = useMemo(() => {
     const out: PepeEntry[] = []
     for (let i = 0; i < ids.length; i++) {
-      const pos = detailResults[i * 2] as [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint] | undefined
+      const pos = detailResults[i * 3] as [bigint, bigint, bigint, bigint, bigint] | undefined
       if (!pos) continue
-      out.push({ id: ids[i], amount: pos[0], requestEpoch: pos[2] })
+      out.push({ id: ids[i], amount: pos[0], requestEpoch: pos[2], withdrawing: detailResults[i * 3 + 2] as boolean | undefined })
     }
     return out
   }, [ids, detailResults])
@@ -125,7 +125,7 @@ export default function Stake() {
   const pendings = useMemo(() => {
     const m = new Map<bigint, bigint | undefined>()
     ids.forEach((id, i) => {
-      m.set(id, detailResults[i * 2 + 1] as bigint | undefined)
+      m.set(id, detailResults[i * 3 + 1] as bigint | undefined)
     })
     return m
   }, [ids, detailResults])
@@ -134,7 +134,7 @@ export default function Stake() {
   const totalValueMix = round.marginalPrice ? (totalStaked * round.marginalPrice) / 10n ** 18n : undefined
   const totalValueUsd = totalValueMix !== undefined && ethUsd ? (Number(totalValueMix) / 1e18) * ethUsd : undefined
   const totalPending = [...pendings.values()].reduce<bigint>((a, p) => a + (p ?? 0n), 0n)
-  const stakeableIds = entries.filter((e) => e.requestEpoch === 0n && e.amount > 0n).map((e) => e.id)
+  const stakeableIds = entries.filter((e) => e.withdrawing === false && e.amount > 0n).map((e) => e.id)
 
   /// share of the 60% staker stream = your locked PSP / all locked PSP
   const sharePct =
@@ -507,7 +507,7 @@ export default function Stake() {
           {hasPepes && (
             <section>
               <h3 className="mb-3 text-xs text-text-lo">your staked pepes</h3>
-              <PepeCards round={round} entries={entries} pendings={pendings} vest={vest} approved={reinvestApproved} onDone={refresh} />
+              <PepeCards round={round} entries={entries} pendings={pendings} vest={vest} approved={reinvestApproved} walletBalance={pspBal} onDone={refresh} />
             </section>
           )}
         </div>

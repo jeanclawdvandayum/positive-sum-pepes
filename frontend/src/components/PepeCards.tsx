@@ -1,10 +1,11 @@
 import { rpcCall } from '../lib/rpc'
 import { minimumOutput, MIN_BUY_INPUT } from '../lib/gameRules'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
-import { ADDRESSES } from '../lib/config'
-import { hookAbi, stakerAbi, reinvestorAbi, buildPoolKey } from '../lib/abi'
+import { getAccount } from 'wagmi/actions'
+import { ADDRESSES, CHAIN_ID, wagmiConfig } from '../lib/config'
+import { controllerAbi, erc20Abi, hookAbi, stakerAbi, reinvestorAbi, buildPoolKey } from '../lib/abi'
 import { fmtAmount, fmtCountdown } from '../lib/format'
 import { useNow } from '../phase/PhaseEngine'
 import { renderPepeSvg } from '../lib/pepeRender'
@@ -12,6 +13,9 @@ import { dnaOfId } from './PepePicker'
 import MixLogo from './MixLogo'
 import type { RoundInfo } from '../lib/useRound'
 import { useEthUsd } from '../lib/useEthUsd'
+import { parseTopUpAmount, topUpPosition, type TopUpStep } from '../lib/stakeTopUp'
+import { userFacingRpcError } from '../lib/rpcErrors'
+import PositionTopUp from './PositionTopUp'
 
 /// One card per staked pepe. Rows: art · amount + value · unlock state ·
 /// [cancel-request|withdraw] · [claim – X mixETH] [reinvest].
@@ -20,6 +24,7 @@ export interface PepeEntry {
   id: bigint
   amount: bigint
   requestEpoch: bigint
+  withdrawing: boolean | undefined
 }
 
 type CardStep = 'idle' | 'tx' | 'done'
@@ -41,6 +46,7 @@ export function PepeCard({
   pending,
   isFlat,
   approved,
+  walletBalance,
   onDone,
 }: {
   round: RoundInfo
@@ -49,19 +55,30 @@ export function PepeCard({
   pending: bigint | undefined
   isFlat: boolean
   approved: boolean | undefined
+  walletBalance: bigint | undefined
   onDone: () => void
 }) {
-  const { isConnected } = useAccount()
+  const { address, isConnected } = useAccount()
   const { writeContractAsync } = useConfirmedWrite()
   const ethUsd = useEthUsd()
   const [step, setStep] = useState<CardStep>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [topUpOpen, setTopUpOpen] = useState(false)
+  const [topUpAmount, setTopUpAmount] = useState('')
+  const [topUpStep, setTopUpStep] = useState<TopUpStep | undefined>()
+  const [topUpSuccess, setTopUpSuccess] = useState<string | null>(null)
+  const mounted = useRef(true)
+  const topUpInFlight = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
   /// shared PhaseEngine heartbeat (B0 refactor — was its own 1s setInterval)
   const now = useNow()
 
   const { id, amount, requestEpoch } = entry
   const epoch = vest ? vest / 6n : undefined // VEST_EPOCHS = 6 in the staker
-  const decaying = requestEpoch > 0n
+  const decaying = entry.withdrawing === true
   const vestEnd = decaying && epoch ? Number((requestEpoch + 6n) * epoch) : undefined // (r+6)·epochSize
   const decayed = vestEnd !== undefined && now >= vestEnd
   // stepped power mirror: weight(k) = base - k·slope, k = epochs past request
@@ -77,12 +94,68 @@ export function PepeCard({
   const valueMix = round.marginalPrice ? (amount * round.marginalPrice) / 10n ** 18n : undefined
   const valueUsd = valueMix !== undefined && ethUsd ? (Number(valueMix) / 1e18) * ethUsd : undefined
 
-  const busy = step === 'tx'
+  const busy = step === 'tx' || topUpStep !== undefined
   const canWithdraw = amount > 0n && (isFlat || decayed)
   const canCancel = decaying && amount > 0n
-  const canRequest = !decaying && amount > 0n && !isFlat
+  const canRequest = entry.withdrawing === false && amount > 0n && !isFlat
   const canClaim = isConnected && pending !== undefined && pending > 0n
-  const canReinvest = canClaim && !decaying && round.reinvestorReady && !isFlat
+  const canReinvest = canClaim && entry.withdrawing === false && round.reinvestorReady && !isFlat
+  const topUpBlocked = isFlat || (round.mode !== undefined && round.mode >= 2)
+    ? 'This round has ended; top-ups are closed.'
+    : decaying ? 'Choose “keep staking” to cancel withdrawal before adding PSP.'
+      : entry.withdrawing === undefined || round.mode === undefined || !round.token || !round.controller || !round.hook
+        ? 'Loading position…'
+        : !isConnected ? 'Connect your wallet to add PSP.'
+          : round.rulesCompatible !== true ? 'Waiting for deployment verification…' : undefined
+
+  async function addPsp() {
+    if (busy || topUpInFlight.current || topUpBlocked || !address || !round.staker || !round.token || !round.controller || !round.hook) return
+    const addition = parseTopUpAmount(topUpAmount)
+    if (!addition) return
+    const owner = address
+    const { staker, token, controller, hook } = round
+    topUpInFlight.current = true
+    setStep('idle')
+    setError(null)
+    setTopUpSuccess(null)
+    try {
+      await topUpPosition({ owner, staker, id, amount: addition }, {
+        assertSession: () => {
+          const account = getAccount(wagmiConfig)
+          if (!mounted.current || account.address?.toLowerCase() !== owner.toLowerCase() || account.chainId !== CHAIN_ID) {
+            throw new Error('Wallet, network or round changed. Return to this position and try again.')
+          }
+        },
+        read: async () => {
+          const [nftOwner, withdrawing, balance, allowance, mode, flatTime] = await Promise.all([
+            rpcCall(staker, stakerAbi, 'ownerOf', [id]),
+            rpcCall(staker, stakerAbi, 'isWithdrawing', [id]),
+            rpcCall(token, erc20Abi, 'balanceOf', [owner]),
+            rpcCall(token, erc20Abi, 'allowance', [owner, staker]),
+            rpcCall(hook, hookAbi, 'mode'),
+            rpcCall(controller, controllerAbi, 'flatTime'),
+          ])
+          return { owner: nftOwner as `0x${string}`, withdrawing: withdrawing as boolean, balance: balance as bigint,
+            allowance: allowance as bigint, mode: Number(mode), flatTime: flatTime as bigint }
+        },
+        approve: (spender, value) => writeContractAsync({ address: token, abi: erc20Abi, functionName: 'approve', args: [spender, value] }),
+        stake: (user, pepeId, value) => writeContractAsync({ address: staker, abi: stakerAbi, functionName: 'stakeFor', args: [user, pepeId, value] }),
+        onStep: next => { if (mounted.current) setTopUpStep(next) },
+      })
+      if (mounted.current) {
+        setTopUpOpen(false)
+        setTopUpAmount('')
+        setTopUpSuccess(`✓ Added ${fmtAmount(addition, 6)} PSP to pepe #${id}.`)
+        onDone()
+      }
+    } catch (error) {
+      const friendly = userFacingRpcError(error)
+      if (mounted.current) setError(friendly instanceof Error ? friendly.message.slice(0, 220) : 'Could not add PSP. Try again.')
+    } finally {
+      topUpInFlight.current = false
+      if (mounted.current) setTopUpStep(undefined)
+    }
+  }
 
   async function act(fn: 'requestWithdraw' | 'cancelWithdraw' | 'withdraw' | 'claimFees') {
     setError(null)
@@ -184,6 +257,11 @@ export function PepeCard({
         </span>
       </div>
 
+      <PositionTopUp id={id} balance={walletBalance} value={topUpAmount} open={topUpOpen} busy={busy}
+        step={topUpStep} blockedReason={topUpBlocked} onValue={setTopUpAmount}
+        onToggle={() => { setTopUpOpen(!topUpOpen); setTopUpSuccess(null); setError(null) }} onSubmit={addPsp} />
+      {topUpSuccess && <p role="status" className="text-xs text-pepe">{topUpSuccess}</p>}
+
       <div className="grid grid-cols-2 gap-2">
         <button
           className="st-btn text-xs"
@@ -225,6 +303,7 @@ export default function PepeCards({
   pendings,
   vest,
   approved,
+  walletBalance,
   onDone,
 }: {
   round: RoundInfo
@@ -232,20 +311,23 @@ export default function PepeCards({
   pendings: Map<bigint, bigint | undefined>
   vest: bigint | undefined
   approved: boolean | undefined
+  walletBalance: bigint | undefined
   onDone: () => void
 }) {
   const isFlat = round.flatTime !== undefined && round.flatTime > 0n
+  const { address } = useAccount()
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {entries.map((e) => (
         <PepeCard
-          key={e.id.toString()}
+          key={`${address}:${round.staker}:${e.id}`}
           round={round}
           entry={e}
           vest={vest}
           pending={pendings.get(e.id)}
           isFlat={isFlat}
           approved={approved}
+          walletBalance={walletBalance}
           onDone={onDone}
         />
       ))}

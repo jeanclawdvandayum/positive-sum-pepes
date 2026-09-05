@@ -179,3 +179,31 @@ Solidity source changed after the contract-source hash above.
 - Deployed contracts and addresses are unchanged. Refresh previously open wallet
   browser tabs to load the new build. Public RPC availability remains external;
   wallet-signed buying is left to the user's playtest.
+
+## 2026-09-05 — Add PSP to an existing NFT position
+
+- Each current-round pepe card now has an expandable **+ add PSP** form with
+  wallet balance, exact-decimal Max and amount validation. Uses the deployed
+  `stakeFor(owner, pepeId, amount)` path, retaining the NFT and its existing stake.
+  Zero-stake owned pepes can also be funded; no purchase minimum applies to PSP
+  staking. Deployed contracts and addresses are unchanged.
+- Fresh ownership, balance, allowance, withdrawal and round-state checks run
+  before approval and again after its successful receipt. Approval is limited
+  to the entered PSP amount and the round's staker. Wallet/network changes or
+  an unmounted position stop the second step. Shared simulation, deployment-rule
+  verification and confirmed-receipt handling apply to both writes.
+- Position reads use the explicit `isWithdrawing` getter, including epoch-zero
+  requests. Withdrawal must be cancelled before a top-up; dead rounds reject it.
+  Confirmed actions refresh wallet/position reads immediately without clearing
+  the cards during that refresh. Duplicate top-up clicks are guarded.
+- `bash scripts/check-audit.sh`: **397 Solidity tests / 55 suites**, **34 frontend
+  tests**, **104 ABI declarations**, **32** production size checks, independent
+  oracle and no-governance gates, TypeScript and Vite all pass. Eight new frontend
+  tests cover exact amounts, approval sequencing, stale state/session changes,
+  failure propagation and rejected inputs. Existing Solidity top-up fee-entitlement,
+  donor fee-theft protection and withdrawal-request regressions remain green.
+- Browser: the actual form component was exercised in an isolated local fixture
+  at a 300px card width. Exact Max fill/submission, over-balance and negative-input
+  rejection, and a disabled withdrawing position behaved correctly. The rebuilt
+  real staking page loads. No wallet signature or on-chain top-up was performed;
+  that remains in the user's testnet playtest sequence.
