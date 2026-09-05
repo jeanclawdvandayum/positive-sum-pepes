@@ -59,7 +59,7 @@ contract CurveHook is BaseHook {
     // ─────────────── Immutables ───────────────
     IRoundController public immutable controller;
     CurveMath.CurveConfig public curveConfig;
-    /// @dev Permanent cross-round referral graph — attribution + tier weights.
+    /// @dev Per-round referral graph — signed wallet attribution + tier weights.
     PSPReferralRegistry public immutable referralRegistry;
     /// @dev Cached at construction (staker is born in the controller's
     ///      constructor, so it exists before this hook does). sendFees is
@@ -353,7 +353,7 @@ contract CurveHook is BaseHook {
         // (any direct poolManager.swap caller forges it; the pre-fix lazy
         // bind let such a caller poison a victim's one-time attribution),
         // so attribution binds exclusively via the user-signed
-        // registry.record(refNft). Exactly 32 bytes decodes; anything else
+        // registry.record(refNft) or registry.buyWithMix(..., refNft). Exactly 32 bytes decodes; anything else
         // (router-direct swaps, empty) trades unattributed — the 5%-of-fee
         // referral leg then re-splits 4% pot / 1% deployerCredit (§3 REVISED).
         address refTrader;

@@ -575,3 +575,47 @@ Solidity source changed after the contract-source hash above.
   withdrawal and post-round text was checked against source. Viewport restored;
   no wallet transactions. The rebuilt preview is local only; the existing here.now
   publication and contracts remain unchanged.
+
+
+## 2026-09-06 — Atomic purchase referrals and immutable round attribution (AUD-15)
+
+- Added per-round registry `buyWithMix(key, mixIn, minPspOut, deadline, referrerNftId)`.
+  The caller's signed purchase records an eligible incoming referral before fee
+  routing, pays it on that first purchase and credits the buyer with output/seats.
+  The callback transfers input straight to V4 and output straight to the buyer;
+  a context hash, PoolManager check and reentrancy guard protect standing allowances.
+  Failed buys roll back attribution. Invalid/self/cyclic links emit ReferralSkipped
+  and keep the slot open while the purchase proceeds. No delegated recorder was added.
+- Fixed payout entry resolution: a wallet's recorded referral wins over acquired or
+  changed primary NFTs. Receiving a referred NFT cannot silently attribute a wallet;
+  a new owner cannot rewrite an existing NFT ancestry edge. Referring-NFT transfers
+  still carry income to the new owner. Direct V4 beneficiary hints remain untrusted,
+  cannot bind victims, and are not a claim of identity enforcement across all routers.
+- Frontend captures scoped links at the router root, persists by chain/registry,
+  passes the referral in the purchase, checks compatibility before approvals/writes,
+  and removes the separate confirm-referral transaction. A fresh allowance read
+  targets the actual purchase spender. Legacy, stale-round and unreadable referral
+  targets fail closed; ordinary legacy zap buys remain available without a pending
+  referral. Link sharing is disabled for legacy registries. See
+  docs/audit/REFERRALS.md for UX and deployment details.
+- `bash scripts/check-audit.sh` passes: **426 Solidity tests / 57 suites**,
+  **60 frontend tests**, **110 ABI declarations**, **32** production size checks,
+  independent oracle, no-governance, TypeScript and Vite. Added **22 real-V4 referral
+  tests**, including a 256-run immutability fuzz, and **10 frontend referral tests**.
+  Registry runtime: **5,990 bytes**; ControllerDeployer: **22,622 bytes**.
+  Existing bundle warnings remain. Final source-only comment clarifications and
+  audit documentation do not change the tested executable logic. Final frontend
+  compatibility and request-state refinements also pass all 60 frontend tests and
+  TypeScript/Vite.
+- The first full gate exposed an obsolete combined-birth gas assumption in the
+  34-zone canary: composed rebirth now costs **17,499,292 gas**. The release has
+  required three birthStep transactions since AUD-3. The canary retains the composed
+  measurement, restores the same reservation and proves each split call under a
+  stricter **12M gas** cap: **8,454,668 / 8,829,672 / 212,591 gas**. The test does not
+  increase the old per-transaction limit; it verifies the actual release path.
+- Browser checked explainer-to-play capture and reload persistence on the isolated
+  localhost preview origin; the legacy deployment notice appears and there is no
+  referral confirmation button. No wallet transactions or live deployments were
+  performed. Existing Base Sepolia contracts are immutable, including the registry
+  creation code used by that factory's future rounds. This feature needs a fresh
+  factory/round deployment; current balances, NFTs and recorded referrals are intact.

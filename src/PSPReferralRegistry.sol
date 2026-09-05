@@ -2,6 +2,23 @@
 pragma solidity 0.8.26;
 
 import {IPSPStaker} from "./interfaces/IPSPStaker.sol";
+import {IRoundController} from "./interfaces/IRoundController.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IPoolManager, SwapParams} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {BalanceDelta, BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+
+/// @dev Read-only wiring; avoids importing concrete contracts into the registry.
+interface IReferralStaker { function controller() external view returns (IRoundController); }
+interface IReferralHook {
+    function poolManager() external view returns (IPoolManager);
+    function referralRegistry() external view returns (address);
+}
+
 
 /// @title PSPReferralRegistry — per-round referral attribution keyed by
 ///        staking NFT IDs
@@ -10,38 +27,25 @@ import {IPSPStaker} from "./interfaces/IPSPStaker.sol";
 ///         re-attributes each round, last round's links are void.
 ///
 ///         Attribution binds to a PSPStaker position NFT ID, not an address:
-///         `?ref=<tokenId>` is the link format. Chain edges ride the NFT —
+///         Links carry ref=<tokenId>, refRegistry and refChain. Chain edges ride the NFT —
 ///         transfer a position and its referral subtree (the fees its
-///         referraees generate) transfers with it. Payouts resolve to the
+///         referees generate) transfers with it. Payouts resolve to the
 ///         NFT's CURRENT owner at swap time, live.
 ///
-///         One referrer per trader per round — bound ONLY by the trader's
-///         own signature: `record(referrerNftId)` with the trader as
-///         msg.sender. Swaps can never create attribution (A-1 fix
-///         2026-08-28: V4 hookData is attacker-controlled bytes, so the
-///         hook only READS the graph via payoutFor — the one-time lazy
-///         bind it used to perform from hookData let any direct
-///         poolManager.swap caller poison a victim's attribution).
-///         Tier walk: the trader's referrer
-///         NFT gets tier 1, that NFT's own referrer NFT tier 2, … out to 5
-///         hops [80/12/5/2/1]% of the 50bps carve-out. Dead links (burned
-///         NFT, unlocked referrer) truncate the walk — unpaid weight flows
-///         back to stakers via the hook's subtraction accounting.
+///         AUD-15: a buyer can record the link and buy PSP in ONE signed
+///         buyWithMix transaction. Both paths bind msg.sender only. Raw V4
+///         hookData remains a payout hint and cannot create attribution.
+///         A recorded wallet entry takes precedence over acquired NFTs for
+///         the entire round. NFT ancestry is written once; payouts follow
+///         current NFT owners across up to five deduplicated tiers.
 ///
-///         Qualification: the referrer NFT must be alive and its owner must
-///         hold >= MIN_STAKE_PSP locked at record time (skin in the game).
-///         Genesis predeposit position is never an NFT → can never refer.
-///
-///         The registry holds NO funds. It is pure attribution + payout
-///         math: the CurveHook asks payoutFor(trader) each swap and pays the
-///         cuts itself, straight from the taken fee slice.
-///
-///         Cycle guard: record() walks the referrer NFT's ancestry
-///         (<= MAX_DEPTH hops); if the trader's own NFT appears, revert.
-///         The payout walk is depth-bounded anyway, so a cycle could never
-///         loop gas — the guard only preserves "no one collects two tiers
-///         of their own trade's fee".
-contract PSPReferralRegistry {
+///         Purchases transfer mixETH directly from the caller to V4 and take
+///         PSP directly to the caller. The registry retains no purchase funds.
+///         An invalid/ineligible link is skipped; a failed purchase rolls back
+///         new attribution, fees and token movements together.
+contract PSPReferralRegistry is ReentrancyGuard {
+    using SafeERC20 for IERC20;
+    using BalanceDeltaLibrary for BalanceDelta;
     // ─────────────── Errors ───────────────
     error ZeroAddress();
     error ZeroNftId();
@@ -49,12 +53,31 @@ contract PSPReferralRegistry {
     error AlreadyReferred();
     error NotQualifiedReferrer(); // NFT dead or owner below MIN_STAKE_PSP
     error WouldCreateCycle();
+    error BadPool();
+    error BadAmount();
+    error Expired();
+    error InsufficientOutput();
+    error UnauthorizedCallback();
 
     // ─────────────── Events ───────────────
     event Referred(address indexed trader, uint256 indexed traderNftId, uint256 indexed referrerNftId);
 
+    event ReferralSkipped(address indexed trader, uint256 indexed referrerNftId, bytes4 reason);
+
     // ─────────────── Constants ───────────────
     uint256 public constant MAX_DEPTH = 5;
+    /// @notice Atomic purchase binding and immutable wallet-entry semantics.
+    uint256 public constant PURCHASE_REFERRAL_VERSION = 1;
+
+    struct Purchase {
+        PoolKey key;
+        uint256 mixIn;
+        uint256 minPspOut;
+        address buyer;
+        bool mixIsZero;
+    }
+    address private activeManager;
+    bytes32 private activePurchase;
 
     /// @dev Tier weights (bps of the referral carve-out): closest referrer
     ///      >= 80%, then monotonically smaller out to the 5th hop.
@@ -66,13 +89,13 @@ contract PSPReferralRegistry {
 
     // ─────────────── State ───────────────
     IPSPStaker public immutable staker; // this round's staker (min-stake oracle)
-    /// @dev NFT → referrer NFT. Chain edges ride the token: transfer the
+    /// @dev NFT → referrer NFT, written once. Chain edges ride the token: transfer the
     ///      position and the subtree follows. Set when the NFT's owner
     ///      records their own attribution while holding it.
     mapping(uint256 => uint256) public nftRefOf;
-    /// @dev Trader → referrer NFT for traders holding no NFT at record time.
-    ///      Terminal entry: nothing walks THROUGH a trader slot (walks only
-    ///      follow nftRefOf), so these edges cannot create cycles.
+    /// @dev Trader → immutable referrer NFT, whether or not the trader holds an NFT.
+    ///      Also provides ancestry for later-minted NFTs until a token edge
+    ///      exists. Both record-time checks and payout walks are depth-bounded.
     mapping(address => uint256) public traderRefNftOf;
     /// @dev One attribution per trader per round — the graph resets by
     ///      rebirth, this flag enforces one record per round.
@@ -89,49 +112,95 @@ contract PSPReferralRegistry {
 
     // ─────────────── Attribution ───────────────
 
-    /// @notice Self-registration: "I was referred by the holder of position
-    ///         `referrerNftId`." One shot per round. The frontend's
-    ///         ?ref=<tokenId> capture ends here — this is the ONLY way
-    ///         attribution is created, and it binds msg.sender directly, so
-    ///         no third party (router, direct pool swapper) can ever bind or
-    ///         burn a trader's attribution (A-1 fix 2026-08-26).
-    function record(uint256 referrerNftId) external {
+    /// @notice Optional direct self-registration. Purchases can bind the
+    ///         same entry atomically through buyWithMix instead.
+    function record(uint256 referrerNftId) external nonReentrant {
+        bytes4 reason = _referralError(msg.sender, referrerNftId);
+        if (reason != bytes4(0)) {
+            assembly ("memory-safe") { mstore(0, reason) revert(0, 4) }
+        }
         _record(msg.sender, referrerNftId);
     }
 
-    function _record(address trader, uint256 referrerNftId) internal {
-        if (trader == address(0)) revert ZeroAddress();
-        if (referrerNftId == 0) revert ZeroNftId();
-        if (attributed[trader]) revert AlreadyReferred();
+    /// @notice Buy PSP and bind an eligible referral with the buyer's single
+    ///         purchase signature. Zero skips attribution; an existing entry wins.
+    /// @param referrerNftId The referring pepe in THIS registry's round, or zero.
+    /// @dev AUD-15: no trader argument, delegated recorder, tx.origin or trusted
+    ///      hookData. Only msg.sender's funds and attribution are affected.
+    function buyWithMix(
+        PoolKey calldata key, uint256 mixIn, uint256 minPspOut,
+        uint256 deadline, uint256 referrerNftId
+    ) external nonReentrant returns (uint256 pspOut) {
+        if (mixIn == 0 || mixIn > uint256(uint128(type(int128).max))) revert BadAmount();
+        if (deadline != 0 && block.timestamp > deadline) revert Expired();
+        IRoundController ctl = IReferralStaker(address(staker)).controller();
+        address mix = Currency.unwrap(ctl.getMixETH());
+        address psp = ctl.getPSP();
+        bool mixIsZero = Currency.unwrap(key.currency0) == mix;
+        if (address(key.hooks) != ctl.hookAddress() ||
+            IReferralHook(address(key.hooks)).referralRegistry() != address(this) ||
+            Currency.unwrap(mixIsZero ? key.currency1 : key.currency0) != psp ||
+            Currency.unwrap(mixIsZero ? key.currency0 : key.currency1) != mix ||
+            key.fee != 0x800000 || key.tickSpacing != 60) revert BadPool();
 
-        // Skin in the game: the referrer NFT must be alive and its owner
-        // must hold >= MIN_STAKE_PSP locked. Checked at record time only
-        // (D4): the edge persists even if the referrer later unlocks — the
-        // NFT burns, the walk truncates, unpaid weight goes to stakers.
-        if (!_qualified(referrerNftId)) revert NotQualifiedReferrer();
+        if (referrerNftId != 0 && !attributed[msg.sender]) {
+            bytes4 reason = _referralError(msg.sender, referrerNftId);
+            if (reason == bytes4(0)) _record(msg.sender, referrerNftId);
+            else emit ReferralSkipped(msg.sender, referrerNftId, reason);
+        }
+        IPoolManager manager = IReferralHook(address(key.hooks)).poolManager();
+        bytes memory data = abi.encode(Purchase(key, mixIn, minPspOut, msg.sender, mixIsZero));
+        activeManager = address(manager);
+        activePurchase = keccak256(data);
+        pspOut = abi.decode(manager.unlock(data), (uint256));
+        activeManager = address(0);
+        activePurchase = bytes32(0);
+    }
 
-        // The trader's own position NFT (0 if they stake none yet).
-        uint256 traderNftId = staker.primaryOf(trader);
-        if (traderNftId == referrerNftId) revert SelfReferral();
+    /// @notice V4 callback, accepted only for the purchase currently in flight.
+    function unlockCallback(bytes calldata data) external returns (bytes memory) {
+        if (msg.sender != activeManager || activePurchase == bytes32(0) ||
+            keccak256(data) != activePurchase) revert UnauthorizedCallback();
+        activePurchase = bytes32(0); // consume before external token calls
+        Purchase memory p = abi.decode(data, (Purchase));
+        IPoolManager manager = IPoolManager(msg.sender);
+        Currency mix = p.mixIsZero ? p.key.currency0 : p.key.currency1;
+        manager.sync(mix);
+        IERC20(Currency.unwrap(mix)).safeTransferFrom(p.buyer, msg.sender, p.mixIn);
+        manager.settle();
+        BalanceDelta delta = manager.swap(p.key, SwapParams({
+            amountSpecified: -int256(p.mixIn),
+            sqrtPriceLimitX96: p.mixIsZero ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1,
+            zeroForOne: p.mixIsZero
+        }), abi.encode(p.buyer));
+        int256 output = p.mixIsZero ? delta.amount1() : delta.amount0();
+        if (output <= 0 || uint256(output) < p.minPspOut) revert InsufficientOutput();
+        manager.take(p.mixIsZero ? p.key.currency1 : p.key.currency0, p.buyer, uint256(output));
+        return abi.encode(uint256(output));
+    }
 
-        // Cycle guard: walk the referrer NFT's ancestry; the trader's own
-        // NFT must not appear. MAX_DEPTH bounds gas.
+    function _referralError(address trader, uint256 referrerNftId) internal view returns (bytes4) {
+        if (referrerNftId == 0) return ZeroNftId.selector;
+        if (attributed[trader]) return AlreadyReferred.selector;
+        if (!_qualified(referrerNftId)) return NotQualifiedReferrer.selector;
+        // All NFTs owned by the buyer are self-referrals, including non-primary ones.
+        if (_ownerOf(referrerNftId) == trader) return SelfReferral.selector;
         uint256 node = referrerNftId;
         for (uint256 i = 0; i < MAX_DEPTH; i++) {
             node = _nextEdge(node);
             if (node == 0) break;
-            if (node == traderNftId) revert WouldCreateCycle();
+            if (_ownerOf(node) == trader) return WouldCreateCycle.selector;
         }
+        return bytes4(0);
+    }
 
+    function _record(address trader, uint256 referrerNftId) internal {
+        uint256 traderNftId = staker.primaryOf(trader);
         attributed[trader] = true;
-        // Entry edge for payout resolution (always written).
         traderRefNftOf[trader] = referrerNftId;
-        // Chain edge when the trader holds a position: whoever walks through
-        // this trader's NFT continues to the trader's referrer. Rides the
-        // token through transfers.
-        if (traderNftId != 0) {
-            nftRefOf[traderNftId] = referrerNftId;
-        }
+        // A transferred NFT retains its original ancestry. A new owner's
+        // personal entry must never overwrite another wallet's token edge.
+        if (traderNftId != 0 && nftRefOf[traderNftId] == 0) nftRefOf[traderNftId] = referrerNftId;
         emit Referred(trader, traderNftId, referrerNftId);
     }
 
@@ -155,8 +224,8 @@ contract PSPReferralRegistry {
     ///         up to 5 tiers, each the CURRENT owner of an NFT in the
     ///         trader's referrer chain (closest first), with tier weights.
     ///         Zero-padded; a dead NFT (burned after attribution) truncates
-    ///         the walk — missing tiers' weight is NOT paid and flows back
-    ///         to stakers by the hook's subtraction accounting (D2).
+    ///         the walk. The hook routes the unpaid part of the referral leg
+    ///         through its pot/deployer fee accounting.
     function payoutFor(address trader)
         external
         view
@@ -199,11 +268,10 @@ contract PSPReferralRegistry {
         return traderRefNftOf[_ownerOf(nftId)];
     }
 
-    /// @dev The trader's entry edge: their position NFT's edge if they hold
-    ///      one, else their personal trader-slot edge.
+    /// @dev AUD-15: the signed wallet entry is authoritative for this round.
+    ///      Buying/transferring/changing a primary NFT cannot replace it or
+    ///      silently attribute a wallet that has never recorded a referral.
     function _entryOf(address trader) internal view returns (uint256) {
-        uint256 traderNftId = staker.primaryOf(trader);
-        if (traderNftId != 0) return _nextEdge(traderNftId);
         return traderRefNftOf[trader];
     }
 

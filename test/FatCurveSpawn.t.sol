@@ -18,12 +18,9 @@ import {MockMixETH} from "./mocks/MockMixETH.sol";
 import {MockPoolManager} from "./mocks/MockPoolManager.sol";
 
 /// @title FatCurveSpawn — 34-zone staged-spawn gas canaries (2026-08-30)
-/// @notice SpawnStaging pins the staged legs on the 2-zone playtest curve;
-///         round 2 on Base Sepolia runs the canonical 34-zone staircase.
-///         These canaries measure the FAT-curve costs of every staged leg
-///         so the deploy docs can cite real numbers, not estimates:
-///         genesis deployRound (reserve+birth composed), permissionless
-///         reserveSpawn, and birthRound.
+/// @notice The legacy 34-zone curve remains reachable through the factory.
+///         Measure its composed convenience path and prove the current release's
+///         reserve + three birthStep transactions each fit the deployment cap.
 contract FatCurveSpawn is Test {
     MockPoolManager poolManager;
     MockMixETH mixETH;
@@ -64,10 +61,10 @@ contract FatCurveSpawn is Test {
         assertTrue(address(c1) != address(0), "round 1 born");
     }
 
-    /// Rebirth: kill → reserve (bounded mine, retry semantics) → birth,
-    /// all 34 zones, permissionless callers. The claim the redesign makes:
-    /// birth is variance-free and fits EVERY per-tx cap — Sepolia's 2^24
-    /// is the strictest one in production.
+    /// AUD-15: adding registry purchase code increases the composed birth cost.
+    /// READINESS.md requires the existing three-step birth path on capped chains.
+    /// Preserve the composed measurement, then enforce a stricter 12M per-step
+    /// budget on the SAME reserved round instead of raising the old 2^24 limit.
     function test_gas_rebirth34() public {
         RoundController c1 = _deployFatRound1();
 
@@ -93,6 +90,7 @@ contract FatCurveSpawn is Test {
             console2.log("reserveSpawn 34-zone gas (successful attempt):", gReserve);
         }
 
+        uint256 checkpoint = vm.snapshotState();
         uint256 g0 = gasleft();
         factory.birthRound(); // rando can call; test contract is fine too
         uint256 gBirth = g0 - gasleft();
@@ -100,7 +98,18 @@ contract FatCurveSpawn is Test {
 
         assertEq(factory.currentRoundId(), 2, "round 2 born");
         assertTrue(address(factory.getRound(2).hook) != address(0), "hook exists");
-        assertTrue(gBirth < 16_777_216, "34-zone birth must fit Sepolia's 2^24 per-tx cap");
+        assertTrue(vm.revertToState(checkpoint), "restore the reserved round");
+        for (uint256 phase = 1; phase <= 3; phase++) {
+            assertEq(factory.reservationPhase(), phase, "resume the expected phase");
+            uint256 stepStart = gasleft();
+            factory.birthStep{gas: 12_000_000}();
+            uint256 spent = stepStart - gasleft();
+            console2.log("34-zone birth phase / gas:", phase, spent);
+            assertLt(spent, 12_000_000, "every release birth transaction stays below 12M");
+        }
+        assertEq(factory.currentRoundId(), 2, "split round 2 born");
+        assertFalse(factory.reservationActive(), "birth complete");
+        assertTrue(address(factory.getRound(2).hook) != address(0), "split hook exists");
         assertTrue(gReserve < 16_777_216, "34-zone reserve must fit Sepolia's 2^24 per-tx cap");
     }
 }

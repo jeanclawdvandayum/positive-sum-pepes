@@ -1,9 +1,11 @@
+import { usePurchaseReferral, useReferral } from './ReferralCard'
+import { purchaseReferral } from '../lib/referrals'
 import { MIN_BUY_INPUT, purchaseUnits, TIME_PER_UNIT, minimumOutput } from '../lib/gameRules'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { useRpcReads } from '../lib/useRpcReads'
-import { erc20Abi, hookAbi, controllerAbi, zapInAbi, zapOutAbi, buildPoolKey } from '../lib/abi'
+import { erc20Abi, hookAbi, controllerAbi, registryAbi, zapInAbi, zapOutAbi, buildPoolKey } from '../lib/abi'
 import { rpcCall, rpcBatchCall } from '../lib/rpc'
 import { ADDRESSES } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
@@ -33,7 +35,13 @@ export default function SwapCard() {
   const [customSlip, setCustomSlip] = useState('')
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
-  const { writeContractAsync } = useConfirmedWrite()
+  const referral = useReferral()
+  const hint = usePurchaseReferral()
+  const atomicPurchase = referral.version === 1n && !!referral.registry
+  const buyTarget = atomicPurchase ? referral.registry! : ADDRESSES.zapIn
+  const referralLoading = referral.registry === undefined || referral.version === undefined
+  const referralBlocked = referralLoading || (hint > 0n && referral.attributed !== true && !atomicPurchase)
+  const { writeContractAsync } = useConfirmedWrite({ referralPurchase: { roundId: round.id, registry: referral.registry } })
   const burstRef = useRef<BurstHandle>(null)
 
   /// Flat mode = one-way exit (scoopy 2026-08-29, fix #3): buying is
@@ -113,7 +121,7 @@ export default function SwapCard() {
     ? ADDRESSES.zapOut
     : predepositPhase
       ? round.controller
-      : ADDRESSES.zapIn
+      : buyTarget
 
   const allowanceRes = useRpcReads(
     [
@@ -146,7 +154,9 @@ export default function SwapCard() {
   async function run() {
     setError(null)
     if (!address || !poolKey || busy) return
+    if (side === 'buy' && !predepositPhase && referralBlocked) { setError('Referral purchases require the updated round contracts.'); return }
     if (side === 'buy' && mixIn < MIN_BUY_INPUT) { setError('Minimum purchase is 0.005 mixETH.'); return }
+    setStep('waiting') // lock the action before the fresh allowance RPC
     try {
       if (predepositPhase) {
         if (!hasAllowance) {
@@ -171,22 +181,32 @@ export default function SwapCard() {
 
       // active trading
       if (side === 'buy') {
-        if (!hasAllowance) {
+        const referrerNftId = purchaseReferral(hint, referral.attributed)
+        // The spender changes on upgraded rounds; never reuse a cached zap allowance.
+        const currentAllowance = await rpcCall(round.mix!, erc20Abi, 'allowance', [address, buyTarget]) as bigint
+        if (currentAllowance < mixIn) {
           setStep('approve')
           await writeContractAsync({
             address: round.mix!,
             abi: erc20Abi,
             functionName: 'approve',
-            args: [ADDRESSES.zapIn, mixIn],
+            args: [buyTarget, mixIn],
           })
         }
         setStep('swap')
-        await writeContractAsync({
-          address: ADDRESSES.zapIn,
-          abi: zapInAbi,
-          functionName: 'buyWithMix',
-          args: [poolKey, mixIn, await freshMinOut(), BigInt(Math.floor(Date.now() / 1000) + 600)],
-        })
+        const output = await freshMinOut()
+        const deadline = BigInt(Math.floor(Date.now() / 1000) + 600)
+        if (atomicPurchase) {
+          await writeContractAsync({
+            address: buyTarget, abi: registryAbi, functionName: 'buyWithMix',
+            args: [poolKey, mixIn, output, deadline, referrerNftId],
+          })
+        } else {
+          await writeContractAsync({
+            address: buyTarget, abi: zapInAbi, functionName: 'buyWithMix',
+            args: [poolKey, mixIn, output, deadline],
+          })
+        }
         setStep('done')
         // The chain receipt is confirmed. Only animate the actual capped extension.
         if (round.hook) {
@@ -255,7 +275,7 @@ export default function SwapCard() {
   }
 
   const canSubmit =
-    isConnected && !!poolKey && amountWad > 0n && (side !== 'buy' || mixIn >= MIN_BUY_INPUT) && (predepositPhase || (quoteRaw ?? 0n) > 0n) && payBalanceOk && !busy && !halted && (live || predepositPhase)
+    isConnected && !!poolKey && !(side === 'buy' && !predepositPhase && referralBlocked) && amountWad > 0n && (side !== 'buy' || mixIn >= MIN_BUY_INPUT) && (predepositPhase || (quoteRaw ?? 0n) > 0n) && payBalanceOk && !busy && !halted && (live || predepositPhase)
 
   const cta = !isConnected
     ? 'connect wallet'
@@ -517,6 +537,7 @@ export default function SwapCard() {
       {!halted && (
       <div className="relative pt-4">
         {/* The pay/receive panels absorb spare height above the submit action. */}
+        {side === 'buy' && round.mode === 1 && referralLoading && <p role="status" className="text-xs text-text-lo">checking the round’s purchase settings…</p>}
         {round.mode === 1 && (
           <p className="text-xs leading-relaxed text-text-lo">
             the pot gets fed. stakers get their cut. your swap fee covers both.

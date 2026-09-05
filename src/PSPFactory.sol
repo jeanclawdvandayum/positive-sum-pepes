@@ -109,10 +109,7 @@ contract PSPFactory is Ownable2Step {
         useSine = true;
     }
 
-    /// @dev Referral graph — permanent, cross-round. Born here so every
-    ///      spawned round wires into the SAME social graph: the factory
-    ///      points it at each new round's staker (min-stake oracle) and
-    ///      authorizes each new hook as a lazy recorder.
+    /// @dev Fresh referral graph per round; wallet entries bind once for that round.
     mapping(uint256 => address) public referralRegistryOf;
 
     /// @dev Minimum locked PSP to qualify as a referrer (skin in the game).

@@ -33,6 +33,7 @@ import {StakerDeployer} from "src/StakerDeployer.sol";
 ///        she enters with ETH via PSPZapIn and exits to ETH via PSPZapOut.
 abstract contract RealV4Base is Test {
     function testTimings() internal pure virtual returns (uint256) { return 0; }
+    function createMixETH() internal virtual returns (MockMixETH) { return new MockMixETH(); }
     IPoolManager poolManager;
     MockMixETH mixETH;
     PSPFactory factory;
@@ -50,7 +51,7 @@ abstract contract RealV4Base is Test {
     function setUp() public virtual {
         vm.warp(1000 * 7 days);
         poolManager = IPoolManager(address(new PoolManager(address(this))));
-        mixETH = new MockMixETH();
+        mixETH = createMixETH();
         mixETH.depositETH{value: 100_000e18}();
 
         factory = new PSPFactory(

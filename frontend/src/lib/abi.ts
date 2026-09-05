@@ -149,8 +149,12 @@ export const zapOutAbi = parseAbi([
 ])
 
 /// PSPReferralRegistry — per-round referral attribution graph (2026-08-27).
-/// record() is called by the VISITOR (msg.sender = trader) and binds forever.
+/// buyWithMix binds msg.sender in the purchase; record remains an optional direct path.
 export const registryAbi = parseAbi([
+  'function PURCHASE_REFERRAL_VERSION() view returns (uint256)',
+  'function buyWithMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 mixIn, uint256 minPspOut, uint256 deadline, uint256 referrerNftId) returns (uint256 pspOut)',
+  'event Referred(address indexed trader, uint256 indexed traderNftId, uint256 indexed referrerNftId)',
+  'event ReferralSkipped(address indexed trader, uint256 indexed referrerNftId, bytes4 reason)',
   'function record(uint256 referrerNftId)',
   'function attributed(address) view returns (bool)',
   'function traderRefNftOf(address) view returns (uint256)',

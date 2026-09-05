@@ -1,17 +1,20 @@
 # Audit preparation — September 2026
 
 This is a review packet for the current source tree, not a security certification.
-Final local gates: **404 Solidity tests / 56 suites**, including 64 invariant runs
+Final local gates: **426 Solidity tests / 57 suites**, including 64 invariant runs
 and 2,048 calls per real-V4 handler with zero reverts; an additional three-wallet
-campaign passed 256 runs / 32,768 calls and complete exits; **50 frontend tests**; TypeScript/Vite;
-106 ABI declarations; 32 production size checks; independent oracle and governance
+campaign passed 256 runs / 32,768 calls and complete exits; **60 frontend tests**; TypeScript/Vite;
+110 ABI declarations; 32 production size checks; independent oracle and governance
 gates. Static-analysis flags remain triaged separately. See GATE-LOG.md.
 A fresh Base Sepolia release is deployed and configured in the local frontend.
 See [TESTNET-PLAYTEST.md](TESTNET-PLAYTEST.md) for the running app, release manifest,
 source verification and wallet test sequence. Earlier deployments remain unchanged.
 The current testnet frontend uses the AUD-14 replacement ZapIn/Reinvestor; see
 the [repair manifest](deployments/base-sepolia-2026-09-05-reinvest-repair.json).
-Original round contracts, balances and NFTs remain in place. Old misattributed
+Original round contracts, balances and NFTs remain in place. The AUD-15 atomic
+referral purchase implementation is prepared in source and requires a fresh
+factory/round deployment; the current live registry is unchanged. See
+[REFERRALS.md](REFERRALS.md). Old misattributed
 events/seats are immutable and are not silently relabeled as repaired history.
 
 ## Binding game rules (2026-09-05 approval)
@@ -26,6 +29,10 @@ events/seats are immutable and are not silently relabeled as repaired history.
 - Fees are included in the entry budget. Entry stays constant in mixETH, not USD.
 - The `TimeAdded` second field now reports **actual seconds added after the cap**;
   its ABI selector is unchanged, so do not decode old deployments as the new rules.
+- An eligible referral can bind in the buyer’s signed purchase transaction. The
+  wallet’s recorded NFT referral remains fixed for that round, including across
+  primary-NFT changes. Fresh registries reset the graph. See [REFERRALS.md](REFERRALS.md)
+  for the deployment boundary, optional zero/invalid-link handling and NFT ownership.
 - Selling does not remove tickets. Buy/sell/buy cycles deliberately pay fees on
   all three legs. This is an economic design choice, not proof that cycling is
   unprofitable when the trader also owns staking/referral rewards and pot seats.
@@ -64,6 +71,7 @@ blocked; matching constants is compatibility checking, not source verification.
 | RS-4 | Correct mature cancellation and early-flat withdrawal schedules; bound epoch catch-up; handle epoch-zero requests | FeeImmediacy edge cases; MultiOwnerStateful 32,768 calls |
 | RS-5 | Old-round exits verify their own targets; unclaimed genesis and deferred husk fees remain accessible | 3 exit-preflight tests; typed frontend build |
 | AUD-13 | Permissionless top-ups paid a victim NFT’s accrued fees to the donor and could erase them on a shortfall | Settle to NFT owner; third-party top-ups revert on shortfall; fee-theft and forced-forfeit pins |
+| AUD-15 | Separate referral bind added a wallet transaction; acquiring a primary NFT could override a recorded payout entry | Atomic caller-authenticated registry purchase; immutable wallet entry and NFT ancestry; 22 real-V4 referral tests, 10 frontend referral tests |
 | AUD-14 | Reinvestment credited the wrapper with ladder seats, Buy/TimeAdded events and referral lookup, stranding any resulting pot entitlement on the wrapper | Owner forwarded via buyWithMixFor; single/batch owner/operator tests verify events, referrals and owner pot claims; live-round fork; legacy-wrapper UI guard |
 
 The PoolKey object/tuple explanation in the earlier handoff was not reproduced:
@@ -126,8 +134,10 @@ all stakes and redeems all supply at each campaign’s end.
    virtual genesis position, fee rounding, operator
    approvals, NFT transfers, and conservation across simultaneous obligations.
 3. Hook-data trader identity is an untrusted beneficiary hint, not authentication.
-   Referral binding must remain user-signed; direct routers can assign their seats
-   to another beneficiary at their own expense.
+   Referral binding must remain authenticated by the buyer’s own call to the
+   registry (atomic purchase or optional direct record); direct routers can assign
+   their seats to another beneficiary at their own expense. Review the new
+   registry purchase callback, immutable wallet entry and token ancestry rules.
 4. Adversarial trading economics: majority stakers recapture fees, referrals recapture
    fees, a buyer can own all ten seats, and transaction ordering determines the last
    buyer. No claim of Sybil resistance or MEV immunity is made.

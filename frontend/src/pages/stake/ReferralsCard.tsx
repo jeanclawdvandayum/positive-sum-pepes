@@ -14,14 +14,14 @@ import { useCanRefer, refLinkFor, useReferral } from '../../components/ReferralC
 
 export default function ReferralsCard() {
   const { isConnected } = useAccount()
-  const { pepeIds, registry } = useReferral()
+  const { pepeIds, registry, version } = useReferral()
   const [selected, setSelected] = useState<bigint | null>(null)
   const [copied, setCopied] = useState(false)
 
   const ids = useMemo(() => [...pepeIds].sort((a, b) => (a < b ? -1 : 1)), [pepeIds])
   const active = selected !== null && ids.includes(selected) ? selected : (ids[0] ?? null)
   const canRefer = useCanRefer(registry, active)
-  const link = active !== null ? refLinkFor(active) : ''
+  const link = active !== null && registry && version === 1n ? refLinkFor(active, registry) : ''
 
   useEffect(() => {
     if (!copied) return
@@ -43,9 +43,10 @@ export default function ReferralsCard() {
     <section className="rounded-2xl border border-line bg-bg-1 p-5" aria-label="referrals">
       <h2 className="font-display text-lg">referrals</h2>
 
+      {version === 0n && <p className="mt-3 text-xs text-text-lo">referral links open with the next testnet deployment.</p>}
       {!isConnected ? (
         <p className="mt-3 text-sm leading-relaxed text-text-lo">
-          invite the usual suspects. connect your wallet to share your pepe’s referral link. referral chains share 5% of trading fees from wallets that accept the referral.
+          invite the usual suspects. connect your wallet to share your pepe’s referral link. referral chains share 5% of trading fees from referred wallets. an eligible referral is included in their purchase and stays locked for the round.
         </p>
       ) : ids.length === 0 ? (
         <p className="mt-3 text-sm leading-relaxed text-text-lo">stake a pepe to unlock referral links</p>
@@ -64,12 +65,12 @@ export default function ReferralsCard() {
             ))}
           </select>
           <div className="st-linkbox mt-3">{link}</div>
-          <button type="button" className="st-btn st-btn-primary mt-3 w-full" onClick={copyLink}>
+          <button type="button" className="st-btn st-btn-primary mt-3 w-full" disabled={!link || canRefer !== true} onClick={copyLink}>
             {copied ? 'copied ✓' : 'copy referral link'}
           </button>
           {canRefer === false && (
             <p className="mt-2 text-xs text-phase-heat">
-              pepe #{active?.toString()} needs referral eligibility before visitors can accept its referral.
+              pepe #{active?.toString()} needs referral eligibility before purchases can record its referral.
             </p>
           )}
         </>

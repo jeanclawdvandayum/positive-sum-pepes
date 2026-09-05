@@ -148,7 +148,7 @@ contract ControllerDeployer {
     // beside each hook, keyed by staker position NFT IDs. Fully
     // permissionless since the A-1 fix (2026-08-26): no owner, no
     // authorized recorders — attribution binds only via the user-signed
-    // record(); no mining needed — the registry has no permissioned
+    // record() or buyWithMix(); no mining needed — the registry has no permissioned
     // surface worth squatting.
 
     function deployRegistry(address staker, uint256 minStakePSP)

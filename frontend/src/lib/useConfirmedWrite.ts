@@ -1,14 +1,15 @@
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { CHAIN_ID, ADDRESSES } from './config'
-import { factoryAbi, hookAbi, controllerAbi, reinvestorAbi } from './abi'
+import { factoryAbi, hookAbi, controllerAbi, reinvestorAbi, registryAbi } from './abi'
 import { assertGameRules } from './gameRules'
 import { verifyRoundExit } from './exitRules'
 import { confirmTransaction } from './transactions'
 import { userFacingRpcError } from './rpcErrors'
+import { assertReferralPurchase } from './referrals'
 import { assertReinvestor } from './reinvestRules'
 
 /** AUD-4: every UI write simulates, waits for mining, and checks receipt status. */
-export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined }) {
+export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } | { referralPurchase: { roundId: bigint; registry?: `0x${string}` } }) {
   const { address, chainId } = useAccount()
   const client = usePublicClient()
   const { writeContractAsync } = useWriteContract()
@@ -18,7 +19,7 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined })
     // Immutable legacy deployments do not acquire the new purchase rules.
     const factory = ADDRESSES.factory as `0x${string}`
     const blockNumber = await client.getBlockNumber().catch(error => { throw userFacingRpcError(error) })
-    if (options) {
+    if (options && 'exitRoundId' in options) {
       // Read this immutable registry entry only. The latest round's rules or
       // availability cannot disable an older round's asset exits.
       await verifyRoundExit({
@@ -33,6 +34,20 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined })
         client.readContract({ address: round[2], abi: hookAbi, functionName: 'TIME_PER_UNIT', blockNumber }),
       ])
       assertGameRules(minimum, seconds)
+      if (options && 'referralPurchase' in options) {
+        const intent = options.referralPurchase
+        const atomicBuy = parameters.functionName === 'buyWithMix' && parameters.args?.length === 5
+        const registryApproval = parameters.functionName === 'approve' && intent.registry &&
+          String(parameters.args?.[0]).toLowerCase() === intent.registry.toLowerCase()
+        if (atomicBuy || registryApproval) {
+          if (intent.roundId !== id) throw new Error('The round changed. Refresh before purchasing.')
+          const registry = await client.readContract({ address: factory, abi: factoryAbi, functionName: 'referralRegistryOf', args: [id], blockNumber })
+          const version = await client.readContract({ address: registry, abi: registryAbi, functionName: 'PURCHASE_REFERRAL_VERSION', blockNumber })
+          const key = parameters.args?.[0] as { hooks?: string } | undefined
+          assertReferralPurchase({ registry, version, hook: round[2] },
+            atomicBuy ? parameters.address : String(parameters.args?.[0]), atomicBuy ? key?.hooks ?? '' : round[2])
+        }
+      }
       const approvesRouter = parameters.functionName === 'setApprovalForAll' &&
         String(parameters.args?.[0]).toLowerCase() === ADDRESSES.reinvestor.toLowerCase()
       if (approvesRouter || parameters.address.toLowerCase() === ADDRESSES.reinvestor.toLowerCase()) {

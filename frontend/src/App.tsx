@@ -11,6 +11,7 @@ import Topbar from './components/Topbar'
 import WalletPepeAvatar from './components/WalletPepeAvatar'
 import ScanlineOverlay from './components/ScanlineOverlay' // dark-theme CRT, inert otherwise (B0)
 import Landing from './pages/Landing'
+import { ReferralProvider } from './components/ReferralCard'
 import Trade from './pages/Trade'
 import Stake from './pages/Stake'
 import Predeposit from './pages/Predeposit'
@@ -109,6 +110,7 @@ function Shell() {
           modalSize="compact"
         >
           <HashRouter>
+            <ReferralProvider>
             {/* bg-0 in both themes — the old wrapper was a light-only gradient
                 (inventory red-line #14); scanlines ride above, pointer-dead */}
             <div className="min-h-dvh bg-bg-0">
@@ -129,6 +131,7 @@ function Shell() {
               <RulesNotice />
               <Footer />
             </div>
+            </ReferralProvider>
           </HashRouter>
         </RainbowKitProvider>
       </QueryClientProvider>
