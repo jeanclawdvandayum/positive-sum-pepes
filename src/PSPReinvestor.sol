@@ -13,7 +13,7 @@ import {GameRules} from "./libraries/GameRules.sol";
 
 /// @title PSPReinvestor — claim fees and compound them back into the stake
 /// @notice For a staked pepe: pulls the position's accrued mixETH fees to
-///         this contract, buys PSP on the curve via PSPZapIn.buyWithMix,
+///         this contract, buys PSP on the curve via PSPZapIn.buyWithMixFor,
 ///         and stakes the PSP back into the SAME pepe (stakeFor). One tx.
 ///         Repeats across many pepes via reinvestAll.
 ///
@@ -27,6 +27,8 @@ contract PSPReinvestor is ReentrancyGuard {
     IPSPZapIn public immutable zapIn;
     IERC20 public immutable mix;
     IERC20 public immutable psp;
+    /// @notice AUD-14 compatibility marker: buys credit the NFT owner.
+    uint256 public constant ATTRIBUTION_VERSION = 1;
 
     error NothingToReinvest();
     error DustStranded(uint256 pspLeft);
@@ -63,7 +65,7 @@ contract PSPReinvestor is ReentrancyGuard {
         if (mixIn < GameRules.MIN_BUY) revert NothingToReinvest();
 
         uint256 pspBefore = psp.balanceOf(address(this));
-        zapIn.buyWithMix(key, mixIn, minPspOut, deadline);
+        zapIn.buyWithMixFor(key, mixIn, minPspOut, deadline, owner);
         uint256 bought = psp.balanceOf(address(this)) - pspBefore;
 
         // stake everything back into the caller's pepe. Owner check inside
@@ -108,18 +110,18 @@ contract PSPReinvestor is ReentrancyGuard {
         if (totalShare == 0) revert NothingToReinvest();
 
         uint256 pspBefore = psp.balanceOf(address(this));
-        zapIn.buyWithMix(key, mixIn, minPspOut, deadline);
+        zapIn.buyWithMixFor(key, mixIn, minPspOut, deadline, owner);
         uint256 bought = psp.balanceOf(address(this)) - pspBefore;
 
         // spread the buy proportionally across the claimed pepes
         for (uint256 i; i < pepeIds.length; ++i) {
             uint256 share = (bought * staker.positions(pepeIds[i]).amount) / totalShare;
-            if (share != 0) staker.stakeFor(staker.ownerOf(pepeIds[i]), pepeIds[i], share);
+            if (share != 0) staker.stakeFor(owner, pepeIds[i], share);
         }
 
         uint256 left = psp.balanceOf(address(this));
         if (left > pspBefore && left > 1e3) revert DustStranded(left);
 
-        emit ReinvestedAll(staker.ownerOf(pepeIds[0]), pepeIds.length, mixIn, bought);
+        emit ReinvestedAll(owner, pepeIds.length, mixIn, bought);
     }
 }

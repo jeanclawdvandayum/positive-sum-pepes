@@ -340,6 +340,8 @@ contract RealV4LifecycleTest is RealV4Base {
         reinvestor.reinvest(id,poolKey,1,block.timestamp+600);
         (uint256 afterAmount,,,,)=controller.staker().positions(id);
         assertGt(afterAmount,before);
+        (address creditedBuyer,,,) = hook.board(0);
+        assertEq(creditedBuyer, bob, "AUD-14: reinvestment seats belong to the NFT owner");
     }
 
     function test_LocalV4_ReinvestRejectsDuplicateAndForeignPositions() public {

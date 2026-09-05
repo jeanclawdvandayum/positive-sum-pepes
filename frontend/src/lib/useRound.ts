@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
+import { assertReinvestor } from './reinvestRules'
 import { factoryAbi, controllerAbi, hookAbi, erc20Abi, stakerAbi, reinvestorAbi } from './abi'
 import { ADDRESSES, REINVEST_ENABLED } from './config'
 import { createRoundMetadataReader } from './roundMetadata'
@@ -87,7 +88,10 @@ function startRoundLoop() {
         mix, cfg, zones, detWindow, rulesCompatible } = await readMetadata(id)
       let wrapperStaker = wrapperStakers.get(ADDRESSES.reinvestor)
       if (REINVEST_ENABLED && !wrapperStaker) {
-        wrapperStaker = await (rpcCall(ADDRESSES.reinvestor, reinvestorAbi, 'staker') as Promise<string>).catch(() => undefined)
+        wrapperStaker = await Promise.all([
+          rpcCall(ADDRESSES.reinvestor, reinvestorAbi, 'staker') as Promise<string>,
+          rpcCall(ADDRESSES.reinvestor, reinvestorAbi, 'ATTRIBUTION_VERSION') as Promise<bigint>,
+        ]).then(([staker, version]) => { assertReinvestor(staker, staker, version); return staker }).catch(() => undefined)
         if (wrapperStaker) wrapperStakers.set(ADDRESSES.reinvestor, wrapperStaker)
       }
       const reinvestorReady = wrapperStaker?.toLowerCase() === rStaker.toLowerCase()

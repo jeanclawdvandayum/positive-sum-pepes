@@ -8,4 +8,7 @@ interface IPSPZapIn {
     function buyWithMix(PoolKey calldata key, uint256 mixIn, uint256 minPspOut, uint256 deadline)
         external
         returns (uint256 pspOut);
+    function buyWithMixFor(PoolKey calldata key, uint256 mixIn, uint256 minPspOut, uint256 deadline, address trader)
+        external
+        returns (uint256 pspOut);
 }

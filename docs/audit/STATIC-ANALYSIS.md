@@ -55,6 +55,27 @@ SafeERC20.safeTransfer and is absent from this fresh report.
 
 ## Reproduce
 
+### Reinvestment attribution follow-up
+
+The AUD-14 snapshot has source SHA-256
+`d5bc8f1c3358c638c606e6abf317239c55c40e5bfbcc4349dfebb6b863834276`.
+A fresh isolated production build and the same 102-detector run still report
+234 findings across 156 contracts, with no changes to the counts grouped by
+detector, severity and confidence. The new inventory is
+[slither-reinvest-attribution.csv](slither-reinvest-attribution.csv); the earlier
+inventory remains the original snapshot.
+
+Manual review of the changed path: `buyWithMixFor` pulls only its caller's
+approved mixETH, sends PSP back to that caller, rejects a zero beneficiary,
+and forwards the chosen beneficiary solely for existing hook attribution.
+It cannot create referral edges or spend the beneficiary's allowance.
+The reinvestor derives that beneficiary from the owned NFT, preserves owner/operator
+authorization and nonReentrant on both entry points, and keeps the original
+owner throughout batch restaking. Single/batch and owner/operator real-V4 tests
+verify the resulting seats, events, referral payouts and owner pot claims.
+The existing callback/token and immutable-counterparty assumptions above still
+apply; unchanged detector counts are not a security proof.
+
 Use a new, empty output/cache directory for each static-analysis snapshot:
 
 ```sh

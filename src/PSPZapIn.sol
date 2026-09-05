@@ -32,13 +32,14 @@ contract PSPZapIn {
     error InsufficientOutput();
     error NotPoolManager();
     error BadPool();
+    error ZeroTrader();
 
     struct BuyData {
         PoolKey key;
         uint256 mixIn;
         uint256 minPspOut;
         address to;
-        address trader;   // referral payout identity (0x0 = none)
+        address trader;   // ladder/event beneficiary and recorded referral identity
     }
 
     constructor(IMixETH _mixETH, IPoolManager _poolManager) {
@@ -111,6 +112,26 @@ contract PSPZapIn {
         external
         returns (uint256 pspOut)
     {
+        return _buyWithMix(key, mixIn, minPspOut, deadline, msg.sender);
+    }
+
+    /// @notice Spend the caller's mixETH and return PSP to the caller, while
+    ///         crediting `trader` with ladder seats, time and recorded referrals.
+    /// @dev AUD-14: compounders must pass the NFT owner, including when an
+    ///      operator calls them. This is a beneficiary hint, not authorization:
+    ///      no funds are pulled from trader and no referral edge is recorded.
+    function buyWithMixFor(PoolKey calldata key, uint256 mixIn, uint256 minPspOut, uint256 deadline, address trader)
+        external
+        returns (uint256 pspOut)
+    {
+        if (trader == address(0)) revert ZeroTrader();
+        return _buyWithMix(key, mixIn, minPspOut, deadline, trader);
+    }
+
+    function _buyWithMix(PoolKey calldata key, uint256 mixIn, uint256 minPspOut, uint256 deadline, address trader)
+        internal
+        returns (uint256 pspOut)
+    {
         if (mixIn == 0) revert ZeroAmount();
         if (deadline != 0 && block.timestamp > deadline) revert Expired();
 
@@ -123,7 +144,7 @@ contract PSPZapIn {
         bytes memory result = poolManager.unlock(
             abi.encode(BuyData({
                 key: key, mixIn: mixIn, minPspOut: minPspOut, to: msg.sender,
-                trader: msg.sender
+                trader: trader
             }))
         );
         pspOut = abi.decode(result, (uint256));

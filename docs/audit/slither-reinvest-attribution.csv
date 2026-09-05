@@ -1,0 +1,235 @@
+impact,confidence,detector,finding
+High,Medium,arbitrary-send-eth,"PSPZapOut.zapOut(PoolKey,uint256,uint256,uint256) (src/PSPZapOut.sol#55-85) sends eth to arbitrary user"
+High,Medium,weak-prng,"PSPStaker._distribute() (src/PSPStaker.sol#689-708) uses a weak PRNG: ""numerator % CREDIT_PRECISION != 0 (src/PSPStaker.sol#700)"" "
+High,Medium,reentrancy-balance,"Reentrancy in PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126):"
+High,Medium,reentrancy-balance,"Reentrancy in PSPReinvestor.reinvest(uint256,PoolKey,uint256,uint256) (src/PSPReinvestor.sol#53-80):"
+High,Medium,reentrancy-balance,"Reentrancy in PSPReinvestor.reinvest(uint256,PoolKey,uint256,uint256) (src/PSPReinvestor.sol#53-80):"
+High,Medium,reentrancy-balance,"Reentrancy in PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126):"
+High,Medium,reentrancy-balance,"Reentrancy in PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126):"
+High,Medium,reentrancy-balance,"Reentrancy in PSPReinvestor.reinvest(uint256,PoolKey,uint256,uint256) (src/PSPReinvestor.sol#53-80):"
+High,High,uninitialized-state,PSPStaker.biasAdd (src/PSPStaker.sol#113) is never initialized. It is used in:
+Medium,Medium,divide-before-multiply,CurveMath.slitherConstructorConstantVariables() (src/libraries/CurveMath.sol#22-587) performs a multiplication on the result of a division:
+Medium,Medium,divide-before-multiply,"PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#265-273) performs a multiplication on the result of a division:"
+Medium,Medium,divide-before-multiply,"CurveHook._handleBuy(address,PoolKey,SwapParams,uint256,Currency,Currency,address) (src/CurveHook.sol#434-520) performs a multiplication on the result of a division:"
+Medium,Medium,divide-before-multiply,PSPStaker._distribute() (src/PSPStaker.sol#689-708) performs a multiplication on the result of a division:
+Medium,High,incorrect-equality,"HookDeployer.mineHook(IPoolManager,address,address,CurveMath.CurveConfig,address,uint256) (src/HookDeployer.sol#96-122) uses a dangerous strict equality:"
+Medium,High,incorrect-equality,PSPStaker._distribute() (src/PSPStaker.sol#689-708) uses a dangerous strict equality:
+Medium,High,incorrect-equality,"PSPStaker.claimFeesTo(uint256,address) (src/PSPStaker.sol#603-609) uses a dangerous strict equality:"
+Medium,High,incorrect-equality,"HookDeployer.mineHook(IPoolManager,address,address,CurveMath.CurveConfig,address,uint256) (src/HookDeployer.sol#96-122) uses a dangerous strict equality:"
+Medium,High,incorrect-equality,RoundController.potDeposit(uint256) (src/RoundController.sol#364-373) uses a dangerous strict equality:
+Medium,High,incorrect-equality,"PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#404-421) uses a dangerous strict equality:"
+Medium,High,incorrect-equality,"RoundController._predepositFor(address,uint256) (src/RoundController.sol#310-337) uses a dangerous strict equality:"
+Medium,High,incorrect-equality,PSPStaker._distribute() (src/PSPStaker.sol#689-708) uses a dangerous strict equality:
+Medium,High,incorrect-equality,PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#749-752) uses a dangerous strict equality:
+Medium,High,incorrect-equality,RoundController.seedCarry(uint256) (src/RoundController.sol#344-356) uses a dangerous strict equality:
+Medium,High,incorrect-equality,PSPStaker._creditBeforeEpoch(uint256) (src/PSPStaker.sol#349-358) uses a dangerous strict equality:
+Medium,High,incorrect-equality,"PSPStaker.claimAllTo(uint256[],address) (src/PSPStaker.sol#612-622) uses a dangerous strict equality:"
+Medium,High,incorrect-equality,RoundController.mixETHToETH(uint256) (src/RoundController.sol#252-259) uses a dangerous strict equality:
+Medium,High,incorrect-equality,"PSPStaker._unscheduleDecay(PSPStaker.Position,PSPStaker.GlobalPoint) (src/PSPStaker.sol#578-592) uses a dangerous strict equality:"
+Medium,High,incorrect-equality,PSPStaker._distribute() (src/PSPStaker.sol#689-708) uses a dangerous strict equality:
+Medium,High,locked-ether,Contract locking ether found:
+Medium,Medium,reentrancy-no-eth,"Reentrancy in PSPStaker._stake(address,uint256,uint256) (src/PSPStaker.sol#470-499):"
+Medium,Medium,reentrancy-no-eth,Reentrancy in PSPFactory.birthStep() (src/PSPFactory.sol#312-326):
+Medium,Medium,reentrancy-no-eth,Reentrancy in PSPStaker.cancelWithdraw(uint256) (src/PSPStaker.sol#525-542):
+Medium,Medium,reentrancy-no-eth,Reentrancy in PSPStaker.withdraw(uint256) (src/PSPStaker.sol#548-575):
+Medium,Medium,reentrancy-no-eth,Reentrancy in PSPStaker.requestWithdraw(uint256) (src/PSPStaker.sol#504-521):
+Medium,Medium,reentrancy-no-eth,Reentrancy in PSPFactory.birthStep() (src/PSPFactory.sol#312-326):
+Medium,Medium,reentrancy-no-eth,"Reentrancy in PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#404-421):"
+Medium,Medium,reentrancy-no-eth,"Reentrancy in PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#404-421):"
+Medium,Medium,reentrancy-no-eth,Reentrancy in PSPFactory._birthWire() (src/PSPFactory.sol#487-553):
+Medium,Medium,reentrancy-no-eth,Reentrancy in PSPFactory.spawnNextRound(uint256) (src/PSPFactory.sol#562-579):
+Medium,Medium,reentrancy-no-eth,Reentrancy in PSPFactory.deployRound(PSPFactory.RoundParams) (src/PSPFactory.sol#182-193):
+Medium,Medium,uninitialized-local,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256).totalShare (src/PSPReinvestor.sol#104) is a local variable never initialized"
+Medium,Medium,uninitialized-local,PSPStaker.stakedTotalOf(address).total (src/PSPStaker.sol#732) is a local variable never initialized
+Medium,Medium,uninitialized-local,CurveHook.claimPot().amount (src/CurveHook.sol#765) is a local variable never initialized
+Medium,Medium,uninitialized-local,"PSPStaker.claimAllTo(uint256[],address).totalPaid (src/PSPStaker.sol#614) is a local variable never initialized"
+Medium,Medium,uninitialized-local,"CurveHook._beforeSwap(address,PoolKey,SwapParams,bytes).refTrader (src/CurveHook.sol#359) is a local variable never initialized"
+Medium,Medium,uninitialized-local,PSPStaker._creditBeforeEpoch(uint256).lo (src/PSPStaker.sol#350) is a local variable never initialized
+Medium,Medium,uninitialized-local,"SineMath.reserveAt(SineMath.Curve,uint256).candidate (src/libraries/SineMath.sol#232) is a local variable never initialized"
+Medium,Medium,uninitialized-local,"CurveMath.computeBuyOutput(uint256,uint256,CurveMath.CurveConfig).lo (src/libraries/CurveMath.sol#237) is a local variable never initialized"
+Medium,Medium,uninitialized-local,CurveHook.getLadder().out (src/CurveHook.sol#717) is a local variable never initialized
+Medium,Medium,uninitialized-local,"HookDeployer.mineHook(IPoolManager,address,address,CurveMath.CurveConfig,address,uint256).scanFrom (src/HookDeployer.sol#107) is a local variable never initialized"
+Medium,Medium,uninitialized-local,PSPReferralRegistry.payoutFor(address).seen (src/PSPReferralRegistry.sol#174) is a local variable never initialized
+Medium,Medium,uninitialized-local,PSPFactory._itoa(uint256).digits (src/PSPFactory.sol#590) is a local variable never initialized
+Medium,Medium,uninitialized-local,RoundController.detonate().nextRound (src/RoundController.sol#579) is a local variable never initialized
+Medium,Medium,uninitialized-local,PSPFactory._birthWire().carry (src/PSPFactory.sol#506) is a local variable never initialized
+Medium,Medium,unused-return,"PSPFactory._birthWire() (src/PSPFactory.sol#487-553) ignores return value by poolManager.initialize(key,79228162514264337593543950336) (src/PSPFactory.sol#531)"
+Medium,Medium,unused-return,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) ignores return value by zapIn.buyWithMixFor(key,mixIn,minPspOut,deadline,owner) (src/PSPReinvestor.sol#113)"
+Medium,Medium,unused-return,PSPZapIn._wrap(uint256) (src/PSPZapIn.sol#154-159) ignores return value by mixETH.depositETH{value: ethAmount}() (src/PSPZapIn.sol#157)
+Medium,Medium,unused-return,"CurveHook._settleCurrency(Currency,uint256) (src/CurveHook.sol#238-245) ignores return value by poolManager.settle() (src/CurveHook.sol#244)"
+Medium,Medium,unused-return,PSPZapOut.unlockCallback(bytes) (src/PSPZapOut.sol#122-162) ignores return value by poolManager.settle() (src/PSPZapOut.sol#133)
+Medium,Medium,unused-return,"PSPReinvestor.reinvest(uint256,PoolKey,uint256,uint256) (src/PSPReinvestor.sol#53-80) ignores return value by zapIn.buyWithMixFor(key,mixIn,minPspOut,deadline,owner) (src/PSPReinvestor.sol#68)"
+Medium,Medium,unused-return,PSPZapIn.unlockCallback(bytes) (src/PSPZapIn.sol#163-204) ignores return value by poolManager.settle() (src/PSPZapIn.sol#173)
+Medium,Medium,unused-return,"PSPZapOut.zapOut(PoolKey,uint256,uint256,uint256) (src/PSPZapOut.sol#55-85) ignores return value by mixETH.redeemETH(mixOut) (src/PSPZapOut.sol#81)"
+Low,Medium,events-maths,RoundController.setFactoryRoundId(uint256) (src/RoundController.sol#238-240) should emit an event for: 
+Low,Medium,events-maths,PSPStaker.lockGenesis(uint256) (src/PSPStaker.sol#629-644) should emit an event for: 
+Low,Medium,events-maths,PSPStaker.addFees(uint256) (src/PSPStaker.sol#678-683) should emit an event for: 
+Low,Medium,missing-zero-check,"PSPStaker.constructor(IERC20,IRoundController,address).descriptor_ (src/PSPStaker.sol#170) lacks a zero-check on :"
+Low,Medium,missing-zero-check,PSPFactory.setDescriptor(address).descriptor_ (src/PSPFactory.sol#85) lacks a zero-check on :
+Low,Medium,calls-loop,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) has external calls inside a loop: share = (bought * staker.positions(pepeIds[i_scope_1]).amount) / totalShare (src/PSPReinvestor.sol#118)"
+Low,Medium,calls-loop,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) has external calls inside a loop: staker.stakeFor(owner,pepeIds[i_scope_1],share) (src/PSPReinvestor.sol#119)"
+Low,Medium,calls-loop,"PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#404-421) has external calls inside a loop: ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#417)"
+Low,Medium,calls-loop,"PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#404-421) has external calls inside a loop: ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#410-415)"
+Low,Medium,calls-loop,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) has external calls inside a loop: staker.isWithdrawing(pepeIds[i_scope_0]) (src/PSPReinvestor.sol#107)"
+Low,Medium,calls-loop,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) has external calls inside a loop: staker.ownerOf(pepeIds[i]) != owner (src/PSPReinvestor.sol#94)"
+Low,Medium,calls-loop,PSPFactory.birthRound() (src/PSPFactory.sol#339-346) has external calls inside a loop: this.birthStep() (src/PSPFactory.sol#342)
+Low,Medium,calls-loop,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) has external calls inside a loop: pos = staker.positions(pepeIds[i_scope_0]) (src/PSPReinvestor.sol#106)"
+Low,Medium,reentrancy-benign,"Reentrancy in PSPStaker._stake(address,uint256,uint256) (src/PSPStaker.sol#470-499):"
+Low,Medium,reentrancy-benign,Reentrancy in RoundController.detonate() (src/RoundController.sol#552-591):
+Low,Medium,reentrancy-benign,Reentrancy in PSPFactory.spawnNextRound(uint256) (src/PSPFactory.sol#562-579):
+Low,Medium,reentrancy-benign,Reentrancy in PSPStaker.requestWithdraw(uint256) (src/PSPStaker.sol#504-521):
+Low,Medium,reentrancy-benign,Reentrancy in PSPFactory.deployRound(PSPFactory.RoundParams) (src/PSPFactory.sol#182-193):
+Low,Medium,reentrancy-benign,"Reentrancy in PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#404-421):"
+Low,Medium,reentrancy-benign,Reentrancy in PSPStaker.cancelWithdraw(uint256) (src/PSPStaker.sol#525-542):
+Low,Medium,reentrancy-benign,Reentrancy in PSPFactory._birthWire() (src/PSPFactory.sol#487-553):
+Low,Medium,reentrancy-benign,"Reentrancy in CurveHook._handleBuy(address,PoolKey,SwapParams,uint256,Currency,Currency,address) (src/CurveHook.sol#434-520):"
+Low,Medium,reentrancy-benign,Reentrancy in PSPFactory._birthPeriphery() (src/PSPFactory.sol#447-479):
+Low,Medium,reentrancy-benign,Reentrancy in PSPFactory.deployRound(PSPFactory.RoundParams) (src/PSPFactory.sol#182-193):
+Low,Medium,reentrancy-benign,Reentrancy in PSPStaker.withdraw(uint256) (src/PSPStaker.sol#548-575):
+Low,Medium,reentrancy-benign,"Reentrancy in CurveHook._handleSell(PoolKey,SwapParams,uint256,Currency,Currency,address) (src/CurveHook.sol#524-584):"
+Low,Medium,reentrancy-events,"Reentrancy in CurveHook._handleBuy(address,PoolKey,SwapParams,uint256,Currency,Currency,address) (src/CurveHook.sol#434-520):"
+Low,Medium,reentrancy-events,Reentrancy in PSPFactory.spawnNextRound(uint256) (src/PSPFactory.sol#562-579):
+Low,Medium,reentrancy-events,Reentrancy in RoundController.addFees(uint256) (src/RoundController.sol#285-288):
+Low,Medium,reentrancy-events,Reentrancy in PSPFactory._birthWire() (src/PSPFactory.sol#487-553):
+Low,Medium,reentrancy-events,Reentrancy in PSPFactory.deployRound(PSPFactory.RoundParams) (src/PSPFactory.sol#182-193):
+Low,Medium,reentrancy-events,"Reentrancy in PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#404-421):"
+Low,Medium,reentrancy-events,"Reentrancy in CurveHook._handleSell(PoolKey,SwapParams,uint256,Currency,Currency,address) (src/CurveHook.sol#524-584):"
+Low,Medium,return-bomb,RoundController.detonate() (src/RoundController.sol#552-591) tries to limit the gas of an external call that controls implicit decoding
+Low,Medium,timestamp,"PSPZapOut.sellToMix(PoolKey,uint256,uint256,uint256) (src/PSPZapOut.sol#95-120) uses timestamp for comparisons"
+Low,Medium,timestamp,PSPStaker.requestWithdraw(uint256) (src/PSPStaker.sol#504-521) uses timestamp for comparisons
+Low,Medium,timestamp,"PSPStaker._unscheduleDecay(PSPStaker.Position,PSPStaker.GlobalPoint) (src/PSPStaker.sol#578-592) uses timestamp for comparisons"
+Low,Medium,timestamp,PSPStaker._distribute() (src/PSPStaker.sol#689-708) uses timestamp for comparisons
+Low,Medium,timestamp,CurveHook.getSellOutput(uint256) (src/CurveHook.sol#912-925) uses timestamp for comparisons
+Low,Medium,timestamp,"PSPStaker.claimFeesTo(uint256,address) (src/PSPStaker.sol#603-609) uses timestamp for comparisons"
+Low,Medium,timestamp,"CurveHook._beforeSwap(address,PoolKey,SwapParams,bytes) (src/CurveHook.sol#318-369) uses timestamp for comparisons"
+Low,Medium,timestamp,RoundController.detonate() (src/RoundController.sol#552-591) uses timestamp for comparisons
+Low,Medium,timestamp,"PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#265-273) uses timestamp for comparisons"
+Low,Medium,timestamp,"PSPStaker._feeSlice(uint256,uint256,uint256) (src/PSPStaker.sol#360-366) uses timestamp for comparisons"
+Low,Medium,timestamp,"CurveHook._handleBuy(address,PoolKey,SwapParams,uint256,Currency,Currency,address) (src/CurveHook.sol#434-520) uses timestamp for comparisons"
+Low,Medium,timestamp,PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#370-388) uses timestamp for comparisons
+Low,Medium,timestamp,"PSPStaker.claimAllTo(uint256[],address) (src/PSPStaker.sol#612-622) uses timestamp for comparisons"
+Low,Medium,timestamp,"HookDeployer.mineHook(IPoolManager,address,address,CurveMath.CurveConfig,address,uint256) (src/HookDeployer.sol#96-122) uses timestamp for comparisons"
+Low,Medium,timestamp,RoundController.predepositState() (src/RoundController.sol#401-425) uses timestamp for comparisons
+Low,Medium,timestamp,PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#749-752) uses timestamp for comparisons
+Low,Medium,timestamp,RoundController._windowOver() (src/RoundController.sol#396-398) uses timestamp for comparisons
+Low,Medium,timestamp,RoundController.launchPooledBuy() (src/RoundController.sol#432-486) uses timestamp for comparisons
+Low,Medium,timestamp,"PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#404-421) uses timestamp for comparisons"
+Low,Medium,timestamp,"PSPZapIn._buyWithMix(PoolKey,uint256,uint256,uint256,address) (src/PSPZapIn.sol#131-151) uses timestamp for comparisons"
+Low,Medium,timestamp,PSPStaker._creditBeforeEpoch(uint256) (src/PSPStaker.sol#349-358) uses timestamp for comparisons
+Low,Medium,timestamp,"PSPZapIn.zapInBuy(PoolKey,uint256,uint256) (src/PSPZapIn.sol#78-101) uses timestamp for comparisons"
+Low,Medium,timestamp,"PSPStaker._advance(PSPStaker.GlobalPoint,uint256) (src/PSPStaker.sol#295-308) uses timestamp for comparisons"
+Low,Medium,timestamp,"PSPZapOut.zapOut(PoolKey,uint256,uint256,uint256) (src/PSPZapOut.sol#55-85) uses timestamp for comparisons"
+Low,Medium,timestamp,PSPStaker.withdraw(uint256) (src/PSPStaker.sol#548-575) uses timestamp for comparisons
+Low,Medium,timestamp,CurveHook.getBuyOutput(uint256) (src/CurveHook.sol#893-909) uses timestamp for comparisons
+Informational,High,assembly,"HookMiner.find(address,uint160,bytes,bytes) (src/utils/HookMiner.sol#24-74) uses assembly"
+Informational,High,assembly,"HookMiner.nextCandidateCapped(address,bytes32,uint160,bytes,bytes,uint256,uint256) (src/utils/HookMiner.sol#148-275) uses assembly"
+Informational,High,assembly,"HookDeployer.deployHookAt(bytes32,IPoolManager,address,address,CurveMath.CurveConfig,address) (src/HookDeployer.sol#128-143) uses assembly"
+Informational,High,assembly,"ControllerDeployer.deployControllerAt(bytes32,PSPToken,IERC20,CurveMath.CurveConfig,address,address,StakerDeployer) (src/ControllerDeployer.sol#88-119) uses assembly"
+Informational,High,assembly,"ControllerDeployer.deployController(PSPToken,IERC20,CurveMath.CurveConfig,address,address,StakerDeployer) (src/ControllerDeployer.sol#38-78) uses assembly"
+Informational,Medium,costly-loop,"PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#404-421) has costly operations inside a loop:"
+Informational,High,cyclomatic-complexity,"HookMiner.nextCandidateCapped(address,bytes32,uint160,bytes,bytes,uint256,uint256) (src/utils/HookMiner.sol#148-275) has a high cyclomatic complexity (13)."
+Informational,High,cyclomatic-complexity,"CurveMath.computeBuyOutput(uint256,uint256,CurveMath.CurveConfig) (src/libraries/CurveMath.sol#118-248) has a high cyclomatic complexity (27)."
+Informational,High,cyclomatic-complexity,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) has a high cyclomatic complexity (14)."
+Informational,Medium,dead-code,PSPStaker._anchorNow() (src/PSPStaker.sol#326-336) is never used and should be removed
+Informational,High,low-level-calls,Low level call in RoundController.detonate() (src/RoundController.sol#552-591):
+Informational,High,low-level-calls,Low level call in PSPReferralRegistry._ownerOf(uint256) (src/PSPReferralRegistry.sol#145-150):
+Informational,High,low-level-calls,Low level call in SepoliaMixETH.redeemETH(uint256) (src/testnet/SepoliaMixETH.sol#50-56):
+Informational,High,low-level-calls,"Low level call in PSPZapOut.zapOut(PoolKey,uint256,uint256,uint256) (src/PSPZapOut.sol#55-85):"
+Informational,High,low-level-calls,Low level call in RoundController._getTotalAssets() (src/RoundController.sol#261-270):
+Informational,High,missing-inheritance,PSPZapIn (src/PSPZapIn.sol#21-205) should inherit from IPSPZapIn (src/interfaces/IPSPZapIn.sol#7-14)
+Informational,High,missing-inheritance,PSPStaker (src/PSPStaker.sol#43-760) should inherit from IPepeDescriptor (src/PSPStaker.sol#13-15)
+Informational,High,missing-inheritance,SepoliaMixETH (src/testnet/SepoliaMixETH.sol#23-65) should inherit from IMixETH (src/interfaces/IMixETH.sol#7-10)
+Informational,High,missing-inheritance,PSPToken (src/PSPToken.sol#9-51) should inherit from IMintableMix (src/testnet/MixETHFaucet.sol#7-9)
+Informational,High,missing-inheritance,SepoliaMixETH (src/testnet/SepoliaMixETH.sol#23-65) should inherit from IMintableMix (src/testnet/MixETHFaucet.sol#7-9)
+Informational,High,missing-inheritance,HookInitCode (src/HookInitCode.sol#46-78) should inherit from IHookInitCode (src/HookInitCode.sol#36-44)
+Informational,High,naming-convention,"Parameter CurveMath.curveIntegral(uint256,uint256,CurveMath.CurveConfig).S1 (src/libraries/CurveMath.sol#271) is not in mixedCase"
+Informational,High,naming-convention,"Parameter SineMath.sellOut(SineMath.Curve,uint256,uint256).R (src/libraries/SineMath.sol#256) is not in mixedCase"
+Informational,High,naming-convention,"Parameter CurveHook.initializeCurve(uint256,uint256,uint256)._genesisPotFee (src/CurveHook.sol#835) is not in mixedCase"
+Informational,High,naming-convention,"Parameter CurveMath.singleCurve(uint256,uint256,uint256,uint256).P0 (src/libraries/CurveMath.sol#412) is not in mixedCase"
+Informational,High,naming-convention,Variable RoundController.VEST_DURATION (src/RoundController.sol#130) is not in mixedCase
+Informational,High,naming-convention,"Parameter SineMath.buyOut(SineMath.Curve,uint256,uint256).R (src/libraries/SineMath.sol#247) is not in mixedCase"
+Informational,High,naming-convention,"Parameter CurveHook.initializeCurve(uint256,uint256,uint256)._initialSupply (src/CurveHook.sol#835) is not in mixedCase"
+Informational,High,naming-convention,"Parameter CurveMath.curveIntegral(uint256,uint256,CurveMath.CurveConfig).S2 (src/libraries/CurveMath.sol#271) is not in mixedCase"
+Informational,High,naming-convention,Variable RoundController.PREDEPOSIT_CAP_PER_WALLET (src/RoundController.sol#123) is not in mixedCase
+Informational,High,naming-convention,Variable PSPReferralRegistry.TIER_BPS (src/PSPReferralRegistry.sol#62) is not in mixedCase
+Informational,High,naming-convention,Parameter CurveHook.sinePriceAt(uint256).R (src/CurveHook.sol#873) is not in mixedCase
+Informational,High,naming-convention,Parameter RoundController.setHook(CurveHook)._hook (src/RoundController.sol#234) is not in mixedCase
+Informational,High,naming-convention,Parameter RoundController.setFactoryRoundId(uint256)._roundId (src/RoundController.sol#238) is not in mixedCase
+Informational,High,naming-convention,Variable RoundController.PREDEPOSIT_DURATION (src/RoundController.sol#110) is not in mixedCase
+Informational,High,naming-convention,"Parameter CurveMath.marginalPrice(uint256,CurveMath.CurveConfig).S (src/libraries/CurveMath.sol#48) is not in mixedCase"
+Informational,High,naming-convention,"Parameter CurveHook.initializeCurve(uint256,uint256,uint256)._reserveMixETH (src/CurveHook.sol#835) is not in mixedCase"
+Informational,High,naming-convention,"Parameter CurveMath.multiCurve(uint256,uint256[],uint256[],bool[]).P0 (src/libraries/CurveMath.sol#438) is not in mixedCase"
+Informational,High,naming-convention,Function IRoundController.VEST_DURATION() (src/interfaces/IRoundController.sol#25) is not in mixedCase
+Informational,High,naming-convention,"Parameter SineMath.supplyAt(SineMath.Curve,uint256).R (src/libraries/SineMath.sol#179) is not in mixedCase"
+Informational,High,naming-convention,Parameter PSPToken.setController(address)._controller (src/PSPToken.sol#35) is not in mixedCase
+Informational,High,naming-convention,Variable PSPReferralRegistry.MIN_STAKE_PSP (src/PSPReferralRegistry.sol#65) is not in mixedCase
+Informational,High,naming-convention,"Parameter SineMath.priceAt(SineMath.Curve,uint256).R (src/libraries/SineMath.sol#157) is not in mixedCase"
+Informational,High,naming-convention,"Parameter CurveMath.singleCurve(uint256,uint256,uint256,uint256).S_inf (src/libraries/CurveMath.sol#413) is not in mixedCase"
+Informational,Medium,too-many-digits,Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,PepeArtData8Bit.slitherConstructorConstantVariables() (src/PepeArtData8Bit.sol#13-191) uses literals with too many digits:
+Informational,Medium,too-many-digits,PSPFactory.roundPool(uint256) (src/PSPFactory.sol#635-646) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.slitherConstructorConstantVariables() (src/curves/Curve1Zones.sol#14-116) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve3Zones.config() (src/curves/Curve3Zones.sol#17-175) uses literals with too many digits:
+Informational,Medium,too-many-digits,CurveHook.slitherConstructorConstantVariables() (src/CurveHook.sol#33-926) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.slitherConstructorConstantVariables() (src/curves/LinearZones.sol#16-130) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve3Zones.config() (src/curves/Curve3Zones.sol#17-175) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve2Zones.slitherConstructorConstantVariables() (src/curves/Curve2Zones.sol#14-74) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZonesLean.config() (src/curves/LinearZonesLean.sol#24-62) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+Informational,Medium,too-many-digits,SineMath._sinWad(uint256) (src/libraries/SineMath.sol#295-328) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,"ControllerDeployer.predictRegistry(bytes32,address,uint256) (src/ControllerDeployer.sol#168-182) uses literals with too many digits:"
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,"ControllerDeployer.deployController(PSPToken,IERC20,CurveMath.CurveConfig,address,address,StakerDeployer) (src/ControllerDeployer.sol#38-78) uses literals with too many digits:"
+Informational,Medium,too-many-digits,Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZonesLean.config() (src/curves/LinearZonesLean.sol#24-62) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,"ControllerDeployer.predictController(bytes32,PSPToken,IERC20,CurveMath.CurveConfig,address,address,StakerDeployer) (src/ControllerDeployer.sol#125-143) uses literals with too many digits:"
+Informational,Medium,too-many-digits,PepeArtData8Bit.slitherConstructorConstantVariables() (src/PepeArtData8Bit.sol#13-191) uses literals with too many digits:
+Informational,Medium,too-many-digits,HookInitCode.constructor() (src/HookInitCode.sol#50-58) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZonesLean.config() (src/curves/LinearZonesLean.sol#24-62) uses literals with too many digits:
+Informational,Medium,too-many-digits,"ControllerDeployer.deployControllerAt(bytes32,PSPToken,IERC20,CurveMath.CurveConfig,address,address,StakerDeployer) (src/ControllerDeployer.sol#88-119) uses literals with too many digits:"
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZonesLean.config() (src/curves/LinearZonesLean.sol#24-62) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZonesLean.config() (src/curves/LinearZonesLean.sol#24-62) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZonesLean.config() (src/curves/LinearZonesLean.sol#24-62) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,PSPFactory._birthWire() (src/PSPFactory.sol#487-553) uses literals with too many digits:
+Informational,Medium,too-many-digits,"StakerDeployer.predictStaker(bytes32,IERC20,IRoundController,address) (src/StakerDeployer.sol#50-65) uses literals with too many digits:"
+Informational,Medium,too-many-digits,Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZonesLean.slitherConstructorConstantVariables() (src/curves/LinearZonesLean.sol#21-63) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,"TokenDeployer.predictToken(bytes32,string,string,address) (src/ControllerDeployer.sol#211-226) uses literals with too many digits:"
+Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve3Zones.slitherConstructorConstantVariables() (src/curves/Curve3Zones.sol#14-176) uses literals with too many digits:
+Informational,Medium,too-many-digits,Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+Optimization,High,constable-states,PSPFactory.baseSymbol (src/PSPFactory.sol#128) should be constant 
+Optimization,High,constable-states,PSPFactory.baseName (src/PSPFactory.sol#127) should be constant 

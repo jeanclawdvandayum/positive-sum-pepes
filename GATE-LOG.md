@@ -235,3 +235,37 @@ Solidity source changed after the contract-source hash above.
   oracle and no-governance gates, TypeScript and Vite pass. Six new regressions
   cover buy/sell fee math, flat/inactive states and complete quote snapshots.
   Final footer copy also passes TypeScript/Vite. No contracts were changed.
+
+## 2026-09-05 — AUD-14 reinvestment buyer attribution, source validation
+
+- Confirmed live at Base Sepolia block **46416798**: all ten ladder seats named
+  the old reinvestor `0x7328d580df5d234f5d904f1b0fb1d631f26213f6`. Restaking itself
+  credited the correct NFT, but `buyWithMix` forwarded its contract caller into
+  hookData. This also misattributed Buy/TimeAdded and skipped the NFT owner's
+  recorded referral chain. Pot claims on those seats belong to the immutable old
+  wrapper, which has no forwarding claim method. Existing seats cannot be edited.
+- Added `PSPZapIn.buyWithMixFor`: the caller pays and receives PSP, while an
+  explicit beneficiary receives seats/events and recorded referral payouts.
+  Reinvestor passes the NFT owner on single and aggregate buys, including operator
+  calls; batch restaking also remains bound to that original owner. No tx.origin
+  dependency, new referral binding, victim allowance use, or administrative powers.
+- Frontend checks `ATTRIBUTION_VERSION == 1` and current-round staker wiring before
+  enabling or approving/calling a reinvestor. Old wrappers fail closed. Rebuilt
+  the local UI with this guard during the repair.
+- `bash scripts/check-audit.sh`: **404 Solidity tests / 56 suites**, **41 frontend
+  tests**, **106 ABI declarations**, **32** production size checks, oracle,
+  no-governance, TypeScript and Vite pass. Seven new real-V4 tests cover single/batch
+  owner/operator attribution, referral payment, all owned seat payouts, exact caller
+  funding, zero beneficiary and preserved slippage/deadline checks. An older
+  reinvestment regression now also asserts the seat owner.
+- `ReinvestRepairTest` passes on a local fork of block **46416798**, attaching
+  the live factory, hook, tokens, staker and canonical V4 PoolManager. Fresh local
+  replacement routers support operator single/batch reinvestment and the NFT
+  owner's post-detonation pot claim. No transaction is broadcast by this test.
+- Fresh production Slither run: **234 findings / 156 contracts / 102 detectors**,
+  unchanged detector/severity/confidence counts. Manual delta review and new CSV
+  are in STATIC-ANALYSIS.md. Runtime: ZapIn **4032 bytes**, Reinvestor **4687 bytes**.
+- Testnet replacement script `RepairReinvestor.s.sol` simulates successfully and
+  deploys only those two wrappers. It verifies chain 84532 and the expected current
+  round; existing round state and assets stay in their existing contracts. Actual
+  replacement addresses and broadcast verification are recorded separately below.

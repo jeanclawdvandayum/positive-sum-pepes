@@ -164,6 +164,7 @@ export const faucetAbi = parseAbi([
 
 /// PSPReinvestor — claims mixETH fees and compounds them into PSP stakes.
 export const reinvestorAbi = parseAbi([
+  'function ATTRIBUTION_VERSION() view returns (uint256)',
   'function reinvest(uint256 pepeId, (address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 minPspOut, uint256 deadline)',
   'function reinvestAll(uint256[] pepeIds, (address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 minPspOut, uint256 deadline)',
   'function staker() view returns (address)',

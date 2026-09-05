@@ -1,10 +1,10 @@
 # Audit preparation — September 2026
 
 This is a review packet for the current source tree, not a security certification.
-Final local gates: **397 Solidity tests / 55 suites**, including 64 invariant runs
+Final local gates: **404 Solidity tests / 56 suites**, including 64 invariant runs
 and 2,048 calls per real-V4 handler with zero reverts; an additional three-wallet
-campaign passed 256 runs / 32,768 calls and complete exits; **40 frontend tests**; TypeScript/Vite;
-105 ABI declarations; 32 production size checks; independent oracle and governance
+campaign passed 256 runs / 32,768 calls and complete exits; **41 frontend tests**; TypeScript/Vite;
+106 ABI declarations; 32 production size checks; independent oracle and governance
 gates. Static-analysis flags remain triaged separately. See GATE-LOG.md.
 A fresh Base Sepolia release is deployed and configured in the local frontend.
 See [TESTNET-PLAYTEST.md](TESTNET-PLAYTEST.md) for the running app, release manifest,
@@ -60,6 +60,7 @@ blocked; matching constants is compatibility checking, not source verification.
 | RS-4 | Correct mature cancellation and early-flat withdrawal schedules; bound epoch catch-up; handle epoch-zero requests | FeeImmediacy edge cases; MultiOwnerStateful 32,768 calls |
 | RS-5 | Old-round exits verify their own targets; unclaimed genesis and deferred husk fees remain accessible | 3 exit-preflight tests; typed frontend build |
 | AUD-13 | Permissionless top-ups paid a victim NFT’s accrued fees to the donor and could erase them on a shortfall | Settle to NFT owner; third-party top-ups revert on shortfall; fee-theft and forced-forfeit pins |
+| AUD-14 | Reinvestment credited the wrapper with ladder seats, Buy/TimeAdded events and referral lookup, stranding any resulting pot entitlement on the wrapper | Owner forwarded via buyWithMixFor; single/batch owner/operator tests verify events, referrals and owner pot claims; live-round fork; legacy-wrapper UI guard |
 
 The PoolKey object/tuple explanation in the earlier handoff was not reproduced:
 installed viem produces identical bytes and the correct uint24 0x800000 flag.

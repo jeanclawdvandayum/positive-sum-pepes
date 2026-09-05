@@ -5,6 +5,7 @@ import { assertGameRules } from './gameRules'
 import { verifyRoundExit } from './exitRules'
 import { confirmTransaction } from './transactions'
 import { userFacingRpcError } from './rpcErrors'
+import { assertReinvestor } from './reinvestRules'
 
 /** AUD-4: every UI write simulates, waits for mining, and checks receipt status. */
 export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined }) {
@@ -35,11 +36,12 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined })
       const approvesRouter = parameters.functionName === 'setApprovalForAll' &&
         String(parameters.args?.[0]).toLowerCase() === ADDRESSES.reinvestor.toLowerCase()
       if (approvesRouter || parameters.address.toLowerCase() === ADDRESSES.reinvestor.toLowerCase()) {
-        const [expected, actual] = await Promise.all([
+        const [expected, actual, attributionVersion] = await Promise.all([
           client.readContract({ address: round[1], abi: controllerAbi, functionName: 'staker', blockNumber }),
           client.readContract({ address: ADDRESSES.reinvestor, abi: reinvestorAbi, functionName: 'staker', blockNumber }),
+          client.readContract({ address: ADDRESSES.reinvestor, abi: reinvestorAbi, functionName: 'ATTRIBUTION_VERSION', blockNumber }),
         ])
-        if (expected.toLowerCase() !== actual.toLowerCase()) throw new Error('Compounding is unavailable for this round.')
+        assertReinvestor(expected, actual, attributionVersion)
       }
     } catch (error) {
       throw userFacingRpcError(error)
