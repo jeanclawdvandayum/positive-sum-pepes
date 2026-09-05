@@ -3,46 +3,53 @@ import { Link } from 'react-router-dom'
 import Clock from '../components/Clock'
 import { useCaptureReferral } from '../components/ReferralCard'
 import { randomDna, renderPepeSvg } from '../lib/pepeRender'
-import { BeatDiagram, DiagramStyles } from './explainer/diagrams'
+import { BeatDiagram, DiagramStyles, type BeatKind } from './explainer/diagrams'
+import { targetChain } from '../lib/config'
 import PayoutSlider from './explainer/PayoutSlider'
 import CurveExplainer from './explainer/CurveExplainer'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // / — the explainer (REDESIGN-B1 §1–§4). Narrative, not a card wall:
-// hero → five beats → repeating curve → the math → settlement.
+// hero → six beats → repeating curve → the math → settlement.
 // Game rules follow READINESS.md; the hero clock uses the shared live deadline.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SUBHEAD =
   'positive sum pepes is a countdown-driven bonding-curve game. buy PSP → buy time → hold a ladder spot → split the pot. staking pays you to stay. after detonation, redeem PSP for its share of remaining backing. this can be less than your purchase cost.'
 
-const BEATS: { n: string; name: string; copy: string; kind: 'arm' | 'buy' | 'climb' | 'detonate' | 'claim' }[] = [
+const BEATS: { n: string; name: string; copy: string; kind: BeatKind }[] = [
   {
     n: '01',
+    name: 'backed by mixETH',
+    copy: 'the game’s reserve asset is Alchemix’s mixETH, a yield-earning ETH vault token built on ERC-4626. as its external strategies earn yield, each mixETH share can represent more ETH — bringing value into the game’s reserves even between trades. the game keeps its accounts in mixETH.',
+    kind: 'reserve',
+  },
+  {
+    n: '02',
     name: 'arm',
     copy: 'the clock arms at launch with the round’s configured window. hit zero and trading halts.',
     kind: 'arm',
   },
   {
-    n: '02',
+    n: '03',
     name: 'buy',
     copy: 'every 0.005 mixETH purchased adds +4:20 — but never more than a full clock.',
     kind: 'buy',
   },
   {
-    n: '03',
+    n: '04',
     name: 'climb',
     copy: '60% of each trading fee goes to stakers, 35% to the pot, and 5% to the referral leg. without attribution, that leg splits 4% to the pot and 1% to the deployer.',
     kind: 'climb',
   },
   {
-    n: '04',
+    n: '05',
     name: 'detonate',
     copy: 'clock at zero? anyone — yes, you — can detonate the round.',
     kind: 'detonate',
   },
   {
-    n: '05',
+    n: '06',
     name: 'claim or redeem',
     copy: 'winners claim their share via claimPot() whenever they want — pull-based, no deadline, no sweep.',
     kind: 'claim',
@@ -57,7 +64,7 @@ const MATH: [string, string][] = [
 ]
 
 // stepped timeline: each beat steps further right (staircase, not a card wall)
-const STEP_PAD = ['', 'lg:pl-6', 'lg:pl-12', 'lg:pl-18', 'lg:pl-24']
+const STEP_PAD = ['', 'lg:pl-6', 'lg:pl-12', 'lg:pl-18', 'lg:pl-24', 'lg:pl-30']
 
 export default function Landing() {
   useCaptureReferral()
@@ -100,9 +107,9 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── 2. one round, five beats ── */}
+      {/* ── 2. one round, six beats ── */}
       <section className="mt-20">
-        <h2 className="font-display text-2xl sm:text-3xl">one round, five beats</h2>
+        <h2 className="font-display text-2xl sm:text-3xl">one round, six beats</h2>
         <ol className="mt-8">
           {BEATS.map((b, i) => (
             <li
@@ -115,6 +122,23 @@ export default function Landing() {
                   {b.n} · {b.name}
                 </div>
                 <p className="mt-2 leading-relaxed">{b.copy}</p>
+                {b.kind === 'reserve' && (
+                  <>
+                    {targetChain.testnet && (
+                      <p className="mt-3 text-xs leading-relaxed text-text-lo">
+                        this testnet uses mock mixETH, which does not earn real yield.
+                      </p>
+                    )}
+                    <a
+                      href="https://docs.alchemix.fi/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-block text-xs text-text-lo underline underline-offset-4 hover:text-text-hi"
+                    >
+                      learn about Alchemix’s mix-yield tokens ↗
+                    </a>
+                  </>
+                )}
               </div>
             </li>
           ))}

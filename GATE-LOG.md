@@ -473,3 +473,25 @@ Solidity source changed after the contract-source hash above.
   **50 frontend tests**, **106 ABI declarations**, **32** production size checks,
   independent oracle, no-governance, TypeScript and Vite. Existing bundle-size
   warnings remain. No contract or deployment changes.
+
+## 2026-09-05 — External mixETH yield explainer beat
+
+- Added `01 · backed by mixETH` ahead of launch and renumbered the narrative to
+  `one round, six beats`. The copy explains Alchemix's ETH ERC-4626 vault token
+  and how external strategy yield can increase ETH backing per mixETH share;
+  PSP accounting remains in mixETH. The testnet row explicitly identifies mock
+  mixETH as having no real yield, with a link to Alchemix's documentation.
+- Added a matching CSS diagram using the existing mixETH token mark, yield
+  particle and rising ETH-per-share backing indicator. Reduced-motion users
+  receive a static frame; no new JavaScript animation loop or chain reads.
+- Source checks: Alchemix's [documentation](https://docs.alchemix.fi/?fallback=true)
+  describes yield accruing in MYT redemption value; its
+  [v3 introduction](https://alchemixfi.medium.com/introducing-alchemix-v3-d55f86d35b49)
+  identifies the Morpho V2 / ERC-4626 implementation. Testnet behavior follows
+  `src/testnet/SepoliaMixETH.sol` and the readiness packet.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **50 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle, no-governance, TypeScript and Vite. Existing bundle-size
+  warnings remain. Browser inspection confirms the six rows, diagram, copy,
+  source link and testnet note at 1266px and 678px; viewport restored.
+  No contract or deployment changes.

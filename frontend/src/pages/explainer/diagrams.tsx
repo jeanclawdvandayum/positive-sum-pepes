@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Explainer beat diagrams — "one round, five beats" (REDESIGN-B1 §2, spec §4)
+// Explainer beat diagrams — "one round, six beats" (REDESIGN-B1 §2, spec §4)
 //
 // CSS-only animated diagrams, one per beat. Every rule is prefixed xd- and
 // scoped to this page tree (no shared-file edits). Base styles ARE the static
@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { CSSProperties } from 'react'
+import MixLogo from '../../components/MixLogo'
 
 export function DiagramStyles() {
   return (
@@ -37,6 +38,58 @@ export function DiagramStyles() {
 .xd-page :is(a, button, input):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* ── reserve: external yield increases ETH backing per mixETH share ── */
+.xd-yield-token {
+  position: absolute;
+  left: 1rem;
+  top: 2.8rem;
+}
+.xd-yield-route {
+  position: absolute;
+  left: 3.5rem;
+  top: 3.75rem;
+  width: 2.25rem;
+  border-top: 1px dotted var(--pepe);
+}
+.xd-yield-pulse {
+  position: absolute;
+  top: -0.2rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 0.1rem;
+  background: var(--pepe);
+  transform: translateX(1.6rem);
+  animation: xd-yield-flow 3s ease-in-out infinite;
+}
+@keyframes xd-yield-flow {
+  0% { transform: translateX(0); opacity: 0; }
+  20% { opacity: 1; }
+  80% { transform: translateX(2rem); opacity: 1; }
+  100% { transform: translateX(2rem); opacity: 0; }
+}
+.xd-yield-backing {
+  position: absolute;
+  top: 2.2rem;
+  right: 1.1rem;
+  width: 2.1rem;
+  height: 2.7rem;
+  border: 1px solid var(--pepe);
+  border-radius: 0.3rem;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+.xd-yield-fill {
+  position: absolute;
+  inset: auto 0 0;
+  height: 76%;
+  background: var(--pepe);
+  animation: xd-yield-grow 6s ease-in-out infinite alternate;
+}
+@keyframes xd-yield-grow {
+  from { height: 24%; }
+  to { height: 76%; }
 }
 
 /* ── arm: the machine's screen + a draining fuse ── */
@@ -285,6 +338,8 @@ export function DiagramStyles() {
 
 /* reduced motion: static frames only (spec §4) */
 @media (prefers-reduced-motion: reduce) {
+  .xd-yield-pulse,
+  .xd-yield-fill,
   .xd-fuse-fill,
   .xd-ticket,
   .xd-jar-fill,
@@ -303,11 +358,21 @@ export function DiagramStyles() {
   )
 }
 
-export type BeatKind = 'arm' | 'buy' | 'climb' | 'detonate' | 'claim'
+export type BeatKind = 'reserve' | 'arm' | 'buy' | 'climb' | 'detonate' | 'claim'
 
 export function BeatDiagram({ kind }: { kind: BeatKind }) {
   return (
     <div className="xd-stage" aria-hidden="true">
+      {kind === 'reserve' && (
+        <>
+          <span className="xd-note" style={{ left: '0.8rem', top: '0.7rem' }}>external yield</span>
+          <div className="xd-yield-token"><MixLogo px={32} /></div>
+          <div className="xd-yield-route"><i className="xd-yield-pulse" /></div>
+          <div className="xd-yield-backing"><div className="xd-yield-fill" /></div>
+          <span className="xd-note" style={{ right: '0.55rem', bottom: '0.6rem' }}>ETH / share</span>
+        </>
+      )}
+
       {kind === 'arm' && (
         <>
           <div className="xd-screen">
