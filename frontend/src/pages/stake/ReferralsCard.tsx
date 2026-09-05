@@ -1,13 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // ReferralsCard — the den's right column lead (REDESIGN-B3 item 4): link
-// generator + the 0.5% mechanic stated plainly. This is the STAKE page's own
+// generator and referral fee share. This is the STAKE page's own
 // presentation; the shared components/ReferralCard.tsx keeps serving the
 // predeposit page untouched — we only reuse its 4s data hooks (no new lanes).
 //
-// NOTE (copy flag — RESOLVED 2026-08-31): contract truth is a FIXED 0.5% of
-// trade volume (CurveHook REFERRAL_FEE_BIPS = 50, spec fix 2026-08-19). This
-// card's 0.5%-of-every-trade line is correct; the explainer's old "5% tips
-// the referrer" leg was wrong and has been fixed in Landing.tsx to match.
+// Referral chains split 5% of attributed trade fees; the closest tier gets
+// 80% of that leg. These are live transfers, not a per-block accumulator.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from 'react'
@@ -47,7 +45,7 @@ export default function ReferralsCard() {
 
       {!isConnected ? (
         <p className="mt-3 text-sm leading-relaxed text-text-lo">
-          connect a wallet and your link pays you 0.5% of every trade it brings.
+          connect a wallet to share your pepe's referral link. Referral chains share 5% of attributed trade fees.
         </p>
       ) : ids.length === 0 ? (
         <p className="mt-3 text-sm leading-relaxed text-text-lo">stake a pepe to unlock referral links</p>
@@ -77,12 +75,8 @@ export default function ReferralsCard() {
         </>
       )}
 
-      {/* audit r1 fix 4: line 2 was the 0.5% stated twice — now the mechanism:
-          referral fees accrue per block from the round's fee stream (same
-          real flow the stake accumulator ticks on; no invented claims). */}
       <p className="mt-3 text-xs leading-relaxed text-text-lo">
-        your share accrues per block, straight from the round's fee stream — it
-        adds up while you're not looking.
+        the closest referrer receives 80% of the referral share. Payouts arrive with each attributed trade; the remaining tiers share the rest.
       </p>
     </section>
   )

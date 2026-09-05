@@ -7,6 +7,7 @@
 import { rpcCall } from './rpc'
 import { hookAbi } from './abi'
 import type { CurvePoint } from './curve'
+import { mapBatched } from './positions'
 
 export interface SineMarker {
   reserve: number // mixETH, human units
@@ -65,12 +66,11 @@ async function sample(hook: `0x${string}`): Promise<SineCurveData> {
   const stepWad = BigInt(Math.round((endR * 1e18) / N))
   for (let i = 1; i <= N; i++) push(stepWad * BigInt(i))
   for (let j = 0; j <= 3; j++) push(boot + lam * BigInt(j))
+  for (let j = 0; j < 3; j++) for (const q of [1, 2, 3]) push(boot + lam * BigInt(j) + lam * BigInt(q) / 4n)
   const R = [...grid].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
 
   // one eth_call per sample — a one-shot ~110-call burst, cached forever after
-  const prices = await Promise.all(
-    R.map((r) => rpcCall(hook, hookAbi, 'sinePriceAt', [r]) as Promise<bigint>),
-  )
+  const prices = await mapBatched(R, r => rpcCall(hook, hookAbi, 'sinePriceAt', [r]) as Promise<bigint>)
 
   // cumulative ∫dR/P in wad-PSP (dS_wad = dR_wad / P_wad — 1e18 factors cancel)
   const I = [0]
@@ -116,7 +116,12 @@ async function sample(hook: `0x${string}`): Promise<SineCurveData> {
 export function loadSineCurve(hook: `0x${string}`): Promise<SineCurveData> {
   let p = cache.get(hook)
   if (!p) {
-    p = sample(hook)
+    p = sample(hook).then(result => {
+      // Predeposit geometry is not materialized yet. Do not cache an empty
+      // curve forever when this same hook later launches.
+      if (!result.active) cache.delete(hook)
+      return result
+    })
     p.catch(() => cache.delete(hook)) // allow retry on transient RPC failure
     cache.set(hook, p)
   }

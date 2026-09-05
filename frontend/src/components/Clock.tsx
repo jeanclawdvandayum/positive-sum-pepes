@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useRound } from '../lib/useRound'
 import {
   getRemainingMs,
   subscribeFrames,
@@ -23,7 +24,6 @@ import {
 const PHASE_WORD: Record<Phase, string> = { calm: 'calm', heat: 'heating', critical: 'critical' }
 
 const LAYOUT_LEN = 8 // "HH:MM:SS"
-const IDLE = '72:00:00' // pre-launch, dimmed (spec §8)
 const GHOST = '88:88:88' // unlit seven-segment segments
 
 function fmtClock(ms: number): string {
@@ -49,8 +49,11 @@ export default function Clock({
   className?: string
 }) {
   const { phase, hasDeadline } = usePhase()
+  const round = useRound()
+  const idle = round.mode === 0 && round.detWindow !== undefined
+    ? fmtClock(Number(round.detWindow) * 1000) : '--:--:--'
   const digitRefs = useRef<(HTMLSpanElement | null)[]>([])
-  const prevStr = useRef<string>(hasDeadline ? fmtClock(getRemainingMs()) : IDLE)
+  const prevStr = useRef<string>(hasDeadline ? fmtClock(getRemainingMs()) : idle)
   const flashPending = useRef(false)
   const chipSeq = useRef(0)
   const chipTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -59,7 +62,7 @@ export default function Clock({
   // live value: subscribe to the engine's ONE rAF loop, write digits in place
   useLayoutEffect(() => {
     const write = () => {
-      const str = hasDeadline ? fmtClock(getRemainingMs()) : IDLE
+      const str = hasDeadline ? fmtClock(getRemainingMs()) : idle
       const prev = prevStr.current
       for (let i = 0; i < LAYOUT_LEN; i++) {
         const el = digitRefs.current[i]
@@ -77,7 +80,7 @@ export default function Clock({
     }
     write()
     return subscribeFrames(write)
-  }, [hasDeadline])
+  }, [hasDeadline, idle])
 
   // +5:00 injection → flash changed digits on the next frame + float a chip
   useEffect(() => {
@@ -138,7 +141,7 @@ export default function Clock({
           </span>
         )}
       </span>
-      <span className={hasDeadline ? 'clock-word' : 'clock-word clock-word--armed'}>{hasDeadline ? PHASE_WORD[phase] : 'armed'}</span>
+      <span className={hasDeadline ? 'clock-word' : 'clock-word clock-word--armed'}>{hasDeadline ? PHASE_WORD[phase] : round.mode === 0 ? 'at launch' : (round.mode ?? 0) >= 2 ? 'settled' : 'loading'}</span>
     </div>
   )
 }

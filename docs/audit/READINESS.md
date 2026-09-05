@@ -3,11 +3,12 @@
 This is a review packet for the current source tree, not a security certification.
 Final local gates: **397 Solidity tests / 55 suites**, including 64 invariant runs
 and 2,048 calls per real-V4 handler with zero reverts; an additional three-wallet
-campaign passed 256 runs / 32,768 calls and complete exits; **12 frontend tests**; TypeScript/Vite;
-102 ABI declarations; 32 production size checks; independent oracle and governance
+campaign passed 256 runs / 32,768 calls and complete exits; **17 frontend tests**; TypeScript/Vite;
+103 ABI declarations; 32 production size checks; independent oracle and governance
 gates. Static-analysis flags remain triaged separately. See GATE-LOG.md.
-Existing Base Sepolia deployments are immutable and do not acquire these fixes.
-A fresh deployment and recorded release manifest are required before playtesting them.
+A fresh Base Sepolia release is deployed and configured in the local frontend.
+See [TESTNET-PLAYTEST.md](TESTNET-PLAYTEST.md) for the running app, release manifest,
+source verification and wallet test sequence. Earlier deployments remain unchanged.
 
 ## Binding game rules (2026-09-05 approval)
 
@@ -81,10 +82,12 @@ by the presence of this script.
 Per the user’s direction, current work stays on testnet. No mainnet transactions
 were sent; the authenticated mainnet fork check is deferred.
 
-`forge test --match-path 'test/integration/*'` is a separate authenticated mainnet
-fork gate. It must pass with a valid MAINNET_RPC_URL before treating fork coverage
-as complete. Local real-V4 tests supplement this gate; they do not verify live
-Base Sepolia addresses, chain gas policy, RPC behavior, or a deployed frontend.
+The deterministic gate excludes `test/integration/*`. Mainnet integration tests
+remain deferred until a valid MAINNET_RPC_URL is available and mainnet work is
+authorized. Separately, `BaseSepoliaReleaseTest` attaches the actual new deployment
+on a local Base Sepolia fork and passes two rounds, reinvestment, staged rebirth,
+and old-round exits. Real deployment receipts and browser checks are recorded in
+GATE-LOG.md; no wallet-signed browser playtest is claimed.
 
 The size gate explicitly excludes `VectorPepeDescriptor`, an existing experimental
 renderer with roughly 181 KB of runtime. It cannot be deployed under EIP-170 and
@@ -135,6 +138,11 @@ all stakes and redeems all supply at each campaign’s end.
 8. Legacy zone configurations include retired numerical scenarios. Passing default
    sine tests does not certify all configurable zone shapes; keep them in audit scope
    while their code remains reachable through the factory.
+9. Genesis principal splits are independently floored per depositor. Up to N−1
+   wei of PSP can remain in the virtual genesis position after N claims, along
+   with its tiny share of fees/backing. The deployed two-wallet fork left one
+   wei of PSP after all owned positions exited. This bounded rounding residue
+   is documented, rather than counted as redeemed user-owned supply.
 
 ## Release checklist
 

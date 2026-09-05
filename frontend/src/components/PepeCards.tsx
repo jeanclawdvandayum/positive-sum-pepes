@@ -189,7 +189,7 @@ export function PepeCard({
           className="st-btn text-xs"
           disabled={busy || (decaying ? !canCancel : !canRequest)}
           onClick={() => act(decaying ? 'cancelWithdraw' : 'requestWithdraw')}
-          title={decaying ? 'stop the decay, restore full power' : 'start the 6-week exit ramp'}
+          title={decaying ? 'stop the decay, restore full power' : 'start the six-epoch exit ramp'}
         >
           {decaying ? '↩ keep staking' : 'request withdraw'}
         </button>

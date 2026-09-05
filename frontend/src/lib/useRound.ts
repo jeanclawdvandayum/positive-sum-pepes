@@ -29,6 +29,7 @@ export interface RoundInfo {
   /// not armed yet (predeposit), round not in Active mode, or the hook
   /// predates the clock (read reverts — caught, reported as undefined).
   detonationAt: bigint | undefined
+  detWindow: bigint | undefined
   predepositClosed: boolean | undefined
   totalPredeposit: bigint | undefined
   predepositCap: bigint | undefined
@@ -51,6 +52,7 @@ const EMPTY: RoundInfo = {
   totalLocked: undefined, predepositClosed: undefined, totalPredeposit: undefined,
   predepositCap: undefined, curve: undefined, flatTime: undefined, sine: null,
   detonationAt: undefined,
+  detWindow: undefined,
 }
 
 const F = ADDRESSES.factory as `0x${string}`
@@ -89,12 +91,11 @@ function startRoundLoop() {
       ).then(s => s.toLowerCase() === rStaker.toLowerCase()).catch(() => false)
       // sine geometry is static once armed — the cached sampler runs once per
       // hook; the 4s loop below only refreshes the live scalars.
-      const sine = await loadSineCurve(rHook).catch(() => null)
-      const [mode, reserve, supply, cfg, zones, totalLocked, pd, flatTime, potBalance, sineActive, swapFeeBps] = await Promise.all([
+      const [mode, reserve, supply, cfg, zones, totalLocked, pd, flatTime, potBalance, sineActive, swapFeeBps, detWindow] = await Promise.all([
         rpcCall(rHook, hookAbi, 'mode') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'reserveMixETH') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'totalSupplyPSP') as Promise<bigint>,
-        rpcCall(rHook, hookAbi, 'curveConfig') as Promise<bigint>,
+        rpcCall(rHook, hookAbi, 'curveConfig') as Promise<[bigint, bigint]>,
         rpcCall(rHook, hookAbi, 'getCurveZones') as Promise<Zone[]>,
         rpcCall(rStaker, stakerAbi, 'totalLocked') as Promise<bigint>,
         rpcCall(rController, controllerAbi, 'predepositState') as Promise<
@@ -104,6 +105,7 @@ function startRoundLoop() {
         rpcCall(rHook, hookAbi, 'potBalance') as Promise<bigint>,
         (rpcCall(rHook, hookAbi, 'sineActive') as Promise<boolean>).catch(() => false),
         (rpcCall(rHook, hookAbi, 'swapFeeBps') as Promise<bigint>).catch(() => undefined),
+        (rpcCall(rHook, hookAbi, 'detWindow') as Promise<bigint>).catch(() => undefined),
       ])
       if (!rHook || !rController) return
       // sine flavor: the zone getMarginalPrice is legacy — price comes from
@@ -140,13 +142,19 @@ function startRoundLoop() {
         totalLocked,
         predepositClosed: pd[3], totalPredeposit: pd[0], predepositCap: pd[1],
         flatTime,
-        curve: { p0: cfg, zones: zones.map((z) => ({ ...z })) },
-        sine,
+        curve: { p0: cfg[0], zones: zones.map((z) => ({ ...z })) },
+        sine: shared.hook === rHook ? shared.sine : null,
         detonationAt,
+        detWindow,
       }
       backoffMs = 0
       listeners.forEach((l) => l(shared))
-    } catch {
+      // Publish balances and clock before the larger chart sample completes.
+      const sine = await loadSineCurve(rHook).catch(() => null)
+      shared = { ...shared, sine }
+      listeners.forEach((l) => l(shared))
+    } catch (error) {
+      console.warn('Could not refresh PSP round data:', error)
       /* round not resolvable / rpc down — keep last state, back off */
       backoffMs = backoffMs ? Math.min(backoffMs * 2, 60_000) : 8_000
     } finally {

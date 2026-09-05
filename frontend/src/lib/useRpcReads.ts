@@ -25,6 +25,8 @@ export function useRpcReads(reads: RpcRead[], enabled = true, intervalMs = 6000)
   const key = keyOf(reads)
 
   useEffect(() => {
+    // Account/round changes must not reuse another wallet's balances or approvals.
+    setResults(reads.map(() => undefined))
     if (!enabled) return
     let dead = false
     let timer: ReturnType<typeof setTimeout> | undefined

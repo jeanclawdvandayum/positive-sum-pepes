@@ -90,9 +90,13 @@ contract BaseSepoliaReleaseTest is Test {
             if(r.hook.claimablePot(holders[i]) > 0)r.hook.claimPot();
             vm.stopPrank();
         }
-        assertEq(staker.totalLocked(), 0);
-        assertEq(r.token.totalSupply(), 0);
-        assertEq(r.hook.reserveMixETH(), 0);
+        // Each public allocation floors its genesis share. Two depositors
+        // can leave at most one PSP wei in the unowned virtual position.
+        (uint256 genesisDust,,,,) = staker.positions(0);
+        assertLe(genesisDust, 1);
+        assertEq(staker.totalLocked(), genesisDust);
+        assertEq(r.token.totalSupply(), genesisDust);
+        if (genesisDust == 0) assertEq(r.hook.reserveMixETH(), 0);
         assertEq(uint8(next.hook.mode()), uint8(CurveHook.Mode.Active));
     }
 }

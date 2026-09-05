@@ -1,4 +1,5 @@
 import { MIN_BUY_INPUT } from '../lib/gameRules'
+import { predepositResult } from '../lib/chainResults'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -47,6 +48,7 @@ export default function Predeposit() {
   const [nonce, setNonce] = useState(0)
 
   useEffect(() => {
+    setMyDep(undefined)
     if (!round.controller) return
     let dead = false
     async function tick() {
@@ -60,10 +62,7 @@ export default function Predeposit() {
         ])
         let dep: { mixETHAmount: bigint; claimed: boolean } | undefined
         if (address) {
-          dep = (await rpcCall(round.controller!, controllerAbi, 'predeposits', [address])) as {
-            mixETHAmount: bigint
-            claimed: boolean
-          }
+          dep = predepositResult(await rpcCall(round.controller!, controllerAbi, 'predeposits', [address]))
         }
         if (dead) return
         setPd({

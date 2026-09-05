@@ -1,5 +1,6 @@
 import { minimumOutput, MIN_BUY_INPUT } from '../lib/gameRules'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
+import { predepositResult } from '../lib/chainResults'
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { ADDRESSES, FAUCET_ENABLED, REINVEST_ENABLED } from '../lib/config'
@@ -302,20 +303,15 @@ export default function Stake() {
   const [myDep, setMyDep] = useState<{ mixETHAmount: bigint; claimed: boolean } | undefined>(undefined)
   const [claimStep, setClaimStep] = useState<'idle' | 'tx' | 'done' | 'err'>('idle')
   useEffect(() => {
+    setMyDep(undefined)
     if (!round.controller || !address || (round.mode ?? 0) < 1) return
     let dead = false
     const c = round.controller
     const who = address
     async function tick() {
       try {
-        // named-tuple return decodes as { mixETHAmount, claimed } in viem
-        const d = (await rpcCall(c, controllerAbi, 'predeposits', [who])) as unknown as {
-          mixETHAmount: bigint
-          claimed: boolean
-        }
-        if (!dead && typeof d.mixETHAmount === 'bigint') {
-          setMyDep({ mixETHAmount: d.mixETHAmount, claimed: d.claimed })
-        }
+        const d = predepositResult(await rpcCall(c, controllerAbi, 'predeposits', [who]))
+        if (!dead) setMyDep(d)
       } catch { /* keep last */ }
     }
     tick()
@@ -446,7 +442,7 @@ export default function Stake() {
               <PspIcon px={20} /> stake psp
             </h2>
             <p className="mt-1 text-xs text-text-lo">
-              indefinite lock · fees flow while you stay · request a withdraw to start the 6-week exit ramp
+              indefinite lock · fees flow while you stay · request a withdrawal to start the six-epoch exit ramp
             </p>
 
             <div className="mt-4">

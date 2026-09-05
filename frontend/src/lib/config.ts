@@ -2,6 +2,7 @@ import { http, cookieStorage, createStorage } from 'wagmi'
 import { base, baseSepolia, mainnet, sepolia } from 'wagmi/chains'
 import { defineChain } from 'viem'
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
+import { injectedWallet } from '@rainbow-me/rainbowkit/wallets'
 
 const env = import.meta.env
 
@@ -54,7 +55,10 @@ export const REINVEST_ENABLED = Boolean(env.VITE_REINVESTOR)
 
 export const wagmiConfig = getDefaultConfig({
   appName: 'Positive Sum Pepes',
-  projectId: env.VITE_WC_PROJECT_ID || '9a469b7e0f5b4b1f8c3d2e6a5b7c8d9f',
+  projectId: env.VITE_WC_PROJECT_ID || '',
+  // Browser extensions use EIP-6963/injection without a relay project.
+  // Offer remote wallets only when their real project is configured.
+  wallets: env.VITE_WC_PROJECT_ID ? undefined : [{ groupName: 'Browser wallets', wallets: [injectedWallet] }],
   chains: [targetChain],
   storage: createStorage({ storage: cookieStorage }),
   transports: {

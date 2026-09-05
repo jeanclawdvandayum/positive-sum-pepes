@@ -150,7 +150,7 @@ export default function PotBoard({
               ? 'nobody was seated — the pot waits, forever.'
               : 'distribution is frozen. claims never expire.'
             : seated === 0
-              ? 'last 10 buys hold the ladder — every whole psp bought is a ticket'
+              ? 'the latest 10 tickets hold the ladder — each 0.005 mixETH purchased earns one ticket'
               : 'payout if the bomb dropped this second'}
         </p>
       </div>

@@ -24,8 +24,11 @@ All financial entry points and NFT transfer share a reentrancy guard.
 
 Claiming a predeposit splits the virtual genesis position's accrued whole and
 fractional credit proportionally. Integer split dust remains with the unsplit
-position and reaches the final claimant. Remaining predepositors retain their
-entitlement; the claim does not reset it to zero.
+position. Remaining predepositors retain their entitlement; the claim does not
+reset it to zero. Controller principal allocations are separately floored per
+depositor: after N claims, up to N−1 wei of PSP can remain in the virtual genesis
+position, carrying its tiny fee/backing share. The deployed two-wallet fork
+observed one wei of this unallocated PSP; all wallet-owned positions exited.
 
 Every writer of a decay schedule checkpoints the global point first. Outstanding
 decays end within seven transitions, so advancing the current point after years

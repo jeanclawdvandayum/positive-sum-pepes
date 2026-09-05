@@ -1,0 +1,158 @@
+{
+  "chainId": 84532,
+  "receipts": [
+    {
+      "stage": "deployment",
+      "transactionHash": "0x832e048293eb9fd5df2f60ed0cd12a57fbf4506012d405c7329ddc7f6d53b003",
+      "blockNumber": "0x2c4316b",
+      "blockHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "status": "0x1",
+      "gasUsed": "0x9c41e",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0xf521dbfa14b018b0efcbcd1f3e5c95703b47b63eb658ed68747b26fb6679f79d",
+      "blockNumber": "0x2c4316c",
+      "blockHash": "0x8bb9df3698400c44a689b1ac84157073d834024ece90b8884225c8933f14c5c4",
+      "status": "0x1",
+      "gasUsed": "0x216c5",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0x93ebb2abbf64a7c50963905918ad4de0168f34d03d932b284cb7ca38b1facb88",
+      "blockNumber": "0x2c4316d",
+      "blockHash": "0x9dd9e5116af2c07e48336c265679760f55fe418ae57f325510df23a864b023aa",
+      "status": "0x1",
+      "gasUsed": "0x5eeb6c",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0xf13437d300d4e36dd7d3050fe1d713e39ee2d3090f9f8176c3e11b99c045c41c",
+      "blockNumber": "0x2c4316e",
+      "blockHash": "0x21ca21ba16df281ab7646992b5d9fa154854b37675101e35cafe694c5f678126",
+      "status": "0x1",
+      "gasUsed": "0x3f5a57",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0x5196df8173639595c2a7cca35289508f2c20fba3babc1f025daa31afaef66ea7",
+      "blockNumber": "0x2c4316f",
+      "blockHash": "0x4e3c61d209e710c12f840d8c12f98774ebd8b395a6686bda112c32a0e39de91e",
+      "status": "0x1",
+      "gasUsed": "0x2b6473",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0xc0970ad2e5055ffa94360fbaff27c925b59b91b7e55d91afe4c7679f115fc145",
+      "blockNumber": "0x2c43170",
+      "blockHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "status": "0x1",
+      "gasUsed": "0x590301",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0x2ea8957e1b8c7ac634ac6a58857562845fd362e44f1bc0372d76670043e541d6",
+      "blockNumber": "0x2c43171",
+      "blockHash": "0xc56d55af46cf847bf654d3eb2ebec48dbd557398bd8a1d5461cc311fa966e314",
+      "status": "0x1",
+      "gasUsed": "0x4b1e5b",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0xb7d80af80cf270b5bdee19e20f19ed786314ca4db21cb549a077ce0f93371029",
+      "blockNumber": "0x2c43172",
+      "blockHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "status": "0x1",
+      "gasUsed": "0xb352",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0xd5a5752f8edc6e4e7247300d58b2a16393c79feaaab1b8d6f398469da6422c11",
+      "blockNumber": "0x2c43173",
+      "blockHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "status": "0x1",
+      "gasUsed": "0x26b46",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0xd87cbe84cc096ed6bde191b0e2451ecdb104e205e984a690f3809556634e7ad7",
+      "blockNumber": "0x2c43174",
+      "blockHash": "0xbe93301e0d0585cd06884dd7b1c8129861b5e1617bf1ab87fe1197f2dd7f6c82",
+      "status": "0x1",
+      "gasUsed": "0x42fdc6",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0x53964718b8962ba5652f8d75258ec99edda26d3c6cf7a904e058f68bd0d57588",
+      "blockNumber": "0x2c43175",
+      "blockHash": "0x6703dfac3a340269c01591fe07256be366393fd27a91d93d49a694d0817e70ed",
+      "status": "0x1",
+      "gasUsed": "0x81b4ef",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0x2c7b8276ce4e767e6ab9cf8704f534a2c9c1353101b8a94a933bf4830ce6317a",
+      "blockNumber": "0x2c43176",
+      "blockHash": "0x959c85fe19f3df8a867b7989b7e59fb3dcbbabde9c60260107c7208ed9c212c1",
+      "status": "0x1",
+      "gasUsed": "0x7e6277",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0x07ca56fc7c10cb53f3922879630ee10769be3e2cf1b1858648983f77a86e8257",
+      "blockNumber": "0x2c43177",
+      "blockHash": "0x9ab615e8d96f2846878e0b8721bad04deb1697d5dd71c269b6aa4027b7a1461c",
+      "status": "0x1",
+      "gasUsed": "0x87b15",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0x56e5375a089b39d127202dbe8ab1fc1d92b49f5c1744e67c72dcf69e67f60cad",
+      "blockNumber": "0x2c43178",
+      "blockHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "status": "0x1",
+      "gasUsed": "0xde089",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0xb035dbad14797eb79888b3ab1db157de4b29e54d97bdc80f99c3455537d63ead",
+      "blockNumber": "0x2c43179",
+      "blockHash": "0x6483ecc37724d9d0980471acd715d3933e0cbab864a9eef7e6b3e7d1261871ae",
+      "status": "0x1",
+      "gasUsed": "0xd7a72",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "deployment",
+      "transactionHash": "0x2c0348734d253e6dee24320b5d31b311046d8ef40d73567a7849486c32c798ad",
+      "blockNumber": "0x2c4317a",
+      "blockHash": "0x62362b3c8407badb0191eb2141c67c1314b563f0e48c3e4868d1ef09a51903af",
+      "status": "0x1",
+      "gasUsed": "0xb788a",
+      "effectiveGasPrice": "0x5b8d80"
+    },
+    {
+      "stage": "reinvestor",
+      "transactionHash": "0x2a6077190bfe757a0f9662db1cf79621059160a695e36514671215dd3d6e9f98",
+      "blockNumber": "0x2c431bd",
+      "blockHash": "0xc1bece86f54bf646acbb5c55dd82e30a51f0f9707bdd995786794c696d57fc6f",
+      "status": "0x1",
+      "gasUsed": "0x121d22",
+      "effectiveGasPrice": "0x5b8d80"
+    }
+  ]
+}

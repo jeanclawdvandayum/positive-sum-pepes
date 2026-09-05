@@ -5,7 +5,10 @@ tree. The release now uses the committed npm lockfile and a fresh `npm ci`.
 Patch overrides pin axios 1.18.0, ws 8.21.0 (the older JSON-RPC adapter keeps the
 patched 7.5.13 line), and uuid 11.1.1. UUID retains both CommonJS and ESM exports;
 the CommonJS interface, frontend ABI/transaction tests, TypeScript and Vite build
-were checked after installation. The wallet dialog receives browser checking.
+were checked after installation. The browser wallet dialog was checked. The
+placeholder WalletConnect project was removed; without VITE_WC_PROJECT_ID the
+app offers browser extensions via injection/EIP-6963 and does not start a remote
+WalletConnect session. The transitive dependency advisory remains tracked below.
 
 The final npm advisory scan reports **0 critical, 0 high, 16 moderate** entries.
 The sixteen entries propagate one underlying advisory through the WalletConnect

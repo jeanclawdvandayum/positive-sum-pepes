@@ -30,6 +30,7 @@ export default function CurveChart({
 
   const pts = useMemo(() => {
     if (round.sine?.active && round.sine.points.length) return round.sine.points
+    if (!round.sine || round.sine.configured) return []
     return round.curve ? sampleCurve(round.curve, round.supply ?? 0n) : []
   }, [round.sine, round.curve, round.supply])
 
@@ -103,8 +104,8 @@ export default function CurveChart({
       const y = sy(yMode === 'price' ? p.price : p.supply)
       d += `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
     })
-    const xLast = sx(vis[vis.length - 1].reserve)
-    const xFirst = sx(vis[0].reserve)
+    const xLast = sx(vis[vis.length - 1]?.reserve ?? 0)
+    const xFirst = sx(vis[0]?.reserve ?? 0)
     const a = `${d}L${xLast.toFixed(1)},${H - PAD.b}L${xFirst.toFixed(1)},${H - PAD.b}Z`
     const hp =
       hover !== null && pts[hover]
@@ -399,7 +400,9 @@ export default function CurveChart({
         </svg>
       ) : (
         <div className="flex h-48 items-center justify-center text-sm text-text-lo">
-          loading curve…
+          {round.mode === 0 && round.sine?.configured
+            ? 'The curve takes shape at launch, anchored to the final predeposit raise.'
+            : 'loading curve…'}
         </div>
       )}
 

@@ -107,3 +107,46 @@ scan has zero high/critical findings and 16 moderate propagated entries from one
 remaining decoder advisory (DEPENDENCIES.md). Reinvestor controls check the
 wrapper's staker against the current round before approval or compounding. No
 Solidity source changed after the contract-source hash above.
+
+## 2026-09-05 — Fresh Base Sepolia release and browser handoff
+
+- Final `bash scripts/check-audit.sh`: **397 Solidity tests / 55 suites**,
+  zero failed/skipped; **17 frontend tests**, zero failed/cancelled; **103 ABI
+  declarations**, **32** production size checks, **90** independent oracle
+  vectors, no-governance, TypeScript and Vite all pass.
+- Deployed factory **0xc79b74dacf99a82f1b1e847948338f9263913a59** on chain
+  **84532**. Deployment **16/16** receipts succeeded; second-pass reinvestor
+  **1/1** succeeded. Largest deployment receipt: **8,500,463 gas**. Public receipt
+  records, pinned manifest and source-verification responses are under
+  `docs/audit/deployments/base-sepolia-2026-09-05*`.
+- Source verification: **17/17** creation/runtime matches through Sourcify v2.
+  The build uses `bytecodeHash=none`; these are `match`, not metadata-backed
+  `exact_match`. Manifest construction verifies the immutable hook data shards
+  concatenate to the local CurveHook creation artifact byte-for-byte.
+- `BaseSepoliaReleaseTest` passes at pinned block **46412314**, using the actual
+  deployed contracts and real canonical V4 PoolManager. Two-wallet predeposit,
+  launch, partial genesis claims, buy/sell, retained vesting fees, actual deployed
+  reinvestor, capped detonation, three-step successor birth, minimum-size round-2
+  launch, and old-round withdrawals/redemptions/pot claims all pass. **1 test**,
+  zero failures/skips; aggregate test gas **26,183,543** (many transactions, not
+  a single transaction's required gas). Execution is local fork only.
+- Complete exit leaves **one wei of unallocated genesis PSP** in the two-wallet
+  case. User-owned positions all exit; this bounded pro-rata rounding residue
+  and its tiny fee/backing share are documented in FEE-ACCOUNTING.md.
+- Browser checks: correct fresh factory/round, two-hour pre-launch clock,
+  predeposit/faucet onboarding, browser-wallet selector, staking and empty
+  graveyard. Fixed getter tuple decoding, inactive sine cache, stale ladder/
+  referral/vesting copy, prelaunch legacy chart fallback, and account-change
+  read clearing. No wallet connection, signature or live user play transaction
+  was performed. Browser account/chain switches and transaction rejection remain
+  explicitly assigned to the user playtest.
+- Publicnode throttling was observed during concurrent fork/browser checks.
+  The frontend now uses Base's public Sepolia endpoint with batched/deduplicated
+  reads, capped batch size and request timeouts. Reversed-response, per-item
+  revert and stalled-request regressions pass; public endpoint availability is
+  still an external dependency.
+- Protocol source hash remains
+  `044015bd5b1cf380460b62472c6460a954e1098e8337d8ff33b6900eacbaeffd`.
+  The manifest pins `a35228a3`; later changes affect frontend, tests and release
+  records only. Historical broadcast files remain preserved outside the source
+  commit. Testnet only; mainnet fork/deployment remains deferred by user direction.
