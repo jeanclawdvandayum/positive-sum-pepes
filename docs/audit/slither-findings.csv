@@ -61,9 +61,9 @@ Medium,Medium,unused-return,"PSPZapOut.zapOut(PoolKey,uint256,uint256,uint256) (
 Medium,Medium,unused-return,PSPZapIn.unlockCallback(bytes) (src/PSPZapIn.sol#142-183) ignores return value by poolManager.settle() (src/PSPZapIn.sol#152)
 Medium,Medium,unused-return,PSPZapIn._wrap(uint256) (src/PSPZapIn.sol#133-138) ignores return value by mixETH.depositETH{value: ethAmount}() (src/PSPZapIn.sol#136)
 Medium,Medium,unused-return,"PSPReinvestor.reinvest(uint256,PoolKey,uint256,uint256) (src/PSPReinvestor.sol#51-78) ignores return value by zapIn.buyWithMix(key,mixIn,minPspOut,deadline) (src/PSPReinvestor.sol#66)"
-Low,Medium,events-maths,RoundController.setFactoryRoundId(uint256) (src/RoundController.sol#238-240) should emit an event for: 
-Low,Medium,events-maths,PSPStaker.lockGenesis(uint256) (src/PSPStaker.sol#629-644) should emit an event for: 
-Low,Medium,events-maths,PSPStaker.addFees(uint256) (src/PSPStaker.sol#678-683) should emit an event for: 
+Low,Medium,events-maths,RoundController.setFactoryRoundId(uint256) (src/RoundController.sol#238-240) should emit an event for:
+Low,Medium,events-maths,PSPStaker.lockGenesis(uint256) (src/PSPStaker.sol#629-644) should emit an event for:
+Low,Medium,events-maths,PSPStaker.addFees(uint256) (src/PSPStaker.sol#678-683) should emit an event for:
 Low,Medium,missing-zero-check,"PSPStaker.constructor(IERC20,IRoundController,address).descriptor_ (src/PSPStaker.sol#170) lacks a zero-check on :"
 Low,Medium,missing-zero-check,PSPFactory.setDescriptor(address).descriptor_ (src/PSPFactory.sol#85) lacks a zero-check on :
 Low,Medium,calls-loop,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#82-124) has external calls inside a loop: staker.ownerOf(pepeIds[i]) != owner (src/PSPReinvestor.sol#92)"
@@ -231,5 +231,5 @@ Informational,Medium,too-many-digits,Curve1Zones.config() (src/curves/Curve1Zone
 Informational,Medium,too-many-digits,LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
 Informational,Medium,too-many-digits,Curve3Zones.slitherConstructorConstantVariables() (src/curves/Curve3Zones.sol#14-176) uses literals with too many digits:
 Informational,Medium,too-many-digits,Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
-Optimization,High,constable-states,PSPFactory.baseSymbol (src/PSPFactory.sol#128) should be constant 
-Optimization,High,constable-states,PSPFactory.baseName (src/PSPFactory.sol#127) should be constant 
+Optimization,High,constable-states,PSPFactory.baseSymbol (src/PSPFactory.sol#128) should be constant
+Optimization,High,constable-states,PSPFactory.baseName (src/PSPFactory.sol#127) should be constant
