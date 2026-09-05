@@ -9,6 +9,10 @@ gates. Static-analysis flags remain triaged separately. See GATE-LOG.md.
 A fresh Base Sepolia release is deployed and configured in the local frontend.
 See [TESTNET-PLAYTEST.md](TESTNET-PLAYTEST.md) for the running app, release manifest,
 source verification and wallet test sequence. Earlier deployments remain unchanged.
+The current testnet frontend uses the AUD-14 replacement ZapIn/Reinvestor; see
+the [repair manifest](deployments/base-sepolia-2026-09-05-reinvest-repair.json).
+Original round contracts, balances and NFTs remain in place. Old misattributed
+events/seats are immutable and are not silently relabeled as repaired history.
 
 ## Binding game rules (2026-09-05 approval)
 

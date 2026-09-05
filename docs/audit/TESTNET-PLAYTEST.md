@@ -11,7 +11,7 @@ WalletConnect project can be configured later for remote/mobile connections.
 
 - Factory: `0xc79b74dacf99a82f1b1e847948338f9263913a59`.
 - [Release manifest](deployments/base-sepolia-2026-09-05.json): factory-derived
-  addresses, bytecode hashes, constructor wiring and approved rules.
+  original addresses, bytecode hashes, constructor wiring and approved rules.
 - [Verification record](deployments/base-sepolia-2026-09-05-verification.json):
   17/17 creation/runtime matches on Sourcify. This build uses `bytecodeHash=none`,
   so these are executable-code matches, not metadata-backed exact-source matches.
@@ -19,6 +19,23 @@ WalletConnect project can be configured later for remote/mobile connections.
   and [the verified factory](https://sourcify.dev/server/v2/contract/84532/0xc79b74dacf99a82f1b1e847948338f9263913a59?fields=all).
 - [Deployment receipts](deployments/base-sepolia-2026-09-05-receipts.json): 16
   deployment transactions plus the second-pass reinvestor, all successful.
+
+**Reinvestment repair (AUD-14):** use the
+[current manifest](deployments/base-sepolia-2026-09-05-reinvest-repair.json).
+Only ZapIn and Reinvestor were replaced; all retained contract code hashes match
+the original release. New ZapIn: `0xfbaedab9e2e3ad26827c3cec712520cd56e5d842`.
+New Reinvestor: `0x7e5a814b4c7c7d788b20eb90fd7340fa4929f9ae`.
+Both [creation receipts](deployments/base-sepolia-2026-09-05-reinvest-repair-receipts.json)
+succeeded and the [verification record](deployments/base-sepolia-2026-09-05-reinvest-repair-verification.json)
+confirms creation/runtime matches. Refresh old browser tabs. The new addresses
+need fresh token/router approvals and NFT operator approval before use.
+
+The old reinvestor incorrectly owned ladder seats and Buy/TimeAdded identity;
+PSP principal was still restaked into the correct NFT. Historical events and
+seats cannot be rewritten. Ordinary later buys evict old seats; pot entitlement
+left on the old wrapper at detonation has no forwarding claim path. The new UI
+rejects wrappers without the corrected attribution version. Do not use the old
+`0x7328d580df5d234f5d904f1b0fb1d631f26213f6` wrapper for new reinvestments.
 
 To restart the built app from `frontend/`, run:
 
@@ -28,8 +45,9 @@ node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 4173
 
 Deployment addresses are in the ignored `.env.local`; the production RPC default
 is in `.env.production` (use `.env.production.local` to override it locally).
-Rebuilding uses those settings. The manifest pins protocol source revision `a35228a3`;
-subsequent frontend/documentation changes do not change deployed Solidity code.
+Rebuilding uses those settings. The original round uses source revision `a35228a3`;
+the replacement router manifest pins `796222cd`. Round assets and the active
+clock remain on the original contracts.
 The frontend uses [Base's public Sepolia endpoint](https://docs.base.org/base-chain/api-reference/rpc-overview)
 with Multicall3 view batching, concurrent-request deduplication, a second public
 provider as fallback, and 12-second timeouts per provider. Immutable round
@@ -73,7 +91,10 @@ a smaller raise becomes publicly launchable when its window ends.
    wallet/network between approval and staking; the second write must not proceed.
 5. Cancel a withdrawal before and after maturity, transfer a pepe, claim its fees
    as the new owner, and reinvest fees of at least 0.005 mixETH. The wrapper needs
-   explicit NFT operator approval and is specific to its deployed round.
+   explicit NFT operator approval and is specific to its deployed round. Check
+   that single and batch reinvestments name the NFT owner in the ladder and tape,
+   including calls made by an approved operator. The owner's recorded referral
+   chain should receive its share and resulting seats must be claimable by the owner.
 6. Let the clock expire. Trades should fail. Detonate, then resume successor birth
    through reservation and three confirmed birth steps. Interrupting/reloading
    between steps should resume from chain state.
@@ -93,6 +114,12 @@ The automated deployed-code test is `BaseSepoliaReleaseTest`, with
 BaseSepoliaReleaseTest --fork-url BASE_SEPOLIA_RPC --fork-block-number 46412314`.
 This is local fork execution only. The two-wallet complete exit can leave one
 wei of unallocated genesis PSP; see [FEE-ACCOUNTING.md](FEE-ACCOUNTING.md).
+
+The router repair also passed `ReinvestRepairTest` against the actual replacement
+contracts at block **46416991**, with `PSP_REINVEST_REPAIR_TEST=true` and
+`PSP_USE_DEPLOYED_REPAIR=true`, plus factory/zap/reinvestor addresses from the
+current manifest. It tests operator single/batch reinvestment and owner pot claims
+against the live round's deployed contracts on a local fork. It sends no transactions.
 
 ## Measured economic scenarios
 

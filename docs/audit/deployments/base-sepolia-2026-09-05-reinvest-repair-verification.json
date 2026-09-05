@@ -1,0 +1,232 @@
+{
+  "chainId": 84532,
+  "revision": "796222cdf3777557f4c2f7fc6a08a0f105ee14fb",
+  "contracts": {
+    "factory": {
+      "address": "0xC79B74DACf99a82F1B1e847948338f9263913A59",
+      "identifier": "src/PSPFactory.sol:PSPFactory",
+      "matchId": "47144986",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:08Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "token": {
+      "address": "0x6D456AD3f13968F2Ccb371c37B06Efb35F1AA14A",
+      "identifier": "src/PSPToken.sol:PSPToken",
+      "matchId": "47144978",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:01Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "controller": {
+      "address": "0xd7788E2434c59595961A618998350B79Db9916C3",
+      "identifier": "src/RoundController.sol:RoundController",
+      "matchId": "47144989",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:08Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "hook": {
+      "address": "0xD26e8d8545cC01c173Eb4a4bb9f53bE008f3AA88",
+      "identifier": "src/CurveHook.sol:CurveHook",
+      "matchId": "47144988",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:08Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "staker": {
+      "address": "0x6dbc806Ba49718E88F308DE8a120eB6C40724D1b",
+      "identifier": "src/PSPStaker.sol:PSPStaker",
+      "matchId": "47144987",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:08Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "mix": {
+      "address": "0x25A34E544e2528eaaD35136c4d86Ab79aE8501b6",
+      "identifier": "src/testnet/SepoliaMixETH.sol:SepoliaMixETH",
+      "matchId": "47144985",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:08Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "registry": {
+      "address": "0x8effE28dA8b242B1d64C499b262c606c48F40203",
+      "identifier": "src/PSPReferralRegistry.sol:PSPReferralRegistry",
+      "matchId": "47144990",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:10Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "zapIn": {
+      "address": "0xfbAeDaB9e2E3aD26827c3CEC712520cd56E5d842",
+      "identifier": "src/PSPZapIn.sol:PSPZapIn",
+      "verificationId": "5ff94b7f-58c7-4272-a941-b7c687345c62",
+      "matchId": "47150267",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T09:59:30Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "5ff94b7f-58c7-4272-a941-b7c687345c62",
+        "jobStartTime": "2026-09-05T09:59:29Z",
+        "jobFinishTime": "2026-09-05T09:59:30Z",
+        "compilationTime": "927",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "verificationId": "fbaedab9e2e3ad26827c3cec712520cd56e5d8426a9be802",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=fbaedab9e2e3ad26827c3cec712520cd56e5d8426a9be802",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0xfbAeDaB9e2E3aD26827c3CEC712520cd56E5d842",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0xfbAeDaB9e2E3aD26827c3CEC712520cd56E5d842"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xfbAeDaB9e2E3aD26827c3CEC712520cd56E5d842",
+          "verifiedAt": "2026-09-05T09:59:30Z",
+          "matchId": "47150267"
+        }
+      }
+    },
+    "zapOut": {
+      "address": "0x3B3DC4B584410BbBB283f9ebccdEa94A5c2AaF56",
+      "identifier": "src/PSPZapOut.sol:PSPZapOut",
+      "matchId": "47144993",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:15Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "faucet": {
+      "address": "0x1a260e953Ba4Cbe9337AC5fAc9f809Cd229843c6",
+      "identifier": "src/testnet/MixETHFaucet.sol:MixETHFaucet",
+      "matchId": "47144992",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:15Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "reinvestor": {
+      "address": "0x7e5A814B4C7c7D788B20EB90fd7340fA4929f9aE",
+      "identifier": "src/PSPReinvestor.sol:PSPReinvestor",
+      "verificationId": "0da638e2-ecec-4578-8355-bb197977beb1",
+      "matchId": "47150268",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T09:59:34Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "0da638e2-ecec-4578-8355-bb197977beb1",
+        "jobStartTime": "2026-09-05T09:59:31Z",
+        "jobFinishTime": "2026-09-05T09:59:34Z",
+        "compilationTime": "2117",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "verificationId": "7e5a814b4c7c7d788b20eb90fd7340fa4929f9ae6a9be806",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=7e5a814b4c7c7d788b20eb90fd7340fa4929f9ae6a9be806",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x7e5A814B4C7c7D788B20EB90fd7340fA4929f9aE",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x7e5A814B4C7c7D788B20EB90fd7340fA4929f9aE"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x7e5A814B4C7c7D788B20EB90fd7340fA4929f9aE",
+          "verifiedAt": "2026-09-05T09:59:34Z",
+          "matchId": "47150268"
+        }
+      }
+    },
+    "descriptor": {
+      "address": "0xFA349FaFa07B969C792BE63C257dB905c6D03166",
+      "identifier": "src/PepeDescriptor.sol:PepeDescriptor",
+      "matchId": "47144996",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:26Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "hookDeployer": {
+      "address": "0xeFD37018d0c764F2629Da81EfA6F997D0500Af13",
+      "identifier": "src/HookDeployer.sol:HookDeployer",
+      "matchId": "47145006",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:52Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "controllerDeployer": {
+      "address": "0x1362dC8796AcfAfB5f5075Aa902277a44E4aD43E",
+      "identifier": "src/ControllerDeployer.sol:ControllerDeployer",
+      "matchId": "47144998",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:30Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "stakerDeployer": {
+      "address": "0x2b8F65aa5fe475938A5Cc4BcEC5b5A7B74141Bd3",
+      "identifier": "src/StakerDeployer.sol:StakerDeployer",
+      "matchId": "47145000",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:39Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "tokenDeployer": {
+      "address": "0xb6A0c491ac6E74e06dAE39393566B1054A01B6A0",
+      "identifier": "src/ControllerDeployer.sol:TokenDeployer",
+      "matchId": "47144999",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:30Z",
+      "match": "match",
+      "chainId": "84532"
+    },
+    "hookInitCode": {
+      "address": "0xD23A1a4D4f86486634FD6bC9AB054D2e195A7692",
+      "identifier": "src/HookInitCode.sol:HookInitCode",
+      "matchId": "47145001",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-05T07:26:49Z",
+      "match": "match",
+      "chainId": "84532"
+    }
+  }
+}

@@ -269,3 +269,32 @@ Solidity source changed after the contract-source hash above.
   deploys only those two wrappers. It verifies chain 84532 and the expected current
   round; existing round state and assets stay in their existing contracts. Actual
   replacement addresses and broadcast verification are recorded separately below.
+
+## 2026-09-05 — AUD-14 replacement deployed on Base Sepolia
+
+- Reviewed source revision **796222cd**. Two `--slow` deployment receipts
+  succeeded: new ZapIn **0xfbaedab9e2e3ad26827c3cec712520cd56e5d842** at block
+  **46416990** (**925,504 gas**); new Reinvestor
+  **0x7e5a814b4c7c7d788b20eb90fd7340fa4929f9ae** at block **46416991**
+  (**1,151,879 gas**). Factory and round 1 remain unchanged.
+- Current manifest at block **46417019** is
+  `docs/audit/deployments/base-sepolia-2026-09-05-reinvest-repair.json`. Only those
+  two addresses changed; all retained contract code hashes match the original
+  manifest. Immutable wiring and stored hook creation code were checked again.
+  Companion files record the incident, successful creations and verification.
+- Sourcify reports **17/17** creation/runtime matches across the current release,
+  including both replacement contracts; `bytecodeHash=none` still means `match`
+  rather than metadata-backed `exact_match`.
+- The post-deploy **ReinvestRepairTest** passes on the actual deployed code at
+  block **46416991**: operator single and batch compounding, NFT-owner ladder
+  attribution, unchanged NFT ownership, and owner pot claims after detonation.
+  **1 test passed**, zero failures/skips, local fork only. No user's NFT approval,
+  reinvestment, buy, or pot claim was broadcast during repair.
+- Updated the ignored local frontend configuration to the verified replacement
+  addresses and rebuilt successfully. Fresh approvals are required; old tabs must
+  refresh. Existing wrong seats and historical events are unchanged. Later buys
+  can evict them, but no retrospective claim/seat reassignment exists in old code.
+- Read-only frontend preflight at block **46417135** accepts the new wrapper's
+  staker/version and rejects the old wrapper. Reloaded the rebuilt staking page;
+  live round 1 data loads with no browser warning/error logs. Wallet-signed
+  approval/reinvestment remains the user's playtest.
