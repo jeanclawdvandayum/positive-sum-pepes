@@ -22,7 +22,7 @@ contract BaseSepoliaReleaseTest is Test {
         assertEq(block.chainid, 84532, "testnet only");
         PSPFactory factory = PSPFactory(vm.envAddress("PSP_FACTORY"));
         PSPZapIn zapIn = PSPZapIn(vm.envAddress("PSP_ZAPIN"));
-        PSPZapOut zapOut = PSPZapOut(vm.envAddress("PSP_ZAPOUT"));
+        PSPZapOut zapOut = PSPZapOut(payable(vm.envAddress("PSP_ZAPOUT")));
         PSPReinvestor reinvestor = PSPReinvestor(vm.envAddress("PSP_REINVESTOR"));
         PSPFactory.Round memory r = factory.getRound(1);
         PSPStaker staker = r.controller.staker();
