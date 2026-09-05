@@ -294,7 +294,7 @@ export default function SwapCard() {
             aria-pressed={side === 'buy'}
             title={
               halted
-                ? 'the clock is at zero — no more moves'
+                ? 'the clock is at zero. trading has stopped.'
                 : round.mode === 2
                   ? 'buying is disabled while the round is flat'
                   : undefined
@@ -342,10 +342,10 @@ export default function SwapCard() {
         <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-2.5 rounded-lg border border-phase-critical/40 p-6 text-center">
           <PixelIcon name="bomb" size={22} />
           <p className="font-display text-lg text-text-hi">
-            the clock struck zero. no more moves.
+            time’s up. somebody press the button.
           </p>
           <p className="max-w-xs text-xs leading-relaxed text-text-lo">
-            the next move is detonation — the pot settles, the curve flattens, the exits open. nothing left to buy, nothing left to sell.
+            trading has stopped. detonation settles the pot, opens staked positions for withdrawal, and makes PSP redeemable for remaining mixETH.
           </p>
         </div>
       ) : (
@@ -449,7 +449,7 @@ export default function SwapCard() {
             </span>
           </div>
           <p className="mt-1 text-[10px] text-text-lo">
-            {quote?.feeBps === 0n ? 'No trade fee.' : side === 'buy' ? 'Included in your payment.' : 'Already deducted from the receive amount.'}
+            {quote?.feeBps === 0n ? 'Trading fee: 0%.' : side === 'buy' ? 'Included in your payment.' : 'Already deducted from the receive amount.'}
             {' '}Network gas is extra, shown in your wallet.
           </p>
         </div>
@@ -519,7 +519,7 @@ export default function SwapCard() {
         {/* The pay/receive panels absorb spare height above the submit action. */}
         {round.mode === 1 && (
           <p className="text-xs leading-relaxed text-text-lo">
-            swap fees feed the pot, the stakers, and whoever's link brought you
+            the pot gets fed. stakers get their cut. your swap fee covers both.
           </p>
         )}
         <button
@@ -544,13 +544,13 @@ export default function SwapCard() {
       {round.mode === 3 && (
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-phase-critical/40 p-3 text-xs font-semibold text-phase-critical">
           <PixelIcon name="bomb" size={16} />
-          <span>this round was carpet-bombed. wait for round n+1.</span>
+          <span>this round went boom. claim winnings and redeem PSP in the graveyard.</span>
         </div>
       )}
       {round.mode === 2 && (
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-line p-3 text-xs font-semibold text-text-lo">
           <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-[2px] bg-accent" aria-hidden="true" />
-          <span>round is dying — exits are toll-free at exact average backing. buying is disabled.</span>
+          <span>this round has ended. redeem PSP for its share of remaining mixETH with a 0% trading fee. payouts are rounded down.</span>
         </div>
       )}
     </div>

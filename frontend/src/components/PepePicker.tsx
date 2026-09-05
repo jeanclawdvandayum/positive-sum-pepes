@@ -25,7 +25,7 @@ interface Props {
 /// The art randomizer — 6 candidate pepes rendered by the ON-CHAIN descriptor
 /// (eth_call renderSVG(keccak(id))). What you see is exactly what you'll mint:
 /// lockWithPepe(amount, id) commits that id, and its dna is the previewed dna.
-/// Refresh rolls 6 fresh ids. This is the "choose your pepe" step of staking.
+/// Refresh rolls 6 fresh ids. This is the "choose your accomplice" step of staking.
 export default function PepePicker({ round, selected, onSelect, seed, onReroll }: Props) {
   const staker = round.staker
   const [descriptor, setDescriptor] = useState<string | undefined>()
@@ -93,11 +93,11 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
     <div className="rounded-2xl border border-line bg-bg-1 p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-display text-lg text-text-hi">choose your pepe</h2>
-          <p className="truncate text-xs text-text-lo">
+          <h2 className="font-display text-lg text-text-hi">choose your accomplice</h2>
+          <p className="text-xs leading-relaxed text-text-lo">
             {localMode
-              ? 'rolled locally — same art data the contract renders'
-              : 'rolled fresh from the on-chain renderer · the one you pick is the one you mint'}
+              ? 'local preview · pick the pepe you’ll mint'
+              : 'pick a face for your financial decisions. this is the pepe you’ll mint.'}
           </p>
         </div>
         <button

@@ -78,7 +78,7 @@ export default function DetonateButton({
         <p className="max-w-md break-words text-center text-xs text-phase-critical">{error}</p>
       ) : (
         <p className="pl-context font-data text-xs">
-          permissionless — anyone can press it. the pot settles the same either way.
+          big red button. anyone can press it. the ladder decides who gets paid.
         </p>
       )}
     </div>

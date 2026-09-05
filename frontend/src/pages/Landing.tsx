@@ -15,7 +15,7 @@ import CurveExplainer from './explainer/CurveExplainer'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SUBHEAD =
-  'buy PSP to take a place on the ladder and add time to the clock. each new ticket pushes the older ones down. when the clock reaches zero, anyone can detonate the round. the tickets left on the ladder share the pot. stake your PSP to earn trading fees along the way.'
+  'buy PSP, grab a ladder spot, and make it everyone else’s problem. each new ticket pushes the older ones down and adds time to the clock. when the clock reaches zero, anyone can detonate the round. the tickets left on the ladder share the pot. stake your PSP to earn trading fees along the way.'
 
 const BEATS: { n: string; name: string; copy: string; kind: BeatKind }[] = [
   {
@@ -38,7 +38,7 @@ const BEATS: { n: string; name: string; copy: string; kind: BeatKind }[] = [
   },
   {
     n: '04',
-    name: 'earn trading fees',
+    name: 'put your pepe to work',
     copy: 'stake PSP in a pepe NFT to earn trading fees. stakers receive 60% of each fee. you can claim your rewards or reinvest them into your pepe.',
     kind: 'climb',
   },

@@ -49,7 +49,7 @@ export default function Tape({ entries }: { entries: TapeEntry[] }) {
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-bg-1" aria-label="live activity">
       {shown.length === 0 ? (
-        <p className="px-4 py-2.5 text-sm text-text-lo">no trades yet — the first one prints here.</p>
+        <p className="px-4 py-2.5 text-sm text-text-lo">waiting for trades. the tape keeps receipts.</p>
       ) : (
         shown.map((e) => (
           <div

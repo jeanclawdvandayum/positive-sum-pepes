@@ -22,7 +22,7 @@ import { useSeatPepes } from './useSeatPepes'
 // lized across the seats actually taken ("nobody gets dusted"); payouts are
 // pot × share, exact wei math. LIVE, the pot is potBalance() (fee escrow —
 // the clock redesign's pot is no longer the curve reserve) and the header
-// reads "payout if the bomb dropped this second". SETTLED (post-round), the
+// reads "your cut if it blows now. everyone wants your seat.". SETTLED (post-round), the
 // pot is frozen and rows become claims-forever rows with a claimPot button.
 //
 // Holder avatars are LOCAL derivations — keccak(address) → dna →
@@ -147,11 +147,11 @@ export default function PotBoard({
         <p className="text-xs text-text-lo">
           {settled
             ? seated === 0
-              ? 'nobody was seated — the pot waits, forever.'
-              : 'distribution is frozen. claims never expire.'
+              ? 'empty ladder. the pot joined the reserves for PSP redemption.'
+              : 'the seats are settled. collect your cut whenever you’re ready.'
             : seated === 0
               ? 'the latest 10 tickets hold the ladder — each 0.005 mixETH purchased earns one ticket'
-              : 'payout if the bomb dropped this second'}
+              : 'your cut if it blows now. everyone wants your seat.'}
         </p>
       </div>
 
@@ -176,7 +176,7 @@ export default function PotBoard({
       )}
       {claimErr && <p className="mt-2 break-words text-xs text-phase-critical">{claimErr}</p>}
       {claimStep === 'done' && (
-        <p className="mt-2 text-xs text-text-lo">✓ claimed — if you held more seats, they paid into the same pull.</p>
+        <p className="mt-2 text-xs text-text-lo">✓ claimed — all your winning seats paid together.</p>
       )}
 
       <ol className="mt-4 flex flex-1 flex-col gap-1.5">
@@ -231,20 +231,20 @@ export default function PotBoard({
                     </>
                   ) : (
                     <>
-                      this seat pays{' '}
+                      open seat ·{' '}
                       <span
                         className={`tabular font-data ${isTop ? 'text-pot-gold' : 'text-text-hi'}`}
                       >
                         {LADDER[i] ?? 0}%
                       </span>{' '}
-                      — nobody's sitting in it.
+                      with a full ladder. prime frog real estate.
                     </>
                   )}
                 </p>
                 {s && (
                   <span
                     className="tabular shrink-0 font-data text-xs text-text-lo"
-                    title="renormalized share of the pot"
+                    title="share of the pot, adjusted for the occupied seats"
                   >
                     {nominal % 1 === 0 ? nominal : nominal.toFixed(1)}%
                   </span>

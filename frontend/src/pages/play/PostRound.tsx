@@ -129,12 +129,12 @@ export default function PostRound({
       <div className="rounded-xl border border-line bg-bg-1">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line p-5">
           <div className="flex items-baseline gap-3">
-            <h2 className="font-display text-xl text-text-hi">redemption portal</h2>
+            <h2 className="font-display text-xl text-text-hi">the round went boom. check your pockets.</h2>
             <span className="rounded-full border border-line px-2.5 py-0.5 text-xs text-text-lo">
               round {dead.roundId?.toString() ?? '…'} {dead.name ? `· ${dead.name} ` : ''}— {modeWord}
             </span>
           </div>
-          <p className="text-xs text-text-lo">frozen payout: <span className="tabular font-data text-text-hi">{fmtPrice(perPsp)}</span> mix / psp</p>
+          <p className="text-xs text-text-lo">current backing per PSP: <span className="tabular font-data text-text-hi">{fmtPrice(perPsp)}</span> mix / psp</p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
@@ -160,7 +160,7 @@ export default function PostRound({
               {!isConnected ? (
                 <p className="text-xs text-text-lo">connect wallet to redeem.</p>
               ) : !redeemable ? (
-                <p className="text-xs text-text-lo">no psp from this round in your wallet.</p>
+                <p className="text-xs text-text-lo">PSP from this round is needed for redemption.</p>
               ) : (
                 <button
                   onClick={redeem}
@@ -194,7 +194,7 @@ export default function PostRound({
             </p>
             {dead.positions.length === 0 ? (
               <p className="mt-auto pt-4 text-xs text-text-lo">
-                {!isConnected ? 'connect wallet to check your positions.' : 'nothing staked from this round.'}
+                {!isConnected ? 'connect wallet to check your positions.' : 'your wallet has 0 staked positions in this round.'}
               </p>
             ) : (
               <ul className="mt-3 flex flex-col gap-2">
@@ -228,7 +228,7 @@ export default function PostRound({
         </div>
 
         <p className="border-t border-line px-5 py-3 text-center text-xs text-text-lo">
-          no deadline. the portal stays open forever — redeem, unlock, and claim whenever.
+          take your time. redemption, withdrawals and claims stay open.
         </p>
       </div>
     </section>

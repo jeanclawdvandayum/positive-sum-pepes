@@ -58,9 +58,9 @@ export default function FeeAccumulator({
   if (!connected) {
     return (
       <div>
-        <div className="text-xs text-text-lo">fees earned this round</div>
+        <div className="text-xs text-text-lo">unclaimed trading fees</div>
         <p className="mt-2 max-w-[26rem] text-sm leading-relaxed text-text-lo">
-          connect a wallet and this counter ticks your cut of every trade.
+          connect your wallet to check what your pepe has earned.
         </p>
       </div>
     )
@@ -68,9 +68,9 @@ export default function FeeAccumulator({
   if (!hasStake) {
     return (
       <div>
-        <div className="text-xs text-text-lo">fees earned this round</div>
+        <div className="text-xs text-text-lo">unclaimed trading fees</div>
         <p className="mt-2 max-w-[26rem] text-sm leading-relaxed text-text-lo">
-          stake a pepe — the counter starts with the first lock.
+          put PSP in a pepe. let the trading fees come to you.
         </p>
       </div>
     )
@@ -90,7 +90,7 @@ export default function FeeAccumulator({
 
   return (
     <div className="min-w-0" style={{ containerType: 'inline-size' }}>
-      <div className="text-xs text-text-lo">fees earned this round</div>
+      <div className="text-xs text-text-lo">unclaimed trading fees</div>
       {anchor === undefined ? (
         <Skeleton className="mt-2 h-10 w-60 max-w-full" />
       ) : (
@@ -100,12 +100,12 @@ export default function FeeAccumulator({
             // Size against this column, keeping every digit plus right padding.
             style={{ fontSize: `min(2.25rem, calc((100cqi - 0.5rem) / ${formatted.length * 0.62}))` }}
             role="timer"
-            aria-label="fees earned this round, ticking"
+            aria-label="unclaimed trading fees"
           >
             {formatted}
           </div>
           <div className="mt-1.5 text-xs text-text-lo">
-            {idle ? 'mixETH · waiting for the next trade' : 'mixETH · ticking between updates — claims reset the counter'}
+            {idle ? 'mixETH · accrued fees appear here' : 'mixETH · your cut, ready to claim'}
           </div>
         </>
       )}

@@ -16,7 +16,7 @@ export default function HallOfDetonations({ rounds, checked, connected }: {
   return (
     <section className="rounded-2xl border border-line bg-bg-1 p-5" aria-label="round history">
       <h2 className="font-display text-lg">hall of detonations</h2>
-      <p className="mt-1 text-xs text-text-lo">round history — every boom, archived.</p>
+      <p className="mt-1 text-xs text-text-lo">every boom gets a paper trail.</p>
 
       {!checked ? (
         <p role="status" className="mt-6 text-sm text-text-lo">checking the graveyard…</p>
@@ -34,7 +34,7 @@ export default function HallOfDetonations({ rounds, checked, connected }: {
             </span>
           </div>
           <div>
-            <p className="text-sm text-text-hi">no detonations yet — the first archive seat is open.</p>
+            <p className="text-sm text-text-hi">the graveyard is waiting for its first customer.</p>
             <p className="mt-1 text-xs leading-relaxed text-text-lo">
               past rounds and their pots appear here. unlock positions, claim winnings, and redeem below.
             </p>

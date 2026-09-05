@@ -395,10 +395,10 @@ export default function Stake() {
         <div className="flex min-w-0 flex-col gap-4">
           {claimable && (
             <section className="rounded-2xl border border-pepe bg-bg-1 p-5">
-              <h2 className="font-display text-lg">unclaimed genesis share</h2>
+              <h2 className="font-display text-lg">your first bag is waiting</h2>
               <p className="mt-1 text-xs leading-relaxed text-text-lo">
-                your predeposit ({fmtAmount(myDep!.mixETHAmount)} mixETH) has an unclaimed pro-rata PSP share
-                waiting — claiming mints a fresh pepe with the PSP locked in, earning fees from day one.
+                your {fmtAmount(myDep!.mixETHAmount)} mixETH predeposit bought a share of the launch PSP.
+                claim it into a fresh pepe NFT. your PSP stays staked, and you keep your share of the fees earned before claiming.
               </p>
               <button
                 type="button"
@@ -442,7 +442,7 @@ export default function Stake() {
               <PspIcon px={20} /> stake psp
             </h2>
             <p className="mt-1 text-xs text-text-lo">
-              indefinite lock · fees flow while you stay · request a withdrawal to start the six-epoch exit ramp
+              park your PSP with your pepe. staked PSP earns trading fees; requesting withdrawal starts a six-epoch exit.
             </p>
 
             <div className="mt-4">
@@ -456,7 +456,7 @@ export default function Stake() {
               <div className="mt-2 flex gap-2">
                 <input
                   className="st-input min-w-0 flex-1"
-                  placeholder={hasPepes ? '0.0 — new pepe' : '0.0 — or nothing, just the pepe'}
+                  placeholder={hasPepes ? '0.0 — new pepe' : '0.0 — zero gets you the pepe'}
                   value={amount}
                   inputMode="decimal"
                   onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
@@ -517,8 +517,8 @@ export default function Stake() {
             <div>
               <div className="text-sm font-semibold">pepe names — .wei</div>
               <p className="mt-1 text-xs leading-relaxed text-text-lo">
-                every pepe can claim a .wei name once the registry opens. until then your pepe # is your
-                name — it already earns either way.
+                give your accomplice an alias. .wei names are planned for a future registry launch.
+                your pepe number identifies your NFT today.
               </p>
             </div>
           </div>

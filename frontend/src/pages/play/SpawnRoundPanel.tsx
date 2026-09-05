@@ -67,7 +67,7 @@ export default function SpawnRoundPanel({
     <section aria-label="spawn next round" className="mt-4">
       <div className="rounded-xl border border-line bg-bg-1 p-5">
         <div className="flex items-baseline gap-3">
-          <h2 className="font-display text-xl text-text-hi">birth round {Number(destroyedRoundId) + 1}</h2>
+          <h2 className="font-display text-xl text-text-hi">another round of frog business · {Number(destroyedRoundId) + 1}</h2>
           <span className="rounded-full border border-line px-2.5 py-0.5 text-xs text-text-lo">
             permissionless
           </span>
@@ -85,7 +85,7 @@ export default function SpawnRoundPanel({
         >
           <span className="pl-btn-fill" aria-hidden="true" />
           <span className="relative">
-            {step === 'reserving' ? 'reserving salt space…' : step === 'birthing' ? 'birthing the round…' : 'spawn round ' + (Number(destroyedRoundId) + 1)}
+            {step === 'reserving' ? 'reserving the next round…' : step === 'birthing' ? 'creating the next round…' : 'spawn round ' + (Number(destroyedRoundId) + 1)}
           </span>
         </button>
         <p className="mt-2 text-xs text-text-lo">

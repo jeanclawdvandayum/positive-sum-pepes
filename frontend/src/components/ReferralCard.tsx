@@ -141,7 +141,7 @@ export default function ReferralCard() {
     <div className="card p-5">
       <h2 className="text-lg font-black text-slate-900">referrals</h2>
       {!isConnected ? (
-        <p className="mt-2 text-sm text-slate-500">connect a wallet to generate referral links.</p>
+        <p className="mt-2 text-sm text-slate-500">invite the usual suspects. connect your wallet to get your pepe’s referral link.</p>
       ) : ids.length === 0 ? (
         <div className="mt-3 rounded-xl bg-sky-50 p-3 text-sm font-bold text-slate-500">
           stake a pepe to unlock referral links
@@ -167,13 +167,13 @@ export default function ReferralCard() {
           </button>
           {canRefer === false && (
             <div className="mt-2 text-xs font-bold text-amber-600">
-              pepe #{active?.toString()} isn't referral-eligible yet — visitors can't bind to it.
+              pepe #{active?.toString()} needs referral eligibility before visitors can accept its referral.
             </div>
           )}
         </>
       )}
       <p className="mt-3 text-xs leading-relaxed text-slate-400">
-        share your link — when they connect and bind, their trades pay you referral fees from the round's swap fees.
+        share your link with the group chat. once a wallet accepts your referral, its trades pay a share of the trading fee to your referral chain.
       </p>
     </div>
   )
@@ -242,7 +242,7 @@ export function RefBanner() {
   if (boundToRef || justBound) {
     return (
       <div className="card px-4 py-3 text-xs font-bold text-emerald-600">
-        ✅ referred by pepe #{ref.toString()} — attribution bound.
+        ✅ referred by pepe #{ref.toString()} — referral confirmed.
       </div>
     )
   }
@@ -251,7 +251,7 @@ export function RefBanner() {
   if (isConnected && attributed === true) {
     return (
       <div className="card px-4 py-3 text-xs font-bold text-slate-400">
-        referred by pepe #{ref.toString()}
+        your wallet already has a recorded referral.
       </div>
     )
   }
@@ -263,12 +263,12 @@ export function RefBanner() {
     <div className="card flex flex-wrap items-center gap-2 px-4 py-3">
       <span className="flex-1 text-xs font-bold text-slate-500">
         {isConnected
-          ? `you were referred by pepe #${ref.toString()} — bind attribution?`
-          : `you were referred by pepe #${ref.toString()} — connect a wallet to bind`}
+          ? `you were referred by pepe #${ref.toString()} — confirm this referral to share trading fees with its referral chain.`
+          : `you were referred by pepe #${ref.toString()} — connect your wallet to confirm this referral`}
       </span>
       {canBind && (
         <button type="button" onClick={bind} className="btn-ghost px-3 py-1.5 text-xs">
-          bind attribution
+          confirm referral
         </button>
       )}
       <button

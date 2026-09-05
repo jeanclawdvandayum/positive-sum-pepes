@@ -253,7 +253,7 @@ export function PepeCard({
                 : vestEnd
                   ? `${fmtCountdown(vestEnd - now)} · ${dateStr(vestEnd)}`
                   : '…'
-              : 'no expiry — request to exit'}
+              : 'request withdrawal to start exit'}
         </span>
       </div>
 
@@ -267,7 +267,7 @@ export function PepeCard({
           className="st-btn text-xs"
           disabled={busy || (decaying ? !canCancel : !canRequest)}
           onClick={() => act(decaying ? 'cancelWithdraw' : 'requestWithdraw')}
-          title={decaying ? 'stop the decay, restore full power' : 'start the six-epoch exit ramp'}
+          title={decaying ? 'cancel withdrawal and restore full staking weight' : 'start the six-epoch exit ramp'}
         >
           {decaying ? '↩ keep staking' : 'request withdraw'}
         </button>

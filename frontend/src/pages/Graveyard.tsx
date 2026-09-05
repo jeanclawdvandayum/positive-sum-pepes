@@ -114,7 +114,7 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
       <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
         <Card title="redeem your psp">
           <p className="mt-1 text-xs text-text-lo">
-            burn round-{round.roundId.toString()} PSP for its frozen pro-rata backing. rounding dust remains in backing for later redemptions.
+            burn round-{round.roundId.toString()} PSP for its share of this round’s remaining mixETH. payouts are rounded down; the remainder stays in the reserves.
           </p>
           <div className="mt-3 flex items-baseline justify-between text-sm">
             <span className="text-text-lo">your balance</span>
@@ -132,7 +132,7 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
             {!isConnected ? (
               <p className="text-xs text-text-lo">connect wallet to check.</p>
             ) : !redeemable ? (
-              <p className="text-xs text-text-lo">no psp from this round in your wallet.</p>
+              <p className="text-xs text-text-lo">your wallet holds 0 PSP from this round.</p>
             ) : (
               <button
                 onClick={redeem}
@@ -157,7 +157,7 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
           </p>
           {round.positions.length === 0 ? (
             <p className="mt-auto pt-4 text-xs text-text-lo">
-              {!isConnected ? 'connect wallet to check.' : 'nothing staked from this round.'}
+              {!isConnected ? 'connect wallet to check.' : 'your wallet has 0 staked positions in this round.'}
             </p>
           ) : (
             <ul className="mt-3 flex flex-col gap-2">
@@ -189,7 +189,7 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
       </div>
 
       <p className="border-t border-line px-5 py-3 text-center text-xs text-text-lo">
-        no deadline. redeem, unlock, and claim whenever — the portal stays open forever.
+        take your time. redemption, withdrawals and claims stay open.
       </p>
     </div>
   )
@@ -205,8 +205,7 @@ export default function Graveyard() {
       <div className="mt-4">
         <h1 className="font-display text-3xl text-text-hi">the graveyard</h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-lo">
-          every round that ever died, and everything you left behind. redemption is
-          indefinite — each PSP redeems against its round’s remaining backing, with floor rounding.
+          even a dead round has receipts. claim ladder winnings, withdraw old stakes, and redeem PSP for its share of that round’s remaining mixETH. payouts are rounded down and can be worth less than you paid.
         </p>
       </div>
       <div className="mt-6 flex flex-col gap-6">

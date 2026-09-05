@@ -106,16 +106,16 @@ export default function IdentityPanel({
 
   if (!address) {
     art = teaser
-    nameLine = 'connect to meet your pepe'
-    subLine = "here's a random one meanwhile — 100M combinations"
+    nameLine = 'meet your accomplice'
+    subLine = "connect your wallet to find your pepe. this one’s keeping you company."
   } else if (tokenId === undefined) {
     art = teaser
     nameLine = <Skeleton className="h-6 w-40" />
-    subLine = 'looking for your pepe… if this hangs, the dev chain is down — art still renders locally'
+    subLine = 'looking up your pepe. a slow connection can take a moment.'
   } else if (tokenId === 0n) {
     art = teaser
-    nameLine = 'an un-hatched pepe'
-    subLine = 'one transaction hatches it — stake any amount, or zero to just collect the art'
+    nameLine = 'time to hatch a pepe'
+    subLine = 'pick your accomplice below. add PSP to stake, or enter zero to mint the NFT.'
   } else {
     art = svg ?? (dna !== undefined ? renderPepeSvg(dna) : null)
     nameLine = (
@@ -189,8 +189,8 @@ export default function IdentityPanel({
             {claimRow}
             {parked > 0n && (
               <p className="mt-3 text-xs leading-relaxed text-text-lo">
-                {fmtAmount(parked)} mixETH of swap fees parked — no staked weight yet, so they attach on
-                the next trade once weight exists. nothing is lost while waiting.
+                {fmtAmount(parked)} mixETH in trading fees carried forward. later trades can distribute
+                them once enough fees and eligible staking weight are available.
               </p>
             )}
           </div>

@@ -552,3 +552,26 @@ Solidity source changed after the contract-source hash above.
   **50 frontend tests**, **106 ABI declarations**, **32** production size checks,
   independent oracle, no-governance, TypeScript and Vite. Existing bundle warnings
   remain. This is a local UI update per the current publishing preference.
+
+
+## 2026-09-05 — Site-wide copy with a little edge
+
+- Extended the explainer's voice through play, staking, referrals, predeposit,
+  graveyard and footer copy. Examples include “choose your accomplice”, “the tape
+  keeps receipts” and “the graveyard is waiting for its first customer”. Financial
+  amounts, fee estimates, action eligibility and transaction behavior are unchanged.
+- Corrected stale descriptions of testnet reserve yield, empty-ladder pot routing,
+  remaining-reserve redemption, genesis staking and carried-forward staking fees.
+  The rewards counter now says “unclaimed trading fees”, matching its actual chain
+  reading and claim resets. An already-recorded referral no longer displays an
+  incoming link's pepe ID as if it were the wallet's existing referrer.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **50 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle, no-governance, TypeScript and Vite. Final wording and picker
+  wrapping refinements also pass TypeScript/Vite and `git diff --check`.
+  Existing bundle warnings remain.
+- Browser reviewed the local explainer, loaded play ladder, staking, predeposit
+  and empty graveyard; staking copy also checked at 678px. Conditional claim,
+  withdrawal and post-round text was checked against source. Viewport restored;
+  no wallet transactions. The rebuilt preview is local only; the existing here.now
+  publication and contracts remain unchanged.

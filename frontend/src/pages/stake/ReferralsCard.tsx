@@ -45,7 +45,7 @@ export default function ReferralsCard() {
 
       {!isConnected ? (
         <p className="mt-3 text-sm leading-relaxed text-text-lo">
-          connect a wallet to share your pepe's referral link. Referral chains share 5% of attributed trade fees.
+          invite the usual suspects. connect your wallet to share your pepe’s referral link. referral chains share 5% of trading fees from wallets that accept the referral.
         </p>
       ) : ids.length === 0 ? (
         <p className="mt-3 text-sm leading-relaxed text-text-lo">stake a pepe to unlock referral links</p>
@@ -69,14 +69,14 @@ export default function ReferralsCard() {
           </button>
           {canRefer === false && (
             <p className="mt-2 text-xs text-phase-heat">
-              pepe #{active?.toString()} isn't referral-eligible yet — visitors can't bind to it.
+              pepe #{active?.toString()} needs referral eligibility before visitors can accept its referral.
             </p>
           )}
         </>
       )}
 
       <p className="mt-3 text-xs leading-relaxed text-text-lo">
-        the closest referrer receives 80% of the referral share. Payouts arrive with each attributed trade; the remaining tiers share the rest.
+        the closest referrer gets 80% of the referral share. the other tiers split the rest. each referred trade pays the chain.
       </p>
     </section>
   )

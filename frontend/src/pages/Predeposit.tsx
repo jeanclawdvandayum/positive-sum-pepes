@@ -249,7 +249,7 @@ export default function Predeposit() {
           )}
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          commit mixETH before launch — everything pools into the genesis buy, then claim your PSP.
+          get your frog in the door. deposit mixETH before launch to join the pooled first buy. after launch, claim your share as PSP staked in a pepe NFT.
         </p>
       </div>
 
@@ -352,7 +352,7 @@ export default function Predeposit() {
               {step === 'done' ? '✅ deposited' : cta}
             </button>
             {pd?.closed && (
-              <div className="mt-2 text-xs font-bold text-slate-400">predeposit window is closed — no new deposits.</div>
+              <div className="mt-2 text-xs font-bold text-slate-400">predeposits are closed for this round.</div>
             )}
           </div>
 
@@ -365,8 +365,8 @@ export default function Predeposit() {
                   {myDep && myDep.claimed ? (
                     <>
                       <p className="mt-1 text-sm text-slate-500">
-                        ✅ claimed — your genesis PSP is locked inside your pepe on the stake page
-                        (vesting on the decay schedule, earning fees as they accrue).
+                        ✅ claimed. your pepe is holding your first bag on the stake page.
+                        the PSP stays staked until you request withdrawal, which starts the six-epoch exit.
                       </p>
                       <Link to="/stake" className="btn-primary mt-3 block w-full text-center">
                         see your pepe →
@@ -375,8 +375,8 @@ export default function Predeposit() {
                   ) : myDep && myDep.mixETHAmount > 0n ? (
                     <>
                       <p className="mt-1 text-sm text-slate-500">
-                        predeposit closed — your pro-rata PSP share is waiting. claiming mints your
-                        pepe with the PSP locked in.
+                        your first bag is waiting. claim your share of the launch PSP into a pepe NFT,
+                        with the PSP staked inside.
                       </p>
                       <Link to="/stake" className="btn-primary mt-3 block w-full text-center">
                         claim your PSP on the stake page →
@@ -384,7 +384,7 @@ export default function Predeposit() {
                     </>
                   ) : (
                     <p className="mt-1 text-sm text-slate-500">
-                      round is live — no predeposit from you this round. buy on the curve instead.
+                      the round is live. buy PSP on the play page to join the ladder.
                     </p>
                   )}
                 </>

@@ -40,7 +40,7 @@ function Footer() {
   return (
     <footer className="border-t border-line font-body text-xs text-text-lo">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 pb-8 pt-6 sm:px-6">
-        <span>positive sum pepes — the game that pays you to stay</span>
+        <span>positive sum pepes — the frogs have a pot problem</span>
         {hasFactory && (
           <>
             <span aria-hidden="true">·</span>

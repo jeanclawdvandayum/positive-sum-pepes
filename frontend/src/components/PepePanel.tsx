@@ -66,8 +66,8 @@ export default function PepePanel({ round, refreshKey = 0 }: Props) {
           className="h-40 w-40 overflow-hidden rounded-2xl border-2 border-dashed border-sky-200 [&>svg]:h-full [&>svg]:w-full"
           dangerouslySetInnerHTML={{ __html: teaser }}
         />
-        <p className="mt-3 text-sm font-bold text-slate-500">connect to meet your pepe</p>
-        <p className="mt-1 text-xs text-slate-400">here's a random one meanwhile — 100M combinations</p>
+        <p className="mt-3 text-sm font-bold text-slate-500">meet your accomplice</p>
+        <p className="mt-1 text-xs text-slate-400">connect your wallet to find your pepe. this one’s keeping you company.</p>
       </div>
     )
   }
@@ -81,7 +81,7 @@ export default function PepePanel({ round, refreshKey = 0 }: Props) {
             dangerouslySetInnerHTML={{ __html: teaser }}
           />
           <p className="max-w-[10rem] text-xs font-bold text-slate-400">
-            looking for your pepe… if this hangs, the dev chain is down — art still renders locally
+            looking up your pepe. a slow connection can take a moment.
           </p>
         </div>
       </div>
@@ -94,9 +94,9 @@ export default function PepePanel({ round, refreshKey = 0 }: Props) {
         <div className="grid h-40 w-40 place-items-center rounded-2xl border-2 border-dashed border-sky-200 bg-sky-50/50 text-5xl grayscale">
           🥚
         </div>
-        <p className="mt-3 text-sm font-black text-slate-700">an un-hatched pepe</p>
+        <p className="mt-3 text-sm font-black text-slate-700">time to hatch a pepe</p>
         <p className="mt-1 text-xs text-slate-400">
-          one transaction hatches it — stake any amount, or zero to just collect the art
+          pick your accomplice below. add PSP to stake, or enter zero to mint the NFT.
         </p>
       </div>
     )

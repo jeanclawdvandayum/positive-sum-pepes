@@ -70,7 +70,7 @@ export default function ClockPanel({
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 pb-7 pt-6 sm:pb-9 sm:pt-8">
         <Clock />
-        <div className="mt-5 text-2xl sm:text-3xl" title="the pot — 35% of every trade fee + the genesis launch fee, laddered to the last 10 buys at detonation">
+        <div className="mt-5 text-2xl sm:text-3xl" title="the pot gets the launch fee and at least 35% of each trading fee. the last ten tickets split it at detonation; an empty ladder sends it to redemption backing.">
           {round.potBalance === undefined ? (
             <Skeleton className="h-8 w-44" aria-label="loading the pot" />
           ) : (
@@ -79,7 +79,7 @@ export default function ClockPanel({
         </div>
         <div
           className="mt-2 font-data text-xs text-[#8fa3b8]"
-          title="mixETH backing circulating PSP inside the bonding curve — earns yield for every holder"
+          title="the mixETH held by the curve to back PSP."
         >
           curve reserves:{' '}
           {round.reserve === undefined ? (
@@ -92,7 +92,7 @@ export default function ClockPanel({
         </div>
         {lastTime === undefined ? (
           <p className="pl-context mt-3 font-data text-xs">
-            no time added yet — every 0.005 mixETH purchased feeds the clock +4:20
+            feed the clock. each full 0.005 mixETH in a buy adds up to +4:20.
           </p>
         ) : (
           <p className="pl-context mt-3 flex items-center gap-1.5 font-data text-xs">
