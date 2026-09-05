@@ -28,8 +28,7 @@ export function DiagramStyles() {
   position: absolute;
   font-family: var(--font-data);
   font-size: 0.6rem;
-  /* audit r1 fix 3: contrast up two steps (text-lo → text-hi) — the beat
-     labels ("1 psp = 1 ticket") must read as drawn copy, not placeholder */
+  /* Beat labels must remain readable in both themes. */
   color: var(--text-hi);
   letter-spacing: 0.02em;
 }
@@ -118,7 +117,7 @@ export function DiagramStyles() {
   100% { transform: translate(0, -0.5rem); opacity: 0; }
 }
 
-/* ── climb: the pot fills while fees feed stakers + pot (referral = fixed 0.5% of volume, CurveHook REFERRAL_FEE_BIPS=50) ── */
+/* ── climb: fee shares feed stakers, pot and the referral leg ── */
 .xd-jar {
   position: absolute;
   left: 1.2rem;
@@ -322,8 +321,8 @@ export function BeatDiagram({ kind }: { kind: BeatKind }) {
 
       {kind === 'buy' && (
         <>
-          <span className="xd-note" style={{ right: '0.8rem', top: '0.7rem' }}>
-            1 psp = 1 ticket
+          <span className="xd-note" style={{ left: '0.8rem', top: '0.7rem' }}>
+            0.005 mixETH<br />= 1 ticket
           </span>
           <div className="xd-ladder">
             <div className="xd-rung" />

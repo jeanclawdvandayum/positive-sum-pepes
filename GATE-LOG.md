@@ -321,3 +321,26 @@ Solidity source changed after the contract-source hash above.
   preview origin verifies explainer referral capture and the same referral hint
   on Play and Predeposit after navigation; no browser warning/error logs there.
   Populated dead-round history and wallet-signed actions were not browser-tested.
+
+## 2026-09-05 — Animated curve explainer and settlement alignment
+
+- Added an explanatory card after the five beats. Its two repeating S-shaped
+  stretches use the normalized default-amplitude tilted-sine formula from
+  SineMath, with explicitly labeled illustrative/log-price axes. Green flatter
+  zones and amber steeper zones explain percentage-price sensitivity to equal
+  mixETH reserve changes. The copy distinguishes relative stability from a fixed
+  price and explains that the pattern repeats.
+- CSS animation moves a marker through equal reserve increments in equal time,
+  then reverses for sells. Pause/play works; reduced-motion CSS leaves a useful
+  static frame. No new rAF loop, RPC polling or transaction path was introduced.
+- Left-aligned the settlement label, heading and copy. Corrected the buy diagram
+  to `0.005 mixETH = 1 ticket` and allowed beat copy to shrink within narrow rows.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **41 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle, no-governance, TypeScript and Vite. Existing bundle-size
+  warnings remain; no contract or deployment changes.
+- Browser inspection at 1280px and the user's 678px viewport confirms the new
+  card, pause/play and left-aligned settlement; every main section fits its
+  container at 678px. No browser warning/error logs. Temporary viewport reset.
+  Separate pre-existing issue observed: the header's clock/faucet/theme/connect
+  group extends beyond the 678px viewport; this change does not alter the header.

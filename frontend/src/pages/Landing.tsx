@@ -5,20 +5,12 @@ import { useCaptureReferral } from '../components/ReferralCard'
 import { randomDna, renderPepeSvg } from '../lib/pepeRender'
 import { BeatDiagram, DiagramStyles } from './explainer/diagrams'
 import PayoutSlider from './explainer/PayoutSlider'
+import CurveExplainer from './explainer/CurveExplainer'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // / — the explainer (REDESIGN-B1 §1–§4). Narrative, not a card wall:
-// hero → one round, five beats → the math, straight → settlement after detonation.
-//
-// Copy policy: every sentence below is existing lineage copy kept verbatim
-// (sigmabf Explainer + inventory §5 claims) — the numbers mirror the
-// contracts; do not paraphrase them. Voice stays lowercase, wry.
-//
-// The hero Clock is the REAL instrument. No deadline is wired yet (the
-// contract exposes no round timer), so PhaseEngine idles and the Clock runs
-// its spec §8 pre-launch state: dimmed 72:00:00, "armed the moment the round
-// launches." setDeadline() stays ready for contract wiring — no invented
-// chain reads, no fake liveness (B0 conflict #1, DECIDED).
+// hero → five beats → repeating curve → the math → settlement.
+// Game rules follow READINESS.md; the hero clock uses the shared live deadline.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SUBHEAD =
@@ -118,7 +110,7 @@ export default function Landing() {
               className={`flex flex-col items-start gap-6 border-t border-line py-8 sm:flex-row sm:items-center ${STEP_PAD[i]}`}
             >
               <BeatDiagram kind={b.kind} />
-              <div className="max-w-md">
+              <div className="min-w-0 max-w-md">
                 <div className="tabular font-data text-sm text-text-lo">
                   {b.n} · {b.name}
                 </div>
@@ -128,6 +120,8 @@ export default function Landing() {
           ))}
         </ol>
       </section>
+
+      <CurveExplainer />
 
       {/* ── 3. the math, straight ── */}
       <section className="mt-20 rounded-2xl border border-line bg-bg-1 p-6 sm:p-10">
@@ -144,12 +138,12 @@ export default function Landing() {
       </section>
 
       {/* ── 4. settlement after detonation ── */}
-      <section className="mt-24 pb-20 text-center">
+      <section className="mt-24 pb-20 text-left">
         <p className="text-sm text-text-lo">settlement after detonation</p>
-        <p className="mx-auto mt-4 max-w-4xl font-display text-[clamp(2.25rem,5vw,4rem)] leading-[1.1]">
+        <h2 className="mt-4 max-w-4xl font-display text-[clamp(2.25rem,5vw,4rem)] leading-[1.1]">
           compete for the pot. redeem remaining backing after detonation.
-        </p>
-        <p className="mx-auto mt-6 max-w-xl leading-relaxed text-text-lo">
+        </h2>
+        <p className="mt-6 max-w-xl leading-relaxed text-text-lo">
           after detonation, redemption has no deadline. payouts depend on remaining backing and floor rounding; they do not guarantee your original purchase cost.
         </p>
       </section>
