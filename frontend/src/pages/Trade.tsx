@@ -103,9 +103,9 @@ export default function Trade() {
       </div>
       <div className="mt-4">
         <CurveChart hasTrades={tape.count > 0 || (ticketCount ?? 0n) > 0n} entryPrice={entryPrice} />
-        {round.swapFeeBps !== undefined && (
-          <p className="mt-2 text-xs font-data text-text-lo" title="the sliding sine fee at the current reserve — 10% pre-wave → 2.5% past the 10k target">
-            trade fee: {(Number(round.swapFeeBps) / 100).toFixed(2)}% of every buy and sell — 60% to stakers · 35% to the ladder pot · rest referrals
+        {round.mode === 1 && round.swapFeeBps !== undefined && (
+          <p className="mt-2 text-xs font-data text-text-lo" title="the sliding sine fee at the current reserve — 10% at launch → 2.5% at the reserve target">
+            trade fee: {(Number(round.swapFeeBps) / 100).toFixed(2)}% of every buy and sell — 60% to stakers · the rest to the pot and referral/deployer rewards
           </p>
         )}
       </div>

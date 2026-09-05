@@ -207,3 +207,31 @@ Solidity source changed after the contract-source hash above.
   rejection, and a disabled withdrawing position behaved correctly. The rebuilt
   real staking page loads. No wallet signature or on-chain top-up was performed;
   that remains in the user's testnet playtest sequence.
+
+## 2026-09-05 — Curve guide cleanup and trade fee estimates
+
+- Removed wave-marker vertical dashes/labels and the hover crosshair. The live
+  reserve marker is the only dotted vertical guide; hover points/tooltips, axis
+  grids and the user's horizontal entry-price marker remain.
+- Buy/sell cards show an estimated trade fee in mixETH and percent, with explicit
+  after-fee receive amounts and separate network-gas copy. Quote, fee rate and
+  mode read through one Multicall3 snapshot. Input/direction changes invalidate
+  the previous display; polling cannot overlap itself and backs off on failures.
+- Buy fees use exact integer gross-input math. Sell estimates reconstruct fees
+  from the net contract quote, with an upper rounding error of one wei across
+  250–1000 bps; no second fee is deducted from output or minOut. Flat sells read
+  the contract's pro-rata quote and show zero trade fees.
+- Browser checks caught the previously missing `swapFeeBps()` frontend ABI
+  declaration, which also hid the rate footer. Added it and normalized the uint24
+  result. Snapshot tests now use the production ABI. The footer appears only in
+  Active mode and accounts for unattributed referral/deployer routing.
+- Live read-only browser checks: **0.005 mixETH buy → 13.7014 PSP**, estimated
+  **0.000428 mixETH** fee at **8.56%**; **100 PSP sell → 0.0305 mixETH** after fees,
+  estimated **0.00285601 mixETH** fee. Inspected the cleaned chart and fee panel;
+  no browser warnings/errors. Quotes are examples at the checked live state,
+  not fixed prices. No wallet write was submitted.
+- `bash scripts/check-audit.sh`: **397 Solidity tests / 55 suites**, **40 frontend
+  tests**, **105 ABI declarations**, **32** production size checks, independent
+  oracle and no-governance gates, TypeScript and Vite pass. Six new regressions
+  cover buy/sell fee math, flat/inactive states and complete quote snapshots.
+  Final footer copy also passes TypeScript/Vite. No contracts were changed.

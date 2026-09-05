@@ -9,6 +9,14 @@ export function createRpcReader(url: string, options: Pick<HttpTransportConfig, 
     transport: rpcTransport(url, fallbackUrl, httpOptions) })
   const pending = new Map<string, Promise<unknown>>()
   return {
+    /** One aggregate3 call: related quote/fee/mode reads share an EVM snapshot. */
+    async batchCall(to: Address, abi: readonly unknown[], calls: readonly { functionName: string; args?: readonly unknown[] }[]): Promise<readonly unknown[]> {
+      return client.multicall({
+        contracts: calls.map(call => ({ address: to, abi: abi as Abi, functionName: call.functionName, args: call.args })),
+        allowFailure: false,
+        batchSize: 0,
+      })
+    },
     async call(to: Address, abi: readonly unknown[], functionName: string, args: readonly unknown[] = []): Promise<unknown> {
       if (!/^0x[0-9a-fA-F]{40}$/.test(to) || /^0x0+$/.test(to)) throw new Error(`rpc ${functionName}: no target address`)
       const data = encodeFunctionData({ abi: abi as Abi, functionName, args: args as never })

@@ -104,7 +104,7 @@ function startRoundLoop() {
         rpcCall(rController, controllerAbi, 'flatTime') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'potBalance') as Promise<bigint>,
         (rpcCall(rHook, hookAbi, 'sineActive') as Promise<boolean>).catch(() => false),
-        (rpcCall(rHook, hookAbi, 'swapFeeBps') as Promise<bigint>).catch(() => undefined),
+        rpcCall(rHook, hookAbi, 'swapFeeBps').then(value => BigInt(value as number)).catch(() => undefined),
       ])
       if (!rHook || !rController) return
       // sine flavor: the zone getMarginalPrice is legacy — price comes from

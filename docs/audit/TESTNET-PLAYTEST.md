@@ -56,7 +56,12 @@ a smaller raise becomes publicly launchable when its window ends.
    claim your genesis position. A second wallet helps test distribution.
 3. Buy 0.005, 0.01 and 0.05 mixETH. Expect 1, 2 and 10 new ticket units. Fractional
    purchase remainders give neither an extra seat nor extra time. At the clock cap,
-   actual added time can be zero. Selling keeps existing seats.
+   actual added time can be zero. Selling keeps existing seats. Check the estimated
+   trade fee (mixETH and percentage) below the receive box in both directions:
+   buy fees are included in payment; sell quotes already deduct fees. Network gas
+   is separate. Quote, rate and mode come from one on-chain snapshot. Sell fee
+   estimates reconstruct gross proceeds and can be up to one wei high at current
+   protocol rates; the actual receive quote and transaction minOut remain unchanged.
 4. Stake into multiple pepes, trade from the other wallet, and observe fees. Claim
    once immediately; request withdrawal on another position and leave its fees
    unclaimed across boundaries. Earned fees should remain available. Use **+ add

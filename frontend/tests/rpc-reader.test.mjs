@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { parseAbi, encodeFunctionResult } from 'viem'
 import { createRpcReader } from '../src/lib/rpcReader.ts'
+import { hookAbi } from '../src/lib/abi.ts'
 
 const abi = parseAbi(['function balanceOf(address) view returns (uint256)'])
 const token = '0x0000000000000000000000000000000000000001'
@@ -80,4 +81,46 @@ test('a rate-limited provider falls back for reads without dropping their argume
   }})
   assert.equal(await reader.call(token,abi,'balanceOf',[alice]),99n)
   assert.deepEqual(urls,['https://rpc.test/limited','https://rpc.test/healthy'])
+})
+
+test('quote, rate and mode are read in one explicit aggregate at the same block', async () => {
+  const { baseSepolia } = await import('viem/chains')
+  const { multicall3Abi, decodeFunctionData } = await import('viem')
+  const calls = [{ functionName: 'getSellOutput', args: [100n] }, { functionName: 'swapFeeBps' }, { functionName: 'mode' }]
+  const values = [90n, 1000, 1]
+  let requests = 0
+  const reader = createRpcReader('https://rpc.test/quote', { chain: baseSepolia, fetchFn: async (_url, init) => {
+    requests++
+    const body = JSON.parse(init.body), qs = Array.isArray(body) ? body : [body]
+    assert.equal(qs.length, 1)
+    const q = qs[0]
+    const aggregate = decodeFunctionData({ abi: multicall3Abi, data: q.params[0].data })
+    assert.equal(aggregate.args[0].length, 3)
+    const result = encodeFunctionResult({ abi: multicall3Abi, functionName: 'aggregate3', result: aggregate.args[0].map((call, i) => {
+      assert.equal(call.target.toLowerCase(), token)
+      const decoded = decodeFunctionData({ abi: hookAbi, data: call.callData })
+      assert.equal(decoded.functionName, calls[i].functionName)
+      if (i === 0) assert.deepEqual(decoded.args, [100n])
+      return { success: true, returnData: encodeFunctionResult({ abi: hookAbi, functionName: calls[i].functionName, result: values[i] }) }
+    }) })
+    const reply = { jsonrpc: '2.0', id: q.id, result }
+    return Response.json(Array.isArray(body) ? [reply] : reply)
+  } })
+  assert.deepEqual(await reader.batchCall(token, hookAbi, calls), values)
+  assert.equal(requests, 1)
+})
+
+test('a missing fee read rejects the entire quote snapshot', async () => {
+  const { baseSepolia } = await import('viem/chains')
+  const { multicall3Abi } = await import('viem')
+  const reader = createRpcReader('https://rpc.test/partial-quote', { chain: baseSepolia, fetchFn: async (_url, init) => {
+    const body = JSON.parse(init.body), q = Array.isArray(body) ? body[0] : body
+    const result = encodeFunctionResult({ abi: multicall3Abi, functionName: 'aggregate3', result: [
+      { success: true, returnData: encodeFunctionResult({ abi, functionName: 'balanceOf', result: 90n }) },
+      { success: false, returnData: '0x' },
+    ] })
+    const reply = { jsonrpc: '2.0', id: q.id, result }
+    return Response.json(Array.isArray(body) ? [reply] : reply)
+  } })
+  await assert.rejects(reader.batchCall(token, abi, [{ functionName: 'balanceOf', args: [alice] }, { functionName: 'balanceOf', args: [bob] }]))
 })

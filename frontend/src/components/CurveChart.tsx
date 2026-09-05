@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { sampleCurve } from '../lib/curve'
 import { useRound } from '../lib/useRound'
 import { fmtAmount, fmtPrice } from '../lib/format'
-import { markerLabel } from '../lib/sine'
 
 type YMode = 'price' | 'supply'
 
@@ -252,33 +251,6 @@ export default function CurveChart({
             )
           })}
 
-          {/* tilted-sine wave markers: launch tread + quarter-wave anchors;
-              tops (k=4/8/12) highlighted — the staircase of plateaus */}
-          {round.sine?.active &&
-            round.sine.markers.map((m, i) => {
-              const x = sx(m.reserve)
-              if (x < PAD.l || x > W - PAD.r) return null
-              const label = markerLabel(m, fmtPrice)
-              if (!label) return null
-              return (
-                <g key={`sm-${i}`}>
-                  <line
-                    x1={x} x2={x} y1={PAD.t} y2={H - PAD.b}
-                    stroke={m.kind === 'top' ? '#f472b6' : '#fbbf24'}
-                    strokeWidth="1" strokeDasharray="4 4" opacity="0.75"
-                  />
-                  <text
-                    x={Math.min(x + 3, W - PAD.r - 120)}
-                    y={PAD.t + 12 + (i % 3) * 13}
-                    fontSize="10"
-                    className={m.kind === 'top' ? 'fill-pink-400' : 'fill-amber-500'}
-                  >
-                    {label}
-                  </text>
-                </g>
-              )
-            })}
-
           {/* x gridlines + labels (1-2-5 decades, log x) */}
           {xTicks.map((t) => {
             const x = sx(t)
@@ -369,18 +341,9 @@ export default function CurveChart({
             <EntryMark price={entryPrice} sy={sy} />
           )}
 
-          {/* hover crosshair */}
+          {/* Hover point + tooltip; the only dashed vertical guide is live. */}
           {hoverPt && hover !== null && pts[hover] && (
             <g>
-              <line
-                x1={hoverPt.x}
-                x2={hoverPt.x}
-                y1={PAD.t}
-                y2={H - PAD.b}
-                stroke="var(--chart-hover-dash)"
-                strokeDasharray="3 3"
-                strokeWidth="1"
-              />
               <circle cx={hoverPt.x} cy={hoverPt.y} r="5" fill="var(--accent)" stroke="var(--text-hi)" strokeWidth="1.5" />
               <g
                 transform={`translate(${Math.min(hoverPt.x + 12, W - 170)},${Math.max(hoverPt.y - 44, PAD.t + 4)})`}

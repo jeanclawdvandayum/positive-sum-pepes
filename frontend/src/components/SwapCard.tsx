@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { useRpcReads } from '../lib/useRpcReads'
 import { erc20Abi, hookAbi, controllerAbi, zapInAbi, zapOutAbi, buildPoolKey } from '../lib/abi'
-import { rpcCall } from '../lib/rpc'
+import { rpcCall, rpcBatchCall } from '../lib/rpc'
 import { ADDRESSES } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
 import { fmtAmount, parseAmountToWad, wadToExact } from '../lib/format'
@@ -13,6 +13,7 @@ import MixLogo from './MixLogo'
 import { PspIcon } from './TokenIcon'
 import { PixelIcon } from './PixelIcon'
 import PixelBurst, { type BurstHandle } from './PixelBurst'
+import { quoteWithFee, type TradeQuote } from '../lib/tradeQuote'
 
 /// mixETH-only swap card (testnet): the mock mixETH has no ETH backing, so
 /// every ETH leg (zapInBuy / zapOut / zapInPredeposit) is off the table —
@@ -60,42 +61,38 @@ export default function SwapCard() {
 
   const pspIn = side === 'sell' ? amountWad : 0n
 
-  /// on-chain quote from the hook itself
-  const [quoteRaw, setQuoteRaw] = useState<bigint | undefined>(undefined)
-  const flat = round.mode === 2
+  // Quote, fee rate and mode must describe the same input and chain snapshot.
+  const quoteKey = `${round.hook}:${side}:${amountWad}:${round.mode}:${halted}`
+  const [quoteState, setQuoteState] = useState<{ key: string; quote?: TradeQuote; failed?: boolean }>()
+  const quote = quoteState?.key === quoteKey ? quoteState.quote : undefined
+  const quoteFailed = quoteState?.key === quoteKey && quoteState.failed
+  const quoteRaw = quote?.output
   useEffect(() => {
-    setQuoteRaw(undefined)
-    if (!round.hook) return
-    if (side === 'buy' ? mixIn <= 0n : pspIn <= 0n) return
-    if (flat) {
-      // Flat mode pays exact pro-rata (F-9, fee-free) — and the DEPLOYED
-      // hook's views are curve-based, so compute locally from live state:
-      // sell = psp×R/S · buy = mix×S/R (mirrors _handleFlatSell/_handleFlatBuy).
-      setQuoteRaw(
-        side === 'buy'
-          ? (mixIn * (round.supply ?? 0n)) / (round.reserve ?? 1n)
-          : (pspIn * (round.reserve ?? 0n)) / (round.supply ?? 1n),
-      )
-      return
-    }
+    if (!round.hook || !live || halted || amountWad <= 0n || (side === 'buy' && (round.mode === 2 || mixIn < MIN_BUY_INPUT))) return
     let dead = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let backoff = 0
     async function tick() {
       try {
-        const q = (await rpcCall(
-          round.hook!, hookAbi,
-          side === 'buy' ? 'getBuyOutput' : 'getSellOutput',
-          [side === 'buy' ? mixIn : pspIn],
-        )) as bigint
-        if (!dead) setQuoteRaw(q)
+        const [output, rate, mode] = await rpcBatchCall(round.hook!, hookAbi, [
+          { functionName: side === 'buy' ? 'getBuyOutput' : 'getSellOutput', args: [amountWad] },
+          { functionName: 'swapFeeBps' },
+          { functionName: 'mode' },
+        ])
+        const quoted = quoteWithFee(side, amountWad, output as bigint, BigInt(rate as number), Number(mode))
+        if (!dead) { setQuoteState({ key: quoteKey, quote: quoted }); backoff = 0 }
       } catch {
-        if (!dead) setQuoteRaw(undefined)
+        if (!dead) {
+          setQuoteState({ key: quoteKey, failed: true })
+          backoff = backoff ? Math.min(backoff * 2, 60_000) : 8000
+        }
       }
+      if (!dead) timer = setTimeout(tick, backoff || 4000)
     }
     tick()
-    const iv = setInterval(tick, 4000)
-    return () => { dead = true; clearInterval(iv) }
-  }, [round.hook, side, mixIn, pspIn, flat, round.mode, round.supply, round.reserve])
-  const quoteMixOut = side === 'sell' ? (quoteRaw ?? 0n) : 0n
+    return () => { dead = true; if (timer) clearTimeout(timer) }
+  }, [quoteKey, round.hook, side, amountWad, mixIn, round.mode, live, halted])
+  const quoteMixOut = side === 'sell' ? quoteRaw : undefined
 
   const poolKey = useMemo(
     () =>
@@ -376,7 +373,7 @@ export default function SwapCard() {
       {/* receive box */}
       <div className="rounded-lg border border-line bg-bg-2 p-4">
         <div className="flex items-center justify-between text-xs font-semibold text-text-lo">
-          <span>receive (est.)</span>
+          <span>receive (est., after fee)</span>
         </div>
         <div className="mt-2 flex items-center gap-2">
           <div className="tabular flex-1 font-data text-2xl text-text-hi">
@@ -393,6 +390,21 @@ export default function SwapCard() {
           )}
         </div>
       </div>
+
+      {live && amountWad > 0n && (side === 'sell' || mixIn >= MIN_BUY_INPUT) && (
+        <div className="mt-3 rounded-lg border border-line px-3 py-2 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-1 text-text-lo">
+            <span>trade fee (est.){quote && ` · ${(Number(quote.feeBps) / 100).toFixed(2)}%`}</span>
+            <span className="tabular font-data font-semibold text-text-hi" title={quote ? `${wadToExact(quote.feeMix)} mixETH` : undefined}>
+              {quote ? `≈ ${fmtAmount(quote.feeMix, 8)} mixETH` : quoteFailed ? 'unavailable' : 'estimating…'}
+            </span>
+          </div>
+          <p className="mt-1 text-[10px] text-text-lo">
+            {quote?.feeBps === 0n ? 'No trade fee.' : side === 'buy' ? 'Included in your payment.' : 'Already deducted from the receive amount.'}
+            {' '}Network gas is extra, shown in your wallet.
+          </p>
+        </div>
+      )}
 
       {side === 'buy' && (
         <p className="mt-3 text-xs text-text-lo">
@@ -434,7 +446,7 @@ export default function SwapCard() {
       {live && quoteRaw !== undefined && quoteRaw > 0n && (
         <div className="mt-2 space-y-1">
           <div className="flex justify-between text-xs text-text-lo">
-            <span>{side === 'sell' ? 'expected out (after fee)' : 'expected out'}</span>
+            <span>expected out (after fee)</span>
             <span className="tabular font-data font-semibold text-text-hi">
               {side === 'buy'
                 ? `${fmtAmount(quoteRaw, 4)} PSP`

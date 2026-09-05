@@ -92,6 +92,7 @@ export const hookAbi = parseAbi([
   'function getBuyOutput(uint256 mixETHInput) view returns (uint256)',
   'function getSellOutput(uint256 pspInput) view returns (uint256)',
   'function SWAP_FEE_BIPS() view returns (uint24)',
+  'function swapFeeBps() view returns (uint24)',
   'function curveConfig() view returns (uint256 P0, uint256 timings)',
   'function getCurveZones() view returns ((uint256 startSupply, uint256 endSupply, uint256 rate, bool isExponential)[])',
   // tilted-sine curve (2026-08): struct-free auto-getters on the hook
