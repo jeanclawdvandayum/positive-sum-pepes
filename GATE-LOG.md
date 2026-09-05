@@ -344,3 +344,27 @@ Solidity source changed after the contract-source hash above.
   container at 678px. No browser warning/error logs. Temporary viewport reset.
   Separate pre-existing issue observed: the header's clock/faucet/theme/connect
   group extends beyond the 678px viewport; this change does not alter the header.
+
+## 2026-09-05 — Matching swap/ladder heights and purchase shortcuts
+
+- Removed the swap column's self-start override so SwapCard and PotBoard stretch
+  to the same grid-row height when side by side. The submit action remains at
+  the bottom; stacked layouts keep their natural content heights.
+- The arrow is now a keyboard-accessible buy/sell button. Both tabs and the
+  arrow share direction-change behavior that clears the prior token amount,
+  quote and error. Pending transactions lock direction, amount and balance-fill
+  controls; predeposit, flat and halted mode restrictions also apply to the arrow.
+- Added `buy 1 ladder spot`, visible during an active round. It selects Buy and
+  fills `wadToExact(MIN_BUY_INPUT)` (0.005 mixETH); it never submits a transaction.
+  Existing quotes, fee estimates, slippage, allowance and confirmed-write flows
+  remain in use. The one-ticket caption now correctly reads `1 seat`.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **41 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle and no-governance. TypeScript/Vite pass again after the final
+  singular/plural copy adjustment. Existing bundle-size warnings remain.
+- At the user's 1266px viewport, both populated panels measured **699.328125px**
+  tall with identical top/bottom bounds after the one-seat quote loaded. Browser
+  checks cover the exact 0.005 input, 1 seat/+4:20, fee/minimum-output estimates,
+  mouse and Enter direction switches, and switching a filled Sell form to the
+  one-seat Buy preset. No browser warning/error logs; viewport restored. No
+  wallet-signed transactions or contract/deployment changes in this update.

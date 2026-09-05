@@ -81,13 +81,11 @@ export default function Trade() {
         <SpawnRoundPanel factory={ADDRESSES.factory} destroyedRoundId={dead.roundId} />
       )}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-5">
-        {/* audit r2 fix 2: swap column hugs its content (lg:self-start) — the
-            ladder owns the tall right column; asymmetric bottoms are
-            intentional. Kills the ~237px dead zone above the CTA. */}
-        <div className="lg:col-span-2 lg:self-start">
+        {/* Stretch both cards to the shared row height on wide screens. */}
+        <div className="min-w-0 lg:col-span-2">
           <SwapCard />
         </div>
-        <div className="lg:col-span-3">
+        <div className="min-w-0 lg:col-span-3">
           <PotBoard
             pot={postRound && dead.dead ? settledBoard.pot : liveBoard.pot}
             tickets={postRound && dead.dead ? settledBoard.seats : liveBoard.seats}

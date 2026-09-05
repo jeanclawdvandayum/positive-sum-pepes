@@ -232,6 +232,28 @@ export default function SwapCard() {
   }, [step])
 
   const busy = step === 'approve' || step === 'swap' || step === 'waiting'
+  const buyDisabled = busy || halted || (round.mode !== 0 && round.mode !== 1)
+  const sellDisabled = busy || halted || !live
+
+  function changeSide(next: Side) {
+    if (next === side || (next === 'buy' ? buyDisabled : sellDisabled)) return
+    setSide(next)
+    // The input token changes too; never reinterpret a mixETH amount as PSP.
+    setAmount('')
+    setQuoteState(undefined)
+    setError(null)
+    setStep('idle')
+  }
+
+  function chooseLadderSpot() {
+    if (round.mode !== 1 || halted || busy) return
+    setSide('buy')
+    setAmount(wadToExact(MIN_BUY_INPUT))
+    setQuoteState(undefined)
+    setError(null)
+    setStep('idle')
+  }
+
   const canSubmit =
     isConnected && !!poolKey && amountWad > 0n && (side !== 'buy' || mixIn >= MIN_BUY_INPUT) && (predepositPhase || (quoteRaw ?? 0n) > 0n) && payBalanceOk && !busy && !halted && (live || predepositPhase)
 
@@ -266,8 +288,10 @@ export default function SwapCard() {
         )}
         <div className="flex rounded-full bg-bg-2 p-1">
           <button
-            onClick={() => setSide('buy')}
-            disabled={round.mode === 2 || halted}
+            type="button"
+            onClick={() => changeSide('buy')}
+            disabled={buyDisabled}
+            aria-pressed={side === 'buy'}
             title={
               halted
                 ? 'the clock is at zero — no more moves'
@@ -282,8 +306,10 @@ export default function SwapCard() {
             buy
           </button>
           <button
-            onClick={() => setSide('sell')}
-            disabled={predepositPhase || halted}
+            type="button"
+            onClick={() => changeSide('sell')}
+            disabled={sellDisabled}
+            aria-pressed={side === 'sell'}
             className={`rounded-full px-4 py-1 text-sm font-semibold transition disabled:opacity-30 ${
               side === 'sell' ? 'bg-accent text-bg-0' : 'text-text-lo hover:text-text-hi'
             }`}
@@ -331,6 +357,7 @@ export default function SwapCard() {
           <button
             type="button"
             title="fill your full balance"
+            disabled={busy}
             onClick={() => setAmount(wadToExact(side === 'buy' ? mixBal : pspBal))}
             className="rounded-md px-1.5 py-0.5 transition hover:bg-bg-1 hover:text-text-hi"
           >
@@ -345,8 +372,10 @@ export default function SwapCard() {
         </div>
         <div className="mt-2 flex items-center gap-2">
           <input
-            className="tabular w-full flex-1 rounded-lg border border-line bg-bg-0 px-4 py-3 font-data text-2xl text-text-hi outline-none transition placeholder:text-text-lo/60 focus:border-accent"
+            className="tabular min-w-0 w-full flex-1 rounded-lg border border-line bg-bg-0 px-4 py-3 font-data text-2xl text-text-hi outline-none transition placeholder:text-text-lo/60 focus:border-accent"
             placeholder="0.0"
+            aria-label={side === 'buy' ? 'mixETH to pay' : 'PSP to sell'}
+            disabled={busy}
             value={amount}
             inputMode="decimal"
             onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
@@ -364,10 +393,30 @@ export default function SwapCard() {
         {payBalance !== undefined && amountWad > payBalance && (
           <div className="mt-1 text-xs font-semibold text-phase-critical">insufficient balance</div>
         )}
+        {round.mode === 1 && (
+          <button
+            type="button"
+            onClick={chooseLadderSpot}
+            disabled={busy}
+            className="mt-3 flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg border border-line bg-bg-1 px-3 py-2 text-xs transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <span className="font-semibold text-accent">buy 1 ladder spot</span>
+            <span className="tabular font-data text-text-lo">{wadToExact(MIN_BUY_INPUT)} mixETH</span>
+          </button>
+        )}
       </div>
 
-      <div className="flex justify-center py-1 text-lg text-text-lo" aria-hidden="true">
-        ↓
+      <div className="flex justify-center py-1">
+        <button
+          type="button"
+          onClick={() => changeSide(side === 'buy' ? 'sell' : 'buy')}
+          disabled={side === 'buy' ? sellDisabled : buyDisabled}
+          aria-label={side === 'buy' ? 'switch to selling PSP' : 'switch to buying PSP'}
+          title={side === 'buy' ? 'switch to sell' : 'switch to buy'}
+          className="grid h-10 w-10 place-items-center rounded-full border border-line bg-bg-1 text-lg text-text-lo transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-30"
+        >
+          <span aria-hidden="true">↓</span>
+        </button>
       </div>
 
       {/* receive box */}
@@ -408,7 +457,7 @@ export default function SwapCard() {
 
       {side === 'buy' && (
         <p className="mt-3 text-xs text-text-lo">
-          minimum 0.005 mixETH{!predepositPhase && ` · ${purchaseUnits(mixIn) > 10n ? 10n : purchaseUnits(mixIn)} seats · +${Number(purchaseUnits(mixIn) * TIME_PER_UNIT / 60n)}m ${purchaseUnits(mixIn) * TIME_PER_UNIT % 60n}s before the clock cap`}
+          minimum 0.005 mixETH{!predepositPhase && ` · ${purchaseUnits(mixIn) > 10n ? 10n : purchaseUnits(mixIn)} ${purchaseUnits(mixIn) === 1n ? 'seat' : 'seats'} · +${Number(purchaseUnits(mixIn) * TIME_PER_UNIT / 60n)}m ${purchaseUnits(mixIn) * TIME_PER_UNIT % 60n}s before the clock cap`}
         </p>
       )}
       {/* slippage */}
@@ -466,13 +515,8 @@ export default function SwapCard() {
       )}
 
       {!halted && (
-      <div className="relative mt-auto">
-        {/* audit r1 fix 6: the dead zone between the slippage row and the CTA
-            gets ONE quiet on-voice line — the real fee routing (stakers + pot
-            + a fixed 0.5%-of-volume referral carve-out, stated without
-            numbers so it stays true across the fee's wave regimes). Curve
-            mode only: flat exits are fee-free (F-9) and predeposit has no
-            swaps, so the line never lies. Panel height untouched. */}
+      <div className="relative mt-auto pt-4">
+        {/* Keep the submit action at the bottom of the shared card height. */}
         {round.mode === 1 && (
           <p className="mb-2 text-center text-xs text-text-lo">
             swap fees feed the pot, the stakers, and whoever's link brought you
