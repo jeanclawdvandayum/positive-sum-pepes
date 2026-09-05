@@ -18,10 +18,10 @@ export default function PayoutSlider() {
     <div className="mt-10">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <label htmlFor={id} className="text-text-lo">
-          if the bomb dropped now with a pot of
+          try a pot of
         </label>
         <output htmlFor={id} className="tabular font-data text-lg" style={{ color: 'var(--pot-gold)' }}>
-          {pot.toLocaleString('en-US')} mix
+          {pot.toLocaleString('en-US')} mixETH
         </output>
       </div>
 
@@ -58,7 +58,7 @@ export default function PayoutSlider() {
               className="tabular relative ml-auto font-data text-sm"
               style={{ color: i === 0 ? 'var(--pot-gold)' : 'var(--text-hi)' }}
             >
-              {(pot * pct / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })} mix
+              {(pot * pct / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })} mixETH
             </span>
           </div>
         ))}

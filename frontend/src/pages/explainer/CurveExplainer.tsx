@@ -43,10 +43,11 @@ export default function CurveExplainer() {
           .xd-curve-motion { display: none; }
         }
       `}</style>
-      <h2 id={titleId} className="font-display text-2xl sm:text-3xl">the S-shaped bonding curve</h2>
+      <h2 id={titleId} className="font-display text-2xl sm:text-3xl">how buying and selling move the price</h2>
       <p className="mt-3 max-w-2xl leading-relaxed text-text-lo">
-        PSP’s tilted-sine curve repeats an S-shaped pattern: flatter stretches, steeper climbs,
-        then flatter stretches again. where you trade changes how much the price moves.
+        buying PSP adds mixETH to the reserves and raises the price. selling takes mixETH
+        out and lowers it. the S-shaped bonding curve alternates between flatter and steeper
+        sections as reserves grow.
       </p>
 
       <div className="mt-7 grid items-center gap-8 lg:grid-cols-2">
@@ -62,7 +63,7 @@ export default function CurveExplainer() {
             </button>
           </div>
           <svg viewBox="0 0 420 240" className="mt-3 block w-full" role="img" aria-labelledby={descId}>
-            <title id={descId}>Two repeating S-shaped price stretches. Green flatter zones have lower price sensitivity; amber steeper zones have higher sensitivity. A dot moves right for buys and left for sells.</title>
+            <title id={descId}>Two S-shaped sections. Green marks flatter stretches with smaller percentage price moves. Amber marks steeper stretches with larger moves. The dot follows buys to the right and sells to the left.</title>
             {ZONES.map(zone => (
               <rect key={zone.from} x={point(zone.from).x} y="15" width={182 * (zone.to - zone.from)} height="210"
                 fill={zone.calm ? 'var(--phase-calm)' : 'var(--phase-heat)'} opacity="0.07" />
@@ -79,29 +80,27 @@ export default function CurveExplainer() {
           </svg>
           <p className="text-right text-xs text-text-lo">mixETH reserves →</p>
           <figcaption className="mt-4 flex flex-wrap justify-between gap-2 border-t border-line pt-3 text-xs text-text-lo">
-            <span>illustrative · two repeating stretches</span>
+            <span>example curve</span>
             <span>← sells · buys →</span>
           </figcaption>
         </figure>
 
         <div className="min-w-0">
           <div className="border-l-2 border-phase-calm pl-4">
-            <h3 className="font-data text-sm text-phase-calm">stable zones · flatter stretches</h3>
+            <h3 className="font-data text-sm text-phase-calm">stable zones</h3>
             <p className="mt-2 leading-relaxed">
-              a given change in mixETH reserves causes a smaller percentage price move.
-              trades have less price impact here.
+              on the flatter sections, buying or selling moves the price by a smaller percentage.
             </p>
           </div>
           <div className="mt-6 border-l-2 border-phase-heat pl-4">
-            <h3 className="font-data text-sm text-phase-heat">volatile zones · steeper stretches</h3>
+            <h3 className="font-data text-sm text-phase-heat">volatile zones</h3>
             <p className="mt-2 leading-relaxed">
-              the same reserve change moves the price more sharply. buys climb faster,
-              and sells bring the price down faster.
+              on the steeper sections, the same change in reserves causes a bigger
+              percentage move in price.
             </p>
           </div>
           <p className="mt-6 text-sm leading-relaxed text-text-lo">
-            the pattern repeats as reserves grow. “stable” describes lower price sensitivity;
-            the price can still change.
+            the amount of mixETH behind PSP determines where you are on the curve.
           </p>
         </div>
       </div>

@@ -520,3 +520,20 @@ Solidity source changed after the contract-source hash above.
   preset produces a one-seat / +4:20 quote with fee and minimum-output estimates.
   Wallet connection modal, staking artwork and the six-beat explainer render.
   This was a disconnected-browser check; no wallet signing or chain writes.
+
+
+## 2026-09-05 — Plain-language explainer copy
+
+- Rewrote the hero, six explanatory rows, curve description, fee/payout table,
+  slider labels and redemption section in direct everyday language. The page
+  leads with the last ten tickets sharing the pot, and uses concrete 0.005 / 0.05
+  mixETH examples for seats and capped clock additions.
+- Preserved the fee split, smaller-ladder weighting, mixETH accounting, external
+  yield explanation, 0% yield practice-token note and redemption-value caveat.
+  Copy replaces negation, rhetorical questions and contract/API jargon with
+  affirmative descriptions. Animation, pricing and transaction logic are unchanged.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **50 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle, no-governance, TypeScript and Vite. Existing bundle warnings
+  remain. Browser reviewed the rendered copy at 1280px and 678px; a scoped text
+  check finds none of the removed negation/jargon phrases. Viewport restored.

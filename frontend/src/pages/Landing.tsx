@@ -15,52 +15,52 @@ import CurveExplainer from './explainer/CurveExplainer'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SUBHEAD =
-  'positive sum pepes is a countdown-driven bonding-curve game. buy PSP → buy time → hold a ladder spot → split the pot. staking pays you to stay. after detonation, redeem PSP for its share of remaining backing. this can be less than your purchase cost.'
+  'buy PSP to take a place on the ladder and add time to the clock. each new ticket pushes the older ones down. when the clock reaches zero, anyone can detonate the round. the tickets left on the ladder share the pot. stake your PSP to earn trading fees along the way.'
 
 const BEATS: { n: string; name: string; copy: string; kind: BeatKind }[] = [
   {
     n: '01',
     name: 'backed by mixETH',
-    copy: 'the game’s reserve asset is Alchemix’s mixETH, a yield-earning ETH vault token built on ERC-4626. as its external strategies earn yield, each mixETH share can represent more ETH — bringing value into the game’s reserves even between trades. the game keeps its accounts in mixETH.',
+    copy: 'the game holds its reserves in Alchemix’s mixETH, an ETH vault token (ERC-4626). yield earned outside the game can increase the ETH value of each mixETH held in reserve. trades, fees and rewards are all counted in mixETH.',
     kind: 'reserve',
   },
   {
     n: '02',
-    name: 'arm',
-    copy: 'the clock arms at launch with the round’s configured window. hit zero and trading halts.',
+    name: 'start the clock',
+    copy: 'the countdown starts when the round launches. buys add time, up to the round’s full starting duration.',
     kind: 'arm',
   },
   {
     n: '03',
-    name: 'buy',
-    copy: 'every 0.005 mixETH purchased adds +4:20 — but never more than a full clock.',
+    name: 'buy a ladder spot',
+    copy: 'each full 0.005 mixETH in a buy gets you one ticket and adds up to 4 minutes and 20 seconds. a 0.05 mixETH buy takes all ten spots and adds up to 43 minutes and 20 seconds. fees are included in those amounts.',
     kind: 'buy',
   },
   {
     n: '04',
-    name: 'climb',
-    copy: '60% of each trading fee goes to stakers, 35% to the pot, and 5% to the referral leg. without attribution, that leg splits 4% to the pot and 1% to the deployer.',
+    name: 'earn trading fees',
+    copy: 'stake PSP in a pepe NFT to earn trading fees. stakers receive 60% of each fee. you can claim your rewards or reinvest them into your pepe.',
     kind: 'climb',
   },
   {
     n: '05',
     name: 'detonate',
-    copy: 'clock at zero? anyone — yes, you — can detonate the round.',
+    copy: 'when the clock reaches zero, trading stops. anyone can press detonate to settle the round and open every staked position for withdrawal.',
     kind: 'detonate',
   },
   {
     n: '06',
     name: 'claim or redeem',
-    copy: 'winners claim their share via claimPot() whenever they want — pull-based, no deadline, no sweep.',
+    copy: 'claim your ladder winnings and redeem your PSP for a share of that round’s remaining mixETH. both stay available whenever you’re ready.',
     kind: 'claim',
   },
 ]
 
 const MATH: [string, string][] = [
-  ['ladder', 'at detonation the pot splits 25/18/14/10/8/7/6/5/4/3% from newest ticket to oldest.'],
-  ['renormalization', 'fewer than 10 entries? shares renormalize, nobody gets dusted.'],
-  ['bonding curve', 'PSP price rides a bonding curve: buys push it up, sells glide it down.'],
-  ['fee routing', '60% of each trading fee goes to stakers, 35% to the pot, and 5% to the referral leg. without attribution, that leg splits 4% to the pot and 1% to the deployer.'],
+  ['ladder payouts', 'with ten tickets, the pot splits 25/18/14/10/8/7/6/5/4/3% from newest to oldest. one wallet can hold several spots.'],
+  ['smaller ladders', 'one ticket gets the whole pot. with two to nine tickets, each gets a larger share using the same relative weights.'],
+  ['trading fees', '60% of each trading fee goes to stakers and 35% goes to the pot.'],
+  ['referrals', 'with a recorded referral, the final 5% goes to the referral chain. for everyone else, 4% goes to the pot and 1% goes to the deployer.'],
 ]
 
 // stepped timeline: each beat steps further right (staircase, not a card wall)
@@ -81,7 +81,7 @@ export default function Landing() {
           <div>
             {/* the REAL clock, embedded live — prelaunch idle state per §8 */}
             <Clock variant="mini" />
-            <p className="mt-2 text-xs text-text-lo">armed the moment the round launches.</p>
+            <p className="mt-2 text-xs text-text-lo">the countdown starts at launch.</p>
           </div>
           <span
             className="block h-[138px] w-[138px] shrink-0 overflow-hidden rounded-lg border border-line sm:h-[207px] sm:w-[207px] [&>svg]:h-full [&>svg]:w-full"
@@ -92,7 +92,7 @@ export default function Landing() {
         </div>
 
         <h1 className="mt-10 font-display text-[clamp(4rem,8vw,6rem)] leading-[1.05] tracking-tight">
-          a bomb, a clock, and a pot that only grows
+          the last ten tickets split the pot
         </h1>
 
         <p className="mt-6 max-w-2xl text-base leading-relaxed text-text-lo">{SUBHEAD}</p>
@@ -109,7 +109,7 @@ export default function Landing() {
 
       {/* ── 2. one round, six beats ── */}
       <section className="mt-20">
-        <h2 className="font-display text-2xl sm:text-3xl">one round, six beats</h2>
+        <h2 className="font-display text-2xl sm:text-3xl">how a round works</h2>
         <ol className="mt-8">
           {BEATS.map((b, i) => (
             <li
@@ -126,7 +126,7 @@ export default function Landing() {
                   <>
                     {targetChain.testnet && (
                       <p className="mt-3 text-xs leading-relaxed text-text-lo">
-                        this testnet uses mock mixETH, which does not earn real yield.
+                        this testnet uses free practice mixETH with 0% yield.
                       </p>
                     )}
                     <a
@@ -135,7 +135,7 @@ export default function Landing() {
                       rel="noopener noreferrer"
                       className="mt-2 inline-block text-xs text-text-lo underline underline-offset-4 hover:text-text-hi"
                     >
-                      learn about Alchemix’s mix-yield tokens ↗
+                      read more about mixETH at Alchemix ↗
                     </a>
                   </>
                 )}
@@ -149,7 +149,7 @@ export default function Landing() {
 
       {/* ── 3. the math, straight ── */}
       <section className="mt-20 rounded-2xl border border-line bg-bg-1 p-6 sm:p-10">
-        <h2 className="font-display text-2xl sm:text-3xl">the math, straight</h2>
+        <h2 className="font-display text-2xl sm:text-3xl">where the money goes</h2>
         <dl className="mt-8">
           {MATH.map(([term, def]) => (
             <div key={term} className="grid gap-1 border-t border-line py-4 sm:grid-cols-[12rem_1fr] sm:gap-6">
@@ -163,12 +163,13 @@ export default function Landing() {
 
       {/* ── 4. settlement after detonation ── */}
       <section className="mt-24 pb-20 text-left">
-        <p className="text-sm text-text-lo">settlement after detonation</p>
+        <p className="text-sm text-text-lo">after the round</p>
         <h2 className="mt-4 max-w-4xl font-display text-[clamp(2.25rem,5vw,4rem)] leading-[1.1]">
-          compete for the pot. redeem remaining backing after detonation.
+          redeem your PSP when you’re ready
         </h2>
         <p className="mt-6 max-w-xl leading-relaxed text-text-lo">
-          after detonation, redemption has no deadline. payouts depend on remaining backing and floor rounding; they do not guarantee your original purchase cost.
+          after detonation, you can redeem PSP at any time for its share of that round’s
+          remaining mixETH. payouts are rounded down and can be worth less than you paid.
         </p>
       </section>
     </div>
