@@ -86,16 +86,23 @@ export default function FeeAccumulator({
   // claims reset it. No invented liveness.
   const display = anchor !== undefined ? Number(anchor.v) / 1e18 : 0
   const idle = anchor === undefined ? false : anchor.v === 0n
+  const formatted = fmtAccum(display)
 
   return (
-    <div>
+    <div className="min-w-0" style={{ containerType: 'inline-size' }}>
       <div className="text-xs text-text-lo">fees earned this round</div>
       {anchor === undefined ? (
-        <Skeleton className="mt-2 h-10 w-60" />
+        <Skeleton className="mt-2 h-10 w-60 max-w-full" />
       ) : (
         <>
-          <div className="st-accum mt-2 text-3xl sm:text-4xl" role="timer" aria-label="fees earned this round, ticking">
-            {fmtAccum(display)}
+          <div
+            className="st-accum mt-2 pr-2"
+            // Size against this column, keeping every digit plus right padding.
+            style={{ fontSize: `min(2.25rem, calc((100cqi - 0.5rem) / ${formatted.length * 0.62}))` }}
+            role="timer"
+            aria-label="fees earned this round, ticking"
+          >
+            {formatted}
           </div>
           <div className="mt-1.5 text-xs text-text-lo">
             {idle ? 'mixETH · waiting for the next trade' : 'mixETH · ticking between updates — claims reset the counter'}

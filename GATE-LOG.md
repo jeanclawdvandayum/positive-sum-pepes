@@ -458,3 +458,18 @@ Solidity source changed after the contract-source hash above.
   respectively, with matching SVG bounds and circular clipping. Close works;
   balance, copy-address and disconnect controls remain present. No wallet was
   signed or connected on the user's behalf. Fixture and server removed.
+
+## 2026-09-05 — Fee counter right padding
+
+- FeeAccumulator sizes its number against the actual column width and formatted
+  character count, capped at 36px. It retains all displayed digits and reserves
+  8px right padding; the loading skeleton is also constrained to the column.
+  Fee values, formatting precision and claim/reinvest behavior are unchanged.
+- Browser checked the actual counter component at 186px, 300px and 560px content
+  widths with `0.00076112`, `123.456789` and `1,234,567.123456`. Every number fits;
+  the screenshot's value leaves 16.640625px after its last digit at 186px, inside
+  the card's existing padding. Temporary preview files/server removed.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **50 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle, no-governance, TypeScript and Vite. Existing bundle-size
+  warnings remain. No contract or deployment changes.
