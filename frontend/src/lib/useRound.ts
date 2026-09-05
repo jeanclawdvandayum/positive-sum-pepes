@@ -36,7 +36,7 @@ export interface RoundInfo {
   totalPredeposit: bigint | undefined
   predepositCap: bigint | undefined
   curve: CurveConfig | undefined
-  /// tilted-sine flavor: static geometry sampled once per hook (cached);
+  /// tilted-sine flavor: cached geometry extends locally with the live reserve;
   /// null when the hook runs the legacy zone curve or the RPC failed.
   sine: SineCurveData | null
   /// the sliding sine fee at the live reserve (bips of the trade) — the
@@ -95,8 +95,8 @@ function startRoundLoop() {
         if (wrapperStaker) wrapperStakers.set(ADDRESSES.reinvestor, wrapperStaker)
       }
       const reinvestorReady = wrapperStaker?.toLowerCase() === rStaker.toLowerCase()
-      // sine geometry is static once armed — the cached sampler runs once per
-      // hook; the 4s loop below only refreshes the live scalars.
+      // Immutable sine coefficients are cached per hook. Geometry extends
+      // locally when the live reserve approaches the sampled window's edge.
       const [mode, reserve, supply, totalLocked, pd, flatTime, potBalance, sineActive, swapFeeBps] = await Promise.all([
         rpcCall(rHook, hookAbi, 'mode') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'reserveMixETH') as Promise<bigint>,
@@ -150,7 +150,7 @@ function startRoundLoop() {
       backoffMs = 0
       listeners.forEach((l) => l(shared))
       // Publish balances and clock before the larger chart sample completes.
-      const sine = await loadSineCurve(rHook).catch(() => shared.sine)
+      const sine = await loadSineCurve(rHook, Number(reserve) / 1e18).catch(() => shared.sine)
       shared = { ...shared, sine }
       listeners.forEach((l) => l(shared))
     } catch (error) {

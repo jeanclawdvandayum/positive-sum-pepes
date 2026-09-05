@@ -351,7 +351,7 @@ export default function SwapCard() {
       ) : (
       <>
       {/* pay box */}
-      <div className="mt-4 rounded-lg border border-line bg-bg-2 p-4">
+      <div className="mt-4 flex min-h-48 flex-1 flex-col rounded-lg border border-line bg-bg-2 p-4">
         <div className="flex items-center justify-between text-xs font-semibold text-text-lo">
           <span>{side === 'buy' ? 'pay' : 'sell'}</span>
           <button
@@ -370,9 +370,9 @@ export default function SwapCard() {
             )}
           </button>
         </div>
-        <div className="mt-2 flex items-center gap-2">
+        <div className="my-3 flex flex-1 items-center gap-2">
           <input
-            className="tabular min-w-0 w-full flex-1 rounded-lg border border-line bg-bg-0 px-4 py-3 font-data text-2xl text-text-hi outline-none transition placeholder:text-text-lo/60 focus:border-accent"
+            className="tabular min-w-0 w-full flex-1 rounded-lg border border-line bg-bg-0 px-4 py-4 font-data text-3xl text-text-hi outline-none transition placeholder:text-text-lo/60 focus:border-accent"
             placeholder="0.0"
             aria-label={side === 'buy' ? 'mixETH to pay' : 'PSP to sell'}
             disabled={busy}
@@ -381,12 +381,12 @@ export default function SwapCard() {
             onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
           />
           {side === 'buy' ? (
-            <div className="shrink-0 rounded-lg border border-line bg-bg-1 px-4 py-3 text-lg font-semibold text-text-hi">
-              <MixLogo px={20} /> mix
+            <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-bg-1 px-3 py-4 text-lg font-semibold leading-none text-text-hi">
+              <MixLogo px={20} /><span>mix</span>
             </div>
           ) : (
-            <div className="shrink-0 rounded-lg border border-line bg-bg-1 px-4 py-3 text-lg font-semibold text-text-hi">
-              <PspIcon px={20} /> PSP
+            <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-bg-1 px-3 py-4 text-lg font-semibold leading-none text-text-hi">
+              <PspIcon px={20} /><span>PSP</span>
             </div>
           )}
         </div>
@@ -398,7 +398,7 @@ export default function SwapCard() {
             type="button"
             onClick={chooseLadderSpot}
             disabled={busy}
-            className="mt-3 flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg border border-line bg-bg-1 px-3 py-2 text-xs transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg border border-line bg-bg-1 px-3 py-2 text-xs transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-40"
           >
             <span className="font-semibold text-accent">buy 1 ladder spot</span>
             <span className="tabular font-data text-text-lo">{wadToExact(MIN_BUY_INPUT)} mixETH</span>
@@ -420,21 +420,21 @@ export default function SwapCard() {
       </div>
 
       {/* receive box */}
-      <div className="rounded-lg border border-line bg-bg-2 p-4">
+      <div className="flex min-h-40 flex-1 flex-col rounded-lg border border-line bg-bg-2 p-4">
         <div className="flex items-center justify-between text-xs font-semibold text-text-lo">
           <span>receive (est., after fee)</span>
         </div>
-        <div className="mt-2 flex items-center gap-2">
-          <div className="tabular flex-1 font-data text-2xl text-text-hi">
+        <div className="mt-3 flex flex-1 items-center gap-2">
+          <div className="tabular min-w-0 flex-1 break-words font-data text-3xl text-text-hi">
             {side === 'buy' ? fmtAmount(quoteRaw, 4) : fmtAmount(quoteMixOut, 4)}
           </div>
           {side === 'buy' ? (
-            <div className="shrink-0 rounded-lg border border-line bg-bg-1 px-4 py-3 text-lg font-semibold text-text-hi">
-              <PspIcon px={20} /> PSP
+            <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-bg-1 px-3 py-4 text-lg font-semibold leading-none text-text-hi">
+              <PspIcon px={20} /><span>PSP</span>
             </div>
           ) : (
-            <div className="shrink-0 rounded-lg border border-line bg-bg-1 px-4 py-3 text-lg font-semibold text-text-hi">
-              <MixLogo px={20} /> mix
+            <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-bg-1 px-3 py-4 text-lg font-semibold leading-none text-text-hi">
+              <MixLogo px={20} /><span>mix</span>
             </div>
           )}
         </div>
@@ -515,16 +515,16 @@ export default function SwapCard() {
       )}
 
       {!halted && (
-      <div className="relative mt-auto pt-4">
-        {/* Keep the submit action at the bottom of the shared card height. */}
+      <div className="relative pt-4">
+        {/* The pay/receive panels absorb spare height above the submit action. */}
         {round.mode === 1 && (
-          <p className="mb-2 text-center text-xs text-text-lo">
+          <p className="text-xs leading-relaxed text-text-lo">
             swap fees feed the pot, the stakers, and whoever's link brought you
           </p>
         )}
         <button
           data-pending={busy || undefined}
-          className={`relative mt-4 w-full overflow-hidden rounded-xl px-5 py-3 font-semibold transition active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40 ${
+          className={`relative mt-3 w-full overflow-hidden rounded-xl px-5 py-3 font-semibold transition active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40 ${
             busy || step === 'done'
               ? 'bg-accent text-bg-0'
               : 'border border-line bg-bg-2 text-text-hi hover:border-accent'

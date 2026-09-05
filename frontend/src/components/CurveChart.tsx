@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { sampleCurve } from '../lib/curve'
-import { useRound } from '../lib/useRound'
+import { useRound, type RoundInfo } from '../lib/useRound'
 import { fmtAmount, fmtPrice } from '../lib/format'
+import { logTicks } from '../lib/chartTicks'
 
 type YMode = 'price' | 'supply'
 
@@ -9,16 +10,23 @@ const W = 640
 const H = 440
 const PAD = { l: 64, r: 16, t: 16, b: 40 }
 
-export default function CurveChart({
-  hasTrades = true,
-  entryPrice,
-}: {
+// Large reserve ranges can span many price decades; keep labels inside the plot.
+const chartPrice = (wad: bigint | undefined) => wad !== undefined && wad >= 10_000n * 10n ** 18n
+  ? (Number(wad) / 1e18).toExponential(2) : fmtPrice(wad)
+
+type ChartProps = {
   /** any trade logged this round? false → dotted ghost theoretical curve (§8) */
   hasTrades?: boolean
   /** connected user's vw avg buy price (mixETH per PSP) — from the Buy log lane */
   entryPrice?: number
-}) {
+}
+
+export default function CurveChart(props: ChartProps) {
   const round = useRound()
+  return <CurveChartView {...props} round={round} />
+}
+
+export function CurveChartView({ round, hasTrades = true, entryPrice }: ChartProps & { round: RoundInfo }) {
   const [yMode, setYMode] = useState<YMode>('price')
   // axis default by curve family (2026-08-29): zone teeth read literally on
   // LINEAR axes; the tilted sine spans 4 decades — the staircase of plateaus
@@ -58,7 +66,7 @@ export default function CurveChart({
     const xMaxFull = Math.max(pts[pts.length - 1].reserve, liveReserve * 1.05)
     const xMax = (lin ? Math.max(liveReserve + 1000, liveReserve * 1.1) : xMaxFull) || 1
     // y fits the VISIBLE window in linear mode (price at reserve<=xMax),
-    // else the whole curve (log view keeps the 4-decade ladder).
+    // else the full sampled curve, which extends ahead of the live reserve.
     const ysAll = pts.map((p) => (yMode === 'price' ? p.price : p.supply)).filter((v) => v > 0)
     const ys = lin
       ? pts.filter((p) => p.reserve <= xMax).map((p) => (yMode === 'price' ? p.price : p.supply)).filter((v) => v > 0)
@@ -125,12 +133,7 @@ export default function CurveChart({
     if (yMode !== 'price' || lin || yMin <= 0) return [0.25, 0.5, 0.75, 1].map((f) => f * yMax)
     const lo = yMin
     const hi = yMax * 1.05
-    const out: number[] = []
-    for (let e = Math.ceil(Math.log10(lo)); e <= Math.floor(Math.log10(hi)); e++)
-      for (const m of [1, 2, 5]) {
-        const v = m * 10 ** e
-        if (v >= lo && v <= hi) out.push(v)
-      }
+    const out = logTicks(lo, hi)
     return out.length >= 2 ? out : [yMin, yMax]
   }, [yMode, yMin, yMax, lin])
 
@@ -144,11 +147,7 @@ export default function CurveChart({
       const step = (norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10) * mag
       for (let v = step; v <= xMax * 0.999; v += step) out.push(v)
     } else {
-      for (let e = Math.ceil(Math.log10(xMin)); e <= Math.floor(Math.log10(xMax)); e++)
-        for (const m of [1, 2, 5]) {
-          const v = m * 10 ** e
-          if (v >= xMin && v <= xMax) out.push(v)
-        }
+      return logTicks(xMin, xMax, 10)
     }
     return out
   }, [xMin, xMax, lin])
@@ -244,7 +243,7 @@ export default function CurveChart({
                   fontSize="11"
                 >
                   {yMode === 'price'
-                    ? fmtPrice(BigInt(Math.round(t * 1e18)))
+                    ? chartPrice(BigInt(Math.round(t * 1e18)))
                     : fmtAmount(BigInt(Math.round(t * 1e18)))}
                 </text>
               </g>
@@ -354,7 +353,7 @@ export default function CurveChart({
                 </text>
                 <text x="10" y="31" fontSize="11" fontWeight="bold" className="fill-text-hi">
                   {yMode === 'price'
-                    ? `price ${fmtPrice(BigInt(Math.round(pts[hover].price * 1e18)))}`
+                    ? `price ${chartPrice(BigInt(Math.round(pts[hover].price * 1e18)))}`
                     : `supply ${fmtAmount(BigInt(Math.round(pts[hover].supply * 1e18)))}`}
                 </text>
               </g>
@@ -375,7 +374,7 @@ export default function CurveChart({
             live:{' '}
             <span className="text-text-hi">
               {fmtAmount(round.reserve)} mix · {fmtAmount(round.supply)} PSP ·{' '}
-              {fmtPrice(round.marginalPrice)}
+              {chartPrice(round.marginalPrice)}
             </span>
           </span>
           <span>● you are here</span>
@@ -411,7 +410,7 @@ function EntryMark({ price, sy }: { price: number; sy: (v: number) => number }) 
         fontSize="10"
         className="fill-pepe font-semibold"
       >
-        your entry · {fmtPrice(BigInt(Math.round(price * 1e18)))}
+        your entry · {chartPrice(BigInt(Math.round(price * 1e18)))}
       </text>
     </g>
   )

@@ -412,3 +412,32 @@ Solidity source changed after the contract-source hash above.
   rendered in a temporary fixture with that artwork and two address fallbacks,
   confirms each 24×24 SVG stays inside its 36px button. Fixture removed afterward;
   connected-wallet modal interaction was not exercised in this check.
+
+## 2026-09-05 — Swap spacing, aligned token marks and expanding curve range
+
+- Token badges use flex alignment so mixETH and PSP icons share the text's
+  vertical center in both swap directions. Enlarged pay/receive panels and
+  amount typography; the panels absorb spare card height while the action and
+  fee/slippage details follow directly below. Swap/ladder still match heights.
+- Cache the immutable sine coefficients, extending local samples when reserves
+  approach the existing endpoint. Keep at least one wavelength, 1,000 mixETH or
+  10% of reserve ahead, rounded to a whole wave. Sampling is bounded to 8,192
+  post-boot steps; extension requires no new RPC calls. The chart's existing
+  linear/log and price/supply scales consume the expanded geometry.
+- Log ticks stay bounded and retain the highest tick; scientific notation
+  keeps large price labels inside the chart. The live marker remains the only
+  dotted vertical guide. No quote, transaction, contract or deployment changes.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **50 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle and no-governance. All 50 frontend tests and TypeScript/Vite
+  pass again after final tick/label adjustments. Existing bundle warnings remain.
+  New regressions cover range growth at 10,001/20,000/50,000/100,000 mixETH,
+  preservation of earlier geometry/supply, and bounded ordered axis ticks.
+- Browser checks at 1266px: token/text center offsets are exactly zero in Buy
+  and Sell; unfilled Swap and Ladder both measure 687.109375px high, with pay
+  and receive panels measuring 192px and 189.609375px. The 0.005 one-seat shortcut,
+  fee/minimum-output quote and stacked 678px layout remain usable.
+- A temporary interactive fixture of the actual chart component checked 20,000
+  and 100,000 mixETH ranges, including log/linear and supply views. Paths remain
+  finite and live marker centers stay inside the plot. Fixture/server removed;
+  viewport restored. These were simulated chart reserves, not testnet purchases.

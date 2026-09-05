@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { sampleSineChart } from '../src/lib/sineChart.ts'
+import { sampleSineChart, sineChartHeadroom } from '../src/lib/sineChart.ts'
+import { logTicks } from '../src/lib/chartTicks.ts'
 // Materialized coefficients read from deployed Base Sepolia round 1 after its
 // 500 mixETH genesis: price/supply at launch and wave seams come from the hook.
 const raw = [10000000000000n,4605170185988092n,450000000000000000000n,10000000000000000000000n,
@@ -28,4 +29,42 @@ test('the active chart renders finite, increasing prices and correctly scaled PS
 
 test('unmaterialized chart coefficients cannot produce a misleading chart', () => {
   assert.throws(() => sampleSineChart(Array(11).fill(0n)), /not been materialized/)
+})
+
+test('chart geometry grows past the old four-wave end and keeps headroom beyond 10k', () => {
+  const wavelength = Number(raw[4]) / 1e18
+  let previousEnd = sampleSineChart(raw).points.at(-1).reserve
+  for (const reserve of [10_001, 20_000, 50_000, 100_000]) {
+    const c = sampleSineChart(raw, reserve)
+    const end = c.points.at(-1)
+    assert.ok(end.reserve > previousEnd)
+    assert.ok(end.reserve >= sineChartHeadroom(reserve, wavelength))
+    assert.ok(c.points.some(p => p.reserve < reserve) && c.points.some(p => p.reserve > reserve))
+    assert.ok(c.points.every(p => Number.isFinite(p.price * 1e18) && Number.isFinite(p.supply)))
+    const expected = Number(raw[5]) / 1e18 * Math.exp(Number(raw[6]) / 1e18 * (end.reserve - c.boot))
+    close(end.price, expected, 1e-10) // expanded endpoint is a full wave seam
+    previousEnd = end.reserve
+  }
+})
+
+test('expansion preserves the original curve and launch supply', () => {
+  const original = sampleSineChart(raw)
+  const expanded = sampleSineChart(raw, 50_000)
+  for (const p of original.points.filter(p => p.reserve > 0)) {
+    const match = expanded.points.find(q => Math.abs(q.reserve - p.reserve) < 1e-8)
+    assert.ok(match, `missing original reserve ${p.reserve}`)
+    close(match.price, p.price, 1e-10)
+    close(match.supply, p.supply, 1e-10)
+  }
+  assert.throws(() => sampleSineChart(raw, Infinity), /Invalid live reserve/)
+})
+
+test('expanded logarithmic axes use bounded, ordered ticks inside the visible range', () => {
+  assert.deepEqual(logTicks(0.02, 1), [0.02, 0.05, 0.1, 0.2, 0.5, 1])
+  assert.equal(logTicks(6, 25_000, 10).at(-1), 20_000)
+  for (const [min, max, budget] of [[6, 120_000, 10], [1e-5, 1e30, 12]]) {
+    const ticks = logTicks(min, max, budget)
+    assert.ok(ticks.length >= 2 && ticks.length <= budget)
+    ticks.forEach((v, i) => assert.ok(v >= min && v <= max && (!i || v > ticks[i - 1])))
+  }
 })

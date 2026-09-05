@@ -21,19 +21,26 @@ export interface SineCurveData {
 
 /** Display-only sampling from the hook's immutable, materialized coefficients.
  * Quotes/minOut always come from the contract. Numbers here use human units. */
-export function sampleSineChart(raw: readonly bigint[]): SineCurveData {
+export function sampleSineChart(raw: readonly bigint[], liveReserve = 0): SineCurveData {
   if (raw.length !== 11) throw new Error('Invalid sine curve response')
   const [p0, preK, boot, target, lam, B, slope, amp, , , q0] = raw.map(v => Number(v) / 1e18)
   if (![p0, preK, boot, target, lam, B, slope, q0].every(v => Number.isFinite(v) && v > 0)) {
     throw new Error('Curve has not been materialized')
   }
+  if (!Number.isFinite(liveReserve) || liveReserve < 0) throw new Error('Invalid live reserve')
+  // Keep at least one wave / 1,000 mixETH / 10% ahead of the live reserve.
+  // Whole-wave boundaries keep the window steady between expansions.
+  const waves = Math.max(4, Math.ceil((Math.max(target, sineChartHeadroom(liveReserve, lam)) - boot) / lam))
+  const end = boot + waves * lam
   const price = (r: number) => r <= boot ? p0 * Math.exp(preK * r)
     : B * Math.exp(slope * (r - boot) - amp * Math.sin(2 * Math.PI * ((r - boot) % lam) / lam))
   const reserves = new Set<number>([0, boot, target])
   // Dense local geometry costs no extra RPC reads; cover the predeposit ramp
   // even when the final raise is tiny compared with the wavelength.
   for (let i = 1; i <= 64; i++) reserves.add(boot * i / 64)
-  for (let i = 1; i <= 512; i++) reserves.add(boot + 4 * lam * i / 512)
+  // 128 samples per wave, bounded so deep reserves cannot stall the browser.
+  const steps = Math.min(8192, waves * 128)
+  for (let i = 1; i <= steps; i++) reserves.add(boot + (end - boot) * i / steps)
   const grid = [...reserves].sort((a, b) => a - b)
   let supply = q0
   const points = grid.map((r, i) => {
@@ -52,4 +59,8 @@ export function sampleSineChart(raw: readonly bigint[]): SineCurveData {
   }
   return { active: true, configured: true, boot, span: target - boot, top: target,
     q0: raw[10], checkpoints: [], points, markers }
+}
+
+export function sineChartHeadroom(liveReserve: number, wavelength: number): number {
+  return liveReserve + Math.max(1000, wavelength, liveReserve * 0.1)
 }

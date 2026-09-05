@@ -1,12 +1,12 @@
 import { rpcCall } from './rpc'
 import { hookAbi } from './abi'
-import { sampleSineChart, type SineCurveData, type SineMarker } from './sineChart'
+import { sampleSineChart, sineChartHeadroom, type SineCurveData, type SineMarker } from './sineChart'
 export type { SineCurveData, SineMarker } from './sineChart'
 
-const cache = new Map<string, Promise<SineCurveData>>()
+const cache = new Map<string, Promise<{ raw: bigint[]; data: SineCurveData }>>()
 
-/** Three reads on first load, then no RPC work for the chart after launch. */
-export function loadSineCurve(hook: `0x${string}`): Promise<SineCurveData> {
+/** Cache immutable coefficients; extend geometry locally as reserves grow. */
+export async function loadSineCurve(hook: `0x${string}`, liveReserve = 0): Promise<SineCurveData> {
   const key = hook.toLowerCase()
   let promise = cache.get(key)
   if (!promise) {
@@ -15,15 +15,20 @@ export function loadSineCurve(hook: `0x${string}`): Promise<SineCurveData> {
       rpcCall(hook, hookAbi, 'sineActive') as Promise<boolean>,
       rpcCall(hook, hookAbi, 'sineCurve') as Promise<bigint[]>,
     ]).then(([configured, active, raw]) => {
-      if (configured && active) return sampleSineChart(raw)
+      if (configured && active) return { raw, data: sampleSineChart(raw, liveReserve) }
       cache.delete(key) // The same predeposit hook can materialize later.
-      return { active: false, configured, boot: 0, span: 0, top: 0, q0: 0n,
-        checkpoints: [], points: [], markers: [] }
+      return { raw, data: { active: false, configured, boot: 0, span: 0, top: 0, q0: 0n,
+        checkpoints: [], points: [], markers: [] } }
     })
     cache.set(key, promise)
     promise.catch(() => cache.delete(key))
   }
-  return promise
+  const cached = await promise
+  const { data, raw } = cached
+  if (data.active && data.points.at(-1)!.reserve < sineChartHeadroom(liveReserve, Number(raw[4]) / 1e18)) {
+    cached.data = sampleSineChart(raw, liveReserve)
+  }
+  return cached.data
 }
 
 /// human-readable tag for a marker (chart labels)
