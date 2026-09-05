@@ -2,6 +2,8 @@
 pragma solidity 0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {ICurveHook} from "./interfaces/ICurveHook.sol";
@@ -30,18 +32,15 @@ interface IPepeDescriptor {
 ///         Fee credits are NOT epoch-based (2026-08-28 redesign, scoopy's
 ///         must-fix): a single monotonic `creditPerWeight` accumulator is
 ///         advanced the instant fees arrive — `delta = fees * 1e30 /
-///         totalWeight` — and every position claims `weightNow * (credit -
-///         checkpoint) / 1e30` live, with no epoch walk and no boundary wait.
+///         totalWeight` — and positions claim their integral of weight times credit
+///         increments live, without waiting for an epoch boundary.
 ///         Each feed splits at the total weight live at that instant, so
 ///         same-instant weight/fee interleavings are exact; positions settle
 ///         before any weight mutation, so nothing is credited retroactively.
-///         The one approximation (explicitly accepted): a DECAYING position
-///         that skips claims while its vest steps down has fees earned at
-///         earlier, higher weights settled at its current, lower weight — it
-///         under-credits only, never over-credits, and a position that
-///         reaches zero weight with unclaimed credit forfeits it (claim
-///         before your vest runs out).
-contract PSPStaker {
+///         RS-1: sparse fee-epoch checkpoints preserve earned fees during
+///         withdrawal. Static positions settle in O(1); decaying positions
+///         read at most six epoch intervals. Claims are never epoch-gated.
+contract PSPStaker is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ─────────────── Interfaces ───────────────
@@ -71,7 +70,7 @@ contract PSPStaker {
     event WithdrawCancelled(address indexed user, uint256 indexed pepeId);
     event Withdrawn(address indexed user, uint256 indexed pepeId, uint256 amount);
     event FeesClaimed(address indexed user, uint256 indexed pepeId, uint256 amount);
-    event FeesForfeited(address indexed user, uint256 mixETHAmount);
+    event FeesDeferred(address indexed user, uint256 indexed pepeId, uint256 mixETHAmount);
     event FeesCredited(uint256 amount, uint256 creditPerWeightAfter);
 
     // ─────────────── Epoch-point core state ───────────────
@@ -87,7 +86,7 @@ contract PSPStaker {
 
     struct Position {
         uint256 amount;          // principal PSP
-        uint256 startEpoch;      // weight live from startEpoch+1 (0 while minted-in-epoch)
+        uint256 startEpoch;      // weight live immediately from this epoch
         uint256 requestEpoch;    // 0 = indefinite lock; E = decay armed at E (full through E)
         uint256 creditCheckpoint; // creditPerWeight at last settle (claims are O(1) deltas)
         uint256 feesPaid;        // cumulative fees paid out
@@ -96,6 +95,8 @@ contract PSPStaker {
     /// @dev pepeId-keyed: one position per NFT, many NFTs per user.
     ///      tokenId 0 = the genesis virtual position (predeposit pool).
     mapping(uint256 => Position) public positions;
+    // Explicit flag: epoch zero is a valid withdrawal-request epoch.
+    mapping(uint256 => bool) public isWithdrawing;
 
     mapping(uint256 => GlobalPoint) public points; // epoch => point
     uint256 public lastPointEpoch;                 // latest stored point
@@ -115,14 +116,20 @@ contract PSPStaker {
     mapping(uint256 => uint256) public slopeSub; // -slope (decay completion)
 
     // ─────────────── Fee credit accumulator ───────────────
-    /// @dev Masterchef-style monotonic accumulator, advanced on every addFees
-    ///      by `fees * CREDIT_PRECISION / totalWeight`. Claims are O(1):
-    ///      `weightNow * (creditPerWeight - checkpoint) / CREDIT_PRECISION`.
+    /// @dev Live accumulator. Sparse epoch boundaries preserve the historical
+    ///      weight applied to each fee increment without delaying claims.
     uint256 public creditPerWeight;
     uint256 public constant CREDIT_PRECISION = 1e30;
 
     uint256 public pendingFeesMixETH; // orphaned (zero-weight) fees + rolling remainder
     uint256 public totalLocked;       // Σ principal (display)
+
+    struct FeeEpoch { uint256 epoch; uint256 creditBefore; }
+    FeeEpoch[] private feeEpochs;
+    mapping(uint256 => uint256) public accruedFees;
+    mapping(uint256 => uint256) private feeRemainder;
+    uint256 public totalFeesReceived;
+    uint256 public totalFeesPaid;
 
     /// @dev decay steps per vest window: weight(e) = base - k·slope, k = e - requestEpoch
     uint256 public constant VEST_EPOCHS = 6;
@@ -221,7 +228,7 @@ contract PSPStaker {
 
     /// @notice Transfer a pepe NFT — moves principal + fee state + decay
     ///         clock together. Multi-position: no recipient constraints.
-    function transferFrom(address from, address to, uint256 tokenId) external {
+    function transferFrom(address from, address to, uint256 tokenId) external nonReentrant {
         if (to == address(0) || to == address(this)) revert BadNftTransfer();
         address o = _ownerOf[tokenId];
         if (o == address(0) || o != from) revert NotNftOwner();
@@ -258,7 +265,7 @@ contract PSPStaker {
     function weightAt(uint256 pepeId, uint256 e) public view returns (uint256) {
         Position storage pos = positions[pepeId];
         if (pos.amount == 0 || e < pos.startEpoch) return 0;
-        if (pos.requestEpoch == 0 || e <= pos.requestEpoch) return pos.amount;
+        if (!isWithdrawing[pepeId] || e <= pos.requestEpoch) return pos.amount;
         uint256 k = e - pos.requestEpoch;
         if (k >= VEST_EPOCHS) return 0;
         uint256 base = pos.amount - (pos.amount % VEST_EPOCHS);
@@ -286,13 +293,17 @@ contract PSPStaker {
     /// @dev Advance a point from its epoch to `to`, applying stored deltas and
     ///      preferring stored points along the way (corrections propagate).
     function _advance(GlobalPoint memory p, uint256 to) private view returns (GlobalPoint memory) {
-        for (uint256 e = p.epoch; e < to; ++e) {
+        // RS-4: every schedule writer checkpoints first. All outstanding
+        // decays therefore finish within seven transitions of this point.
+        uint256 end = to < p.epoch + VEST_EPOCHS + 1 ? to : p.epoch + VEST_EPOCHS + 1;
+        for (uint256 e = p.epoch; e < end; ++e) {
             p.slope = p.slope + slopeAdd[e] - slopeSub[e];
             p.weight = p.weight + biasAdd[e] - biasSub[e] - p.slope;
             p.epoch = e + 1;
             GlobalPoint storage stored = points[e + 1];
             if (stored.epoch != 0) p = stored; // authoritative
         }
+        p.epoch = to;
         return p;
     }
 
@@ -334,25 +345,79 @@ contract PSPStaker {
 
     // ─────────────── Fee settlement (O(1) accumulator delta) ───────────────
 
-    /// @dev Live unclaimed credit for `pepeId` — fees are assigned the moment
-    ///      they land, so this reads the CURRENT epoch's (frozen) weight times
-    ///      the accumulator growth since the position's last settle. For a
-    ///      decaying position claimed epochs after earning, the growth is
-    ///      scaled at the current (lower) weight — under-credits only.
-    function _liveCredit(uint256 pepeId) private view returns (uint256) {
-        Position storage pos = positions[pepeId];
-        return (weightAt(pepeId, _epoch()) * (creditPerWeight - pos.creditCheckpoint)) / CREDIT_PRECISION;
+    /// @dev Accumulator immediately before the first fee in `epoch` or later.
+    function _creditBeforeEpoch(uint256 epoch) private view returns (uint256) {
+        uint256 lo;
+        uint256 hi = feeEpochs.length;
+        while (lo < hi) {
+            uint256 mid = lo + (hi - lo) / 2;
+            if (feeEpochs[mid].epoch < epoch) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo == feeEpochs.length ? creditPerWeight : feeEpochs[lo].creditBefore;
     }
 
-    /// @dev Settle `pepeId` to the current accumulator and pay the newly
-    ///      credited fees to `to`. Returns the amount paid.
-    function _settleAndPay(uint256 pepeId, address to, bool forfeitOnShortfall) private returns (uint256 paid) {
+    function _feeSlice(uint256 weight, uint256 delta, uint256 remainder)
+        private pure returns (uint256 whole, uint256 nextRemainder)
+    {
+        whole = Math.mulDiv(weight, delta, CREDIT_PRECISION);
+        nextRemainder = mulmod(weight, delta, CREDIT_PRECISION) + remainder;
+        if (nextRemainder >= CREDIT_PRECISION) { ++whole; nextRemainder -= CREDIT_PRECISION; }
+    }
+
+    /// @dev RS-1: at most six fixed-weight intervals; claim frequency does
+    /// not destroy fractional entitlements or previously earned whole fees.
+    function _earnedFees(uint256 pepeId) private view returns (uint256 earned, uint256 remainder) {
         Position storage pos = positions[pepeId];
-        uint256 due = _liveCredit(pepeId);
-        pos.creditCheckpoint = creditPerWeight;
-        pos.feesPaid += due;
-        paid = due;
-        if (paid != 0) _payFees(to, paid, forfeitOnShortfall);
+        remainder = feeRemainder[pepeId];
+        if (pos.amount == 0) return (0, remainder);
+        if (!isWithdrawing[pepeId]) {
+            return _feeSlice(pos.amount, creditPerWeight - pos.creditCheckpoint, remainder);
+        }
+        uint256 start = _creditBeforeEpoch(pos.requestEpoch);
+        for (uint256 k; k < VEST_EPOCHS; ++k) {
+            uint256 end = _creditBeforeEpoch(pos.requestEpoch + k + 1);
+            uint256 from = start > pos.creditCheckpoint ? start : pos.creditCheckpoint;
+            if (end > from) {
+                uint256 whole;
+                (whole, remainder) = _feeSlice(weightAt(pepeId, pos.requestEpoch + k), end - from, remainder);
+                earned += whole;
+            }
+            start = end;
+        }
+    }
+
+    function _liveCredit(uint256 pepeId) private view returns (uint256) {
+        (uint256 earned,) = _earnedFees(pepeId);
+        return accruedFees[pepeId] + earned;
+    }
+
+    function _accrue(uint256 pepeId) private {
+        (uint256 earned, uint256 remainder) = _earnedFees(pepeId);
+        accruedFees[pepeId] += earned;
+        feeRemainder[pepeId] = remainder;
+        positions[pepeId].creditCheckpoint = creditPerWeight;
+    }
+
+    /// @dev A failed payout may defer fees while allowing principal to exit.
+    /// The entitlement stays attached to the NFT and can be claimed later.
+    function _settleAndPay(uint256 pepeId, address to, bool deferOnShortfall) private returns (uint256 paid) {
+        _accrue(pepeId);
+        paid = accruedFees[pepeId];
+        if (paid == 0) return 0;
+        accruedFees[pepeId] = 0;
+        if (deferOnShortfall) {
+            try ICurveHook(controller.hookAddress()).sendFees(to, paid) {}
+            catch {
+                accruedFees[pepeId] = paid;
+                emit FeesDeferred(to, pepeId, paid);
+                return 0;
+            }
+        } else {
+            ICurveHook(controller.hookAddress()).sendFees(to, paid);
+        }
+        positions[pepeId].feesPaid += paid;
+        totalFeesPaid += paid;
     }
 
     // ─────────────── Staking ───────────────
@@ -368,7 +433,7 @@ contract PSPStaker {
 
     /// @notice Lock PSP into a FRESH sequential pepe (art is a surprise).
     ///         amount == 0 hatches the pepe unstaked.
-    function lock(uint256 amount) external {
+    function lock(uint256 amount) external nonReentrant {
         _requireAlive();
         uint256 id = _mintFresh(msg.sender);
         if (amount != 0) _stake(msg.sender, id, amount);
@@ -376,7 +441,7 @@ contract PSPStaker {
 
     /// @notice Lock with a CHOSEN pepe (art picked off-chain from
     ///         dnaOf candidates). amount == 0 hatches unstaked.
-    function lockWithPepe(uint256 amount, uint256 pepeId) external {
+    function lockWithPepe(uint256 amount, uint256 pepeId) external nonReentrant {
         _requireAlive();
         if (pepeId == 0 || _ownerOf[pepeId] != address(0)) revert BadPepeId();
         _mint(msg.sender, pepeId);
@@ -386,7 +451,7 @@ contract PSPStaker {
     /// @notice Top up an owned pepe — or stake FOR someone (permissionless:
     ///         the reinvestor path; PSP is pulled from msg.sender into
     ///         user's position; only the owner's address benefits).
-    function stakeFor(address user, uint256 pepeId, uint256 amount) external {
+    function stakeFor(address user, uint256 pepeId, uint256 amount) external nonReentrant {
         _requireAlive();
         if (amount == 0) revert ZeroAmount();
         if (_ownerOf[pepeId] != user) revert NotNftOwner();
@@ -399,13 +464,16 @@ contract PSPStaker {
         _mint(to, id);
     }
 
-    /// @dev shared stake body. Weight goes live at the next epoch boundary
-    ///      (InfiniFi semantics: no retroactive claim on this epoch's fees).
+    /// @dev Shared stake body. New weight goes live after pre-topup fees
+    ///      are settled; it never earns fees from before the deposit.
     ///      Reverts RequestActive on a decaying position — cancel first.
     function _stake(address user, uint256 pepeId, uint256 amount) private {
         Position storage pos = positions[pepeId];
-        if (pos.requestEpoch != 0) revert RequestActive();
-        if (pos.amount != 0) _settleAndPay(pepeId, msg.sender, true); // pay what's due pre-topup
+        if (isWithdrawing[pepeId]) revert RequestActive();
+        // AUD-13: permissionless stakeFor donors never receive the owner's
+        // accrued fees. Settle to the beneficiary; only an owner-initiated
+        // top-up may defer a payout on shortfall without erasing it.
+        if (pos.amount != 0) _settleAndPay(pepeId, user, msg.sender == user);
 
         psp.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -433,17 +501,18 @@ contract PSPStaker {
     /// @notice Arm the 6-epoch linear decay (dividends). Weight stays
     ///         full through the request epoch, then steps down each boundary:
     ///         5/6 after one week, 1/2 after three, 0 after six (mainnet).
-    function requestWithdraw(uint256 pepeId) external {
+    function requestWithdraw(uint256 pepeId) external nonReentrant {
         _requireOwner(pepeId);
         Position storage pos = positions[pepeId];
         if (pos.amount == 0) revert NotLocker();
-        if (pos.requestEpoch != 0) revert RequestActive();
+        if (isWithdrawing[pepeId]) revert RequestActive();
 
         _settleAndPay(pepeId, msg.sender, true); // state-then-pay below is safe: request changes no balances
 
-        uint256 e = _epoch();
+        uint256 e = _checkpoint().epoch;
         (uint256 base, uint256 slope) = _decay(pos);
         pos.requestEpoch = e;
+        isWithdrawing[pepeId] = true;
         slopeAdd[e] += slope;              // decay starts at the next boundary
         slopeSub[e + VEST_EPOCHS] += slope; // slope retires after the final step
         if (base != pos.amount) biasSub[e] += pos.amount - base; // dust now, exact zero later
@@ -451,37 +520,23 @@ contract PSPStaker {
         emit WithdrawRequested(msg.sender, pepeId);
     }
 
-    /// @notice Abort a decay — restores full power from the next boundary.
+    /// @notice Abort a decay — restores full weight immediately.
     ///         Fees earned while decaying are settled and paid first.
-    function cancelWithdraw(uint256 pepeId) external {
+    function cancelWithdraw(uint256 pepeId) external nonReentrant {
         _requireOwner(pepeId);
         Position storage pos = positions[pepeId];
-        if (pos.requestEpoch == 0) revert NotDecaying();
+        if (!isWithdrawing[pepeId]) revert NotDecaying();
 
         _settleAndPay(pepeId, msg.sender, true);
 
-        uint256 f = _epoch();
-        uint256 r = pos.requestEpoch;
-        (uint256 base, uint256 slope) = _decay(pos);
-        uint256 dust = pos.amount - base;
-
-        if (f == r) {
-            // nothing materialized yet — cancel the pending deltas
-            slopeAdd[r] -= slope;
-            slopeSub[r + VEST_EPOCHS] -= slope;
-            if (dust != 0) biasSub[r] -= dust;
-        } else {
-            // slope partially applied — correct the live point directly:
-            // remove the slope AND restore the decayed-away weight + dust now
-            GlobalPoint memory p = _checkpoint();
-            p.slope -= slope;
-            p.weight += (f - r) * slope + dust;
-            points[p.epoch] = p;
-            slopeSub[r + VEST_EPOCHS] -= slope;
-        }
-
+        GlobalPoint memory p = _checkpoint();
+        uint256 currentWeight = weightAt(pepeId, p.epoch);
+        p = _unscheduleDecay(pos, p);
+        p.weight += pos.amount - currentWeight;
+        points[p.epoch] = p;
         pos.requestEpoch = 0;
-        pos.startEpoch = f; // re-anchor at full amount, live from f+1
+        isWithdrawing[pepeId] = false;
+        pos.startEpoch = p.epoch;
 
         emit WithdrawCancelled(msg.sender, pepeId);
     }
@@ -490,12 +545,12 @@ contract PSPStaker {
     ///         the round is flat — detonation opens all locks). The NFT
     ///         survives as a husk: the pepe stays with its owner forever,
     ///         re-stakeable.
-    function withdraw(uint256 pepeId) external {
+    function withdraw(uint256 pepeId) external nonReentrant {
         _requireOwner(pepeId);
         Position storage pos = positions[pepeId];
         if (pos.amount == 0) revert NotLocker();
         bool flat = controller.flatTime() != 0;
-        if (pos.requestEpoch == 0) {
+        if (!isWithdrawing[pepeId]) {
             if (!flat) revert NotDecaying(); // must request first
         } else if (!flat && _epoch() < pos.requestEpoch + VEST_EPOCHS) {
             revert VestNotComplete();
@@ -504,21 +559,36 @@ contract PSPStaker {
         _settleAndPay(pepeId, msg.sender, true);
 
         uint256 amount = pos.amount;
-        if (pos.requestEpoch != 0) {
-            // slope retires at r+6 via slopeSub (lazy) — no correction needed;
-            // the position's weight is already zero by construction.
-        } else {
-            // flat-path exit: keep the global honest, instantly
-            GlobalPoint memory p = _checkpoint();
-            p.weight -= amount;
-            points[p.epoch] = p;
-        }
+        GlobalPoint memory p = _checkpoint();
+        uint256 currentWeight = weightAt(pepeId, p.epoch);
+        if (isWithdrawing[pepeId]) p = _unscheduleDecay(pos, p);
+        p.weight -= currentWeight;
+        points[p.epoch] = p;
         totalLocked -= amount;
+        // Keep deferred fees and fractional credits on the surviving NFT.
         delete positions[pepeId];
+        delete isWithdrawing[pepeId];
 
         psp.safeTransfer(msg.sender, amount);
 
         emit Withdrawn(msg.sender, pepeId, amount);
+    }
+
+    /// @dev Remove only this position's pending/active decay schedule.
+    function _unscheduleDecay(Position storage pos, GlobalPoint memory p)
+        private returns (GlobalPoint memory)
+    {
+        uint256 r = pos.requestEpoch;
+        (uint256 base, uint256 slope) = _decay(pos);
+        if (p.epoch == r) {
+            slopeAdd[r] -= slope;
+            biasSub[r] -= pos.amount - base;
+            slopeSub[r + VEST_EPOCHS] -= slope;
+        } else if (p.epoch <= r + VEST_EPOCHS) {
+            p.slope -= slope;
+            slopeSub[r + VEST_EPOCHS] -= slope;
+        }
+        return p;
     }
 
     // ─────────────── Claims ───────────────
@@ -530,7 +600,7 @@ contract PSPStaker {
         claimFeesTo(pepeId, msg.sender);
     }
 
-    function claimFeesTo(uint256 pepeId, address to) public {
+    function claimFeesTo(uint256 pepeId, address to) public nonReentrant {
         if (to == address(0)) revert ZeroAddress();
         _requireAuthorized(pepeId);
         uint256 paid = _settleAndPay(pepeId, to, false); // strict: explicit intent
@@ -539,13 +609,13 @@ contract PSPStaker {
     }
 
     /// @notice Multiclaim across pepes in one transaction, paying `to`.
-    function claimAllTo(uint256[] calldata pepeIds, address to) public {
+    function claimAllTo(uint256[] calldata pepeIds, address to) public nonReentrant {
         if (to == address(0)) revert ZeroAddress();
         uint256 totalPaid;
         for (uint256 i; i < pepeIds.length; ++i) {
             uint256 pepeId = pepeIds[i];
             _requireAuthorized(pepeId);
-            totalPaid += _settleAndPay(pepeId, to, true);
+            totalPaid += _settleAndPay(pepeId, to, false);
         }
         if (totalPaid == 0) revert NothingToClaim();
         emit FeesClaimed(msg.sender, 0, totalPaid);
@@ -556,9 +626,10 @@ contract PSPStaker {
     /// @dev Genesis virtual lock — the whole claimable predeposit pool,
     ///      locked at launch (kills the first-locker fee-capture window).
     ///      tokenId 0, never an NFT, never decays.
-    function lockGenesis(uint256 amount) external {
+    function lockGenesis(uint256 amount) external nonReentrant {
         if (msg.sender != address(controller)) revert NotController();
         if (amount == 0) revert ZeroAmount();
+        _accrue(0);
         Position storage genesis = positions[0];
         uint256 e = _epoch();
         genesis.startEpoch = e; // (re)anchor increments (pre-launch: no fees yet)
@@ -574,30 +645,29 @@ contract PSPStaker {
 
     /// @dev Predeposit share claim: move `share` out of the genesis position
     ///      into a FRESH sequential pepe minted to `user`, paying the share's
-    ///      accrued fees alongside (forfeit-on-shortfall).
-    function claimGenesisShare(address user, uint256 share) external {
+    ///      accrued fees alongside (deferred if payout is unavailable).
+    function claimGenesisShare(address user, uint256 share) external nonReentrant {
         if (msg.sender != address(controller)) revert NotController();
 
+        if (user == address(0)) revert ZeroAddress();
         Position storage genesis = positions[0];
-        uint256 genesisDue = _liveCredit(0);
+        _accrue(0);
         uint256 genesisAmount = genesis.amount;
-        uint256 shareFees = genesisAmount == 0 ? 0 : (genesisDue * share) / genesisAmount;
-        genesis.creditCheckpoint = creditPerWeight;
-        genesis.feesPaid += shareFees;
-        genesis.amount = genesisAmount - share;
-
-        uint256 e = _epoch();
-        // weight moves between positions (genesis → fresh pepe), both live
-        // immediately via their amounts — the global total is unchanged, so
-        // no deltas or corrections are needed here.
+        if (share == 0 || share > genesisAmount) revert ZeroAmount();
+        uint256 shareFees = Math.mulDiv(accruedFees[0], share, genesisAmount);
+        uint256 shareRemainder = Math.mulDiv(feeRemainder[0], share, genesisAmount);
+        accruedFees[0] -= shareFees;
+        feeRemainder[0] -= shareRemainder;
+        genesis.amount -= share;
 
         uint256 id = _mintFresh(user);
         Position storage pos = positions[id];
         pos.amount = share;
-        pos.startEpoch = e;
+        pos.startEpoch = _epoch();
         pos.creditCheckpoint = creditPerWeight;
-
-        if (shareFees != 0) _payFees(user, shareFees, true);
+        accruedFees[id] = shareFees;
+        feeRemainder[id] = shareRemainder;
+        _settleAndPay(id, user, true);
 
         emit Locked(user, id, share);
     }
@@ -605,14 +675,15 @@ contract PSPStaker {
     /// @dev Fee feed — controller forwards hook addFees() here. Fees credit
     ///      the accumulator IMMEDIATELY (scoopy 2026-08-28: never epoch-gated);
     ///      zero-weight rounds park them in pending until weight exists.
-    function addFees(uint256 mixETHAmount) external {
+    function addFees(uint256 mixETHAmount) external nonReentrant {
         if (msg.sender != address(controller)) revert NotController();
+        totalFeesReceived += mixETHAmount;
         pendingFeesMixETH += mixETHAmount;
         _distribute();
     }
 
     /// @dev Credit pending fees at the current (epoch-frozen) weight.
-    ///      Rolling remainder (A-F3): only the distributed part leaves
+    ///      Rolling remainder (A-F3/AUD-12): the ceiling of allocated credit leaves
     ///      `pendingFeesMixETH`, so sub-precision dust accumulates until it
     ///      crosses one credit unit instead of being stranded forever.
     function _distribute() private {
@@ -621,26 +692,19 @@ contract PSPStaker {
         if (w == 0) return; // orphaned: distributes once weight exists
         uint256 delta = (pendingFeesMixETH * CREDIT_PRECISION) / w;
         if (delta == 0) return; // sub-precision: keep rolling in pending
-        uint256 distributed = (delta * w) / CREDIT_PRECISION; // ≤ pendingFeesMixETH
+        // AUD-12: creditPerWeight retains fractional entitlements between
+        // feeds. Debit their CEILING from pending so that fraction cannot
+        // also be allocated again as a rolling remainder on the next feed.
+        uint256 numerator = delta * w;
+        uint256 distributed = numerator / CREDIT_PRECISION;
+        if (numerator % CREDIT_PRECISION != 0) ++distributed; // <= pendingFeesMixETH
+        uint256 epoch = _epoch();
+        if (feeEpochs.length == 0 || feeEpochs[feeEpochs.length - 1].epoch != epoch) {
+            feeEpochs.push(FeeEpoch(epoch, creditPerWeight));
+        }
         creditPerWeight += delta;
         pendingFeesMixETH -= distributed;
         emit FeesCredited(distributed, creditPerWeight);
-    }
-
-    // ─────────────── Fee payout ───────────────
-
-    /// @dev M-2: on the forfeit path a hook surplus shortfall burns the fees
-    ///      rather than reverting — a fee leg must never trap PSP principal.
-    function _payFees(address user, uint256 amount, bool forfeitOnShortfall) private {
-        address hook = controller.hookAddress();
-        if (forfeitOnShortfall) {
-            try ICurveHook(hook).sendFees(user, amount) {}
-            catch {
-                emit FeesForfeited(user, amount);
-            }
-        } else {
-            ICurveHook(hook).sendFees(user, amount);
-        }
     }
 
     function _requireOwner(uint256 pepeId) private view {

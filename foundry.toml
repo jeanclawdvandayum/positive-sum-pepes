@@ -17,7 +17,9 @@ bytecode_hash = "none"
 [profile.default.fuzz]
 runs = 256
 
-[profile.invariant]
+# Invariant tuning must nest under the profile it applies to — a top-level
+# [profile.invariant] table is a NEW profile, and its keys warn+no-op.
+[profile.default.invariant]
 runs = 64
 depth = 32
 fail_on_revert = true
@@ -31,7 +33,11 @@ ffi = true
 
 [profile.sepolia]
 eth-rpc-url = "${SEPOLIA_RPC_URL}"
-verify = false
+
+[profile.base_sepolia]
+eth-rpc-url = "${BASE_SEPOLIA_RPC_URL}"
 
 [etherscan]
 sepolia = { key = "${ETHERSCAN_API_KEY}" }
+# Etherscan V2: the same key verifies on Base Sepolia (Basescan) via chainid routing.
+base_sepolia = { key = "${ETHERSCAN_API_KEY}", chain = 84532 }

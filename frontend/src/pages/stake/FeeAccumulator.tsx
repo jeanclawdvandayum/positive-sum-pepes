@@ -18,7 +18,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef } from 'react'
-import { useNow } from '../../phase/PhaseEngine'
 import Skeleton from '../../components/Skeleton'
 
 interface Reading {
@@ -27,7 +26,6 @@ interface Reading {
 }
 
 const WINDOW = 12 // readings kept (~72s at the 6s cadence)
-const EXTRAPOLATE_CAP_MS = 8_000 // one poll + grace; beyond that we hold
 
 function fmtAccum(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return '0.00000000'
@@ -45,7 +43,6 @@ export default function FeeAccumulator({
   connected: boolean
   hasStake: boolean
 }) {
-  const now = useNow() // whole-second flips on the shared heartbeat
   const hist = useRef<Reading[]>([])
 
   useEffect(() => {
@@ -82,22 +79,13 @@ export default function FeeAccumulator({
   const h = hist.current
   const anchor = h.length > 0 ? h[h.length - 1] : undefined
 
-  let rate = 0 // mixETH per ms, ≥ 0
-  if (h.length >= 2) {
-    const first = h[0]
-    const last = h[h.length - 1]
-    const dt = last.t - first.t
-    if (dt > 0 && last.v > first.v) rate = Number(last.v - first.v) / 1e18 / dt
-  }
-
-  let display = 0
-  if (anchor !== undefined) {
-    const elapsed = Math.min(Math.max(0, now * 1000 - anchor.t), EXTRAPOLATE_CAP_MS)
-    display = Number(anchor.v) / 1e18 + rate * elapsed
-    if (display < 0) display = 0
-  }
-
-  const idle = anchor === undefined ? false : anchor.v === 0n && rate === 0
+  // HONEST COUNTER (2026-09-03 playtest fix): the old extrapolated drip
+  // (windowed rate × capped elapsed) ticked ABOVE the chain's real pending —
+  // a claim then paid less than the number on screen. The counter now shows
+  // the LAST REAL READING and moves only when the chain moves (6s lane);
+  // claims reset it. No invented liveness.
+  const display = anchor !== undefined ? Number(anchor.v) / 1e18 : 0
+  const idle = anchor === undefined ? false : anchor.v === 0n
 
   return (
     <div>

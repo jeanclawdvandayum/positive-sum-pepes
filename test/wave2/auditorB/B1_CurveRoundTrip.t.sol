@@ -108,8 +108,8 @@ contract B1_CurveRoundTrip is BBase {
     function test_B1e_feeLedgerExact() public {
         _launch(100e18);
 
-        uint256 expectedFees = 0;
-        uint256[3] memory amounts = [uint256(1e18), 7.3e18, 2e15];
+        uint256 expectedFees = 10e18; // genesis launch fee: 10% of the 100-mix boot
+        uint256[3] memory amounts = [uint256(1e18), 7.3e18, 5e15];
         for (uint256 i = 0; i < amounts.length; i++) {
             uint256 amt2 = amounts[i];
             _buy(bob, amt2);

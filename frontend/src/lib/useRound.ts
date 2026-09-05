@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
-import { factoryAbi, controllerAbi, hookAbi, erc20Abi, stakerAbi } from './abi'
-import { ADDRESSES } from './config'
+import { factoryAbi, controllerAbi, hookAbi, erc20Abi, stakerAbi, reinvestorAbi } from './abi'
+import { ADDRESSES, REINVEST_ENABLED } from './config'
+import { assertGameRules } from './gameRules'
 import { rpcCall } from './rpc'
 import type { CurveConfig, Zone } from './curve'
 import { loadSineCurve, SineCurveData } from './sine'
 
 export interface RoundInfo {
+  reinvestorReady: boolean
+  rulesCompatible: boolean | undefined
   id: bigint
   token: `0x${string}` | undefined
   controller: `0x${string}` | undefined
@@ -17,6 +20,9 @@ export interface RoundInfo {
   reserve: bigint | undefined
   supply: bigint | undefined
   marginalPrice: bigint | undefined
+  /// CLOCK-REDESIGN §2: the ladder pot — 35% of every fee + genesis launch
+  /// fee + dust. Paid to the last-10-buyers board at detonation.
+  potBalance: bigint | undefined
   totalLocked: bigint | undefined
   flatTime: bigint | undefined // bomb timestamp — nonzero = flat, locks open
   /// CLOCK-REDESIGN §1: the round's detonation time (SECONDS). undefined =
@@ -30,11 +36,18 @@ export interface RoundInfo {
   /// tilted-sine flavor: static geometry sampled once per hook (cached);
   /// null when the hook runs the legacy zone curve or the RPC failed.
   sine: SineCurveData | null
+  /// the sliding sine fee at the live reserve (bips of the trade) — the
+  /// "average fee" a trader pays right now. undefined = read failed.
+  swapFeeBps: bigint | undefined
 }
 
 const EMPTY: RoundInfo = {
+  reinvestorReady: false,
+  rulesCompatible: undefined,
   id: 0n, token: undefined, controller: undefined, staker: undefined, hook: undefined, mix: undefined,
   mode: undefined, reserve: undefined, supply: undefined, marginalPrice: undefined,
+  potBalance: undefined,
+  swapFeeBps: undefined,
   totalLocked: undefined, predepositClosed: undefined, totalPredeposit: undefined,
   predepositCap: undefined, curve: undefined, flatTime: undefined, sine: null,
   detonationAt: undefined,
@@ -71,14 +84,16 @@ function startRoundLoop() {
         `0x${string}`, `0x${string}`, `0x${string}`,
       ]
       const rStaker = (await rpcCall(rController, controllerAbi, 'staker')) as `0x${string}`
+      const reinvestorReady = REINVEST_ENABLED && await (
+        rpcCall(ADDRESSES.reinvestor, reinvestorAbi, 'staker') as Promise<`0x${string}`>
+      ).then(s => s.toLowerCase() === rStaker.toLowerCase()).catch(() => false)
       // sine geometry is static once armed — the cached sampler runs once per
       // hook; the 4s loop below only refreshes the live scalars.
       const sine = await loadSineCurve(rHook).catch(() => null)
-      const [mode, reserve, supply, mp, cfg, zones, totalLocked, pd, flatTime] = await Promise.all([
+      const [mode, reserve, supply, cfg, zones, totalLocked, pd, flatTime, potBalance, sineActive, swapFeeBps] = await Promise.all([
         rpcCall(rHook, hookAbi, 'mode') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'reserveMixETH') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'totalSupplyPSP') as Promise<bigint>,
-        rpcCall(rHook, hookAbi, 'getMarginalPrice') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'curveConfig') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'getCurveZones') as Promise<Zone[]>,
         rpcCall(rStaker, stakerAbi, 'totalLocked') as Promise<bigint>,
@@ -86,13 +101,21 @@ function startRoundLoop() {
           [bigint, bigint, bigint, boolean, boolean, boolean, boolean]
         >,
         rpcCall(rController, controllerAbi, 'flatTime') as Promise<bigint>,
+        rpcCall(rHook, hookAbi, 'potBalance') as Promise<bigint>,
+        (rpcCall(rHook, hookAbi, 'sineActive') as Promise<boolean>).catch(() => false),
+        (rpcCall(rHook, hookAbi, 'swapFeeBps') as Promise<bigint>).catch(() => undefined),
       ])
       if (!rHook || !rController) return
       // sine flavor: the zone getMarginalPrice is legacy — price comes from
       // the wave at the live reserve
-      let livePrice = mp as bigint
-      if (sine?.active && reserve) {
-        livePrice = (await rpcCall(rHook, hookAbi, 'sinePriceAt', [reserve])) as bigint
+      // sine rounds price off the wave at the live reserve — the legacy
+      // zone marginal view read 11,000x the wave price and dragged the
+      // chart's you-are-here marker off-scale
+      let livePrice: bigint | undefined = undefined
+      if (sineActive && reserve) {
+        livePrice = await (
+          rpcCall(rHook, hookAbi, 'sinePriceAt', [reserve]) as Promise<bigint>
+        ).catch(() => undefined)
       }
       // CLOCK-REDESIGN §6.1: the detonation clock rides THIS lane (no new
       // cadence). Active rounds only, and a hook without the clock reverts
@@ -103,9 +126,17 @@ function startRoundLoop() {
           rpcCall(rHook, hookAbi, 'detonationAt') as Promise<bigint>
         ).catch(() => undefined)
       }
+      const rulesCompatible = await Promise.all([
+        rpcCall(rHook, hookAbi, 'MIN_BUY_INPUT') as Promise<bigint>,
+        rpcCall(rHook, hookAbi, 'TIME_PER_UNIT') as Promise<bigint>,
+      ]).then(([minimum, seconds]) => { assertGameRules(minimum, seconds); return true }).catch(() => false)
       shared = {
+        reinvestorReady,
+        rulesCompatible,
         id, token: rToken, controller: rController, staker: rStaker, hook: rHook, mix,
         mode: Number(mode), reserve, supply, marginalPrice: livePrice,
+        potBalance,
+        swapFeeBps,
         totalLocked,
         predepositClosed: pd[3], totalPredeposit: pd[0], predepositCap: pd[1],
         flatTime,

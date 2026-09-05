@@ -4,50 +4,45 @@ import { parseAbi, type Address } from 'viem'
 
 export const factoryAbi = parseAbi([
   'function currentRoundId() view returns (uint256)',
-  'function rounds(uint256) view returns (address token, address controller, address hook, bool destroyed, string name)',
+  'function rounds(uint256) view returns (address token, address controller, address hook, bool destroyed, string name, string symbol)',
   'function mixETH() view returns (address)',
   'function referralRegistryOf(uint256) view returns (address)',
   'function poolManager() view returns (address)',
   'function html() view returns (string)',
+  // staged spawn (2026-08-30): permissionless rebirth on capped chains
+  'function reserveSpawn(uint256 fromRoundId)',
+  'function birthStep()',
+  'function birthRound() returns (uint256 roundId, address hookAddr)',
+  'function reservationActive() view returns (bool)',
+  'function reservationPhase() view returns (uint8)',
   // 2026-08-29 UI round views
   'function currentRound() view returns (uint256)',
-  'function pspRoundToken(uint256) view returns (address)',
-  'function roundPool(uint256) view returns (address currency0, address currency1, uint24 fee, int24 spacing, address hook)',
-  'function roundInfo(uint256) view returns (address token, address controller, address hook, address staker, address referralRegistry, string name, string symbol, bool destroyed, uint256 predepositDuration, uint256 vestDuration, uint256 voteDuration, uint256 flatExitWindow)',
+  'function pspRoundToken(uint256 roundId) view returns (address)',
+  'function roundPool(uint256 roundId) view returns (address currency0, address currency1, uint24 fee, int24 spacing, address hook)',
+  'function roundInfo(uint256 roundId) view returns (address token, address controller, address hook, address staker, address referralRegistry, string name, string symbol, bool destroyed, uint256 predepositDuration, uint256 vestDuration)',
 ])
 
 export const controllerAbi = parseAbi([
   'function staker() view returns (address)',
   'function predepositState() view returns (uint256 total, uint256 cap, uint256 startTime, bool closed, bool capReached, bool windowOver, bool launchable)',
   'function claimPredepositPSP()',
-  'function predeposit(uint256)',
+  'function predeposit(uint256 mixETHAmount)',
   'function launchPooledBuy()',
   'function PREDEPOSIT_DURATION() view returns (uint256)',
   'function PREDEPOSIT_CAP_PER_WALLET() view returns (uint256)',
   'function totalPredepositors() view returns (uint256)',
-  'function predeposits(address) view returns ((uint256 mixETHAmount, bool claimed))',
-  'function proposeCarpetBomb()',
-  'function voteCarpetBomb(uint256[] pepeIds, bool support)',
-  'function carpetBomb()',
-  'function finalizeCarpet()',
+  'function predeposits(address) view returns (uint256 mixETHAmount, bool claimed)',
+  // CLOCK-REDESIGN §4: the clock replaced carpet-bomb governance — detonate
+  // is the one-tx kill (flatten + open locks + mark destroyed + spawn)
+  'function detonate()',
   'function flatTime() view returns (uint256)',
-  'function getCarpetBombState() view returns (address proposer, uint256 proposeTime, uint256 yesVotes, uint256 noVotes, bool executed, bool canExecute)',
-  'function currentProposal() view returns (address proposer, uint256 proposeTime, uint256 yesVotes, uint256 noVotes, bool executed)',
-  'function proposalCount() view returns (uint256)',
-  'function lastVotedPepeOn(uint256 pepeId) view returns (uint256)',
-  'function VOTE_DURATION() view returns (uint256)',
-  'function FLAT_EXIT_WINDOW() view returns (uint256)',
-  'function QUORUM_BIPS() view returns (uint256)',
-  'function MAJORITY_BIPS() view returns (uint256)',
   'function VEST_DURATION() view returns (uint256)',
-  'event CarpetBombProposed(address indexed proposer)',
-  'event Voted(address indexed voter, bool support, uint256 weight)',
-  'event CarpetBombExecuted(uint256 mixETHCarried)',
+  'event Detonated(address indexed by, uint256 potDistributed, address nextRound)',
 ])
 
 /// PSPStaker — ERC-721 staking positions + pepe art (2026-08-22).
 export const stakerAbi = parseAbi([
-  'function positions(uint256) view returns (uint256 amount, uint256 startEpoch, uint256 requestEpoch, uint256 creditCheckpoint, uint256 feesPaid, uint256 actionTime)',
+  'function positions(uint256) view returns (uint256 amount, uint256 startEpoch, uint256 requestEpoch, uint256 creditCheckpoint, uint256 feesPaid)',
   'function pendingFeesOf(uint256 pepeId) view returns (uint256)',
   'function pendingFeesMixETH() view returns (uint256)',
   'function points(uint256) view returns (uint256 epoch, uint256 weight, uint256 slope)',
@@ -56,16 +51,12 @@ export const stakerAbi = parseAbi([
   'function biasOf(uint256 pepeId, uint256 at) view returns (uint256)',
   'function totalLocked() view returns (uint256)',
   'function totalWeight() view returns (uint256)',
-  'function accFeePerShareMixETH() view returns (uint256)',
-  'function balanceOf(address) view returns (uint256)',
-  'function tokenOfOwnerByIndex(address, uint256) view returns (uint256)',
-  'function primaryOf(address) view returns (uint256)',
-  'function stakedTotalOf(address) view returns (uint256)',
-  'function voteWeight(address, uint256) view returns (uint256)',
-  'function pepeVoteWeight(uint256 pepeId, uint256 at) view returns (uint256)',
-  'function totalVotableWeight() view returns (uint256)',
-  'function ownerOf(uint256) view returns (address)',
-  'function dnaOf(uint256) view returns (uint256)',
+  'function balanceOf(address owner) view returns (uint256)',
+  'function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)',
+  'function primaryOf(address user) view returns (uint256)',
+  'function stakedTotalOf(address user) view returns (uint256)',
+  'function ownerOf(uint256 tokenId) view returns (address)',
+  'function dnaOf(uint256 tokenId) pure returns (uint256)',
   'function descriptor() view returns (address)',
   'function name() view returns (string)',
   'function symbol() view returns (string)',
@@ -79,7 +70,7 @@ export const stakerAbi = parseAbi([
   'function claimFeesTo(uint256 pepeId, address to)',
   'function claimAllTo(uint256[] pepeIds, address to)',
   'function setApprovalForAll(address operator, bool approved)',
-  'function isApprovedForAll(address, address) view returns (bool)',
+  'function isApprovedForAll(address owner, address operator) view returns (bool)',
   'function transferFrom(address from, address to, uint256 tokenId)',
   'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
   'event Locked(address indexed user, uint256 indexed pepeId, uint256 amount)',
@@ -89,26 +80,24 @@ export const stakerAbi = parseAbi([
 
 /// PepeDescriptor — on-chain SVG art (eth_call-able, pure).
 export const descriptorAbi = parseAbi([
-  'function renderSVG(uint256 dna) view returns (string)',
-  'function tokenURI(uint256 dna) view returns (string)',
+  'function renderSVG(uint256 dna) pure returns (string)',
+  'function tokenURI(uint256 dna) pure returns (string)',
 ])
 
 export const hookAbi = parseAbi([
   'function mode() view returns (uint8)',
   'function reserveMixETH() view returns (uint256)',
   'function totalSupplyPSP() view returns (uint256)',
-  'function getMarginalPrice() view returns (uint256)',
   'function getBuyOutput(uint256 mixETHInput) view returns (uint256)',
   'function getSellOutput(uint256 pspInput) view returns (uint256)',
   'function SWAP_FEE_BIPS() view returns (uint24)',
-  'function curveConfig() view returns (uint256 P0)',
-  'function getCurveZones() view returns ((uint256 startSupply, uint256 endSupply, uint256 rate, bool isExponential)[] zones)',
+  'function curveConfig() view returns (uint256 P0, uint256 timings)',
+  'function getCurveZones() view returns ((uint256 startSupply, uint256 endSupply, uint256 rate, bool isExponential)[])',
   // tilted-sine curve (2026-08): struct-free auto-getters on the hook
   'function sineConfigured() view returns (bool)',
   'function sineActive() view returns (bool)',
-  'function sineParams() view returns (uint256 p0, uint256 preK, uint256 magM, uint256 lnTop, uint24 ampBps)',
-  'function sineCurve() view returns (uint256 p0, uint256 preK, uint256 boot, uint256 span, uint256 segWidth, uint256 lam, uint256 B, uint256 slope, uint256 amp, uint256 pTop, uint256 tailSlope, uint256 q0)',
-  'function getSineCheckpoints() view returns (uint256[13])',
+  'function sineParams() view returns (uint256 p0, uint256 preK, uint256 pTarget, uint256 targetReserve, uint24 ampBps)',
+  'function sineCurve() view returns (uint256 p0, uint256 preK, uint256 boot, uint256 targetReserve, uint256 lam, uint256 B, uint256 slope, uint256 amp, uint256 g, uint256 W, uint256 q0)',
   'function sinePriceAt(uint256 R) view returns (uint256)',
   'event Buy(address indexed buyer, uint256 mixETHIn, uint256 pspOut, uint256 newSupply, uint256 newReserveMixETH)',
   'event Sell(address indexed seller, uint256 pspIn, uint256 mixETHOut, uint256 newSupply, uint256 newReserveMixETH)',
@@ -116,18 +105,17 @@ export const hookAbi = parseAbi([
   // Declared here so the frontend typechecks before the contracts sibling
   // lands src/; signatures come straight from the spec, nothing invented.
   // detonationAt is SECONDS (block.timestamp domain) — the UI multiplies to ms.
+  'function MIN_BUY_INPUT() view returns (uint256)',
+  'function TIME_PER_UNIT() view returns (uint256)',
   'function detonationAt() view returns (uint256)',
   // rolling last-10 ticket board: (buyer, pspAmount, mixPaid, ts), newest first
-  'function board(uint256) view returns (address, uint256, uint256, uint256)',
+  'function board(uint256 i) view returns (address, uint256, uint256, uint256)',
   'function potBalance() view returns (uint256)',
-  'function claimablePot(address) view returns (uint256)',
+  'function claimablePot(address who) view returns (uint256 amount)',
   'function claimPot()',
-  // permissionless; gated block.timestamp >= detonationAt; idempotent via mode
-  'function detonate()',
   // burn PSP for floor pro-rata backing — payout per PSP frozen at detonation
-  'function redeemBacking(uint256)',
-  'event TimeAdded(address indexed buyer, uint256 wholePsp, uint256 newDetonationAt)',
-  'event Detonated(address indexed by, uint256 potDistributed, address nextRound)',
+  'function redeemBacking(uint256 pspAmount) returns (uint256 mixETHOut)',
+  'event TimeAdded(address indexed buyer, uint256 secondsAdded, uint256 newDetonationAt)',
 ])
 
 export const erc20Abi = parseAbi([
@@ -147,14 +135,14 @@ export const mixVaultAbi = parseAbi([
 ])
 
 export const zapInAbi = parseAbi([
-  'function zapInBuy((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 minPspOut, uint256 deadline) payable returns (uint256)',
-  'function buyWithMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 mixIn, uint256 minPspOut, uint256 deadline) returns (uint256)',
-  'function zapInPredeposit(address controller, uint256 minSharesMinted) payable returns (uint256)',
+  'function zapInBuy((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 minPspOut, uint256 deadline) payable returns (uint256 pspOut)',
+  'function buyWithMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 mixIn, uint256 minPspOut, uint256 deadline) returns (uint256 pspOut)',
+  'function zapInPredeposit(address controller, uint256 minSharesMinted) payable returns (uint256 shares)',
 ])
 
 export const zapOutAbi = parseAbi([
-  'function zapOut((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 pspIn, uint256 minMixOut, uint256 deadline) returns (uint256)',
-  'function sellToMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 pspIn, uint256 minMixOut, uint256 deadline) returns (uint256)',
+  'function zapOut((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 pspIn, uint256 minMixOut, uint256 deadline) returns (uint256 ethOut)',
+  'function sellToMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 pspIn, uint256 minMixOut, uint256 deadline) returns (uint256 mixOut)',
 ])
 
 /// PSPReferralRegistry — per-round referral attribution graph (2026-08-27).
@@ -163,7 +151,7 @@ export const registryAbi = parseAbi([
   'function record(uint256 referrerNftId)',
   'function attributed(address) view returns (bool)',
   'function traderRefNftOf(address) view returns (uint256)',
-  'function canReferNft(uint256) view returns (bool)',
+  'function canReferNft(uint256 nftId) view returns (bool)',
 ])
 
 /// MixETHFaucet — testnet-only: free unlimited mixETH mint (no ETH needed).

@@ -24,7 +24,7 @@ contract B6_AdminAPI is BBase {
 
         vm.prank(address(controller));
         vm.expectRevert(CurveHook.InvalidMode.selector);
-        hook.initializeCurve(1, 1);
+        hook.initializeCurve(1, 1, 0);
     }
 
     // ── F-B6c (updated 2026-08-30): the admin drain surface is GONE —
@@ -106,7 +106,7 @@ contract B6_AdminAPI is BBase {
         vm.expectRevert(CurveHook.NotController.selector);
         hook.sendFees(carol, 1);
         vm.expectRevert(CurveHook.NotController.selector);
-        hook.initializeCurve(1, 1);
+        hook.initializeCurve(1, 1, 0);
         vm.stopPrank();
     }
 }

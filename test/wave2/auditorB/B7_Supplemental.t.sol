@@ -128,7 +128,6 @@ contract B7_Supplemental is BBase {
         assertApproxEqRel(CurveMath.marginalPrice(5e21 - 1, c), CurveMath.marginalPrice(5e21, c), 1e15);
         // through the real hook: views agree with the library at current supply
         // (genesis has not run; marginal price at S=0 is P0)
-        assertEq(hook.getMarginalPrice(), CurveMath.marginalPrice(0, c), "hook view != library at S=0");
     }
 
     // ─────────────── B7d: spoofed pool initialization is gated ───────────────
@@ -238,7 +237,7 @@ contract B7_Supplemental is BBase {
     function test_B7f_initializeCurveBlindTrust() public {
         // fresh un-launched round in Predeposit
         vm.prank(address(controller));
-        hook.initializeCurve(1e18, 12345); // nonsense: ERC20 supply is still 0
+        hook.initializeCurve(1e18, 12345, 0); // nonsense: ERC20 supply is still 0
         assertEq(hook.totalSupplyPSP(), 12345);
         assertEq(hook.reserveMixETH(), 1e18);
         assertEq(PSPToken(address(psp)).totalSupply(), 0, "ERC20 supply disagrees with ledger");

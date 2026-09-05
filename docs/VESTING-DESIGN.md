@@ -1,3 +1,10 @@
+> **September 5, 2026 amendment:** Fee semantics below are historical. Earned
+> fees now survive vesting and payout shortfalls; sparse fee-epoch checkpoints
+> integrate each position’s earning-time weight. See
+> [current fee accounting](audit/FEE-ACCOUNTING.md). Claims remain immediate,
+> cancellation restores weight immediately, and epoch-zero requests use an
+> explicit flag. Global epoch catch-up is bounded to seven transitions.
+
 # PSP Vesting Redesign — indefinite locks, InfiniFi-style epoch decay, per-pepe cards
 
 Spec (scoopy, 2026-08-28): indefinite locks; `requestWithdraw` starts a 6-week

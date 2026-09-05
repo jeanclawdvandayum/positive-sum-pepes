@@ -100,20 +100,13 @@ contract B4_CurveMathFuzz is Test {
         assertLe(spent, bound, "buy over-minted beyond +20bps");
     }
 
-    // B-2 dust-regime pin (2026-08-28, fuzzer counterexample seed=8000,
-    // input=1e12, supply=17): computeBuyOutput over-mints ~+137bps of input
-    // at near-zero supplies — integer precision is coarse when the minted
-    // slice dwarfs the standing supply. Buyer-side bonus (they receive more
-    // PSP than the input backs). NOT reachable on-chain: hook supply never
-    // sits at dust (genesis pooled buy, MIN_SWAP_INPUT), see B4a comment.
-    // Sentinel: if the library is ever tightened, flip this pin like B4b's.
+    // AUD-7: preserve the former dust over-mint counterexample as a
+    // conservation regression, including zero output at coarse precision.
     function test_B4a2_dustSupplyOvershoot_pinned() public {
         CurveMath.CurveConfig memory c = _randCfg(8000);
         uint256 out = CurveMath.computeBuyOutput(1e12, 17, c);
-        assertGt(out, 0, "no mint, config drifted?");
         uint256 spent = CurveMath.curveIntegral(17, 17 + out, c);
-        assertGt(spent, 1e12, "dust over-mint regime vanished, library tightened?");
-        assertLe(spent, 1e12 + (1e12 * 150) / 10000, "dust overshoot grew beyond +150bps");
+        assertLe(spent, 1e12, "mint exceeds backing");
     }
 
     function _containsLocal(bytes memory haystack, bytes memory needle) internal pure returns (bool) {
@@ -197,27 +190,12 @@ contract B4_CurveMathFuzz is Test {
     // grind the reserve's slack negative by ~3bps per turnover.
     // NOTE: seed is the counterexample the FUZZER reported; do not "fix" this
     // test — flip the assertions only if the library is made stricter.
-    function test_B4b_FINDING_overMintBeyondIntegral_deterministic() public {
+    function test_B4b_FIXED_overMintBeyondIntegral_deterministic() public {
         CurveMath.CurveConfig memory c = _randCfg(1);
         uint256 input = 1e12;
         uint256 out = CurveMath.computeBuyOutput(input, 0, c);
-        assertGt(out, 0, "no mint on counterexample config - config drifted?");
         uint256 spent = CurveMath.curveIntegral(0, out, c);
-
-        // dump the offending config shape for the record
-        console2.log("P0 (wei):", c.P0);
-        for (uint256 i = 0; i < c.zones.length; i++) {
-            console2.log("zone startSupply:", c.zones[i].startSupply);
-            console2.log("zone endSupply:  ", c.zones[i].endSupply);
-            console2.log("zone rate:       ", c.zones[i].rate);
-            console2.log("zone isExp:      ", c.zones[i].isExponential ? 1 : 0);
-        }
-        console2.log("out minted:", out);
-        console2.log("integral(0,out):", spent);
-        console2.log("overshoot (bps):", ((spent - input) * 10000) / input);
-
-        // THE VIOLATION: the minted slice's integral exceeds the input paid.
-        assertGt(spent, input, "FINDING no longer reproduces - library tightened?");
+        assertLe(spent, input, "AUD-7: bounded solver must not over-mint");
     }
 
     // Corrected round-trip property for the PRODUCTION config (the bound that

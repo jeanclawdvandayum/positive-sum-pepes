@@ -7,6 +7,8 @@ import {CurveHook} from "./CurveHook.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
 import {IRoundController} from "./interfaces/IRoundController.sol";
 import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
+import {SSTORE2} from "solady/src/utils/SSTORE2.sol";
+import {LibBytes} from "solady/src/utils/LibBytes.sol";
 
 /// @title HookInitCode — the single on-chain home of CurveHook's creation code
 /// @notice EIP-170 vessel arithmetic (2026-09-01): HookDeployer's runtime
@@ -38,10 +40,22 @@ interface IHookInitCode {
         address referralRegistry,
         CurveMath.CurveConfig calldata config,
         address deployerCutTo
-    ) external pure returns (bytes memory);
+    ) external view returns (bytes memory);
 }
 
 contract HookInitCode {
+    address public immutable first;
+    address public immutable second;
+
+    constructor() {
+        // AUD-10: creation-code storage must not consume the oracle's
+        // executable runtime budget. Two immutable STOP-prefixed data blobs
+        // preserve the exact bytes used by both mining and CREATE2.
+        bytes memory code = type(CurveHook).creationCode;
+        uint256 middle = code.length / 2;
+        first = SSTORE2.write(LibBytes.slice(code, 0, middle));
+        second = SSTORE2.write(LibBytes.slice(code, middle));
+    }
     /// @dev Canonical CurveHook initCode: creation code ++ abi-encoded
     ///      constructor args (deployerCutTo is CLOCK-REDESIGN §3 — the 1%
     ///      unattributed-fee rake recipient, immutable on every hook the
@@ -53,9 +67,9 @@ contract HookInitCode {
         address referralRegistry,
         CurveMath.CurveConfig calldata config,
         address deployerCutTo
-    ) external pure returns (bytes memory) {
+    ) external view returns (bytes memory) {
         return bytes.concat(
-            type(CurveHook).creationCode,
+            SSTORE2.read(first), SSTORE2.read(second),
             abi.encode(
                 pm, IRoundController(controller), PSPReferralRegistry(referralRegistry), config, deployerCutTo
             )

@@ -13,6 +13,7 @@ import Landing from './pages/Landing'
 import Trade from './pages/Trade'
 import Stake from './pages/Stake'
 import Predeposit from './pages/Predeposit'
+import Graveyard from './pages/Graveyard'
 
 const queryClient = new QueryClient()
 
@@ -70,6 +71,14 @@ function DeadlineWire() {
   return null
 }
 
+function RulesNotice() {
+  const round = useRound()
+  if (round.rulesCompatible !== false) return null
+  return <p role="alert" className="mx-auto max-w-6xl px-4 py-3 text-sm text-phase-critical">
+    This deployment’s game rules could not be verified. Actions are unavailable in this interface.
+  </p>
+}
+
 function Shell() {
   const { resolved } = useTheme()
   const { phase } = usePhase()
@@ -111,8 +120,10 @@ function Shell() {
                   <Route path="/trade" element={<Trade />} />
                   <Route path="/stake" element={<Stake />} />
                   <Route path="/predeposit" element={<Predeposit />} />
+                  <Route path="/graveyard" element={<Graveyard />} />
                 </Routes>
               </main>
+              <RulesNotice />
               <Footer />
             </div>
           </HashRouter>

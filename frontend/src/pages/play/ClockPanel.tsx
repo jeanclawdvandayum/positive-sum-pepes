@@ -70,16 +70,29 @@ export default function ClockPanel({
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 pb-7 pt-6 sm:pb-9 sm:pt-8">
         <Clock />
-        <div className="mt-5 text-2xl sm:text-3xl" title="the pot — mixETH waiting in this round">
-          {round.reserve === undefined ? (
+        <div className="mt-5 text-2xl sm:text-3xl" title="the pot — 35% of every trade fee + the genesis launch fee, laddered to the last 10 buys at detonation">
+          {round.potBalance === undefined ? (
             <Skeleton className="h-8 w-44" aria-label="loading the pot" />
           ) : (
-            <PotOdometer value={round.reserve} unit="mixETH" />
+            <PotOdometer value={round.potBalance} unit="mixETH" />
+          )}
+        </div>
+        <div
+          className="mt-2 font-data text-xs text-[#8fa3b8]"
+          title="mixETH backing circulating PSP inside the bonding curve — earns yield for every holder"
+        >
+          curve reserves:{' '}
+          {round.reserve === undefined ? (
+            <Skeleton className="inline-block h-3 w-24 align-middle" aria-label="loading reserves" />
+          ) : (
+            <span className="text-[#c9d7e4]">
+              {(Number(round.reserve) / 1e18).toLocaleString('en-US', { maximumFractionDigits: 4 })} mixETH
+            </span>
           )}
         </div>
         {lastTime === undefined ? (
           <p className="pl-context mt-3 font-data text-xs">
-            no time added yet — every whole psp bought feeds the clock +5:00
+            no time added yet — every 0.005 mixETH purchased feeds the clock +4:20
           </p>
         ) : (
           <p className="pl-context mt-3 flex items-center gap-1.5 font-data text-xs">

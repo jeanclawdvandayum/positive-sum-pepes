@@ -1,3 +1,4 @@
+import { readPositions } from '../../lib/positions'
 // ─────────────────────────────────────────────────────────────────────────────
 // useDeadRound — the post-round lane (CLOCK-REDESIGN §4/§5, §6.4).
 //
@@ -22,13 +23,14 @@
 
 import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
-import { factoryAbi, hookAbi, controllerAbi, stakerAbi, erc20Abi } from '../../lib/abi'
+import { factoryAbi, hookAbi, controllerAbi, erc20Abi } from '../../lib/abi'
 import { rpcCall } from '../../lib/rpc'
 import { ADDRESSES } from '../../lib/config'
 
 export interface DeadPosition {
   id: bigint
   amount: bigint
+  pendingFees: bigint
 }
 
 export interface DeadRoundState {
@@ -76,13 +78,14 @@ function soft<T>(p: Promise<T | undefined>): Promise<T | undefined> {
   return p.catch(() => undefined)
 }
 
-const MAX_POSITIONS = 8 // display + one-click unlock; the stake page owns deep lists
+
 
 export function useDeadRound(): DeadRoundState {
   const { address } = useAccount()
   const [state, setState] = useState<DeadRoundState>(IDLE)
 
   useEffect(() => {
+    setState(IDLE)
     let dead = false
     let timer: ReturnType<typeof setTimeout> | undefined
     let backoff = 0
@@ -133,33 +136,15 @@ export function useDeadRound(): DeadRoundState {
         let positions: DeadPosition[] = []
         if (who) {
           const me = who as `0x${string}`
-          const [clm, bal, alw, nStaked] = await Promise.all([
+          const [clm, bal, alw] = await Promise.all([
             soft(get<bigint>(hook, hookAbi, 'claimablePot', [me])),
             get<bigint>(token, erc20Abi, 'balanceOf', [me]),
             get<bigint>(token, erc20Abi, 'allowance', [me, hook]),
-            staker ? get<bigint>(staker, stakerAbi, 'balanceOf', [me]) : Promise.resolve(undefined),
           ])
           claimable = clm
           pspBal = bal
           pspAllowance = alw
-          const n = nStaked !== undefined ? Math.min(Number(nStaked), MAX_POSITIONS) : 0
-          if (n > 0 && staker) {
-            const ids = (
-              await Promise.all(
-                Array.from({ length: n }, (_, i) =>
-                  get<bigint>(staker, stakerAbi, 'tokenOfOwnerByIndex', [me, BigInt(i)]),
-                ),
-              )
-            ).filter((x): x is bigint => x !== undefined)
-            const amounts = await Promise.all(
-              ids.map((tid) =>
-                get<[bigint, ...bigint[]]>(staker, stakerAbi, 'positions', [tid]).then(
-                  (p) => (p ? { id: tid, amount: p[0] } : undefined),
-                ),
-              ),
-            )
-            positions = amounts.filter((x): x is DeadPosition => x !== undefined && x.amount > 0n)
-          }
+          if (staker) positions = await readPositions(staker, me)
         }
 
         if (!dead) {

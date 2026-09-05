@@ -1,7 +1,9 @@
-/// Tilted-sine curve support (2026-08): the hook can run the sine pricing
-/// curve instead of the zone curve. All curve geometry is static once armed,
-/// so the full sample is fetched ONCE per hook address and cached — the
-/// 4s round loop only re-reads the light live state (reserve/supply/price).
+// Tilted-sine curve support (2026-09): the hook runs the INDEFINITE tilted
+// sine — one endless wave past the launch seam, trend anchored so the price
+// hits pTarget at targetReserve. All curve geometry is static once armed
+// (materialized at launch), so the full sample is fetched ONCE per hook
+// address and cached — the 4s round loop only re-reads the light live state
+// (reserve/supply/price).
 import { rpcCall } from './rpc'
 import { hookAbi } from './abi'
 import type { CurvePoint } from './curve'
@@ -10,67 +12,59 @@ export interface SineMarker {
   reserve: number // mixETH, human units
   price: number // mixETH per PSP, human units
   kind: 'boot' | 'anchor' | 'top'
-  k: number // quarter-wave index (0..12)
+  k: number // quarter-wave index (0..12; treads at 0/4/8/12)
 }
 
 export interface SineCurveData {
   active: boolean
   configured: boolean
   boot: number // human units
-  span: number
-  top: number // boot + span
+  span: number // seam→target distance
+  top: number // the target reserve (the 0.06 tread)
   q0: bigint // launch mint (wei PSP) — supply baked in at boot
-  checkpoints: bigint[] // 13× cumulative curve supply at anchors (wei PSP)
+  checkpoints: bigint[] // retired — empty for the indefinite curve
   points: CurvePoint[]
   markers: SineMarker[]
 }
 
 const cache = new Map<string, Promise<SineCurveData>>()
 
-/// Sample the live sine curve off the hook: ~100 uniform reserves across
-/// [0, top + 1500] plus the exact anchors (boot, every quarter-wave, top).
-/// Supply comes from numerically integrating dS = dR / P: post-boot it is
-/// q0 + ∫_boot^R (matches totalSupplyPSP — q0 is the launch mint), pre-boot
-/// the phase is rescaled so supply goes 0 → q0 across the predeposit ramp.
-export function loadSineCurve(hook: `0x${string}`): Promise<SineCurveData> {
-  let p = cache.get(hook)
-  if (!p) {
-    p = sample(hook)
-    p.catch(() => cache.delete(hook)) // allow retry on transient RPC failure
-    cache.set(hook, p)
-  }
-  return p
-}
-
+/// Sample the live sine curve off the hook: ~110 uniform reserves across
+/// [0, target + one wavelength] plus the exact landmarks (boot, every wave
+/// seam, the target tread). Supply comes from numerically integrating
+/// dS = dR / P: post-boot it is q0 + ∫_boot^R (matches totalSupplyPSP —
+/// q0 is the launch mint), pre-boot the phase is rescaled so supply goes
+/// 0 → q0 across the predeposit ramp.
 async function sample(hook: `0x${string}`): Promise<SineCurveData> {
-  const [configured, active, raw, cps] = await Promise.all([
+  const [configured, active, raw] = await Promise.all([
     rpcCall(hook, hookAbi, 'sineConfigured') as Promise<boolean>,
     rpcCall(hook, hookAbi, 'sineActive') as Promise<boolean>,
     rpcCall(hook, hookAbi, 'sineCurve') as Promise<bigint[]>,
-    rpcCall(hook, hookAbi, 'getSineCheckpoints') as Promise<[bigint, ...bigint[]]>,
   ])
-  const [, , boot, span, segWidth, , , , , , , q0] = raw
+  // getter shape (2026-09-03): (p0, preK, boot, targetReserve, lam, B,
+  // slope, amp, g, W, q0) — no checkpoints, no span, no top.
+  const [, , boot, targetReserve, lam, , , , , , q0] = raw
   const bootN = Number(boot) / 1e18
-  const spanN = Number(span) / 1e18
-  const topN = bootN + spanN
-  const endR = topN + 1500 // headroom past the top shows the tail
+  const targetN = Number(targetReserve) / 1e18
+  const lamN = Number(lam) / 1e18
+  const endR = targetN + lamN // one wavelength of headroom past the target
   const q0n = Number(q0)
 
-  if (!configured || !active || raw.length < 12 || !(bootN > 0)) {
+  if (!configured || !active || raw.length < 11 || !(bootN > 0) || !(lamN > 0)) {
     return {
-      active: false, configured, boot: bootN, span: spanN, top: topN, q0: q0 ?? 0n,
-      checkpoints: [...cps], points: [], markers: [],
+      active: false, configured, boot: bootN, span: targetN - bootN, top: targetN, q0: q0 ?? 0n,
+      checkpoints: [], points: [], markers: [],
     }
   }
 
-  // grid: uniform sweep + exact landmarks (boot, 12 quarter-wave anchors, top)
+  // grid: uniform sweep + exact landmarks (boot, wave seams, target tread)
   const N = 100
   const grid = new Set<bigint>()
   const push = (rWad: bigint) => grid.add(rWad)
   push(0n)
   const stepWad = BigInt(Math.round((endR * 1e18) / N))
   for (let i = 1; i <= N; i++) push(stepWad * BigInt(i))
-  for (let k = 0; k <= 12; k++) push(boot + segWidth * BigInt(k))
+  for (let j = 0; j <= 3; j++) push(boot + lam * BigInt(j))
   const R = [...grid].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
 
   // one eth_call per sample — a one-shot ~110-call burst, cached forever after
@@ -94,23 +88,39 @@ async function sample(hook: `0x${string}`): Promise<SineCurveData> {
     price: Number(prices[i]) / 1e18,
   }))
 
-  // markers: launch tread + every quarter-wave anchor; tops at k=4/8/12
-  const at = (k: number) => R.indexOf(boot + segWidth * BigInt(k))
-  const anchorPrice = (k: number) => Number(prices[at(k)]) / 1e18
-  const markers: SineMarker[] = [{ reserve: bootN, price: anchorPrice(0), kind: 'boot', k: 0 }]
-  for (let k = 1; k <= 12; k++) {
-    markers.push({
-      reserve: Number(boot + segWidth * BigInt(k)) / 1e18,
-      price: anchorPrice(k),
-      kind: k % 4 === 0 ? 'top' : 'anchor',
-      k,
-    })
+  const priceOfR = (rWad: bigint): number => {
+    const idx = R.indexOf(rWad)
+    return idx >= 0 ? Number(prices[idx]) / 1e18 : 0
+  }
+
+  // markers: launch tread + every quarter-wave anchor; the seams (k=4/8/12)
+  // are wave tops — flat treads — highlighted as tops
+  const markers: SineMarker[] = [{ reserve: bootN, price: priceOfR(boot), kind: 'boot', k: 0 }]
+  for (let j = 1; j <= 3; ++j) {
+    const seam = boot + lam * BigInt(j)
+    markers.push({ reserve: Number(seam) / 1e18, price: priceOfR(seam), kind: 'top', k: 4 * j })
+    if (j < 3) {
+      for (const q of [1, 2, 3]) {
+        const r = boot + lam * BigInt(j) + (lam * BigInt(q)) / 4n
+        markers.push({ reserve: Number(r) / 1e18, price: priceOfR(r), kind: 'anchor', k: 4 * j + q })
+      }
+    }
   }
 
   return {
-    active: true, configured, boot: bootN, span: spanN, top: topN, q0,
-    checkpoints: [...cps], points, markers,
+    active: true, configured, boot: bootN, span: targetN - bootN, top: targetN, q0,
+    checkpoints: [], points, markers,
   }
+}
+
+export function loadSineCurve(hook: `0x${string}`): Promise<SineCurveData> {
+  let p = cache.get(hook)
+  if (!p) {
+    p = sample(hook)
+    p.catch(() => cache.delete(hook)) // allow retry on transient RPC failure
+    cache.set(hook, p)
+  }
+  return p
 }
 
 /// human-readable tag for a marker (chart labels)
@@ -119,6 +129,6 @@ export function markerLabel(m: SineMarker, fmtPrice: (v: bigint) => string): str
   if (m.kind === 'boot') return `launch ${p}`
   if (m.k === 4) return `wave 1 top ${p}`
   if (m.k === 8) return `wave 2 top ${p}`
-  if (m.k === 12) return `top ${p}`
+  if (m.k === 12) return `target tread ${p}`
   return ''
 }

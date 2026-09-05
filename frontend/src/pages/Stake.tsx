@@ -1,7 +1,9 @@
+import { minimumOutput, MIN_BUY_INPUT } from '../lib/gameRules'
+import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useMemo, useState } from 'react'
-import { useAccount, useWriteContract } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { ADDRESSES, FAUCET_ENABLED, REINVEST_ENABLED } from '../lib/config'
-import { controllerAbi, erc20Abi, faucetAbi, stakerAbi, reinvestorAbi, buildPoolKey } from '../lib/abi'
+import { controllerAbi, erc20Abi, faucetAbi, hookAbi, stakerAbi, reinvestorAbi, buildPoolKey } from '../lib/abi'
 import { useRound, useBalances } from '../lib/useRound'
 import { useRpcReads } from '../lib/useRpcReads'
 import { rpcCall } from '../lib/rpc'
@@ -47,7 +49,7 @@ export default function Stake() {
   const [pickedId, setPickedId] = useState<bigint | null>(null)
   const [pickerSeed, setPickerSeed] = useState(1)
   const [multiStep, setMultiStep] = useState<'idle' | 'tx' | 'done'>('idle')
-  const { writeContractAsync } = useWriteContract()
+  const { writeContractAsync } = useConfirmedWrite()
   const ethUsd = useEthUsd()
 
   useEffect(() => {
@@ -255,11 +257,14 @@ export default function Stake() {
         })
       }
       const key = buildPoolKey(round.mix!, round.token!, round.hook!)
+      const fees = (await Promise.all(stakeableIds.map(id => rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as Promise<bigint>))).reduce((sum, fee) => sum + fee, 0n)
+      if (fees < MIN_BUY_INPUT) throw new Error('Reinvest requires at least 0.005 mixETH in accrued fees.')
+      const quote = await rpcCall(round.hook!, hookAbi, 'getBuyOutput', [fees]) as bigint
       await writeContractAsync({
         address: ADDRESSES.reinvestor,
         abi: reinvestorAbi,
         functionName: 'reinvestAll',
-        args: [stakeableIds, key, 0n, 0n],
+        args: [stakeableIds, key, minimumOutput(quote, 100), BigInt(Math.floor(Date.now() / 1000) + 600)],
       })
       setMultiStep('done')
       refresh()
@@ -375,7 +380,7 @@ export default function Stake() {
       >
         {multiStep === 'done' ? '✓ claimed' : multiBusy ? 'confirm…' : `multiclaim — ${fmtAmount(totalPending, 4)} mixETH`}
       </button>
-      {REINVEST_ENABLED && (
+      {round.reinvestorReady && (
         <button
           type="button"
           className="st-btn flex-1"

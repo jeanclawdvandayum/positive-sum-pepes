@@ -1,7 +1,10 @@
+import { rpcCall } from '../lib/rpc'
+import { minimumOutput, MIN_BUY_INPUT } from '../lib/gameRules'
+import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useMemo, useState } from 'react'
-import { useAccount, useWriteContract } from 'wagmi'
-import { ADDRESSES, REINVEST_ENABLED } from '../lib/config'
-import { stakerAbi, reinvestorAbi, buildPoolKey } from '../lib/abi'
+import { useAccount } from 'wagmi'
+import { ADDRESSES } from '../lib/config'
+import { hookAbi, stakerAbi, reinvestorAbi, buildPoolKey } from '../lib/abi'
 import { fmtAmount, fmtCountdown } from '../lib/format'
 import { useNow } from '../phase/PhaseEngine'
 import { renderPepeSvg } from '../lib/pepeRender'
@@ -49,7 +52,7 @@ export function PepeCard({
   onDone: () => void
 }) {
   const { isConnected } = useAccount()
-  const { writeContractAsync } = useWriteContract()
+  const { writeContractAsync } = useConfirmedWrite()
   const ethUsd = useEthUsd()
   const [step, setStep] = useState<CardStep>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -79,7 +82,7 @@ export function PepeCard({
   const canCancel = decaying && amount > 0n
   const canRequest = !decaying && amount > 0n && !isFlat
   const canClaim = isConnected && pending !== undefined && pending > 0n
-  const canReinvest = canClaim && !decaying && REINVEST_ENABLED && !isFlat
+  const canReinvest = canClaim && !decaying && round.reinvestorReady && !isFlat
 
   async function act(fn: 'requestWithdraw' | 'cancelWithdraw' | 'withdraw' | 'claimFees') {
     setError(null)
@@ -109,11 +112,14 @@ export function PepeCard({
       }
       setStep('tx')
       const key = buildPoolKey(round.mix!, round.token!, round.hook!)
+      const fees = await rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as bigint
+      if (fees < MIN_BUY_INPUT) throw new Error('Reinvest requires at least 0.005 mixETH in accrued fees.')
+      const quote = await rpcCall(round.hook!, hookAbi, 'getBuyOutput', [fees]) as bigint
       await writeContractAsync({
         address: ADDRESSES.reinvestor,
         abi: reinvestorAbi,
         functionName: 'reinvest',
-        args: [id, key, 0n, 0n],
+        args: [id, key, minimumOutput(quote, 100), BigInt(Math.floor(Date.now() / 1000) + 600)],
       })
       setStep('done')
       onDone()
@@ -201,7 +207,7 @@ export function PepeCard({
         <button className="st-btn st-btn-primary text-xs" disabled={busy || !canClaim} onClick={() => act('claimFees')}>
           {step === 'done' ? '✓ claimed' : `claim — ${fmtAmount(pending, 4) || '0'} mixETH`}
         </button>
-        {REINVEST_ENABLED && (
+        {round.reinvestorReady && (
           <button className="st-btn text-xs" disabled={busy || !canReinvest} onClick={reinvest}>
             {step === 'done' ? '✓' : busy ? 'confirm…' : approved ? '↻ reinvest' : 'approve & reinvest'}
           </button>

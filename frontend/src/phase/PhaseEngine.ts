@@ -13,7 +13,7 @@
 //   · the ONE rAF loop for the live clock value (imperative writes, no re-render)
 //   · one coarse ≤250ms heartbeat that fires whole-second flips — this replaces
 //     every per-component 1s setInterval countdown in the app
-//   · injectTime(+5min): whole-PSP buys push the detonation out (spec §4.3)
+//   · injectTime: confirmed buy events extend the detonation (spec §4.3)
 //
 // Deadline source: the engine does NOT own data fetching (red-line: polling
 // stays centralized in useRound/useRpcReads). Whoever knows THE round

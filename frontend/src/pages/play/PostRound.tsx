@@ -1,3 +1,4 @@
+import { useConfirmedWrite } from '../../lib/useConfirmedWrite'
 // ─────────────────────────────────────────────────────────────────────────────
 // PostRound — the redemption portal (CLOCK-REDESIGN §5, §6.4).
 //
@@ -15,7 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from 'react'
-import { useAccount, useWriteContract } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { erc20Abi, hookAbi, stakerAbi } from '../../lib/abi'
 import { fmtAmount, fmtPrice } from '../../lib/format'
 import type { DeadRoundState } from './useDeadRound'
@@ -40,7 +41,7 @@ export default function PostRound({
   justDetonated: boolean
 }) {
   const { address, isConnected } = useAccount()
-  const { writeContractAsync } = useWriteContract()
+  const { writeContractAsync } = useConfirmedWrite({ exitRoundId: dead.roundId })
   const [redeemStep, setRedeemStep] = useState<RedeemStep>('idle')
   const [redeemErr, setRedeemErr] = useState<string | null>(null)
   const [unlocking, setUnlocking] = useState<Set<string>>(new Set())
@@ -98,7 +99,7 @@ export default function PostRound({
     }
   }
 
-  async function unlock(pepeId: bigint) {
+  async function unlock(pepeId: bigint, amount: bigint) {
     if (!dead.staker) return
     const key = pepeId.toString()
     setUnlockErr(null)
@@ -107,7 +108,7 @@ export default function PostRound({
       await writeContractAsync({
         address: dead.staker,
         abi: stakerAbi,
-        functionName: 'withdraw',
+        functionName: amount > 0n ? 'withdraw' : 'claimFees',
         args: [pepeId],
       })
     } catch (e) {
@@ -140,8 +141,8 @@ export default function PostRound({
           {/* ── redeem PSP → mixETH ─────────────────────────────────────── */}
           <Card title="redeem your psp">
             <p className="mt-1 text-xs text-text-lo">
-              burn round-{dead.roundId?.toString()} PSP for its pro-rata mixETH. the payout froze at
-              detonation — it does not move, ever.
+              burn round-{dead.roundId?.toString()} PSP for its share of remaining backing.
+              rounding dust stays with the remaining holders.
             </p>
             <div className="mt-3 flex items-baseline justify-between text-sm">
               <span className="text-text-lo">your balance</span>
@@ -209,20 +210,17 @@ export default function PostRound({
                         <span className="tabular font-data text-text-hi">{fmtAmount(p.amount)} psp</span> staked
                       </span>
                       <button
-                        onClick={() => unlock(p.id)}
+                        onClick={() => unlock(p.id, p.amount)}
                         disabled={busy}
                         data-pending={busy || undefined}
                         className="relative shrink-0 overflow-hidden rounded-lg border border-line bg-bg-1 px-3 py-1.5 text-xs font-semibold text-text-hi transition hover:border-accent disabled:cursor-wait"
                       >
                         <span className="pl-btn-fill" aria-hidden="true" />
-                        <span className="relative">{busy ? 'unlocking…' : 'unlock'}</span>
+                        <span className="relative">{busy ? 'confirming…' : p.amount > 0n ? 'unlock' : `claim ${fmtAmount(p.pendingFees)} mixETH fees`}</span>
                       </button>
                     </li>
                   )
                 })}
-                {dead.positions.length >= 8 && (
-                  <li className="text-xs text-text-lo">showing the first 8 — the stake page lists the rest.</li>
-                )}
               </ul>
             )}
             {unlockErr && <p className="mt-2 break-words text-xs text-phase-critical">{unlockErr}</p>}

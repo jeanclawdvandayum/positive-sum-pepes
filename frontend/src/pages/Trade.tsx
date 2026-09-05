@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAccount } from 'wagmi'
+import { Link } from 'react-router-dom'
 import SwapCard from '../components/SwapCard'
 import CurveChart from '../components/CurveChart'
 import TickerBar from '../components/TickerBar'
@@ -10,9 +11,10 @@ import { PlayStyles } from './play/PlayStyles'
 import ClockPanel from './play/ClockPanel'
 import Tape from './play/Tape'
 import PotBoard from './play/PotBoard'
-import PostRound from './play/PostRound'
 import { useTradeTape } from './play/useTradeTape'
 import { useLadderBoard } from './play/useLadderBoard'
+import SpawnRoundPanel from './play/SpawnRoundPanel'
+import { ADDRESSES } from '../lib/config'
 import { useDeadRound } from './play/useDeadRound'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,6 +44,7 @@ export default function Trade() {
 
   // the ladder reads the LIVE hook's rolling board while the round trades…
   const liveBoard = useLadderBoard(round.mode === 1 ? round.hook : undefined)
+  const ticketCount = liveBoard.ticketCount
   // …and the dead hook's frozen board once a round has settled
   const settledBoard = useLadderBoard(dead.dead ? dead.hook : undefined)
 
@@ -66,7 +69,17 @@ export default function Trade() {
       <div className="mt-4">
         <Tape entries={tape.entries} />
       </div>
-      {postRound && <PostRound dead={dead} justDetonated={detonated} />}
+      {postRound && dead.dead && (
+        <div className="flex items-center gap-3 rounded-xl border border-line bg-bg-1 p-5 text-sm text-text-lo">
+          <span>
+            round {dead.roundId?.toString()} is flat — redeem your psp from the{' '}
+            <Link to="/graveyard" className="text-accent underline">graveyard</Link>.
+          </span>
+        </div>
+      )}
+      {postRound && dead.roundId !== undefined && (
+        <SpawnRoundPanel factory={ADDRESSES.factory} destroyedRoundId={dead.roundId} />
+      )}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-5">
         {/* audit r2 fix 2: swap column hugs its content (lg:self-start) — the
             ladder owns the tall right column; asymmetric bottoms are
@@ -78,7 +91,10 @@ export default function Trade() {
           <PotBoard
             pot={postRound && dead.dead ? settledBoard.pot : liveBoard.pot}
             tickets={postRound && dead.dead ? settledBoard.seats : liveBoard.seats}
+            ticketCount={liveBoard.ticketCount}
+            staker={postRound && dead.dead ? dead.staker : round.staker}
             settled={postRound && dead.dead}
+            roundId={dead.roundId}
             roundLabel={dead.roundId !== undefined ? `round ${dead.roundId}` : undefined}
             claimable={dead.claimable}
             claimHook={dead.hook}
@@ -86,7 +102,12 @@ export default function Trade() {
         </div>
       </div>
       <div className="mt-4">
-        <CurveChart hasTrades={tape.count > 0} entryPrice={entryPrice} />
+        <CurveChart hasTrades={tape.count > 0 || (ticketCount ?? 0n) > 0n} entryPrice={entryPrice} />
+        {round.swapFeeBps !== undefined && (
+          <p className="mt-2 text-xs font-data text-text-lo" title="the sliding sine fee at the current reserve — 10% pre-wave → 2.5% past the 10k target">
+            trade fee: {(Number(round.swapFeeBps) / 100).toFixed(2)}% of every buy and sell — 60% to stakers · 35% to the ladder pot · rest referrals
+          </p>
+        )}
       </div>
       <div className="mt-4">
         <TickerBar items={tickerItems} />

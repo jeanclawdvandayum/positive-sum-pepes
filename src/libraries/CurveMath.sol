@@ -231,6 +231,19 @@ library CurveMath {
             deltaS = MAX_SUPPLY - currentSupply;
         }
 
+        // AUD-7: Newton's bounded shave may exhaust its budget at extreme
+        // scales. Bracket the integral instead of returning an over-mint.
+        if (curveIntegral(currentSupply, currentSupply + deltaS, cc) > ethInput) {
+            uint256 lo;
+            uint256 hi = deltaS;
+            for (uint256 i; i < 128 && hi - lo > 1; ++i) {
+                uint256 mid = lo + (hi - lo) / 2;
+                if (curveIntegral(currentSupply, currentSupply + mid, cc) <= ethInput) lo = mid;
+                else hi = mid;
+            }
+            deltaS = lo;
+        }
+
         return deltaS;
     }
 
@@ -517,12 +530,16 @@ library CurveMath {
     ///      per LESSONS 2026-08-24 / 2026-08-18): TIMINGS_COUNT fields, each
     ///      TIMINGS_WIDTH = 256 / TIMINGS_COUNT bits wide, laid out at
     ///      k * TIMINGS_WIDTH. Fields: [0] predeposit window, [1] unstake vest,
-    ///      [2] per-wallet predeposit cap (whole mixETH). The vote slot died
-    ///      with governance; the flat-exit window died with indefinite
-    ///      redemption. timings == 0 encodes "mainnet defaults" in
-    ///      RoundController.
-    uint256 internal constant TIMINGS_COUNT = 3;
-    uint256 internal constant TIMINGS_WIDTH = 256 / TIMINGS_COUNT; // 85 bits — ~10^25 years
+    ///      [2] detonation window in SECONDS (0 = hook default 72h), [3]
+    ///      per-wallet predeposit cap (whole mixETH; 0 = uncapped). The vote
+    ///      slot died with governance; the flat-exit window died with
+    ///      indefinite redemption. The det window joined 2026-09-03: a fixed
+    ///      72h ceiling on curves that mint millions of whole PSP per buy
+    ///      pins the clock to its cap on every trade. The cap slot moved
+    ///      170→192 with the width change; timings == 0 encodes "mainnet
+    ///      defaults" in RoundController AND the hook.
+    uint256 internal constant TIMINGS_COUNT = 4;
+    uint256 internal constant TIMINGS_WIDTH = 256 / TIMINGS_COUNT; // 64 bits — ~5.8e11 years
     uint256 internal constant TIMINGS_MASK = (1 << TIMINGS_WIDTH) - 1;
 
     /// @dev COMPILE-TIME LAYOUT ASSERT (do not remove): the last field must
@@ -547,17 +564,22 @@ library CurveMath {
         return predeposit | (vest << TIMINGS_WIDTH);
     }
 
-    /// @dev 3-slot profile: the two timing slots plus a per-wallet predeposit
-    ///      cap in WHOLE mixETH (wad values don't fit the width; 10 = 10e18
+    /// @dev 4-slot profile: the two timing slots, the detonation window in
+    ///      SECONDS (0 = hook default 72h), and a per-wallet predeposit cap
+    ///      in WHOLE mixETH (wad values don't fit the width; 10 = 10e18
     ///      wei). 0 = uncapped. packTimings output is a valid prefix (its
-    ///      slot-3 reads zero).
+    ///      slot-2/3 reads zero → det default + uncapped).
     function packTimingsCapped(
         uint256 predeposit,
         uint256 vest,
+        uint256 detWindowSeconds,
         uint256 walletCapMix
     ) internal pure returns (uint256) {
+        if (detWindowSeconds >= (1 << TIMINGS_WIDTH)) revert TimingsOverflow();
         if (walletCapMix >= (1 << TIMINGS_WIDTH)) revert TimingsOverflow();
-        return packTimings(predeposit, vest) | (walletCapMix << (2 * TIMINGS_WIDTH));
+        return packTimings(predeposit, vest)
+            | (detWindowSeconds << (2 * TIMINGS_WIDTH))
+            | (walletCapMix << (3 * TIMINGS_WIDTH));
     }
 
     error TimingsOverflow();

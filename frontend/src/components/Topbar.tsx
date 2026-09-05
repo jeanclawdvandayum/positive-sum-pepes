@@ -1,7 +1,8 @@
+import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useMemo, useState } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { NavLink, useLocation, Link } from 'react-router-dom'
-import { useAccount, useWriteContract } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { renderPepeSvg, randomDna } from '../lib/pepeRender'
 import { ADDRESSES, FAUCET_ENABLED } from '../lib/config'
 import { faucetAbi } from '../lib/abi'
@@ -22,6 +23,7 @@ const baseLinks = [
   { to: '/', label: 'explainer' },
   { to: '/play', label: 'play' },
   { to: '/stake', label: 'stake' },
+  { to: '/graveyard', label: 'graveyard' },
 ]
 
 export default function Topbar() {
@@ -149,7 +151,7 @@ export function FaucetButton({ full = false }: { full?: boolean }) {
   const { isConnected } = useAccount()
   const [step, setStep] = useState<'idle' | 'tx' | 'done'>('idle')
   const [mintAmount, setMintAmount] = useState('1000')
-  const { writeContractAsync } = useWriteContract()
+  const { writeContractAsync } = useConfirmedWrite()
 
   function amountWad(): bigint | null {
     const n = Number(mintAmount)

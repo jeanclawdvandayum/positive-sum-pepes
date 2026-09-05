@@ -1,6 +1,8 @@
+import { MIN_BUY_INPUT } from '../lib/gameRules'
+import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAccount, useWriteContract } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { controllerAbi, erc20Abi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
 import { CHAIN_ID, FAUCET_ENABLED, NATIVE_ETH_FAUCET_URL, TESTNET_ETH_FAUCET } from '../lib/config'
@@ -119,7 +121,7 @@ export default function Predeposit() {
   const [step, setStep] = useState<Step>('idle')
   const [launchStep, setLaunchStep] = useState<'idle' | 'tx' | 'done'>('idle')
   const [error, setError] = useState<string | null>(null)
-  const { writeContractAsync } = useWriteContract()
+  const { writeContractAsync } = useConfirmedWrite()
 
   const amountWad = parseAmountToWad(amount)
   const hasAllowance = allowance !== undefined && amountWad > 0n && allowance >= amountWad
@@ -154,7 +156,7 @@ export default function Predeposit() {
   const badge = mode !== undefined ? MODE_BADGES[mode] : undefined
   const launched = pd?.closed === true && (mode ?? 0) >= 1
   const canSubmit =
-    isConnected && !!round.controller && amountWad > 0n && balanceOk && !walletCapExceeded && !busy && !pd?.closed && !pd?.launchable
+    isConnected && !!round.controller && amountWad >= MIN_BUY_INPUT && balanceOk && !walletCapExceeded && !busy && !pd?.closed && !pd?.launchable
 
   async function fail(e: unknown) {
     setError(e instanceof Error ? e.message.slice(0, 140) : 'transaction failed')
@@ -162,7 +164,7 @@ export default function Predeposit() {
   }
 
   async function runDeposit() {
-    if (!round.controller || amountWad <= 0n) return
+    if (!round.controller || amountWad < MIN_BUY_INPUT) return
     setError(null)
     try {
       if (!round.mix) return
@@ -220,7 +222,7 @@ export default function Predeposit() {
   const cta = !isConnected
     ? 'connect wallet'
     : amountWad <= 0n
-      ? 'enter an amount'
+      ? 'enter an amount (minimum 0.005 mixETH)'
       : !balanceOk
         ? 'insufficient mixETH'
         : step === 'approve'

@@ -1,7 +1,29 @@
 # TODO — Deploy Positive Sum Pepes on Sepolia
 
-End-to-end checklist for shipping a playtest round of PSP to Sepolia
-(chain `11155111`). Work top to bottom; every box is a verifiable step.
+End-to-end checklist for shipping a playtest round of PSP. Work top to
+bottom; every box is a verifiable step.
+
+**2026-09-03 BASE SEPOLIA DEPLOY-READY (sigma-testnet).** Everything below is
+prepared; the only manual step is filling `example.env` (→ `.env`):
+1. `example.env` rewritten Base-Sepolia-first: `BASE_SEPOLIA_RPC_URL`,
+   `PSP_PM=0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408` (canonical 84532 PM),
+   Coinbase/Alchemy native-ETH faucet links, and the full VITE_ half incl.
+   `VITE_MIX` / `VITE_FAUCET` (faucet UI is env-gated) and `VITE_REINVESTOR`.
+2. **RETIRED knobs deleted from the env template**: `PSP_VOTE_SEC` (carpet
+   governance is gone — the detonation clock replaced it, CLOCK-REDESIGN §4)
+   and `PSP_CURVE` (sine-only since 77a528d4). Live knobs:
+   `PSP_PREDEPOSIT_SEC` / `PSP_VEST_SEC` / `PSP_WALLET_CAP_MIX` (fast-playtest
+   defaults 2h / 1h / 10) + optional `PSP_SINE_*` shape overrides.
+3. `foundry.toml`: `[profile.base_sepolia]` + `base_sepolia` etherscan entry
+   (Etherscan V2 — the one key verifies on 84532/Basescan).
+4. `frontend/.env.basesepolia.example` added (84532 wiring already in
+   `src/lib/config.ts`: Coinbase faucet link, TESTNET_ETH_FAUCET).
+5. Deploy flow = `DeployPSP --slow` THEN `DeployReinvestor` with
+   `PSP_FACTORY` + `PSP_ZAPIN` from the console (staged addresses are
+   entropy-salted; sim ≠ broadcast). The checklist below still says ETH
+   Sepolia + governance-era knobs in places — the 2026-08-28 CHAIN DECISION
+   block and this note supersede those lines. Fork dry-run status: see the
+   2026-09-03 GATE-LOG entry.
 
 **2026-08-29 PLAYTEST WAVE 2 (scoopy's demo feedback, sepolia-fixes branch):**
 1. UI max-selectors everywhere (swap pay box, predeposit commit, stake) —

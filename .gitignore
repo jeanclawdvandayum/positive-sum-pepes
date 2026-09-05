@@ -20,3 +20,6 @@ frontend/tsconfig.tsbuildinfo
 .DS_Store
 **/__pycache__/
 *.DS_Store
+
+# Frontend uses npm/package-lock.json; preserve but ignore local pnpm lock artifacts.
+frontend/pnpm-lock.yaml

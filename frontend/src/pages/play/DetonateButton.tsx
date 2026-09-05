@@ -1,3 +1,4 @@
+import { useConfirmedWrite } from '../../lib/useConfirmedWrite'
 // ─────────────────────────────────────────────────────────────────────────────
 // DetonateButton — the zero-hour trigger (CLOCK-REDESIGN §4, §6.3).
 //
@@ -15,8 +16,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from 'react'
-import { useWriteContract } from 'wagmi'
-import { hookAbi } from '../../lib/abi'
+
+import { controllerAbi } from '../../lib/abi'
 import { usePhase } from '../../phase/PhaseEngine'
 import type { RoundInfo } from '../../lib/useRound'
 import { PixelIcon } from '../../components/PixelIcon'
@@ -33,21 +34,22 @@ export default function DetonateButton({
   const { zero } = usePhase()
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
-  const { writeContractAsync } = useWriteContract()
+  const { writeContractAsync } = useConfirmedWrite()
 
   // the clock still lives, or the round already left Active (detonated by
   // someone else / flattened) — nothing to press
-  if (!zero || round.mode !== 1 || !round.hook) return null
+  if (!zero || round.mode !== 1 || !round.controller) return null
 
   async function detonate() {
-    if (!round.hook || step !== 'idle') return
+    if (!round.controller || step !== 'idle') return
     setError(null)
     setStep('pending')
     try {
       await writeContractAsync({
-        address: round.hook,
-        abi: hookAbi,
+        address: round.controller,
+        abi: controllerAbi,
         functionName: 'detonate',
+        gas: 1_000_000n, // settlement only; successor uses resumable birth steps
       })
       setStep('done')
       onDetonated()

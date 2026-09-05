@@ -13,14 +13,6 @@ test:
 test-fork:
 	forge test --match-path "test/integration/*" --fork-url $(MAINNET_RPC_URL) -vvv
 
-# Run only the V4 integration test
-test-v4:
-	forge test --match-contract V4IntegrationTest --fork-url $(MAINNET_RPC_URL) -vvv
-
-# Run destruction lifecycle test
-test-destroy:
-	forge test --match-contract ForkDestructionTest --fork-url $(MAINNET_RPC_URL) -vvv
-
 # Build
 build:
 	forge build

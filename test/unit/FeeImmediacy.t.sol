@@ -18,6 +18,20 @@ contract MockFactory2 {
     constructor() { owner = msg.sender; }
 }
 
+contract CallbackFeeHook {
+    IERC20 private immutable mix;
+    PSPStaker private immutable staking;
+    address private immutable from;
+    address private immutable to;
+    bool public blocked;
+    constructor(IERC20 m, PSPStaker s, address f, address t) { mix=m; staking=s; from=f; to=t; }
+    function sendFees(address recipient, uint256 amount) external {
+        (bool ok, bytes memory reason) = address(staking).call(abi.encodeCall(staking.transferFrom, (from, to, 101)));
+        blocked = !ok && bytes4(reason) == bytes4(keccak256("ReentrancyGuardReentrantCall()"));
+        mix.transfer(recipient, amount);
+    }
+}
+
 /// @title FeeImmediacyTest — scoopy's must-fix (2026-08-28): trading fees must
 ///         be assigned and claimable AS THEY COME IN, not at epoch close.
 ///         Follow-up (2026-08-28b): a fresh stake must earn on the SUBSEQUENT
@@ -33,8 +47,8 @@ contract MockFactory2 {
 ///            now works — capital-at-risk for one event's pro-rata share;
 ///         4. claims are checkpointed — no double pay on re-claim;
 ///         5. wei-scale dust is never stranded (rolling remainder);
-///         6. decayers claiming epochs late get the blessed approximation:
-///            ≤ bucket-exact share, never more (solvency preserved);
+///         6. decayers keep fees earned at each historical weight, regardless
+///            of when they claim;
 ///         7. Σ position weights == totalWeight() at every instant.
 contract FeeImmediacyTest is Test {
     RoundController controller;
@@ -227,9 +241,39 @@ contract FeeImmediacyTest is Test {
         assertEq(mixETH.balanceOf(alice), 2);
     }
 
-    // ── 6) decayer approximation: under-credits only, never over ──
+    function test_PermissionlessTopupCannotStealOwnersFees() public {
+        _feedFees(100e18);
+        vm.prank(bob);
+        stakerV.stakeFor(alice, 101, 1);
+        assertEq(mixETH.balanceOf(alice), 50e18, "AUD-13: accrued fees belong to NFT owner");
+        assertEq(mixETH.balanceOf(bob), 0, "donor must not receive victim fees");
+        assertEq(stakerV.pendingFeesOf(101), 0, "owner settlement checkpointed");
+        assertEq(stakerV.pendingFeesOf(202), 50e18, "donor keeps only their own entitlement");
+    }
 
-    function test_DecayerLateClaimUndercreditsOnly() public {
+    function test_PermissionlessTopupCannotForfeitOwnersFees() public {
+        _feedFees(100e18);
+        hook.drainAll(address(this)); // reproduce unavailable fee backing
+        vm.prank(bob);
+        vm.expectRevert(MockHook.InsufficientFees.selector);
+        stakerV.stakeFor(alice, 101, 1);
+        assertEq(stakerV.pendingFeesOf(101), 50e18, "donor cannot erase victim entitlement");
+    }
+
+    function test_FractionalCreditIsNotRecycledAsPendingFees() public {
+        vm.prank(alice);
+        stakerV.stakeFor(alice, 101, 1); // make total weight indivisible by precision
+        for (uint256 i = 1; i <= 20; ++i) {
+            _feedFees(1);
+            uint256 promised = stakerV.pendingFeesOf(101) + stakerV.pendingFeesOf(202)
+                + stakerV.pendingFeesMixETH();
+            assertLe(promised, i, "AUD-12: fractional credits allocated twice");
+        }
+    }
+
+    // ── 6) earned fees are preserved across epoch boundaries ──
+
+    function test_DecayerLateClaimPreservesEarnedFees() public {
         vm.prank(alice);
         stakerV.requestWithdraw(101); // r=2, settles nothing yet
 
@@ -242,7 +286,7 @@ contract FeeImmediacyTest is Test {
         // alice does NOT claim; her weight keeps decaying
         vm.warp(t0 + 3 * EPOCH); // epoch 5: alice k=3
         uint256 pending = stakerV.pendingFeesOf(101);
-        assertLt(pending, bucketExact, "late claim uses decayed weight (blessed approximation)");
+        assertEq(pending, bucketExact, "earned fees never decay");
         assertGt(pending, 0);
 
         // bob (static) is still bucket-exact
@@ -258,15 +302,120 @@ contract FeeImmediacyTest is Test {
         );
     }
 
-    // ── 7) documented forfeit: decayed-to-zero without claiming ──
+    // ── 7) mature withdrawals settle all historical fees ──
 
-    function test_FullyDecayedUnclaimedForfeits() public {
+    function test_FullyDecayedUnclaimedFeesSurvive() public {
         vm.prank(alice);
         stakerV.requestWithdraw(101); // r=2
         vm.warp(t0 + 1 * EPOCH); // epoch 3
         _feedFees(150e18); // earned at 5/6 weight
 
         vm.warp(t0 + 6 * EPOCH); // epoch 8: k=6, weight zero, never claimed
-        assertEq(stakerV.pendingFeesOf(101), 0, "documented: claim before your vest runs out");
+        assertGt(stakerV.pendingFeesOf(101), 0, "earned fees survive full vesting");
+        uint256 earned = stakerV.pendingFeesOf(101);
+        vm.prank(alice);
+        stakerV.withdraw(101);
+        assertEq(mixETH.balanceOf(alice), earned);
+    }
+
+    function test_ClaimFrequencyDoesNotChangeVestingEarnings() public {
+        vm.prank(alice); stakerV.requestWithdraw(101);
+        vm.prank(bob); stakerV.requestWithdraw(202);
+        for (uint256 k; k < 6; ++k) {
+            vm.warp(t0 + k * EPOCH);
+            _feedFees(3e18 + k); // odd wei, carried between frequent claims
+            vm.prank(alice); stakerV.claimFees(101);
+        }
+        vm.warp(t0 + 10 * EPOCH);
+        vm.prank(bob); stakerV.claimFees(202);
+        assertEq(mixETH.balanceOf(alice), mixETH.balanceOf(bob));
+        assertLe(stakerV.totalFeesPaid(), stakerV.totalFeesReceived());
+    }
+
+    function test_GenesisPartialClaimsPreserveRemainingOwnersFees() public {
+        vm.prank(address(controller)); stakerV.lockGenesis(2000e18);
+        _feedFees(120e18);
+        vm.prank(address(controller)); stakerV.claimGenesisShare(carol, 500e18);
+        assertEq(mixETH.balanceOf(carol), 15e18);
+        assertEq(stakerV.pendingFeesOf(0), 45e18);
+        _feedFees(40e18);
+        vm.prank(address(controller)); stakerV.claimGenesisShare(bob, 1500e18);
+        assertEq(mixETH.balanceOf(bob), 60e18);
+        assertEq(stakerV.pendingFeesOf(0), 0);
+        assertEq(stakerV.totalWeight(), 4000e18);
+    }
+
+    function test_DeferredFeesStayClaimableOnWithdrawnHusk() public {
+        _feedFees(100e18);
+        hook.drainAll(address(this));
+        vm.prank(alice); stakerV.requestWithdraw(101);
+        vm.warp(t0 + 6 * EPOCH);
+        vm.prank(alice); stakerV.withdraw(101);
+        assertEq(stakerV.pendingFeesOf(101), 50e18);
+        assertEq(pspToken.balanceOf(alice), 10_000e18);
+        mixETH.transfer(address(hook), 100e18);
+        vm.prank(alice); stakerV.transferFrom(alice, carol, 101);
+        vm.prank(carol); stakerV.claimFees(101);
+        assertEq(mixETH.balanceOf(carol), 50e18);
+        assertEq(stakerV.pendingFeesOf(101), 0);
+    }
+
+    function test_CancelAfterYearsRestoresWeightWithoutRetiredSlopeUnderflow() public {
+        vm.prank(alice); stakerV.requestWithdraw(101);
+        vm.warp(t0 + 100 * 365 days);
+        assertEq(stakerV.totalWeight(), 1000e18);
+        vm.prank(alice); stakerV.cancelWithdraw(101);
+        assertEq(stakerV.totalWeight(), 2000e18);
+        skip(10 * EPOCH);
+        assertEq(stakerV.totalWeight(), 2000e18);
+        _feedFees(100e18);
+        assertEq(stakerV.pendingFeesOf(101), 50e18);
+    }
+
+    function test_FlatWithdrawUnschedulesOnlyWithdrawingPosition() public {
+        vm.prank(alice); stakerV.requestWithdraw(101);
+        vm.prank(bob); stakerV.requestWithdraw(202);
+        vm.warp(t0 + EPOCH);
+        vm.mockCall(address(controller), abi.encodeWithSelector(controller.flatTime.selector), abi.encode(block.timestamp));
+        vm.prank(alice); stakerV.withdraw(101);
+        for (uint256 k = 1; k <= 8; ++k) {
+            vm.warp(t0 + k * EPOCH);
+            assertEq(stakerV.totalWeight(), stakerV.weightAt(202, t0 / EPOCH + k));
+        }
+        vm.prank(bob); stakerV.withdraw(202);
+        assertEq(stakerV.totalLocked(), 0);
+        assertEq(stakerV.totalWeight(), 0);
+    }
+
+    function test_RequestAtEpochZeroUsesExplicitFlag() public {
+        // New staker has no historical points; epoch zero is a valid anchor.
+        vm.warp(1);
+        PSPStaker fresh = new PSPStaker(IERC20(address(pspToken)), stakerV.controller(), address(0));
+        vm.startPrank(alice);
+        pspToken.approve(address(fresh), type(uint256).max);
+        fresh.lockWithPepe(600e18, 1);
+        fresh.requestWithdraw(1);
+        assertTrue(fresh.isWithdrawing(1));
+        vm.expectRevert(PSPStaker.RequestActive.selector);
+        fresh.stakeFor(alice, 1, 1);
+        vm.stopPrank();
+        skip(6 * EPOCH);
+        assertEq(fresh.totalWeight(), 0);
+        vm.prank(alice); fresh.withdraw(1);
+        assertFalse(fresh.isWithdrawing(1));
+    }
+
+    function test_FeePayoutCallbackCannotMovePositionMidSettlement() public {
+        _feedFees(100e18);
+        CallbackFeeHook callback = new CallbackFeeHook(IERC20(address(mixETH)), stakerV, alice, carol);
+        mixETH.transfer(address(callback), 100e18);
+        vm.prank(alice); stakerV.setApprovalForAll(address(callback), true);
+        vm.mockCall(address(controller), abi.encodeWithSelector(controller.hookAddress.selector), abi.encode(address(callback)));
+        vm.prank(alice); stakerV.requestWithdraw(101);
+        assertTrue(callback.blocked(), "cross-function callback rejected");
+        assertEq(stakerV.ownerOf(101), alice);
+        assertEq(mixETH.balanceOf(alice), 50e18);
+        assertTrue(stakerV.isWithdrawing(101));
+        assertEq(stakerV.pendingFeesOf(101), 0);
     }
 }

@@ -84,7 +84,10 @@ contract SpawnStaging is CBase {
             address controller,
             address hook,
             bytes32 contextHash,
-            bool active
+            bool active,
+            string memory name,
+            string memory symbol,
+            uint8 phase
         ) = factory.reservation();
         r = PSPFactory.SpawnReservation({
             fromRoundId: fromRoundId,
@@ -96,7 +99,10 @@ contract SpawnStaging is CBase {
             controller: controller,
             hook: hook,
             contextHash: contextHash,
-            active: active
+            active: active,
+            name: name,
+            symbol: symbol,
+            phase: phase
         });
     }
 

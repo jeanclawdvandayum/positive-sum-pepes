@@ -14,7 +14,11 @@ import {Vm} from "forge-std/Vm.sol";
 import {CurveHook} from "../../src/CurveHook.sol";
 import {RoundController} from "../../src/RoundController.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
+import {HookDeployer} from "../../src/HookDeployer.sol";
+import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
+import {StakerDeployer} from "../../src/StakerDeployer.sol";
 import {PSPStaker} from "../../src/PSPStaker.sol";
+import {CurveMath} from "../../src/libraries/CurveMath.sol";
 import {PSPToken} from "../../src/PSPToken.sol";
 
 /// @title ClockDetonation — the CLOCK-REDESIGN §7 test matrix
@@ -124,46 +128,23 @@ contract ClockDetonation is CBase {
         uint256 launchTs = _launchLive();
         assertEq(hook1.detonationAt(), launchTs + 72 hours, "armed at now + DET_WINDOW");
         assertEq(hook1.DET_WINDOW(), 72 hours, "window constant");
-        assertEq(hook1.TIME_PER_PSP(), 5 minutes, "time-per-psp constant");
+        assertEq(hook1.TIME_PER_UNIT(), 260, "seconds per mixETH unit");
     }
 
-    /// A 2.49-psp buy adds EXACTLY +10:00 (floor(2.49) = 2 whole PSP) —
-    /// discrete injection, and the TimeAdded tape event fires.
-    function test_Clock_Buy2_49PSP_AddsExactly10Minutes() public {
+    /// Two whole mixETH units plus a remainder add exactly 8m40s.
+    function test_Clock_TwoUnits_AddExactly520Seconds() public {
         _launchLive();
-        vm.warp(block.timestamp + 1 hours); // burn some window first — a
-        // buy in the launch block itself is fully capped away (remaining
-        // already == 72h)
+        skip(1 hours);
         uint256 armed = hook1.detonationAt();
-
-        // calibrate: smallest input whose buy output crosses 2 WHOLE psp
-        // (deterministic — the view is pure). Target: out in [2e18, 3e18).
-        uint256 lo = 1e15;
-        uint256 hi = 400e18;
-        while (lo + 1 < hi) {
-            uint256 mid = (lo + hi) / 2;
-            if (hook1.getBuyOutput(mid) / 1e18 >= 2) hi = mid;
-            else lo = mid;
-        }
-        uint256 amt = hi;
-        uint256 expectOut = hook1.getBuyOutput(amt);
-        assertGe(expectOut / 1e18, 2, "calibrated to >= 2 whole");
-        assertLt(expectOut / 1e18, 3, "calibrated to < 3 whole");
-
-        // FIX (harness, 2026-09-01): vm.expectEmit before _buyAs bound to
-        // the FIRST call inside (mixETH.transfer) — its Transfer event ate
-        // the slot. Fund + approve first, then bind the emit to the SWAP
-        // call itself.
+        uint256 amt = 0.01249e18;
         mixETH.transfer(alice, amt);
         vm.startPrank(alice);
         mixETH.approve(address(tSwapper), amt);
         vm.expectEmit(true, false, false, true, address(hook1));
-        emit CurveHook.TimeAdded(address(tSwapper), expectOut / 1e18, armed + 10 minutes);
-        uint256 out = tSwapper.buy(_key(), amt, alice, alice);
+        emit CurveHook.TimeAdded(alice, 520, armed + 520);
+        tSwapper.buy(_key(), amt, alice, alice);
         vm.stopPrank();
-        assertEq(out, expectOut, "execution matches the calibrated view");
-
-        assertEq(hook1.detonationAt(), armed + 10 minutes, "+5 min per whole psp, floored at 2");
+        assertEq(hook1.detonationAt(), armed + 520);
     }
 
     /// Extension cap: remaining may never exceed 72h — a monster buy pins
@@ -240,11 +221,14 @@ contract ClockDetonation is CBase {
         uint256[12] memory outs; // ticket pspAmount is the PSP OUT of the buy
         for (uint256 i; i < 12; ++i) {
             buyers[i] = makeAddr(string.concat("buyer-", vm.toString(i)));
-            outs[i] = _buyAs(buyers[i], 1e18 + i); // distinct mix sizes
+            // 2026-09-03: seats = min(wholePSP, 10) — size each buy just
+            // over one whole PSP (~1.04 psp out at P0=0.001) so every
+            // buyer takes exactly ONE seat and the board stays distinct.
+            outs[i] = _buyAs(buyers[i], 5e15 + i);
             vm.warp(block.timestamp + 60); // separate the seats in time
         }
 
-        assertEq(hook1.ticketCount(), 12, "every buy tx is a ticket");
+        assertEq(hook1.ticketCount(), 12, "one whole PSP = one seat, 12 seats");
         assertEq(hook1.seatedCount(), 10, "board holds the newest 10");
         for (uint256 i; i < 10; ++i) {
             (address who, uint256 pspAmt,,) = hook1.board(i);
@@ -266,9 +250,9 @@ contract ClockDetonation is CBase {
     /// rungs in one call.
     function test_Board_SameAddressTwice_TwoSeatsOneClaim() public {
         _launchLive();
-        uint256 out2e = _buyAs(alice, 2e18);
+        uint256 out2e = _buyAs(alice, 5e15); // ~1 whole psp -> 1 seat
         vm.warp(block.timestamp + 60);
-        uint256 out3e = _buyAs(alice, 3e18);
+        uint256 out3e = _buyAs(alice, 7e15); // ~1.6 whole psp -> 1 seat
 
         assertEq(hook1.seatedCount(), 2, "alice holds both seats");
         assertEq(hook1.ticketCount(), 2, "two buy txs, two tickets");
@@ -305,14 +289,14 @@ contract ClockDetonation is CBase {
         address[10] memory buyers;
         for (uint256 i; i < 10; ++i) {
             buyers[i] = makeAddr(string.concat("ten-", vm.toString(i)));
-            _buyAs(buyers[i], 2e18);
+            _buyAs(buyers[i], 5e15 + i * 1e14); // ~1 whole psp -> 1 seat
             vm.warp(block.timestamp + 60);
         }
         // §3 REVISED wiring: the unattributed 35% + 4% + dust legs of every
         // 5% fee landed in the pot — assert the escrow is exactly that sum
         // (deterministic full-chain: fee bps -> split bps -> pot). For an
         // unattributed trade the legs conserve: pot leg == fee - staker - rake
-        uint256 expectedPot;
+        uint256 expectedPot = 40e18; // genesis launch fee: 10% of the 400-mix boot
         {
             for (uint256 i; i < 10; ++i) {
                 (, uint256 pspAmt, uint256 mixPaid,) = hook1.board(i);
@@ -358,11 +342,11 @@ contract ClockDetonation is CBase {
         address b0 = makeAddr("small0");
         address b1 = makeAddr("small1");
         address b2 = makeAddr("small2");
-        _buyAs(b0, 5e18);
+        _buyAs(b0, 5e15); // ~1 whole psp -> 1 seat
         vm.warp(block.timestamp + 60);
-        _buyAs(b1, 5e18);
+        _buyAs(b1, 5e15);
         vm.warp(block.timestamp + 60);
-        _buyAs(b2, 5e18);
+        _buyAs(b2, 5e15);
 
         vm.warp(hook1.detonationAt() + 1);
         vm.prank(rando);
@@ -391,9 +375,9 @@ contract ClockDetonation is CBase {
         _launchLive();
         address b0 = makeAddr("early");
         address b1 = makeAddr("late");
-        _buyAs(b0, 5e18);
+        _buyAs(b0, 5e15); // ~1 whole psp -> 1 seat
         vm.warp(block.timestamp + 60);
-        _buyAs(b1, 5e18);
+        _buyAs(b1, 5e15);
 
         vm.warp(hook1.detonationAt() + 1);
         vm.prank(rando);
@@ -673,4 +657,100 @@ contract ClockDetonationBoom is CBase {
             hooks: IHooks(address(hook2))
         });
     }
+
+    /// 2026-09-03: one ladder seat per WHOLE PSP bought (was one per buy tx).
+    function test_Ladder_SeatsPerWholePSP() public {
+        _launchLive();
+        uint256 tc0 = hook1.ticketCount();
+        uint256 pspOut = _buyAs(alice, 0.05e18); // small buy
+        assertGt(pspOut, 0, "buy produced output");
+        uint256 expect = 10;
+        assertEq(hook1.ticketCount() - tc0, expect, "seats = min(wholePSP, 10)");
+        if (expect != 0) {
+            (address who, uint256 seatPsp, , ) = hook1.board(0);
+            assertEq(who, alice, "newest seat = buyer");
+            assertEq(seatPsp, pspOut / 10, "per-seat psp = buy / wholePSP");
+        }
+    }
+
+    /// A whale buy that mints >= 10 whole PSP takes the ENTIRE board.
+    function test_Ladder_WhaleBuyTakesWholeBoard() public {
+        _launchLive();
+        uint256 tc0 = hook1.ticketCount();
+        _buyAs(alice, 50e18); // deep buy — wholePSP >> 10
+        assertEq(hook1.ticketCount() - tc0, 10_000, "absolute units include evicted tickets");
+        for (uint256 i; i < 10; ++i) {
+            (address who, , , ) = hook1.board(i);
+            assertEq(who, alice, "whale owns every seat");
+        }
+    }
+}
+
+// ─────────────── 2026-09-03 additions ───────────────
+// Ladder seats per WHOLE PSP (was: one seat per buy tx) + tunable det
+// window (packed timing slot [2]; 0 = 72h hook default).
+
+/// @dev CBase curve has timings == 0 → detWindow must decode to the 72h
+///      hook default even though the pack layout changed around it.
+contract DetWindowDefault is CBase {
+    TicketSwapper tSwapper;
+
+    function setUp() public virtual override {
+        super.setUp();
+        tSwapper = new TicketSwapper(IPoolManager(address(poolManager)), IERC20(address(mixETH)));
+    }
+
+    function test_DetWindow_DefaultsTo72h_WhenTimingsZero() public view {
+        assertEq(hook1.detWindow(), 72 hours, "slot [2] zero = 72h default");
+    }
+}
+
+/// @dev A factory deployed with a PACKED profile carrying a short det
+///      window arms the clock with it — the 2026-09-03 playtest knob.
+contract DetWindowTunable is CBase {
+    TicketSwapper tSwapper;
+    PSPFactory f;
+
+    function setUp() public virtual override {
+        super.setUp();
+        tSwapper = new TicketSwapper(IPoolManager(address(poolManager)), IERC20(address(mixETH)));
+
+        f = new PSPFactory(
+            IPoolManager(address(poolManager)),
+            IERC20(address(mixETH)),
+            new HookDeployer(),
+            new ControllerDeployer(),
+            new StakerDeployer(),
+            CurveMath.packTimingsCapped(2 hours, 1 hours, 30 minutes, 10),
+            address(this)
+        );
+        f.setDescriptor(address(0xDead)); // any non-zero: staker art wiring
+        f.deployRound(
+            PSPFactory.RoundParams({
+                name: "Tuned",
+                symbol: "TND",
+                curveConfig: _curve()
+            })
+        );
+    }
+
+    function test_DetWindow_FromPackedSlot() public view {
+        assertEq(f.getRound(1).hook.detWindow(), 30 minutes, "slot [2] decoded");
+    }
+
+    function test_DetWindow_ExtensionCappedAtTunedWindow() public {
+        // launch via controller machinery: predeposit + launch (owner early)
+        // — reuse the CBase flow shape but on the tuned factory.
+        PSPFactory.Round memory r = f.getRound(1);
+        RoundController c = r.controller;
+        mixETH.depositETH{value: 1000e18}();
+        mixETH.approve(address(c), 10e18);
+        c.predeposit(10e18); // exactly at the packed 10-mix wallet cap
+
+        vm.prank(address(f)); // the factory is the controller's owner
+        c.launchPooledBuy();
+        assertEq(uint8(r.hook.mode()), uint8(CurveHook.Mode.Active), "live");
+        assertEq(r.hook.detonationAt() - block.timestamp, 30 minutes, "armed at tuned window");
+    }
+
 }

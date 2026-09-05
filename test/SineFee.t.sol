@@ -72,8 +72,8 @@ contract SineFee is Test {
         factory.configureSine(SineMath.Params({
             p0: 1e13,
             preK: 4_605_170_185_988_092,
-            magM: 20e18,
-            lnTop: 6_396_929_655_216_146_432,
+            pTarget: 0.06e18,
+            targetReserve: 10_000e18,
             ampBps: 10_000
         }));
 
@@ -130,14 +130,17 @@ contract SineFee is Test {
         });
     }
 
-    /// The three regions, read straight off the fee view.
+    /// The fee regions, read straight off the fee view. 2026-09-03: the
+    /// decay region now ends at the TARGET reserve (10k mix — the wave is
+    /// indefinite), not a magM-derived span.
     function test_FeeRegions() public {
-        _launch(100e18); // boot = 100 mix
-        // auto-getter omits cp[]: (p0, preK, boot, span, segWidth, lam, B,
-        // slope, amp, pTop, tailSlope, q0, qTop)
-        (,, uint256 boot, uint256 span,,,,,,,,,) = hook1.sineCurve();
-        assertEq(boot, 100e18, "boot = actual raise");
-        assertEq(span, 2000e18, "span = magM x boot");
+        _launch(100e18); // boot = 90 mix (post genesis pot fee)
+        // auto-getter: (p0, preK, boot, targetReserve, lam, B, slope, amp,
+        // g, W, q0)
+        (,, uint256 boot, uint256 target,,,,,,,) = hook1.sineCurve();
+        assertEq(boot, 90e18, "boot = actual raise minus the genesis pot fee");
+        assertEq(target, 10_000e18, "target reserve = 10k mix (scoopy target)");
+        assertEq(hook1.detWindow() != 0, true, "hook live");
 
         // launch seam: R == boot → pre-wave fee (r <= boot)
         assertEq(hook1.reserveMixETH(), boot, "reserve at launch = boot");
@@ -148,17 +151,18 @@ contract SineFee is Test {
         _buy(1000e18);
         uint256 rMid = hook1.reserveMixETH();
         assertGt(rMid, boot, "past the seam");
-        assertLt(rMid, boot + span, "still inside the wave");
+        assertLt(rMid, target, "still inside the wave");
         assertEq(
             uint256(hook1.swapFeeBps()),
-            1000 - ((750 * (rMid - boot)) / span),
+            1000 - ((750 * (rMid - boot)) / (target - boot)),
             "mid-wave: linear in reserve depth"
         );
 
-        // above the wave: R >= boot + span -> 2.5% (buy past the top; the
-        // fee itself is mid-wave-priced, so leave headroom)
-        _buy(2000e18);
-        assertGe(hook1.reserveMixETH(), boot + span, "past the wave top");
+        // past the target reserve: R >= target -> 2.5% (buy past the 10k
+        // target; the fee itself is mid-wave-priced, so leave headroom —
+        // this is a ~20,000-mix buy on a 90-mix boot: deep dust, wave top)
+        _buy(10_000e18); // ~9,100 mix of curve depth needed to cross 10k
+        assertGe(hook1.reserveMixETH(), target, "past the target reserve");
         assertEq(hook1.swapFeeBps(), 250, "2.5% above the sine");
     }
 

@@ -68,23 +68,30 @@ contract C3_Lifecycle is CBase {
         vm.stopPrank();
         assertEq(factory.currentRoundId(), 2, "parallel round became current");
 
-        // the dying round can never hand off now: detonate composes
-        // markDestroyed + spawnNextRound atomically — the spawn leg bounces
-        // NotLatestRound and the WHOLE tx reverts (hook stays Active-past-zero)
+        // the dying round can never hand off now: a parallel round is
+        // current, so the composed spawn leg bounces NotLatestRound.
+        // detonate TOLERATES that (2026-09-03 cap-resilience: on per-tx
+        // capped chains the composed spawn can exceed the cap): the round
+        // still flattens, opens every lock and marks itself destroyed, and
+        // the event carries nextRound = address(0).
         uint256 reserveLocked = mixETH.balanceOf(address(hook1));
         vm.prank(rando);
-        vm.expectRevert(RoundController.FactorySpawnFailed.selector);
+        vm.expectEmit(true, true, true, false, address(controller1)); // ignore pot data
+        emit RoundController.Detonated(rando, 0, address(0));
         controller1.detonate();
 
-        // direct path shows the exact guard
-        vm.prank(address(controller1));
-        factory.markDestroyed(1);
+        assertTrue(factory.getRound(1).destroyed, "round destroyed despite spawn failure");
+        assertEq(uint8(hook1.mode()), uint8(CurveHook.Mode.Flat), "curve flattened");
+        assertGt(controller1.flatTime(), 0, "flatTime stamped");
+        assertEq(factory.reservationActive(), false, "no stray reservation");
+        assertEq(mixETH.balanceOf(address(hook1)), reserveLocked, "old reserve stranded");
+        vm.prank(rando);
+        vm.expectRevert(PSPFactory.NotLatestRound.selector);
+        factory.reserveSpawn(1);
         vm.prank(rando);
         vm.expectRevert(PSPFactory.NotLatestRound.selector);
         factory.spawnNextRound(1);
 
-        assertEq(mixETH.balanceOf(address(hook1)), reserveLocked, "old reserve stranded");
-        assertTrue(factory.getRound(1).destroyed);
         assertFalse(factory.getRound(2).destroyed);
     }
 

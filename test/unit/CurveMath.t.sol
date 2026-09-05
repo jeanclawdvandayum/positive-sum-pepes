@@ -278,9 +278,8 @@ contract CurveMathTest is Test {
     }
 
     function testFuzz_PriceMonotonic(uint256 s1, uint256 s2) public view {
-        vm.assume(s2 > s1);
-        vm.assume(s2 < 50_000_000e18);
-        vm.assume(s1 > 1e18);
+        s1 = bound(s1, 1e18 + 1, 50_000_000e18 - 2);
+        s2 = bound(s2, s1 + 1, 50_000_000e18 - 1);
 
         uint256 p1 = CurveMath.marginalPrice(s1, cc);
         uint256 p2 = CurveMath.marginalPrice(s2, cc);
@@ -327,18 +326,19 @@ contract CurveMathTest is Test {
     //  TIMINGS PACK — CLOCK-REDESIGN §4 (vote slot out, widths derived)
     // ═════════════════════════════════════════════════════════
 
-    /// Layout contract: THREE 85-bit slots derived from the field count —
-    /// [0] predeposit, [1] vest, [2] wallet cap — and the compile-time
-    /// layout guard proves they exactly fill the word (LESSONS 2026-08-24:
-    /// hand-set widths drift; 2026-08-18: the 5x64 vote-slot truncation
-    /// deployed silently once).
+    /// Layout contract: FOUR 64-bit slots derived from the field count —
+    /// [0] predeposit, [1] vest, [2] det window, [3] wallet cap — and the
+    /// compile-time layout guard proves they exactly fill the word (LESSONS
+    /// 2026-08-24: hand-set widths drift; 2026-08-18: the 5x64 vote-slot
+    /// truncation deployed silently once; 2026-09-03: det window joined,
+    /// cap slot moved 170 -> 192).
     function test_TimingsLayout() public pure {
-        assertEq(CurveMath.TIMINGS_COUNT, 3, "three fields");
-        assertEq(CurveMath.TIMINGS_WIDTH, 85, "width derived from count (256/3)");
-        assertEq(CurveMath.TIMINGS_COUNT * CurveMath.TIMINGS_WIDTH, 255, "fits with headroom");
+        assertEq(CurveMath.TIMINGS_COUNT, 4, "four fields");
+        assertEq(CurveMath.TIMINGS_WIDTH, 64, "width derived from count (256/4)");
+        assertEq(CurveMath.TIMINGS_COUNT * CurveMath.TIMINGS_WIDTH, 256, "fills the word exactly");
         // the layout guard constant exists and is a legal shift (compiling
         // already proves it; pin its value so nobody quietly widens a slot)
-        assertEq(CurveMath.TIMINGS_LAYOUT_GUARD, 1 << (255 - 1), "guard = top bit of slot 2");
+        assertEq(CurveMath.TIMINGS_LAYOUT_GUARD, 1 << 255, "guard = top bit of slot 3");
     }
 
     /// packTimings roundtrip: field i lands at i * TIMINGS_WIDTH and
@@ -349,22 +349,25 @@ contract CurveMathTest is Test {
         uint256 packed = CurveMath.packTimings(p, v);
         assertEq(packed & CurveMath.TIMINGS_MASK, p, "slot 0 = predeposit");
         assertEq((packed >> CurveMath.TIMINGS_WIDTH) & CurveMath.TIMINGS_MASK, v, "slot 1 = vest");
-        // prefix property: an uncapped pack leaves slot 2 reading zero
-        assertEq((packed >> (2 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK, 0, "slot 2 empty");
+        // prefix property: an uncapped pack leaves slots 2+3 reading zero
+        assertEq((packed >> (2 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK, 0, "slot 2 (det) empty");
+        assertEq((packed >> (3 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK, 0, "slot 3 (cap) empty");
     }
 
     /// packTimingsCapped roundtrip + the prefix equivalence.
     function test_TimingsPackCappedRoundtrip() public {
         uint256 p = 2 hours;
         uint256 v = 1 hours;
+        uint256 det = 2 hours;
         uint256 cap = 10;
-        uint256 packed = CurveMath.packTimingsCapped(p, v, cap);
+        uint256 packed = CurveMath.packTimingsCapped(p, v, det, cap);
         assertEq(packed & CurveMath.TIMINGS_MASK, p, "slot 0 = predeposit");
         assertEq((packed >> CurveMath.TIMINGS_WIDTH) & CurveMath.TIMINGS_MASK, v, "slot 1 = vest");
-        assertEq((packed >> (2 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK, cap, "slot 2 = wallet cap");
+        assertEq((packed >> (2 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK, det, "slot 2 = det window");
+        assertEq((packed >> (3 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK, cap, "slot 3 = wallet cap");
         assertEq(packed & CurveMath.packTimings(p, v), CurveMath.packTimings(p, v), "capped pack = capped-prefix of plain");
-        // cap 0 is legal (uncapped mainnet semantics)
-        assertEq(CurveMath.packTimingsCapped(p, v, 0), CurveMath.packTimings(p, v), "cap 0 == plain");
+        // det 0 + cap 0 are legal (mainnet semantics: 72h default, uncapped)
+        assertEq(CurveMath.packTimingsCapped(p, v, 0, 0), CurveMath.packTimings(p, v), "det 0 + cap 0 == plain");
     }
 
     /// Full-axis roundtrip: every field at its MAXIMUM width (2^85 - 1)
@@ -372,10 +375,11 @@ contract CurveMathTest is Test {
     function test_TimingsFullAxisRoundtrip() public {
         uint256 max = (1 << CurveMath.TIMINGS_WIDTH) - 1;
         uint256 v = max - (max % 6); // vest must stay epochal (÷6)
-        uint256 packed = CurveMath.packTimingsCapped(max, v, max);
+        uint256 packed = CurveMath.packTimingsCapped(max, v, max, max);
         assertEq(packed & CurveMath.TIMINGS_MASK, max, "slot 0 max");
         assertEq((packed >> CurveMath.TIMINGS_WIDTH) & CurveMath.TIMINGS_MASK, v, "slot 1 max");
         assertEq((packed >> (2 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK, max, "slot 2 max");
+        assertEq((packed >> (3 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK, max, "slot 3 max");
         // zero axis: everything zero is a legal (if degenerate) pack — the
         // CONTROLLER's TimingsIncomplete guard is what rejects it at deploy
         assertEq(CurveMath.packTimings(0, 0), 0, "zero pack");
@@ -395,7 +399,9 @@ contract CurveMathTest is Test {
         vm.expectRevert(CurveMath.TimingsOverflow.selector);
         p.pack(7 days, max + 1);
         vm.expectRevert(CurveMath.TimingsOverflow.selector);
-        p.packCapped(7 days, 42 days, max + 1);
+        p.packCapped(7 days, 42 days, 2 hours, max + 1);
+        vm.expectRevert(CurveMath.TimingsOverflow.selector);
+        p.packCapped(7 days, 42 days, max + 1, 10);
         vm.expectRevert(CurveMath.VestNotEpochal.selector);
         p.pack(7 days, 42 days + 1); // not divisible by 6
     }
@@ -407,11 +413,11 @@ contract TimingsPacker {
         return CurveMath.packTimings(predepositSec, vestSec);
     }
 
-    function packCapped(uint256 predepositSec, uint256 vestSec, uint256 walletCap)
+    function packCapped(uint256 predepositSec, uint256 vestSec, uint256 detWindow, uint256 walletCap)
         external
         pure
         returns (uint256)
     {
-        return CurveMath.packTimingsCapped(predepositSec, vestSec, walletCap);
+        return CurveMath.packTimingsCapped(predepositSec, vestSec, detWindow, walletCap);
     }
 }

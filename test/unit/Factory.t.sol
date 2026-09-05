@@ -166,6 +166,34 @@ contract FactoryTest is Test {
         poolManager.initialize(halfDecoy, SQRT_RATIO_1_1);
     }
 
+    /// 2026-09-03: the genesis pooled buy routes 10% of the boot into the
+    /// hook's ladder pot; the remaining 90% seeds the curve and mints the
+    /// pro-rata genesis supply.
+    function test_GenesisLaunch_PotFee() public {
+        mixETH.depositETH{value: 200e18}();
+        mixETH.approve(address(controller), 100e18);
+        controller.predeposit(100e18);
+
+        assertEq(hook.potBalance(), 0, "pot empty pre-launch");
+        vm.prank(address(factory)); // the factory is the controller's owner
+        controller.launchPooledBuy();
+
+        // 10% of the 100-mix boot went to the ladder pot...
+        assertEq(hook.potBalance(), 10e18, "genesis pot fee");
+        // ...the other 90 seeds the curve reserve
+        assertEq(hook.reserveMixETH(), 90e18, "curve seeded with 90%");
+        // and the genesis supply is what 90 mix bought on the curve
+        assertEq(
+            hook.totalSupplyPSP(),
+            CurveMath.computeBuyOutput(
+                90e18,
+                0,
+                CurveMath.singleCurve(0.001e18, 1_000_000e18, 0.0000000046e18, 0.05e18)
+            ),
+            "supply = post-fee boot bought"
+        );
+    }
+
     function test_L2_CanonicalPairPassesGateBothOrderings() public {
         // Sorted order (exactly what the factory initialized in setUp —
         // re-invoking through the mock proves the gate accepts it explicitly)

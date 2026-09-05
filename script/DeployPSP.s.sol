@@ -87,17 +87,19 @@ contract DeployPSP is Script {
     //   DEPLOYED on 84532 (0 bytes on three RPCs; unused by PSP anyway)
 
     /// @dev Packed playtest timing profile (see RoundController "Timing
-    ///      profile"): predeposit window · unstake vest · per-wallet
-    ///      predeposit cap (whole mixETH, 0 = uncapped), all env-tunable
-    ///      (PSP_PREDEPOSIT_SEC / PSP_VEST_SEC / PSP_WALLET_CAP_MIX;
-    ///      defaults 2h / 1h / 10 — scoopy's fast-playtest profiles; the
-    ///      vote + flat-exit slots died with governance, CLOCK-REDESIGN
-    ///      §4). VEST must be divisible by 6 — six decay epochs
-    ///      (packTimings guards).
+    ///      profile"): predeposit window · unstake vest · detonation window ·
+    ///      per-wallet predeposit cap (whole mixETH, 0 = uncapped), all
+    ///      env-tunable (PSP_PREDEPOSIT_SEC / PSP_VEST_SEC / PSP_DET_SEC /
+    ///      PSP_WALLET_CAP_MIX; defaults 2h / 1h / 2h / 10 — scoopy's fast-
+    ///      playtest profiles; the vote + flat-exit slots died with
+    ///      governance, CLOCK-REDESIGN §4; the det slot joined 2026-09-03 —
+    ///      0 would mean the hook's 72h default, unreadable on a playtest).
+    ///      VEST must be divisible by 6 — six decay epochs (packTimings).
     function _testnetTimings() internal view returns (uint256) {
         return CurveMath.packTimingsCapped(
             vm.envOr("PSP_PREDEPOSIT_SEC", uint256(2 hours)),
             vm.envOr("PSP_VEST_SEC", uint256(1 hours)),
+            vm.envOr("PSP_DET_SEC", uint256(2 hours)),
             vm.envOr("PSP_WALLET_CAP_MIX", uint256(10))
         );
     }
@@ -139,7 +141,9 @@ contract DeployPSP is Script {
             pm = vm.envOr("PSP_PM", PM_BASE);
             mix = IERC20(vm.envAddress("PSP_MIXETH"));
         }
-        string memory htmlPath = vm.envOr("PSP_HTML", string("script/app.html"));
+        // RS-6: the historical embedded wallet UI calls retired APIs. Publish
+        // a read-only record on testnet; wallet actions use the gated React app.
+        string memory htmlPath = vm.envOr("PSP_HTML", testnet ? string("script/testnet-status.html") : string("script/app.html"));
 
         // Sepolia blocks cap at 60M gas and providers cap per-tx lower still
         // (alchemy ~15M, publicnode 2^24). Under the staged spawn the round
@@ -182,10 +186,22 @@ contract DeployPSP is Script {
         // shape only. The zone-curve libraries stay stashed in src/curves/
         // (see CURVES-STASH.md) for possible future flavors.
         factory.configureSine(_sineParams());
-        // roundId/hookAddr discarded on purpose: staged addresses are
-        // entropy-salted, so the sim's values differ from the chain's —
-        // read real state from the RPC after broadcast instead
-        factory.deployRound(_roundParams(testnet));
+        // Staged genesis (2026-09-03): the post-clock-redesign composed
+        // deployRound is ~18.6-21M — over Base Sepolia's ≈2^24 per-tx cap —
+        // so the birth runs as THREE deterministic birthStep txs (token+
+        // controller · registry+hook · wire+init), each comfortably under
+        // every cap. Addresses stay entropy-salted: the sim's values differ
+        // from the chain's — read real state from the RPC after broadcast.
+        factory.reserveGenesis(_roundParams(testnet));
+        vm.stopBroadcast();
+        vm.startBroadcast();
+        factory.birthStep(); // 1: token + controller (+ staker)
+        vm.stopBroadcast();
+        vm.startBroadcast();
+        factory.birthStep(); // 2: registry + hook
+        vm.stopBroadcast();
+        vm.startBroadcast();
+        factory.birthStep(); // 3: wiring + sine arm + pool init
         vm.stopBroadcast();
 
         // publish the walk-away UI (fetch factory.html() from any rpc)
@@ -228,18 +244,20 @@ contract DeployPSP is Script {
         });
     }
 
-    /// @dev PSP_CURVE=6 — tilted-sine params. Defaults reproduce the dial-lab
-    ///      verified shape (p0 1e-5 → B 1e-4 at boot 500 via preK=ln(10)/500,
-    ///      magM 20 → top reserve = 21×boot, lnTop = ln(600) → top price 0.06,
-    ///      ampBps 10000 = the 45° tilt: flat treads, monotone). Env overrides:
-    ///      PSP_SINE_P0 / PSP_SINE_PREK / PSP_SINE_MAGM / PSP_SINE_LNTOP /
-    ///      PSP_SINE_AMPBPS.
+    /// @dev Tilted-sine params (2026-09-03 indefinite redesign): the whole
+    ///      curve past boot is ONE endless wave — no pre-wave/top/tail split.
+    ///      Defaults target price 0.06 mixETH/PSP at 10,000 mixETH reserves
+    ///      (p0 1e-5 → B 1e-4 at a 500-mix boot via preK = ln(10)/500; the
+    ///      trend lands 0.06 on a tread exactly 3 wavelengths out; ampBps
+    ///      10000 = the 45° tilt: flat treads, monotone). Env overrides:
+    ///      PSP_SINE_P0 / PSP_SINE_PREK / PSP_SINE_PTARGET /
+    ///      PSP_SINE_TARGET_RESERVE / PSP_SINE_AMPBPS.
     function _sineParams() internal view returns (SineMath.Params memory) {
         return SineMath.Params({
             p0: vm.envOr("PSP_SINE_P0", uint256(1e13)),
             preK: vm.envOr("PSP_SINE_PREK", uint256(4_605_170_185_988_092)),
-            magM: vm.envOr("PSP_SINE_MAGM", uint256(20e18)),
-            lnTop: vm.envOr("PSP_SINE_LNTOP", uint256(6_396_929_655_216_146_432)),
+            pTarget: vm.envOr("PSP_SINE_PTARGET", uint256(0.06e18)),
+            targetReserve: vm.envOr("PSP_SINE_TARGET_RESERVE", uint256(10_000e18)),
             ampBps: uint24(vm.envOr("PSP_SINE_AMPBPS", uint256(10_000)))
         });
     }

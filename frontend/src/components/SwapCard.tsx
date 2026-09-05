@@ -1,5 +1,7 @@
+import { MIN_BUY_INPUT, purchaseUnits, TIME_PER_UNIT, minimumOutput } from '../lib/gameRules'
+import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useAccount, useWriteContract } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { useRpcReads } from '../lib/useRpcReads'
 import { erc20Abi, hookAbi, controllerAbi, zapInAbi, zapOutAbi, buildPoolKey } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
@@ -30,7 +32,7 @@ export default function SwapCard() {
   const [customSlip, setCustomSlip] = useState('')
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
-  const { writeContractAsync } = useWriteContract()
+  const { writeContractAsync } = useConfirmedWrite()
   const burstRef = useRef<BurstHandle>(null)
 
   /// Flat mode = one-way exit (scoopy 2026-08-29, fix #3): buying is
@@ -95,23 +97,6 @@ export default function SwapCard() {
   }, [round.hook, side, mixIn, pspIn, flat, round.mode, round.supply, round.reserve])
   const quoteMixOut = side === 'sell' ? (quoteRaw ?? 0n) : 0n
 
-  /// Sell-fee haircut: the LIVE hook's getSellOutput returns the pre-fee
-  /// integral (fixed in src for future deploys; deployed rounds overstate by
-  /// SWAP_FEE_BIPS). Read the fee from the hook and haircut sell quotes +
-  /// minOut so execution matches the number the user saw.
-  const [sellFeeBps, setSellFeeBps] = useState<number>(500)
-  useEffect(() => {
-    if (!round.hook) return
-    let dead = false
-    rpcCall(round.hook!, hookAbi, 'SWAP_FEE_BIPS')
-      .then((v) => { if (!dead && v !== undefined) setSellFeeBps(Number(v)) })
-      .catch(() => {})
-    return () => { dead = true }
-  }, [round.hook])
-  /// Fee applies to curve-mode sells only — flat exits are fee-free (F-9).
-  const sellFactor = flat ? 1 : 1 - sellFeeBps / 10000
-  const quoteMixAfterFee = BigInt(Math.round(Number(quoteMixOut) * sellFactor))
-
   const poolKey = useMemo(
     () =>
       round.mix && round.token && round.hook
@@ -143,44 +128,28 @@ export default function SwapCard() {
     allowanceRes[0] !== undefined &&
     (allowanceRes[0] as bigint) >= (side === 'sell' ? pspIn : mixIn)
 
-  const minOut = useMemo(() => {
-    const q = side === 'buy' ? quoteRaw : quoteMixAfterFee
-    if (!q) return 0n
-    return BigInt(Math.round(Number(q) * (1 - slippage)))
-  }, [quoteRaw, quoteMixAfterFee, slippage, side])
-
-  /// Fresh quote at submit — a polled quote can be seconds stale; for large
-  /// trades that drift eats the whole slippage budget before the tx lands.
+  // AUD-5: the hook already returns POST-FEE outputs. A failed fresh quote
+  // must abort; never silently fall back to zero protection or a stale quote.
   async function freshMinOut(): Promise<bigint> {
-    if (!round.hook) return minOut
-    try {
-      let q: bigint
-      if (flat) {
-        const [r, s] = await Promise.all([
-          rpcCall(round.hook!, hookAbi, 'reserveMixETH') as Promise<bigint>,
-          rpcCall(round.hook!, hookAbi, 'totalSupplyPSP') as Promise<bigint>,
-        ])
-        q = side === 'buy' ? (mixIn * s) / r : (pspIn * r) / s
-      } else {
-        q = (await rpcCall(
-          round.hook!, hookAbi,
-          side === 'buy' ? 'getBuyOutput' : 'getSellOutput',
-          [side === 'buy' ? mixIn : pspIn],
-        )) as bigint
-      }
-      const adj = side === 'sell' ? BigInt(Math.round(Number(q) * sellFactor)) : q
-      return BigInt(Math.round(Number(adj) * (1 - slippage)))
-    } catch {
-      return minOut
-    }
+    if (!round.hook) throw new Error('Round is unavailable.')
+    const q = await rpcCall(round.hook, hookAbi,
+      side === 'buy' ? 'getBuyOutput' : 'getSellOutput',
+      [side === 'buy' ? mixIn : pspIn]) as bigint
+    return minimumOutput(q, Math.round(slippage * 10_000))
   }
+
+  const minOut = useMemo(() => {
+    try { return minimumOutput(quoteRaw ?? 0n, Math.round(slippage * 10_000)) }
+    catch { return 0n }
+  }, [quoteRaw, slippage])
 
   const payBalance = side === 'buy' ? mixBal : pspBal
   const payBalanceOk = payBalance === undefined || amountWad <= payBalance
 
   async function run() {
     setError(null)
-    if (!address || !poolKey) return
+    if (!address || !poolKey || busy) return
+    if (side === 'buy' && mixIn < MIN_BUY_INPUT) { setError('Minimum purchase is 0.005 mixETH.'); return }
     try {
       if (predepositPhase) {
         if (!hasAllowance) {
@@ -219,19 +188,18 @@ export default function SwapCard() {
           address: ADDRESSES.zapIn,
           abi: zapInAbi,
           functionName: 'buyWithMix',
-          args: [poolKey, mixIn, await freshMinOut(), 0n],
+          args: [poolKey, mixIn, await freshMinOut(), BigInt(Math.floor(Date.now() / 1000) + 600)],
         })
         setStep('done')
-        // B2 §4 wiring — VISUAL ONLY until round wiring lands: a whole-PSP
-        // buy feeds the machine. +5:00 per WHOLE psp, discrete (quote-based
-        // estimate; injectTime flashes the clock digits + floats the chip).
-        // Predeposit genesis buys are excluded — the clock isn't armed yet.
-        {
-          const wholePsp = quoteRaw !== undefined ? Number(quoteRaw) / 1e18 : 0
-          const minutes = Math.floor(wholePsp) * 5
-          if (minutes > 0) injectTime(minutes * 60_000)
-          burstRef.current?.fire()
+        // The chain receipt is confirmed. Only animate the actual capped extension.
+        if (round.hook) {
+          const deadline = await rpcCall(round.hook, hookAbi, 'detonationAt').catch(() => undefined) as bigint | undefined
+          if (deadline !== undefined && round.detonationAt !== undefined) {
+            const added = deadline - round.detonationAt
+            if (added > 0n) injectTime(Number(added) * 1000)
+          }
         }
+        burstRef.current?.fire()
         return
       }
       // sell
@@ -249,7 +217,7 @@ export default function SwapCard() {
         address: ADDRESSES.zapOut,
         abi: zapOutAbi,
         functionName: 'sellToMix',
-        args: [poolKey, pspIn, await freshMinOut(), 0n],
+        args: [poolKey, pspIn, await freshMinOut(), BigInt(Math.floor(Date.now() / 1000) + 600)],
       })
       setStep('done')
     } catch (e) {
@@ -268,7 +236,7 @@ export default function SwapCard() {
 
   const busy = step === 'approve' || step === 'swap' || step === 'waiting'
   const canSubmit =
-    isConnected && !!poolKey && amountWad > 0n && payBalanceOk && !busy && !halted && (live || predepositPhase)
+    isConnected && !!poolKey && amountWad > 0n && (side !== 'buy' || mixIn >= MIN_BUY_INPUT) && (predepositPhase || (quoteRaw ?? 0n) > 0n) && payBalanceOk && !busy && !halted && (live || predepositPhase)
 
   const cta = !isConnected
     ? 'connect wallet'
@@ -426,6 +394,11 @@ export default function SwapCard() {
         </div>
       </div>
 
+      {side === 'buy' && (
+        <p className="mt-3 text-xs text-text-lo">
+          minimum 0.005 mixETH{!predepositPhase && ` · ${purchaseUnits(mixIn) > 10n ? 10n : purchaseUnits(mixIn)} seats · +${Number(purchaseUnits(mixIn) * TIME_PER_UNIT / 60n)}m ${purchaseUnits(mixIn) * TIME_PER_UNIT % 60n}s before the clock cap`}
+        </p>
+      )}
       {/* slippage */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="font-semibold text-text-lo">slippage</span>
@@ -465,7 +438,7 @@ export default function SwapCard() {
             <span className="tabular font-data font-semibold text-text-hi">
               {side === 'buy'
                 ? `${fmtAmount(quoteRaw, 4)} PSP`
-                : `${fmtAmount(quoteMixAfterFee, 4)} mix`}
+                : `${fmtAmount(quoteMixOut, 4)} mix`}
             </span>
           </div>
           <div className="flex justify-between text-xs text-text-lo">

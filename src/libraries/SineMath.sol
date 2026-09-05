@@ -3,26 +3,28 @@ pragma solidity 0.8.26;
 
 import {FixedPointMathLib as FPML} from "solady/src/utils/FixedPointMathLib.sol";
 
-/// @title SineMath — parametric tilted-sine bonding curve (scoopy 2026-08-29)
-/// @notice Price is a function of cumulative mixETH RAISED (reserve), not supply:
+/// @title SineMath — INDEFINITE tilted-sine bonding curve (scoopy 2026-09-03)
+/// @notice Price is a function of cumulative mixETH RAISED (reserve), not supply.
+///         The curve has exactly TWO regimes — no segmented phases, no tail:
 ///
-///   predeposit (R in [0, boot]):     p = p0 · e^(preK·R)
-///   wave region  (R in [boot, top]): p = B · e^( s·(R−boot) + A·sin(π + 2π·(R−boot)/λ) )
-///   tail         (R > top):          p = pTop + tailSlope·(R−top)
+///   predeposit (R in [0, boot]):  p = p0 · e^(preK·R)
+///   wave       (R > boot):        p = B · e^( s·(R−boot) + A·sin(π + 2π·(R−boot)/λ) )
 ///
-/// with top = boot + span, span = magM·boot, λ = span/3 (three waves), trend
-/// s = lnTop/span, and amplitude A = (ampBps/10⁴)·s·λ/2π. At ampBps = 10000
-/// ("45° tilt") A·2π = s·λ exactly: the wave never turns down — flat treads at
-/// launch and at every wave top, steepest climb through the mids, monotone by
-/// construction. The phase offset π puts a flat tread at the launch seam.
+///   ...and the wave NEVER ends. The trend is anchored by the target: the
+///   curve passes through pTarget at targetReserve, sitting on a wave tread
+///   (target − boot = 3·λ = whole waves; sin = 0 there), then keeps waving
+///   upward forever — every crest a flat tread, every trough a climb, monotone
+///   by construction at ampBps = 10000 (45° tilt: A·2π = s·λ).
 ///
-/// Supply has no closed form over the wave (∫ e^(−A·sin)); cumulative supply is
-/// computed as a **pure function of the reserve endpoint**:
-///   q(R) = q0 + cp[j] + GL8( a_j → R ),   a_j = boot + j·span/12
-/// where cp[j] are checkpoint integrals (computed once at materialize) and GL8
-/// is 8-point Gauss–Legendre quadrature with FIXED nodes — a deterministic
-/// function of R alone. Endpoint purity makes buy/sell integrals telescope
-/// EXACTLY under any order-chopping (partition-invariance, the B4j class).
+///   λ = (targetReserve − boot) / 3, s = ln(pTarget/B) / (3·λ),
+///   A = (ampBps/10⁴)·s·λ/2π.
+///
+/// Supply integrates reciprocal price using four fixed GL8 cells in the
+/// first wavelength. Completed waves use a rounded geometric sum, with
+/// partial waves scaled between the same adjacent integer endpoints. Supply is a pure
+/// function of reserve, so endpoint differences telescope under chopping.
+/// Fixed-point supply eventually saturates; mathematical infinity is not
+/// representable. Geometric powers use bounded exponentiation by squaring.
 ///
 /// Buys need no inversion (spend IS ΔR); sells invert q(R) by Newton with a
 /// conservative integer clamp. Buy output carries the CurveMath-conservative
@@ -35,8 +37,11 @@ library SineMath {
     uint256 internal constant HALF_PI_WAD = 1570796326794896619;
     /// @dev expWad input cap: ln(type(uint256).max) in WAD (solady panic guard)
     int256 internal constant MAX_EXP_ARG = 135305999368893231588;
-    uint256 internal constant N_CHECKPOINTS = 13; // quarter-wave anchors, 3 waves
+    /// @dev waves between launch seam and target (tread at the target)
     uint256 internal constant WAVES = 3;
+    /// @dev min trend across one wavelength, WAD (keeps (g − 1) precise for
+    ///      the geometric-series division; 0.01 WAD ⇒ g − 1 ≥ ~1.005e16)
+    uint256 internal constant MIN_WAVE_TREND = 1e16;
 
     // GL8 nodes u_i (ascending, WAD) and weights ŵ_i (WAD, Σ ŵ = 1):
     // ∫_a^b f ≈ (b−a) · Σ ŵ_i · f(a + (b−a)·u_i)
@@ -57,43 +62,54 @@ library SineMath {
 
     /// @notice Deploy-time parameters (validated by `validate`).
     struct Params {
-        uint256 p0;     // price at reserve 0 (WAD mixETH per PSP)
-        uint256 preK;   // predeposit growth, ln-units per mixETH (WAD)
-        uint256 magM;   // wave span = magM × actual boot (WAD multiple, ≥ 1e18)
-        uint256 lnTop;  // ln(pTop / B): total trend climb over the wave region (WAD)
-        uint24 ampBps;  // amplitude in bps of the 45° maximum (≤ 10_000)
+        uint256 p0;            // price at reserve 0 (WAD mixETH per PSP)
+        uint256 preK;          // predeposit growth, ln-units per mixETH (WAD)
+        uint256 pTarget;       // marginal price at the target reserve (WAD)
+        uint256 targetReserve; // reserve where price = pTarget (WAD mixETH)
+        uint24 ampBps;         // amplitude in bps of the 45° maximum (≤ 10_000)
     }
 
     /// @notice Materialized curve — built once at launch from the ACTUAL
-    ///         predeposit raise, so the wave is anchored to real boot and every
-    ///         boundary price is invariant to how much was actually raised
-    ///         (same W-cancellation as the dial lab).
+    ///         post-fee boot, so the wave is anchored to real boot and the
+    ///         launch-seam price is B regardless of trade history.
     struct Curve {
         uint256 p0;
         uint256 preK;
-        uint256 boot;     // actual raise; wave region = [boot, top]
-        uint256 span;     // magM·boot; top = boot + span
-        uint256 segWidth; // span / 12 (quarter-wave checkpoint spacing)
-        uint256 lam;      // 4·segWidth (wavelength; anchors stay exact integers)
-        uint256 B;        // p0·e^(preK·boot) — price at launch seam
-        uint256 slope;    // s = lnTop/span (ln-units per mixETH)
-        uint256 amp;      // ln-units; ≤ slope·lam/2π by construction
-        uint256 pTop;     // B·e^lnTop — exact top anchor
-        uint256 tailSlope; // slope·pTop — linear tail absolute slope
-        uint256 q0;       // genesis supply at launch (predeposit leg integral)
-        uint256 qTop;     // supply at curve top = q0 + cp[12]
-        uint256[N_CHECKPOINTS] cp; // cumulative supply increments at anchors (cp[0]=0)
+        uint256 boot;          // actual post-fee raise; the wave starts here
+        uint256 targetReserve; // price pTarget lands on a tread here
+        uint256 lam;           // wavelength = (targetReserve − boot) / 3
+        uint256 B;             // p0·e^(preK·boot) — price at launch seam
+        uint256 slope;         // s = ln(pTarget/B) / (3·λ) (ln-units per mixETH)
+        uint256 amp;           // ln-units; ≤ slope·λ/2π by construction
+        uint256 g;             // e^(s·λ) — per-wave envelope growth (> WAD)
+        uint256 W;             // supply minted across the FIRST wavelength
+        uint256 q0;            // genesis supply at launch (predeposit leg integral)
     }
 
     // ─────────────── errors ───────────────
     error InvalidParams();
     error ExpOverflow();
+    error ExpPreArg();
+    error ExpLnArg();
+    error ExpPriceArg();
 
     // ─────────────── validation ───────────────
 
     function validate(Params memory p) internal pure {
-        if (p.p0 == 0 || p.preK == 0 || p.lnTop == 0) revert InvalidParams();
-        if (p.magM < WAD) revert InvalidParams();           // span ≥ boot
+        // RS-2: supported fixed-point configuration domain. Unbounded inputs
+        // used to pass validation yet round slope to zero at launch, making
+        // every post-launch quote divide by zero. These limits also bound
+        // phase/slope rounding and predeposit products before arithmetic.
+        if (p.p0 < 1e9 || p.p0 > 1e18 || p.preK < 1e12 || p.preK > 1e16) revert InvalidParams();
+        if (p.targetReserve < 451e18 || p.targetReserve > 1_000_000e18) revert InvalidParams();
+        if (p.pTarget == 0 || p.pTarget > p.p0 * 10_000_000) revert InvalidParams();
+        // AUD-8: every public raise (up to 500 gross / 450 net mixETH)
+        // must materialize successfully before accepting any deposits.
+        uint256 preArg = FPML.mulWad(p.preK, 450e18);
+        if (preArg >= uint256(MAX_EXP_ARG)) revert InvalidParams();
+        uint256 maxBootPrice = FPML.mulWad(p.p0, uint256(FPML.expWad(int256(preArg))));
+        if (maxBootPrice == 0 || FPML.divWad(p.pTarget, maxBootPrice) < WAD + MIN_WAVE_TREND / 3) revert InvalidParams();
+        if (FPML.mulWad(p.preK, p.p0) == 0) revert InvalidParams();
         if (p.ampBps > 10_000) revert InvalidParams();      // 45° cap ⇒ monotone
     }
 
@@ -101,126 +117,127 @@ library SineMath {
 
     function materialize(Params memory p, uint256 bootActual) internal pure returns (Curve memory c) {
         if (bootActual == 0) revert InvalidParams();
+        if (bootActual >= p.targetReserve) revert InvalidParams(); // target must be ahead
         c.p0 = p.p0;
         c.preK = p.preK;
         c.boot = bootActual;
-        c.span = FPML.mulWad(p.magM, bootActual);
-        c.segWidth = c.span / 12;
-        c.lam = c.segWidth * 4;
+        c.targetReserve = p.targetReserve;
+        c.lam = (p.targetReserve - bootActual) / WAVES;
         uint256 preArg = FPML.mulWad(p.preK, bootActual);
-        if (int256(preArg) > MAX_EXP_ARG || p.lnTop > uint256(MAX_EXP_ARG)) revert ExpOverflow();
+        if (int256(preArg) > MAX_EXP_ARG) revert ExpPreArg();
         c.B = FPML.mulWad(p.p0, uint256(FPML.expWad(int256(preArg))));
-        c.slope = FPML.divWad(p.lnTop, c.span);
+        // trend: pTarget/B across 3·λ (the target sits on a whole-wave tread —
+        // sin = 0 there, so the trend alone lands the price ON pTarget)
+        uint256 lnArg = FPML.divWad(p.pTarget, c.B);
+        if (lnArg < WAD + MIN_WAVE_TREND / 3) revert InvalidParams(); // (g−1) precision floor
+        // (no upper cap: ln(600) = 6.4 for the 10k/0.06 target is a legal
+        // log-ratio — the old ExpLnArg guard here was a copy of the EXP
+        // argument cap and wrongly rejected the entire 600x trend)
+        c.slope = FPML.divWad(uint256(FPML.lnWad(int256(lnArg))), c.lam * WAVES);
+        if (c.slope == 0) revert InvalidParams();
         // amp = ampBps/1e4 · slope·λ/(2π)
         c.amp = FPML.mulWad(
             uint256(p.ampBps) * 1e14,
             FPML.divWad(FPML.mulWad(c.slope, c.lam), TWO_PI_WAD)
         );
-        c.pTop = FPML.mulWad(c.B, uint256(FPML.expWad(int256(p.lnTop))));
-        c.tailSlope = FPML.mulWad(c.slope, c.pTop);
+        c.g = uint256(FPML.expWad(int256(FPML.mulWad(c.slope, c.lam))));
+        if (c.g <= WAD) revert InvalidParams();
+        // First wavelength: four fixed GL8 cells, checked against a Decimal oracle.
+        c.W = _waveSupply(c, c.lam);
         // genesis supply: q0 = (1 − e^(−preK·boot)) / (preK·p0)
         uint256 expNeg = uint256(FPML.expWad(-int256(preArg)));
         c.q0 = FPML.divWad(WAD - expNeg, FPML.mulWad(p.preK, p.p0));
-        // checkpoints: GL8 over each quarter-wave segment
-        uint256 acc = 0;
-        for (uint256 j = 1; j < N_CHECKPOINTS; j++) {
-            uint256 a = c.boot + (j - 1) * c.segWidth;
-            uint256 b = c.boot + j * c.segWidth;
-            acc += _gl8Supply(c, a, b);
-            c.cp[j] = acc;
-        }
-        c.qTop = c.q0 + c.cp[N_CHECKPOINTS - 1];
+        if (c.W == 0 || c.q0 == 0) revert InvalidParams();
     }
 
     // ─────────────── price ───────────────
 
     /// @notice Marginal price at cumulative reserve R (WAD mixETH per PSP).
+    ///         Unbounded above: the wave rides the exponential trend forever.
     function priceAt(Curve memory c, uint256 R) internal pure returns (uint256) {
         if (R <= c.boot) {
             return FPML.mulWad(c.p0, uint256(FPML.expWad(int256(FPML.mulWad(c.preK, R)))));
         }
-        uint256 top = c.boot + c.span;
-        if (R <= top) {
-            uint256 u = (R - c.boot) % c.lam; // exact integer mod — no angle precision loss
-            // phase = π + 2π·u/λ  (sin evaluated on the reduced angle)
-            int256 sinv = _sinWad(PI_WAD + FPML.mulWad(u, FPML.divWad(TWO_PI_WAD, c.lam)));
-            // solady mulWad is uint-only — split the sign by hand
-            int256 ampTerm = sinv < 0
-                ? -int256(FPML.mulWad(c.amp, uint256(-sinv)))
-                : int256(FPML.mulWad(c.amp, uint256(sinv)));
-            int256 arg = int256(FPML.mulWad(c.slope, R - c.boot)) + ampTerm;
-            if (arg > MAX_EXP_ARG) revert ExpOverflow();
-            return FPML.mulWad(c.B, uint256(FPML.expWad(arg)));
-        }
-        return c.pTop + FPML.mulWad(c.tailSlope, R - top);
+        uint256 u = (R - c.boot) % c.lam; // exact integer mod — no angle precision loss
+        // phase = π + 2π·u/λ  (sin evaluated on the reduced angle)
+        int256 sinv = _sinWad(PI_WAD + FPML.mulWad(u, FPML.divWad(TWO_PI_WAD, c.lam)));
+        // solady mulWad is uint-only — split the sign by hand
+        int256 ampTerm = sinv < 0
+            ? -int256(FPML.mulWad(c.amp, uint256(-sinv)))
+            : int256(FPML.mulWad(c.amp, uint256(sinv)));
+        int256 arg = int256(FPML.mulWad(c.slope, R - c.boot)) + ampTerm;
+        if (arg > MAX_EXP_ARG) revert ExpPriceArg();
+        return FPML.mulWad(c.B, uint256(FPML.expWad(arg)));
     }
 
-    // ─────────────── cumulative supply (endpoint-pure) ───────────────
+    // ─────────────── cumulative supply (endpoint-pure, unbounded) ───────────────
 
     /// @notice q(R) — PSP minted from reserve 0 through R. Pure in R:
     ///         identical inputs give identical outputs regardless of trade
     ///         history ⇒ buy/sell integrals telescope exactly under chopping.
+    ///         Rounded geometric endpoints plus composite GL8 for the partial wave.
     function supplyAt(Curve memory c, uint256 R) internal pure returns (uint256) {
         if (R <= c.boot) {
             uint256 expNeg = uint256(FPML.expWad(-int256(FPML.mulWad(c.preK, R))));
             return FPML.divWad(WAD - expNeg, FPML.mulWad(c.preK, c.p0));
         }
-        if (R >= c.boot + c.span) {
-            // tail: qTop + ln(1 + tailSlope·Δ/pTop)/tailSlope
-            uint256 delta = R - (c.boot + c.span);
-            uint256 lnArg = WAD + FPML.divWad(FPML.mulWad(c.tailSlope, delta), c.pTop);
-            return c.qTop + FPML.divWad(uint256(FPML.lnWad(int256(lnArg))), c.tailSlope);
-        }
-        uint256 j = (R - c.boot) / c.segWidth; // 0..11
-        uint256 a = c.boot + j * c.segWidth;
-        return c.q0 + c.cp[j] + _gl8Supply(c, a, R);
+        uint256 d = R - c.boot;
+        uint256 k = d / c.lam;  // completed waves
+        // AUD-6: normalize each partial wave between its two computed
+        // cumulative endpoints. Rounding cannot create a downward wave seam.
+        // Exponentiation by squaring keeps very shallow trends bounded in gas.
+        uint256 invG = FPML.fullMulDiv(WAD, WAD, c.g);
+        uint256 left = FPML.fullMulDiv(c.W, WAD - FPML.rpow(invG, k, WAD), WAD - invG);
+        uint256 right = FPML.fullMulDiv(c.W, WAD - FPML.rpow(invG, k + 1, WAD), WAD - invG);
+        uint256 partialSupply = _waveSupply(c, d % c.lam);
+        if (partialSupply > c.W) partialSupply = c.W;
+        return c.q0 + left + FPML.fullMulDiv(partialSupply, right - left, c.W);
     }
 
     /// @notice Inverse of supplyAt: the reserve R with q(R) = qTarget
-    ///         (conservative: returns the largest R with q(R) ≤ qTarget).
+    ///         (post-boot: returns an upper reserve endpoint to avoid overpaying sells).
+    /// @dev Starts from the CLOSED-FORM fractional wave index — the total
+    ///      supply at d = x·λ past boot is q0 + W·g·(1−g⁻ˣ)/(g−1), so
+    ///      x = −ln(1 − dQ·(g−1)/(W·g)) / ln(g) lands within one wavelength
+    ///      of the true reserve; Newton (convex ⇒ alternating, contracting)
+    ///      then refines inside that neighborhood. No runaway walks: prices
+    ///      near the start are the prices near the answer.
     function reserveAt(Curve memory c, uint256 qTarget) internal pure returns (uint256) {
         if (qTarget <= c.q0) {
             // predeposit invert: R = −ln(1 − q·preK·p0)/preK
-            uint256 x = FPML.mulWad(FPML.mulWad(qTarget, c.preK), c.p0); // q·preK·p0 ≤ 1
-            if (x >= WAD) return c.boot;
-            return FPML.divWad(uint256(-FPML.lnWad(int256(WAD - x))), c.preK);
+            uint256 preX = FPML.mulWad(FPML.mulWad(qTarget, c.preK), c.p0); // q·preK·p0 ≤ 1
+            if (preX >= WAD) return c.boot;
+            return FPML.divWad(uint256(-FPML.lnWad(int256(WAD - preX))), c.preK);
         }
-        if (qTarget >= c.qTop) {
-            // tail invert: R = top + pTop·(e^(tailSlope·Δq) − 1)/tailSlope
-            uint256 dq = qTarget - c.qTop;
-            uint256 eu = uint256(FPML.expWad(int256(FPML.mulWad(c.tailSlope, dq))));
-            return c.boot + c.span + FPML.divWad(FPML.mulWad(c.pTop, eu - WAD), c.tailSlope);
+        // g⁻ˣ = 1 − dQ·(g−1)/(W·g)   (dQ = qTarget − q0; strictly > 0 here)
+        uint256 invG = FPML.fullMulDiv(WAD, WAD, c.g);
+        uint256 fraction = FPML.fullMulDiv(qTarget - c.q0, WAD - invG, c.W);
+        if (fraction >= WAD) revert InvalidParams(); // outside representable inverse domain
+        uint256 gNegX = WAD - fraction;
+        uint256 x = FPML.divWad(uint256(-FPML.lnWad(int256(gNegX))), uint256(FPML.lnWad(int256(c.g))));
+        uint256 R = c.boot + FPML.mulWad(x, c.lam);
+        // AUD-6: bracket Newton and return the UPPER reserve endpoint.
+        // A lower endpoint overpays a seller (payout = old reserve - endpoint).
+        uint256 lo = c.boot;
+        uint256 hi = R + c.lam;
+        for (uint256 i; supplyAt(c, hi) < qTarget; ++i) {
+            if (i == 16) revert InvalidParams();
+            hi += c.lam;
         }
-        // wave region: locate segment, Newton on the local integral, integer clamp
-        uint256 local = qTarget - c.q0; // in [1, cp[12])
-        uint256 j = 0;
-        for (uint256 k = 1; k < N_CHECKPOINTS; k++) {
-            if (c.cp[k] < local) j = k; else break;
-        }
-        uint256 a = c.boot + j * c.segWidth;
-        uint256 L = local - c.cp[j];
-        uint256 segSup = c.cp[j + 1] - c.cp[j];
-        // linear-interpolation start
-        uint256 R = a + FPML.mulWad(c.segWidth, FPML.divWad(L, segSup == 0 ? 1 : segSup));
-        for (uint256 it = 0; it < 8; it++) {
-            uint256 have = _gl8Supply(c, a, R);
-            if (have == L) break;
-            // ΔR = (L − have)·p(R)  (dq/dR = 1/p)
-            int256 step = int256(FPML.mulWad(L > have ? L - have : have - L, priceAt(c, R)));
-            if (L > have) {
-                R += uint256(step);
-            } else {
-                R = R > uint256(step) ? R - uint256(step) : a;
+        for (uint256 it; it < 96 && hi - lo > 1; ++it) {
+            uint256 have = supplyAt(c, R);
+            if (have == qTarget) return R;
+            if (have < qTarget) lo = R;
+            else hi = R;
+            uint256 candidate;
+            if (it < 16) {
+                uint256 delta = have < qTarget ? qTarget - have : have - qTarget;
+                uint256 step = FPML.mulWad(delta, priceAt(c, R));
+                candidate = have < qTarget ? R + step : (step < R ? R - step : 0);
             }
+            R = candidate > lo && candidate < hi ? candidate : lo + (hi - lo) / 2;
         }
-        // conservative clamp: largest R with integral ≤ L (each step is ≥ 1 wei
-        // of reserve; bounded so gas is capped even on pathological configs)
-        uint256 guard = 0;
-        while (_gl8Supply(c, a, R) > L && guard < 256) {
-            R -= 1;
-            guard += 1;
-        }
-        return R;
+        return hi;
     }
 
     // ─────────────── swap outputs ───────────────
@@ -240,10 +257,23 @@ library SineMath {
         uint256 qNow = supplyAt(c, R);
         if (pspIn >= qNow) return R; // caller guards supply; defensive floor
         uint256 Rn = reserveAt(c, qNow - pspIn);
-        return R - Rn;
+        return Rn >= R ? 0 : R - Rn;
     }
 
     // ─────────────── internals ───────────────
+
+    /// @dev Four fixed cells per canonical wavelength. Partial intervals
+    /// reuse completed cells, improving accuracy and endpoint continuity.
+    function _waveSupply(Curve memory c, uint256 distance) private pure returns (uint256 result) {
+        uint256 a = c.boot;
+        uint256 end = c.boot + distance;
+        for (uint256 i = 1; i <= 4 && a < end; ++i) {
+            uint256 b = c.boot + c.lam * i / 4;
+            if (b > end) b = end;
+            result += _gl8Supply(c, a, b);
+            a = b;
+        }
+    }
 
     /// @dev 8-point Gauss–Legendre quadrature of dR/p over [a, b].
     function _gl8Supply(Curve memory c, uint256 a, uint256 b) internal pure returns (uint256) {

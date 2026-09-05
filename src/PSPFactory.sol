@@ -173,13 +173,12 @@ contract PSPFactory is Ownable2Step {
     }
 
     /// @notice Deploy a new PSP round with all contracts wired together
-    /// @dev Composed path (owner): reserve + birth in one tx. Carries the
+    /// @dev Composed path (owner): reserve + birth in one tx — for chains
+    ///      without a per-tx gas cap (mainnet, local anvil). On capped
+    ///      chains use reserveGenesis + 3× birthStep instead. Carries the
     ///      flag-mine tail (~0.03% of draws exhaust the 131k bound and
     ///      revert the whole tx — retry with fresh block entropy; state
-    ///      rolls back clean). The PERMISSIONLESS rebirth path avoids the
-    ///      lottery entirely: detonate() bounces clean on exhaustion
-    ///      (bounded, deposit-free reserve) and retries, anyone can birth
-    ///      (zero variance).
+    ///      rolls back clean).
     function deployRound(RoundParams calldata params)
         external
         onlyOwner
@@ -187,7 +186,10 @@ contract PSPFactory is Ownable2Step {
     {
         gameCurve = params.curveConfig;
         _reserve(0, params.name, params.symbol);
-        return _birth(params.name, params.symbol);
+        _birthContracts();
+        _birthPeriphery();
+        _birthWire();
+        return (currentRoundId, address(rounds[currentRoundId].hook));
     }
 
     // ─────────────── staged spawn (2026-08-30) ───────────────
@@ -230,6 +232,9 @@ contract PSPFactory is Ownable2Step {
         address hook;
         bytes32 contextHash; // keccak(config-with-timings, descriptor, name, symbol)
         bool active;
+        string name;        // exact ERC20 naming — birth spans multiple txs now
+        string symbol;
+        uint8 phase;        // 0 none/born · 1 contracts · 2 periphery · 3 wire
     }
 
     SpawnReservation public reservation;
@@ -256,6 +261,15 @@ contract PSPFactory is Ownable2Step {
     error ReservationStale();
     error PredictMismatch();
 
+    /// @dev Birth phases — each is one self-contained tx under every known
+    ///      per-tx cap (Base Sepolia operator cap ≈ 16.78M, 2^24; the
+    ///      composed birth is ~18.6-21M post-clock-redesign, 2026-09-03
+    ///      fork measurement, so genesis/rebirth on capped chains MUST go
+    ///      through birthStep)."
+    uint8 internal constant PHASE_CONTRACTS = 1; // token + controller (+ staker in ctor) ≈ 7.7M
+    uint8 internal constant PHASE_PERIPHERY = 2; // registry + hook ≈ 7.5M
+    uint8 internal constant PHASE_WIRE = 3;      // context re-check + wiring + sine + pool init < 1M
+
     /// @notice Stage 1 (permissionless): commit the next round's full
     ///         address set. Rebirth-path only — genesis goes through
     ///         deployRound.
@@ -275,16 +289,60 @@ contract PSPFactory is Ownable2Step {
         );
     }
 
-    /// @notice Stage 2 (permissionless): birth the reserved round. Open
-    ///         to anyone — bundling birth with the first buy captures the
-    ///         launch edge, which pays for the gas.
-    function birthRound() external returns (uint256 roundId, address hookAddr) {
-        SpawnReservation memory r = reservation;
+    /// @notice Stage 1 of GENESIS (owner only): set the game curve and
+    ///         commit round 1's full address set, then finish with up to
+    ///         three permissionless birthStep() txs. Exists because the
+    ///         post-clock-redesign composed birth is ~18.6-21M — over Base
+    ///         Sepolia's ≈16.78M per-tx cap — while every split leg is
+    ///         comfortably under it.
+    function reserveGenesis(RoundParams calldata params) external onlyOwner {
+        gameCurve = params.curveConfig;
+        _reserve(0, params.name, params.symbol);
+    }
+
+    /// @notice Execute the NEXT unfinished phase of the reserved birth.
+    ///         Permissionless — squatting a committed address requires the
+    ///         identical deployer + salt + initcode hash, so a third party
+    ///         can only "help" by deploying the canonical contract early.
+    ///         Phases (each its own tx, deterministic, zero mining):
+    ///           1 CONTRACTS — token + controller (+ staker in ctor)
+    ///           2 PERIPHERY — registry + hook at the mined salt
+    ///           3 WIRE      — context re-check, wiring, sine, pool init
+    ///         Reverts NoReservation once the round is born.
+    function birthStep() external {
+        SpawnReservation storage r = reservation;
         if (!r.active) revert NoReservation();
-        return _birth(
-            string.concat(baseName, " ", _itoa(r.newRoundId)),
-            string.concat(baseSymbol, _itoa(r.newRoundId))
-        );
+        if (r.phase == PHASE_CONTRACTS) {
+            _birthContracts();
+            r.phase = PHASE_PERIPHERY;
+        } else if (r.phase == PHASE_PERIPHERY) {
+            _birthPeriphery();
+            r.phase = PHASE_WIRE;
+        } else if (r.phase == PHASE_WIRE) {
+            _birthWire();
+        } else {
+            revert NoReservation();
+        }
+    }
+
+    function reservationActive() external view returns (bool) {
+        return reservation.active;
+    }
+
+    function reservationPhase() external view returns (uint8) {
+        return reservation.phase;
+    }
+
+    /// @notice Stage 2 (permissionless): birth the reserved round in ONE tx.
+    ///         Composed convenience over birthStep — only for chains whose
+    ///         per-tx gas cap holds the whole birth (mainnet, anvil).
+    function birthRound() external returns (uint256 roundId, address hookAddr) {
+        if (!reservation.active) revert NoReservation();
+        while (reservation.active) {
+            this.birthStep(); // external self-call: composed convenience loop
+        }
+        roundId = currentRoundId;
+        hookAddr = address(rounds[roundId].hook);
     }
 
     /// @notice Owner escape hatch: void a reservation whose committed
@@ -334,29 +392,31 @@ contract PSPFactory is Ownable2Step {
             token: token,
             controller: controller,
             hook: hook,
-            contextHash: keccak256(abi.encode(cfg, descriptor, name, symbol)),
-            active: true
+            contextHash: keccak256(abi.encode(cfg, descriptor, name, symbol, useSine, gameSineParams)),
+            active: true,
+            name: name,
+            symbol: symbol,
+            phase: PHASE_CONTRACTS
         });
 
         emit SpawnReserved(newRoundId, token, controller, hook, staker, registry, hookSalt);
     }
 
-    /// @dev Deterministic birth from the committed reservation. Skips any
-    ///      create2 whose predicted address is already occupied (identical
-    ///      contract — see staging notes above). Everything that can fail
-    ///      runs BEFORE poolManager.initialize: the pool manager's state
-    ///      does not roll back with this tx, so a post-initialize revert
-    ///      would brick the reservation against AlreadyInitialized.
-    function _birth(string memory name, string memory symbol)
-        internal
-        returns (uint256 roundId, address hookAddr)
-    {
-        SpawnReservation memory r = reservation;
-        if (!r.active) revert NoReservation();
-
-        CurveMath.CurveConfig memory cfg = gameCurve;
+    /// @dev Context of everything a birth depends on. Checked before the
+    ///      first create AND re-checked at wire time, so a mid-flight
+    ///      gameCurve/descriptor change fails closed (ReservationStale)
+    ///      instead of wiring a mismatched set.
+    function _configWithTimings() internal view returns (CurveMath.CurveConfig memory cfg) {
+        cfg = gameCurve;
         cfg.timings = roundTimings;
-        if (keccak256(abi.encode(cfg, descriptor, name, symbol)) != r.contextHash) {
+    }
+
+    /// @dev Birth phase 1: token + controller (+ staker in the controller's
+    ///      constructor). Deterministic — committed salts, zero mining.
+    function _birthContracts() internal {
+        SpawnReservation storage r = reservation;
+        CurveMath.CurveConfig memory cfg = _configWithTimings();
+        if (keccak256(abi.encode(cfg, descriptor, r.name, r.symbol, useSine, gameSineParams)) != r.contextHash) {
             revert ReservationStale();
         }
 
@@ -364,7 +424,7 @@ contract PSPFactory is Ownable2Step {
         PSPToken token = PSPToken(r.token);
         if (address(token).code.length == 0) {
             address t = address(
-                tokenDeployer.deployTokenAt(r.tokenSalt, name, symbol, address(this))
+                tokenDeployer.deployTokenAt(r.tokenSalt, r.name, r.symbol, address(this))
             );
             if (t != r.token) revert PredictMismatch();
         }
@@ -380,6 +440,14 @@ contract PSPFactory is Ownable2Step {
             );
             if (c != r.controller) revert PredictMismatch();
         }
+    }
+
+    /// @dev Birth phase 2: token↔controller handshake, referral registry,
+    ///      hook at the mined salt, sine arming.
+    function _birthPeriphery() internal {
+        SpawnReservation storage r = reservation;
+        PSPToken token = PSPToken(r.token);
+        RoundController controller = RoundController(r.controller);
 
         // 3. wire controller as token's controller
         token.setController(address(controller));
@@ -400,15 +468,33 @@ contract PSPFactory is Ownable2Step {
         CurveHook hook = CurveHook(r.hook);
         if (address(hook).code.length == 0) {
             address h = hookDeployer.deployHookAt(
-                r.hookSalt, poolManager, address(controller), registry, cfg, deployerCutTo
+                r.hookSalt, poolManager, address(controller), registry, _configWithTimings(), deployerCutTo
             );
             if (h != r.hook) revert PredictMismatch();
         }
-        hookAddr = r.hook;
 
         // Sine flavor: arm THIS round's hook before pool init (guard inside
         // configureSine enforces pre-init + factory identity).
         if (useSine) hook.configureSine(gameSineParams);
+    }
+
+    /// @dev Birth phase 3: stale-context re-check (fail closed before ANY
+    ///      irreversible wiring), final wiring, carry, pool init, record.
+    ///      Everything that can fail runs BEFORE poolManager.initialize:
+    ///      the pool manager's state does not roll back with this tx, so a
+    ///      post-initialize revert would brick the reservation against
+    ///      AlreadyInitialized.
+    function _birthWire() internal returns (uint256 roundId, address hookAddr) {
+        SpawnReservation storage r = reservation;
+        CurveMath.CurveConfig memory cfg = _configWithTimings();
+        if (keccak256(abi.encode(cfg, descriptor, r.name, r.symbol, useSine, gameSineParams)) != r.contextHash) {
+            revert ReservationStale();
+        }
+
+        PSPToken token = PSPToken(r.token);
+        RoundController controller = RoundController(r.controller);
+        CurveHook hook = CurveHook(r.hook);
+        hookAddr = r.hook;
 
         // 5. wiring
         controller.setHook(hook);
@@ -420,6 +506,9 @@ contract PSPFactory is Ownable2Step {
         uint256 carry;
         if (r.fromRoundId != 0) {
             carry = mixETH.balanceOf(address(this));
+            // AUD-8: unsolicited factory donations must not push the sine
+            // launch beyond its validated boot range and trap public deposits.
+            if (useSine && carry > controller.PREDEPOSIT_CAP()) carry = controller.PREDEPOSIT_CAP();
             if (carry > 0) {
                 mixETH.forceApprove(address(controller), carry);
                 controller.seedCarry(carry);
@@ -447,8 +536,8 @@ contract PSPFactory is Ownable2Step {
             controller: controller,
             hook: hook,
             destroyed: false,
-            name: name,
-            symbol: symbol
+            name: r.name,
+            symbol: r.symbol
         });
         currentRoundId = r.newRoundId;
         if (r.fromRoundId != 0) {
@@ -459,6 +548,7 @@ contract PSPFactory is Ownable2Step {
         );
 
         reservation.active = false; // record kept for history/UI; slot reused next round
+        r.phase = 0;
         return (r.newRoundId, hookAddr);
     }
 
@@ -482,10 +572,10 @@ contract PSPFactory is Ownable2Step {
             string.concat(baseName, " ", _itoa(newRoundId)),
             string.concat(baseSymbol, _itoa(newRoundId))
         );
-        (newRoundId, hookAddr) = _birth(
-            string.concat(baseName, " ", _itoa(newRoundId)),
-            string.concat(baseSymbol, _itoa(newRoundId))
-        );
+        _birthContracts();
+        _birthPeriphery();
+        _birthWire();
+        return (currentRoundId, address(rounds[currentRoundId].hook));
     }
 
     /// @notice Spawn the next round from the latest destroyed one — permissionless.

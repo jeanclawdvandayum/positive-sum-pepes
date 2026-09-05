@@ -156,12 +156,10 @@ contract VestingTest is Test {
         uint256 total = wA + 1000e18;
         _feedFees(150e18); // during epoch 4
 
-        vm.warp(t0 + 3 * EPOCH); // epoch 5: alice k=2 (blessed: claims scale
-        // at the CURRENT weight, so epoch-4 fees settle at k=2, not k=1)
-        uint256 wA2 = _wAt(1000e18, 2);
-        uint256 expA = (150e18 * wA2) / total; // decayer share (approximation)
+        vm.warp(t0 + 3 * EPOCH); // current weight decays; already-earned fees do not
+        uint256 expA = (150e18 * wA) / total;
         uint256 expB = (150e18 * 1000e18) / total;
-        assertEq(stakerV.pendingFeesOf(101), expA, "decayer share at current weight");
+        assertEq(stakerV.pendingFeesOf(101), expA, "decayer share at earning-time weight");
         // bob settled nothing since epoch 2 — his epoch-2 50e18 rides along
         assertEq(stakerV.pendingFeesOf(202), 50e18 + expB, "stayer share (+unclaimed ep2)");
         assertTrue(expA + expB <= 150e18, "never over-distributes");

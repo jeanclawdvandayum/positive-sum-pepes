@@ -39,7 +39,7 @@ export interface TapeEntry {
 /// newest TimeAdded — feeds the clock panel's "last added by X · Ym ago" line.
 export interface LastTimeAdded {
   addr: `0x${string}`
-  wholePsp: bigint
+  secondsAdded: bigint
   /** block timestamp in unix seconds, when the RPC provides it on logs */
   atSec: number | undefined
 }
@@ -52,7 +52,7 @@ const sellEvent = parseAbiItem(
 )
 const feesEvent = parseAbiItem('event FeesAdded(uint256 mixETHAmount)')
 const timeEvent = parseAbiItem(
-  'event TimeAdded(address indexed buyer, uint256 wholePsp, uint256 newDetonationAt)',
+  'event TimeAdded(address indexed buyer, uint256 secondsAdded, uint256 newDetonationAt)',
 )
 
 export function useTradeTape() {
@@ -80,14 +80,14 @@ export function useTradeTape() {
       ])
       if (dead) return
 
-      // TimeAdded(txHash) → wholePsp: buys fold their +5:00 into one row
+      // TimeAdded(txHash) → secondsAdded: buys fold their actual clock extension into one row
       const addedByTx = new Map<string, bigint>()
       let newest: LastTimeAdded | undefined
       let newestBn = -1n
       let newestLi = -1
       for (const l of timeLogs) {
         const who = l.args.buyer
-        const whole = l.args.wholePsp
+        const whole = l.args.secondsAdded
         if (!who || whole === undefined) continue
         if (l.transactionHash) addedByTx.set(l.transactionHash, whole)
         // numeric recency (block, then logIndex) — string keys mis-sort
@@ -98,7 +98,7 @@ export function useTradeTape() {
           newestLi = li
           newest = {
             addr: who as `0x${string}`,
-            wholePsp: whole,
+            secondsAdded: whole,
             atSec: l.blockTimestamp !== undefined ? Number(l.blockTimestamp) : undefined,
           }
         }
@@ -121,7 +121,7 @@ export function useTradeTape() {
           price: Number(mix) / Number(psp),
           block: l.blockNumber,
           logIndex: l.logIndex ?? 0,
-          addedMs: whole !== undefined ? Number(whole) * 300_000 : undefined, // 5min/whole psp
+          addedMs: whole !== undefined ? Number(whole) * 1000 : undefined, // actual seconds after the clock cap
         })
         volume += mix
       }

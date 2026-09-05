@@ -115,7 +115,7 @@ contract DriveAnvil is Script, StdCheats {
 
         console.log("supply:", hook.totalSupplyPSP());
         console.log("reserve:", hook.reserveMixETH());
-        console.log("marginal price:", hook.getMarginalPrice());
+        console.log("marginal price:", hook.sinePriceAt(hook.reserveMixETH()));
     }
 
     function _round(PSPFactory factory)

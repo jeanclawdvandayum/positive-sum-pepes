@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
+import {GameRules} from "./libraries/GameRules.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -29,13 +30,19 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // ─────────────── Errors ───────────────
     error NotHook();
     error NotActive();
+    error PurchaseTooSmall();
     error ClockStillLive(); // CLOCK-REDESIGN §4: detonate() before the clock struck zero
     error NotPredeposit();
     error PredepositClosed();
     error ZeroAmount();
     error ZeroAddress();
     error FactoryMarkFailed();
-    error FactorySpawnFailed();
+    // FactorySpawnFailed removed (2026-09-03): detonate() now TOLERATES a
+    // failed spawn leg — on per-tx-capped chains the composed successor
+    // birth can exceed the cap, and the round must still flatten, open
+    // every lock and mark itself destroyed. The rebirth is then finished
+    // permissionlessly via factory.reserveSpawn + 3× birthStep; Detonated
+    // carries nextRound = address(0) for that case.
     error TimingsIncomplete(); // 2026-08-19: packed profile must fill every timing slot
     error ProtectedToken(); // L-3: sweep() protection has its own error, not ZeroAddress
     error ZeroShare(); // L-4: predeposit share rounded to 0 — claim refused, flag not set
@@ -102,6 +109,11 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // 2026-08-24/2026-08-18: hand-set widths drift from data reality).
     uint256 public immutable PREDEPOSIT_DURATION; // default 7 days
     uint256 public constant PREDEPOSIT_CAP = 500e18; // 500 mixETH
+    /// @dev Genesis pooled buy routes this share of the boot into the hook's
+    ///      ladder pot at launch (mirrors the sine pre-wave fee). The rest
+    ///      seeds the curve; predepositors claim their pro-rata of the PSP
+    ///      that 90% bought.
+    uint256 public constant GENESIS_POT_FEE_BPS = 1000; // 10%
     /// @dev Per-wallet predeposit cap, WHOLE mixETH from the 3rd packed
     ///      timing slot (scoopy 2026-08-29: "10 mixETH per wallet — can be
     ///      sybilled but at least that adds some friction"). 0 = uncapped
@@ -169,15 +181,16 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             VEST_DURATION = 42 days;
             PREDEPOSIT_CAP_PER_WALLET = 0; // uncapped (mainnet)
         } else {
-            // Widths DERIVED in CurveMath (TIMINGS_COUNT=3, TIMINGS_WIDTH=85):
-            // [0] predeposit, [1] vest, [2] wallet cap (whole mixETH). The
-            // layout guard + roundtrip test pin the packing (LESSONS
-            // 2026-08-24 / 2026-08-18).
+            // Widths DERIVED in CurveMath (TIMINGS_COUNT=4, TIMINGS_WIDTH=64):
+            // [0] predeposit, [1] vest, [2] detonation window (hook-owned),
+            // [3] wallet cap (whole mixETH). The layout guard + roundtrip
+            // test pin the packing (LESSONS 2026-08-24 / 2026-08-18).
             PREDEPOSIT_DURATION = t & CurveMath.TIMINGS_MASK;
             VEST_DURATION = (t >> CurveMath.TIMINGS_WIDTH) & CurveMath.TIMINGS_MASK;
-            // 3rd slot (2026-08-29): per-wallet predeposit cap, whole mixETH
+            // 4th slot (2026-09-03): per-wallet predeposit cap, whole mixETH
+            // (the det window moved to slot [2], consumed by CurveHook)
             PREDEPOSIT_CAP_PER_WALLET =
-                ((t >> (2 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK) * 1e18;
+                ((t >> (3 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK) * 1e18;
             // 2026-08-19 tripwire: a truncated slot deployed silently once —
             // never again. (Wallet cap exempt: zero = uncapped is legal.)
             if (PREDEPOSIT_DURATION == 0 || VEST_DURATION == 0) revert TimingsIncomplete();
@@ -311,6 +324,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             revert WalletCapExceeded();
         }
 
+        if (mixETHAmount < GameRules.MIN_BUY) revert PurchaseTooSmall();
+
         // Use balanceBefore/After to support fee-on-transfer tokens safely
         uint256 balBefore = mixETH.balanceOf(address(this));
         mixETH.safeTransferFrom(msg.sender, address(this), mixETHAmount);
@@ -422,6 +437,13 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // Boot pool = public predeposit + any carry bonus (old-pot deposits).
         uint256 totalBoot = totalPredepositMixETH + carryBonusMixETH;
 
+        // Genesis buy pays the pre-wave fee INTO THE POT (scoopy 2026-09-03:
+        // "a 10% fee from that should have gone to the pot"). The remaining
+        // 90% seeds the curve; initialPSP is computed on the post-fee boot so
+        // the wave anchors to what actually landed on the curve.
+        uint256 potFee = (totalBoot * GENESIS_POT_FEE_BPS) / 10000;
+        uint256 curveBoot = totalBoot - potFee;
+
         // Transfer boot mixETH to hook (hook holds all curve reserves + fees)
         mixETH.safeTransfer(address(hook), totalBoot);
 
@@ -430,16 +452,17 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // is the wave's predeposit integral (closed form, no Newton); the hook
         // materializes the identical curve in initializeCurve below.
         uint256 initialPSP = hook.sineConfigured()
-            ? hook.sineGenesisPSP(totalBoot)
-            : CurveMath.computeBuyOutput(totalBoot, 0, curveConfig);
+            ? hook.sineGenesisPSP(curveBoot)
+            : CurveMath.computeBuyOutput(curveBoot, 0, curveConfig);
         if (initialPSP == 0) revert ZeroAmount();
 
         // Snapshot for proportional claims (prevents donation attacks)
         totalInitialPSP = initialPSP;
         genesisPSPSnapshot = initialPSP;
 
-        // Initialize the hook's curve state with the full boot amount
-        hook.initializeCurve(totalBoot, initialPSP);
+        // Initialize the hook's curve state with the post-fee boot, and
+        // route the genesis fee into the ladder pot
+        hook.initializeCurve(curveBoot, initialPSP, potFee);
 
         // Mint PSP to this contract, then move the whole claimable pool into
         // the staker's genesis lock
@@ -453,7 +476,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // lives at the staker's own address (virtual position: never an NFT,
         // never transferable); predepositors claim out of it lazily via
         // claimPredepositPSP() → staker.claimGenesisShare().
-        pspToken.transfer(address(staker), initialPSP);
+        IERC20(address(pspToken)).safeTransfer(address(staker), initialPSP);
         staker.lockGenesis(initialPSP);
 
         // Activate the hook
@@ -533,8 +556,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
 
         // 1+2. flatten — the pot freezes with the mode change (snapshot for
         // the event before it does)
-        uint256 pot = h.potBalance();
         h.setMode(CurveHook.Mode.Flat);
+        uint256 pot = h.potBalance();
         flatTime = block.timestamp;
 
         // 3. mark destroyed on the factory (the spawn chain needs the flag;
@@ -544,12 +567,25 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
 
         // 4. birth the successor: the factory's composed reserve+birth shim
         //    (EIP-170: precomputed selector for spawnNextRound(uint256)).
-        //    Returns (newRoundId, nextHook) — the event carries the live
-        //    successor hook, the address the next game trades against.
-        (bool okSpawn, bytes memory spawned) =
-            factory.call(abi.encodeWithSelector(bytes4(0x1c9424dc), factoryRoundId));
-        if (!okSpawn) revert FactorySpawnFailed();
-        (, address nextRound) = abi.decode(spawned, (uint256, address));
+        //    On chains with a per-tx gas cap (Base Sepolia ≈2^24) the
+        //    composed spawn can exceed the cap — that failure is TOLERATED:
+        //    this tx still flattens, freezes the pot, opens every lock and
+        //    marks the round destroyed, and ANYONE finishes the rebirth
+        //    permissionlessly via factory.reserveSpawn + 3× birthStep (the
+        //    factory cares only about round state, not the caller). The
+        //    Detonated event carries nextRound = address(0) when the
+        //    successor still needs birthing — the UI's "round is spawning"
+        //    signal.
+        address nextRound;
+        // AUD-3: do not burn a capped transaction's gas attempting a birth
+        // that cannot fit. Always retain gas to complete settlement/events.
+        // Low-gas callers finish rebirth through the permissionless stages.
+        if (gasleft() > 30_000_000) {
+            (bool okSpawn, bytes memory spawned) = factory.call{gas: gasleft() - 100_000}(
+                abi.encodeWithSelector(bytes4(0x1c9424dc), factoryRoundId)
+            );
+            if (okSpawn) (, nextRound) = abi.decode(spawned, (uint256, address));
+        }
 
         emit Detonated(msg.sender, pot, nextRound);
     }

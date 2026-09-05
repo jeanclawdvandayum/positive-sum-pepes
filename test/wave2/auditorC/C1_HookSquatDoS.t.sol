@@ -70,7 +70,7 @@ contract C1_HookSquatDoS is CBase {
         _launchRound1();
         _stageNextRound();
 
-        (,,,,, address token, address controller, address hook,, bool active) = factory.reservation();
+        (,,,,, address token, address controller, address hook,, bool active,,,) = factory.reservation();
         assertTrue(active, "reservation live after finalize");
 
         factory.birthRound();
@@ -162,7 +162,10 @@ contract C1_HookSquatDoS is CBase {
             address controller,
             address hook,
             ,
-            bool active
+            bool active,
+            ,
+            ,
+
         ) = factory.reservation();
         assertTrue(active, "committed");
 

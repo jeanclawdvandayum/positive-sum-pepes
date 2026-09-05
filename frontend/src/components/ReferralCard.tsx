@@ -1,6 +1,7 @@
+import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useAccount, useWriteContract } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { factoryAbi, registryAbi, stakerAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
 import { ADDRESSES } from '../lib/config'
@@ -187,7 +188,7 @@ export function RefBanner() {
   const [dismissed, setDismissed] = useState(false)
   const [justBound, setJustBound] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { writeContractAsync } = useWriteContract()
+  const { writeContractAsync } = useConfirmedWrite()
 
   // capture → persist → strip (keep any other params)
   const refParam = searchParams.get('ref')

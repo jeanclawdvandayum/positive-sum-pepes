@@ -1,10 +1,12 @@
+import { useConfirmedWrite } from '../../lib/useConfirmedWrite'
 import { useMemo, useState } from 'react'
-import { useAccount, useWriteContract } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { renderPepeSvg } from '../../lib/pepeRender'
 import { dnaOfId } from '../../components/PepePicker'
 import { fmtAmount } from '../../lib/format'
 import { hookAbi } from '../../lib/abi'
 import type { BoardTicket } from './useLadderBoard'
+import { useSeatPepes } from './useSeatPepes'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PotBoard — the ladder, right of the swap (REDESIGN-B2 §3, CLOCK-REDESIGN
@@ -72,6 +74,9 @@ export default function PotBoard({
   roundLabel,
   claimable,
   claimHook,
+  ticketCount,
+  staker,
+  roundId,
 }: {
   pot: bigint | undefined
   /** board(0..9), newest first; undefined = empty seat (§8) */
@@ -82,9 +87,15 @@ export default function PotBoard({
   claimable?: bigint
   /** the dead hook that pays the pot (settled mode) */
   claimHook?: `0x${string}`
+  /** total tickets ever — seat i (newest first) is ticket count−1−i */
+  ticketCount?: bigint
+  /** the round's staker — for reading seat holders' actual pepe NFTs */
+  staker?: `0x${string}`
+  roundId?: bigint
 }) {
   const { isConnected } = useAccount()
-  const { writeContractAsync } = useWriteContract()
+  const { writeContractAsync } = useConfirmedWrite(settled ? { exitRoundId: roundId } : undefined)
+  const seatDnas = useSeatPepes(staker, tickets)
   const [claimStep, setClaimStep] = useState<'idle' | 'pending' | 'done'>('idle')
   const [claimErr, setClaimErr] = useState<string | null>(null)
 
@@ -171,19 +182,23 @@ export default function PotBoard({
       <ol className="mt-4 flex flex-1 flex-col gap-1.5">
         {seats.map((s, i) => {
           const rank = i + 1
+          // absolute ticket number: seat 0 (newest) = count−1, walking back.
+          // Per-whole-PSP seats mean one buy can take several seats — the
+          // absolute number is what makes them distinct.
+          const ticketNo = ticketCount !== undefined ? ticketCount - BigInt(i) : undefined
           const isTop = rank === 1
           const payout = payoutWad(i)
           const nominal = s ? sharePct(i, seated) : (LADDER[i] ?? 0)
           const barW = Math.min(100, (nominal / top) * 100)
           return (
             <li
-              key={s ? `${s.addr}-${s.pspWad}-${s.ts}` : `seat-${rank}`}
+              key={`${s?.addr ?? 'empty'}-${s?.ts ?? 0n}-${i}`}
               className={`pl-seat ${isTop ? 'pl-seat--top' : ''} ${s ? '' : 'pl-seat--empty'} ${s && rank === 1 ? 'pl-enter' : ''}`}
             >
               <div className="pl-seat-bar" style={{ width: `${barW}%` }} aria-hidden="true" />
               <div className={`pl-seat-inner ${isTop ? 'text-base' : 'text-sm'}`}>
                 <span className="tabular w-7 shrink-0 font-data text-text-lo" aria-hidden="true">
-                  #{rank}
+                  {s !== undefined && ticketNo !== undefined ? ticketNo.toString() : `#${rank}`}
                 </span>
                 <span className="relative flex shrink-0">
                   <span
@@ -192,7 +207,11 @@ export default function PotBoard({
                     }`}
                     style={{ imageRendering: 'pixelated' }}
                     dangerouslySetInnerHTML={{
-                      __html: s ? avatarFor(s.addr) : sleeperFor(rank),
+                      __html: s
+                        ? (seatDnas.get(s.addr) ?? 0n) > 0n
+                          ? renderPepeSvg(seatDnas.get(s.addr)!)
+                          : avatarFor(s.addr)
+                        : sleeperFor(rank),
                     }}
                   />
                   {!s && (

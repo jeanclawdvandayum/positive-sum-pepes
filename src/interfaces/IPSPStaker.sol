@@ -10,10 +10,11 @@ interface IPSPStaker {
         uint256 requestEpoch; // 0 = indefinitely locked (reinvestable)
         uint256 creditCheckpoint;
         uint256 feesPaid;
-        uint256 actionTime;
     }
 
+    function isWithdrawing(uint256 pepeId) external view returns (bool);
     function ownerOf(uint256 pepeId) external view returns (address);
+    function isApprovedForAll(address owner, address operator) external view returns (bool);
     function positions(uint256 pepeId) external view returns (PositionView memory);
     function primaryOf(address user) external view returns (uint256);
     function stakedTotalOf(address user) external view returns (uint256);

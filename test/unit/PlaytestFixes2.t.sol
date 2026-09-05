@@ -73,7 +73,7 @@ contract PlaytestFixes2 is Test {
             new HookDeployer(),
             new ControllerDeployer(),
             new StakerDeployer(),
-            CurveMath.packTimingsCapped(2 hours, 1 hours, 10),
+            CurveMath.packTimingsCapped(2 hours, 1 hours, 2 hours, 10),
             address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );
         PSPFactory.RoundParams memory params;
