@@ -298,3 +298,26 @@ Solidity source changed after the contract-source hash above.
   staker/version and rejects the old wrapper. Reloaded the rebuilt staking page;
   live round 1 data loads with no browser warning/error logs. Wallet-signed
   approval/reinvestment remains the user's playtest.
+
+## 2026-09-05 — Stake layout, referral landing and graveyard history
+
+- Moved Hall of Detonations from Stake to Graveyard. It shares the existing
+  dead-round enumeration and reads each hook's frozen `potBalance`; it no longer
+  treats initial round-id loading as a detonation or displays reserve backing as
+  the pot. Old browser-local records remain untouched and are no longer displayed.
+  Archive amount failures show unavailable without blocking existing exit reads.
+- Referral links now open the explainer. The explainer captures the referral
+  hint before navigation; the existing entry-page banner still requires an
+  explicit user-signed registry bind. No contract writes were added.
+- The six Pepe candidates form two rows of three at all widths. Selection has
+  accessible labels/pressed state; refreshing clears selection and rolls six new
+  candidates. Sleeping-Pepe styles moved with the archive to the graveyard.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **41 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle, no-governance, TypeScript and Vite. Existing large-chunk
+  build warnings remain. No contracts or deployment configuration changed.
+- Browser checks confirm the grid, selection, refresh, absence of history on
+  Stake, and the correct empty archive on Graveyard for live round 1. An isolated
+  preview origin verifies explainer referral capture and the same referral hint
+  on Play and Predeposit after navigation; no browser warning/error logs there.
+  Populated dead-round history and wallet-signed actions were not browser-tested.

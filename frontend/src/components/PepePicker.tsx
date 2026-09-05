@@ -111,16 +111,18 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
         </button>
       </div>
 
-      {/* compact horizontal strip — not a grid (B3 item 2) */}
-      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+      <div className="mt-3 grid grid-cols-3 gap-3">
         {candidates.map((id) => {
           const isSel = selected === id
           const svg = svgs[id.toString()]
           return (
             <button
               key={id.toString()}
+              type="button"
+              aria-label={`select pepe #${id}`}
+              aria-pressed={isSel}
               onClick={() => onSelect(isSel ? null : id)}
-              className={`relative h-24 w-24 shrink-0 rounded-xl border p-1 transition sm:h-28 sm:w-28 ${
+              className={`relative aspect-square w-full min-w-0 rounded-xl border p-1 transition ${
                 isSel
                   ? 'border-pepe bg-bg-2 ring-1 ring-pepe'
                   : 'border-line bg-bg-2/50 hover:border-text-lo'
@@ -128,7 +130,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
             >
               <div className="h-full w-full [&>svg]:h-full [&>svg]:w-full">
                 {svg ? (
-                  <div dangerouslySetInnerHTML={{ __html: svg }} className="h-full w-full" />
+                  <div dangerouslySetInnerHTML={{ __html: svg }} className="h-full w-full [&>svg]:h-full [&>svg]:w-full" />
                 ) : (
                   <div className="skeleton h-full w-full rounded-lg" />
                 )}

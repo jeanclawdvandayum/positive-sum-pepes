@@ -10,10 +10,9 @@ import { useRound } from '../lib/useRound'
 const REF_KEY = 'psp-ref'
 const ZERO_ADDR = /^0x0+$/
 
-/// referral link for a staked pepe: lands visitors on the predeposit page
-/// (round entry point) with the referrer's NFT id in the hash-query.
+/// Referral links land on the explainer with the NFT id in the hash-query.
 export function refLinkFor(pepeId: bigint): string {
-  return `${window.location.origin}${window.location.pathname}#/predeposit?ref=${pepeId}`
+  return `${window.location.origin}${window.location.pathname}#/?ref=${pepeId}`
 }
 
 function readSavedRef(): bigint | null {
@@ -180,15 +179,10 @@ export default function ReferralCard() {
   )
 }
 
-/// visitor side: captures ?ref= from the URL (Predeposit + Trade pages),
-/// persists it, strips it, and offers the one-shot registry.record() bind.
-export function RefBanner() {
-  const { isConnected } = useAccount()
+/// Capture on the explainer as well as entry pages, before navigation drops
+/// the hash-query. Saving a referral hint never binds it on chain.
+export function useCaptureReferral(): bigint | null {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [dismissed, setDismissed] = useState(false)
-  const [justBound, setJustBound] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const { writeContractAsync } = useConfirmedWrite()
 
   // capture → persist → strip (keep any other params)
   const refParam = searchParams.get('ref')
@@ -209,7 +203,17 @@ export function RefBanner() {
     )
   }, [refParam, setSearchParams])
 
-  const ref = useMemo(() => readSavedRef(), [refParam])
+  return useMemo(() => readSavedRef(), [refParam])
+}
+
+/// Entry pages offer the one-shot, user-signed registry.record() bind.
+export function RefBanner() {
+  const { isConnected } = useAccount()
+  const [dismissed, setDismissed] = useState(false)
+  const [justBound, setJustBound] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { writeContractAsync } = useConfirmedWrite()
+  const ref = useCaptureReferral()
   const { registry, attributed, refNft } = useReferral()
   const canRefer = useCanRefer(registry, ref)
 

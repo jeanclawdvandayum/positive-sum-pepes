@@ -20,6 +20,7 @@ export interface GraveyardRound {
   mode: number // 2 flat, 3 destroyed
   reserve: bigint
   supply: bigint
+  pot: bigint | undefined
   pspBal: bigint
   claimablePot: bigint
   pspAllowance: bigint
@@ -66,16 +67,19 @@ export function useGraveyard(): {
           const mode = (await rpcCall(hook, hookAbi, 'mode')) as bigint | undefined
           if (mode === undefined || Number(mode) < 2) continue // not dead
 
-          const [reserve, supply, staker] = await Promise.all([
+          const [reserve, supply, staker, pot] = await Promise.all([
             rpcCall(hook, hookAbi, 'reserveMixETH') as Promise<bigint>,
             rpcCall(hook, hookAbi, 'totalSupplyPSP') as Promise<bigint>,
             rpcCall(controller, controllerAbi, 'staker') as Promise<`0x${string}` | undefined>,
+            // Frozen distribution base, not redemption reserves. An unavailable
+            // archive amount must not block the existing exit controls.
+            (rpcCall(hook, hookAbi, 'potBalance') as Promise<bigint>).catch(() => undefined),
           ])
 
           const gr: GraveyardRound = {
             roundId: rid, name: row[4] ?? `Round ${rid}`, symbol: '',
             token: token as `0x${string}`, controller: controller as `0x${string}`, hook: hook as `0x${string}`,
-            staker, mode: Number(mode), reserve: reserve ?? 0n, supply: supply ?? 0n,
+            staker, mode: Number(mode), reserve: reserve ?? 0n, supply: supply ?? 0n, pot,
             pspBal: 0n, pspAllowance: 0n, positions: [], claimablePot: 0n, unclaimedPredeposit: false,
           }
 

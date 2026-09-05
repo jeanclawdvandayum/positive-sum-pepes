@@ -19,16 +19,15 @@ import { useEthUsd } from '../lib/useEthUsd'
 import StakeStyles from './stake/StakeStyles'
 import IdentityPanel from './stake/IdentityPanel'
 import ReferralsCard from './stake/ReferralsCard'
-import HallOfDetonations from './stake/HallOfDetonations'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // /stake — the den: "your pepe works here" (REDESIGN-B3).
 //
 // Left column: identity panel (pepe big + name + staked + share of the 60%
-// stream + the live fees-earned accumulator) → compact pepe picker strip →
+// stream + the live fees-earned accumulator) → six-pepe grid →
 // stake form (function unchanged; placeholder verbatim) → your staked pepes.
-// Right column: referrals → .wei registry notice → hall of detonations (the
-// void-killer). Bottom stats fold into the TickerBar.
+// Right column: referrals → .wei registry notice. Round history lives in the
+// graveyard. Bottom stats fold into the TickerBar.
 //
 // Every read/write below is StakeCard's, carried over unchanged — same
 // useRpcReads batches, same cadences, same approve→lock flow, same error
@@ -512,7 +511,7 @@ export default function Stake() {
           )}
         </div>
 
-        {/* ── right: referrals → .wei → the hall ── */}
+        {/* ── right: referrals → .wei ── */}
         <div className="flex flex-col gap-4">
           <ReferralsCard />
 
@@ -529,7 +528,6 @@ export default function Stake() {
             </div>
           </div>
 
-          <HallOfDetonations roundId={round.id} pot={round.reserve} yourStaked={totalStaked} />
         </div>
       </div>
 

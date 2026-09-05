@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import Clock from '../components/Clock'
+import { useCaptureReferral } from '../components/ReferralCard'
 import { randomDna, renderPepeSvg } from '../lib/pepeRender'
 import { BeatDiagram, DiagramStyles } from './explainer/diagrams'
 import PayoutSlider from './explainer/PayoutSlider'
@@ -67,6 +68,7 @@ const MATH: [string, string][] = [
 const STEP_PAD = ['', 'lg:pl-6', 'lg:pl-12', 'lg:pl-18', 'lg:pl-24']
 
 export default function Landing() {
+  useCaptureReferral()
   // one greeter pepe per load — the same "the header IS the art" lane
   const greeter = useMemo(() => renderPepeSvg(randomDna()), [])
 

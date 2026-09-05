@@ -5,6 +5,7 @@ import { erc20Abi, hookAbi, stakerAbi, controllerAbi } from '../lib/abi'
 import { fmtAmount, fmtPrice } from '../lib/format'
 import { useGraveyard, type GraveyardRound } from './play/useGraveyard'
 import { PlayStyles } from './play/PlayStyles'
+import HallOfDetonations from './graveyard/HallOfDetonations'
 
 type RedeemStep = 'idle' | 'approve' | 'redeem' | 'done'
 
@@ -210,15 +211,8 @@ export default function Graveyard() {
       </div>
       <div className="mt-6 flex flex-col gap-6">
         {error && <p role="alert" className="text-phase-critical">{error}</p>}
-      {!checked ? (
-          <p className="text-sm text-text-lo">checking the graveyard…</p>
-        ) : rounds.length === 0 ? (
-          <div className="flex items-center gap-3 rounded-xl border border-line bg-bg-1 p-5 text-sm text-text-lo">
-            <span>no dead rounds yet — the first detonation fills this page.</span>
-          </div>
-        ) : (
-          rounds.map((r) => <DeadRoundCard key={r.roundId.toString()} round={r} />)
-        )}
+        <HallOfDetonations rounds={rounds} checked={checked} connected={isConnected} />
+        {checked && rounds.map((r) => <DeadRoundCard key={r.roundId.toString()} round={r} />)}
         {!isConnected && checked && rounds.length > 0 && (
           <p className="text-xs text-text-lo">connect your wallet to see your positions per round.</p>
         )}
