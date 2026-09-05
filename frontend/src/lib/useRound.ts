@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { factoryAbi, controllerAbi, hookAbi, erc20Abi, stakerAbi, reinvestorAbi } from './abi'
 import { ADDRESSES, REINVEST_ENABLED } from './config'
-import { assertGameRules } from './gameRules'
+import { createRoundMetadataReader } from './roundMetadata'
 import { rpcCall } from './rpc'
-import type { CurveConfig, Zone } from './curve'
+import type { CurveConfig } from './curve'
 import { loadSineCurve, SineCurveData } from './sine'
 
 export interface RoundInfo {
+  readError: string | undefined
   reinvestorReady: boolean
   rulesCompatible: boolean | undefined
   id: bigint
@@ -43,6 +44,7 @@ export interface RoundInfo {
 }
 
 const EMPTY: RoundInfo = {
+  readError: undefined,
   reinvestorReady: false,
   rulesCompatible: undefined,
   id: 0n, token: undefined, controller: undefined, staker: undefined, hook: undefined, mix: undefined,
@@ -56,6 +58,8 @@ const EMPTY: RoundInfo = {
 }
 
 const F = ADDRESSES.factory as `0x${string}`
+const readMetadata = createRoundMetadataReader(F, rpcCall)
+const wrapperStakers = new Map<string, string>()
 
 // ── shared singleton store ─────────────────────────────────────────────────
 // Every component on a page used to run its OWN 11-call polling loop every
@@ -78,25 +82,21 @@ function startRoundLoop() {
     if (inFlight) return schedule()
     inFlight = true
     try {
-      const [id, mix] = await Promise.all([
-        rpcCall(F, factoryAbi, 'currentRoundId') as Promise<bigint>,
-        rpcCall(F, factoryAbi, 'mixETH') as Promise<`0x${string}`>,
-      ])
-      const [rToken, rController, rHook] = (await rpcCall(F, factoryAbi, 'rounds', [id])) as [
-        `0x${string}`, `0x${string}`, `0x${string}`,
-      ]
-      const rStaker = (await rpcCall(rController, controllerAbi, 'staker')) as `0x${string}`
-      const reinvestorReady = REINVEST_ENABLED && await (
-        rpcCall(ADDRESSES.reinvestor, reinvestorAbi, 'staker') as Promise<`0x${string}`>
-      ).then(s => s.toLowerCase() === rStaker.toLowerCase()).catch(() => false)
+      const id = await rpcCall(F, factoryAbi, 'currentRoundId') as bigint
+      const { token: rToken, controller: rController, hook: rHook, staker: rStaker,
+        mix, cfg, zones, detWindow, rulesCompatible } = await readMetadata(id)
+      let wrapperStaker = wrapperStakers.get(ADDRESSES.reinvestor)
+      if (REINVEST_ENABLED && !wrapperStaker) {
+        wrapperStaker = await (rpcCall(ADDRESSES.reinvestor, reinvestorAbi, 'staker') as Promise<string>).catch(() => undefined)
+        if (wrapperStaker) wrapperStakers.set(ADDRESSES.reinvestor, wrapperStaker)
+      }
+      const reinvestorReady = wrapperStaker?.toLowerCase() === rStaker.toLowerCase()
       // sine geometry is static once armed — the cached sampler runs once per
       // hook; the 4s loop below only refreshes the live scalars.
-      const [mode, reserve, supply, cfg, zones, totalLocked, pd, flatTime, potBalance, sineActive, swapFeeBps, detWindow] = await Promise.all([
+      const [mode, reserve, supply, totalLocked, pd, flatTime, potBalance, sineActive, swapFeeBps] = await Promise.all([
         rpcCall(rHook, hookAbi, 'mode') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'reserveMixETH') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'totalSupplyPSP') as Promise<bigint>,
-        rpcCall(rHook, hookAbi, 'curveConfig') as Promise<[bigint, bigint]>,
-        rpcCall(rHook, hookAbi, 'getCurveZones') as Promise<Zone[]>,
         rpcCall(rStaker, stakerAbi, 'totalLocked') as Promise<bigint>,
         rpcCall(rController, controllerAbi, 'predepositState') as Promise<
           [bigint, bigint, bigint, boolean, boolean, boolean, boolean]
@@ -105,7 +105,6 @@ function startRoundLoop() {
         rpcCall(rHook, hookAbi, 'potBalance') as Promise<bigint>,
         (rpcCall(rHook, hookAbi, 'sineActive') as Promise<boolean>).catch(() => false),
         (rpcCall(rHook, hookAbi, 'swapFeeBps') as Promise<bigint>).catch(() => undefined),
-        (rpcCall(rHook, hookAbi, 'detWindow') as Promise<bigint>).catch(() => undefined),
       ])
       if (!rHook || !rController) return
       // sine flavor: the zone getMarginalPrice is legacy — price comes from
@@ -128,11 +127,8 @@ function startRoundLoop() {
           rpcCall(rHook, hookAbi, 'detonationAt') as Promise<bigint>
         ).catch(() => undefined)
       }
-      const rulesCompatible = await Promise.all([
-        rpcCall(rHook, hookAbi, 'MIN_BUY_INPUT') as Promise<bigint>,
-        rpcCall(rHook, hookAbi, 'TIME_PER_UNIT') as Promise<bigint>,
-      ]).then(([minimum, seconds]) => { assertGameRules(minimum, seconds); return true }).catch(() => false)
       shared = {
+        readError: undefined,
         reinvestorReady,
         rulesCompatible,
         id, token: rToken, controller: rController, staker: rStaker, hook: rHook, mix,
@@ -150,11 +146,13 @@ function startRoundLoop() {
       backoffMs = 0
       listeners.forEach((l) => l(shared))
       // Publish balances and clock before the larger chart sample completes.
-      const sine = await loadSineCurve(rHook).catch(() => null)
+      const sine = await loadSineCurve(rHook).catch(() => shared.sine)
       shared = { ...shared, sine }
       listeners.forEach((l) => l(shared))
     } catch (error) {
       console.warn('Could not refresh PSP round data:', error)
+      shared = { ...shared, readError: 'The RPC connection is unavailable. Retrying round data automatically.' }
+      listeners.forEach(l => l(shared))
       /* round not resolvable / rpc down — keep last state, back off */
       backoffMs = backoffMs ? Math.min(backoffMs * 2, 60_000) : 8_000
     } finally {

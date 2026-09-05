@@ -1,3 +1,5 @@
+import { DEPLOYMENT_BLOCK } from '../../lib/config'
+import { createLogScanner } from '../../lib/logScanner'
 import { useEffect, useMemo, useState } from 'react'
 import { usePublicClient } from 'wagmi'
 import { parseAbiItem } from 'viem'
@@ -69,15 +71,17 @@ export function useTradeTape() {
     const hookAddr = round.hook
     const ctrlAddr = round.controller
     let dead = false
+    const scanner = createLogScanner((fromBlock, toBlock) => c.getLogs({
+      address: [hookAddr, ctrlAddr], events: [buyEvent, sellEvent, feesEvent, timeEvent],
+      fromBlock, toBlock, strict: true,
+    }), DEPLOYMENT_BLOCK)
 
     async function load() {
-      const [buys, sells, feeLogs, timeLogs] = await Promise.all([
-        c.getLogs({ address: hookAddr, event: buyEvent, fromBlock: 0n }),
-        c.getLogs({ address: hookAddr, event: sellEvent, fromBlock: 0n }),
-        c.getLogs({ address: ctrlAddr, event: feesEvent, fromBlock: 0n }),
-        // same lane, same pull — the clock's injection event (spec §6.6)
-        c.getLogs({ address: hookAddr, event: timeEvent, fromBlock: 0n }),
-      ])
+      const logs = await scanner.poll(await c.getBlockNumber())
+      const buys = logs.filter(log => log.eventName === 'Buy')
+      const sells = logs.filter(log => log.eventName === 'Sell')
+      const feeLogs = logs.filter(log => log.eventName === 'FeesAdded')
+      const timeLogs = logs.filter(log => log.eventName === 'TimeAdded')
       if (dead) return
 
       // TimeAdded(txHash) → secondsAdded: buys fold their actual clock extension into one row
@@ -151,10 +155,10 @@ export function useTradeTape() {
     }
 
     load().catch(() => {})
-    const un = client.watchBlockNumber({ onBlockNumber: () => load().catch(() => {}) })
+    const timer = setInterval(() => { load().catch(() => {}) }, 12_000)
     return () => {
       dead = true
-      un()
+      clearInterval(timer)
     }
   }, [client, round.hook, round.controller])
 

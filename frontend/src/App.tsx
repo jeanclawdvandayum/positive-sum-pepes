@@ -73,9 +73,10 @@ function DeadlineWire() {
 
 function RulesNotice() {
   const round = useRound()
+  if (round.readError) return <p role="status" className="mx-auto max-w-6xl px-4 py-3 text-sm text-phase-heat">{round.readError}</p>
   if (round.rulesCompatible !== false) return null
   return <p role="alert" className="mx-auto max-w-6xl px-4 py-3 text-sm text-phase-critical">
-    This deployment’s game rules could not be verified. Actions are unavailable in this interface.
+    This deployment uses different game rules. Use the interface for that deployment.
   </p>
 }
 

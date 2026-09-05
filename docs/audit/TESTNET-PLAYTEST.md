@@ -31,7 +31,13 @@ is in `.env.production` (use `.env.production.local` to override it locally).
 Rebuilding uses those settings. The manifest pins protocol source revision `a35228a3`;
 subsequent frontend/documentation changes do not change deployed Solidity code.
 The frontend uses [Base's public Sepolia endpoint](https://docs.base.org/base-chain/api-reference/rpc-overview)
-with batched reads, concurrent-request deduplication and 20-second timeouts.
+with Multicall3 view batching, concurrent-request deduplication, a second public
+provider as fallback, and 12-second timeouts per provider. Immutable round
+metadata is cached. The curve preview samples locally from materialized on-chain
+coefficients; executable quotes and minOut protection still come from the contract.
+Activity history starts at `VITE_DEPLOYMENT_BLOCK` and advances in bounded pages
+with a 12-block reorg overlap. Set this block from the factory's creation receipt
+when deploying another instance.
 Public RPC service remains subject to rate limits; the playtest should include
 an interruption/recovery check.
 

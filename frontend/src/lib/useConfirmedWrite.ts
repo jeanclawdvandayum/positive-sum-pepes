@@ -4,6 +4,7 @@ import { factoryAbi, hookAbi, controllerAbi, reinvestorAbi } from './abi'
 import { assertGameRules } from './gameRules'
 import { verifyRoundExit } from './exitRules'
 import { confirmTransaction } from './transactions'
+import { userFacingRpcError } from './rpcErrors'
 
 /** AUD-4: every UI write simulates, waits for mining, and checks receipt status. */
 export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined }) {
@@ -15,7 +16,7 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined })
     if (chainId !== CHAIN_ID) throw new Error('Switch your wallet to the configured network.')
     // Immutable legacy deployments do not acquire the new purchase rules.
     const factory = ADDRESSES.factory as `0x${string}`
-    const blockNumber = await client.getBlockNumber()
+    const blockNumber = await client.getBlockNumber().catch(error => { throw userFacingRpcError(error) })
     if (options) {
       // Read this immutable registry entry only. The latest round's rules or
       // availability cannot disable an older round's asset exits.
@@ -40,11 +41,12 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined })
         ])
         if (expected.toLowerCase() !== actual.toLowerCase()) throw new Error('Compounding is unavailable for this round.')
       }
-    } catch {
-      throw new Error('Could not verify this deployment’s game rules. Actions are unavailable; check the configured deployment and connection.')
+    } catch (error) {
+      throw userFacingRpcError(error)
     }
     return confirmTransaction({
-      simulate: p => client.simulateContract({ ...p, account: address } as never),
+      simulate: p => client.simulateContract({ ...p, account: address } as never)
+        .catch(error => { throw userFacingRpcError(error) }),
       submit: p => writeContractAsync(p),
       wait: async hash => {
         let replacementReason: string | undefined

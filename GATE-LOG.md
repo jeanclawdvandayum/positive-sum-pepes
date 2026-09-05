@@ -150,3 +150,32 @@ Solidity source changed after the contract-source hash above.
   The manifest pins `a35228a3`; later changes affect frontend, tests and release
   records only. Historical broadcast files remain preserved outside the source
   commit. Testnet only; mainnet fork/deployment remains deferred by user direction.
+
+## 2026-09-05 — Live playtest RPC overload and chart recovery
+
+- Reproduced the user's post-launch failure: public Base Sepolia RPC responses
+  reported `over rate limit`. Direct reads confirmed minimum **0.005 mixETH**,
+  time unit **260 seconds**, Active mode and valid materialized sine geometry.
+  The approval simulation succeeded when the node responded.
+- Removed the chart's 100+ per-point RPC calls and repeated failed scans. Display
+  geometry now uses locally sampled on-chain coefficients; corrected the old
+  post-boot supply WAD/unit error. Quotes and minOut still use contract views.
+- Cached immutable registry/constructor data per round, retrying failed reads.
+  RPC failures no longer turn into cached game-rule mismatches. Real mismatches
+  still reject; fresh pinned-block validation and simulation remain before writes.
+- View reads aggregate through Multicall3. JSON-RPC batching, bounded timeouts,
+  concurrent deduplication and a second public provider support reads and
+  simulations. Activity logs start at factory creation, advance in <=1000-block
+  pages, retain a 12-block reorg overlap, and avoid overlapping full-history polls.
+- Browser: active curve renders, no rules-error banner, and a **0.005 mixETH**
+  input quotes **56.646 PSP**, one seat and **4m20s**. Read-only live verification
+  at block **46415448** passed the pinned preflight and approval simulation. Four
+  concurrent live view reads used **one HTTP/RPC call**. No transaction was sent.
+- `bash scripts/check-audit.sh`: **397 Solidity tests / 55 suites**, **26 frontend
+  tests**, **103 ABI declarations**, **32** production size checks, oracle and
+  no-governance gates, TypeScript and Vite all pass. New regressions cover metadata
+  recovery/caching, real mismatches, error classification, chart supply/price,
+  bounded/reorg-safe log reads, Multicall3 response mapping and provider fallback.
+- Deployed contracts and addresses are unchanged. Refresh previously open wallet
+  browser tabs to load the new build. Public RPC availability remains external;
+  wallet-signed buying is left to the user's playtest.

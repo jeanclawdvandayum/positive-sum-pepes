@@ -1,8 +1,9 @@
-import { http, cookieStorage, createStorage } from 'wagmi'
+import { cookieStorage, createStorage } from 'wagmi'
 import { base, baseSepolia, mainnet, sepolia } from 'wagmi/chains'
 import { defineChain } from 'viem'
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { injectedWallet } from '@rainbow-me/rainbowkit/wallets'
+import { rpcTransport } from './rpcTransport'
 
 const env = import.meta.env
 
@@ -15,7 +16,7 @@ const anvil = defineChain({
 
 export const CHAIN_ID = Number(env.VITE_CHAIN_ID || 8453)
 
-const targetChain =
+export const targetChain =
   CHAIN_ID === 31337
     ? anvil
     : CHAIN_ID === 1
@@ -52,6 +53,9 @@ export const TESTNET_ETH_FAUCET = CHAIN_ID === 11155111 || CHAIN_ID === 84532
 
 /// reinvest buttons are env-gated the same way.
 export const REINVEST_ENABLED = Boolean(env.VITE_REINVESTOR)
+export const RPC_URL = env.VITE_RPC_URL || targetChain.rpcUrls.default.http[0]
+export const RPC_FALLBACK_URL = env.VITE_RPC_FALLBACK_URL as string | undefined
+export const DEPLOYMENT_BLOCK = BigInt(env.VITE_DEPLOYMENT_BLOCK || '0')
 
 export const wagmiConfig = getDefaultConfig({
   appName: 'Positive Sum Pepes',
@@ -60,9 +64,10 @@ export const wagmiConfig = getDefaultConfig({
   // Offer remote wallets only when their real project is configured.
   wallets: env.VITE_WC_PROJECT_ID ? undefined : [{ groupName: 'Browser wallets', wallets: [injectedWallet] }],
   chains: [targetChain],
+  batch: { multicall: { batchSize: 4096, wait: 20 } },
   storage: createStorage({ storage: cookieStorage }),
   transports: {
-    [targetChain.id]: http(env.VITE_RPC_URL || undefined, { batch: true }),
+    [targetChain.id]: rpcTransport(RPC_URL, RPC_FALLBACK_URL),
   },
   ssr: false,
 })
