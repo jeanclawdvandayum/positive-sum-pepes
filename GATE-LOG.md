@@ -388,3 +388,27 @@ Solidity source changed after the contract-source hash above.
   staking form across responsive changes; no browser warning/error logs.
   Viewport restored. Connected-wallet position actions were not browser-tested
   for this layout-only change; no contract or deployment update was needed.
+
+## 2026-09-05 — Wallet Pepe identity and avatar containment
+
+- Connected wallet buttons now resolve the current-round primary NFT, verify
+  ownership, and display its on-chain artwork. Wallets without a position use
+  the same deterministic address-to-DNA mapping as the ladder; casing, reloads
+  and rounds do not change fallback DNA. Account/round keys and effect cleanup
+  prevent a previous identity from appearing after the wallet changes.
+- Recheck ownership every six seconds, with bounded backoff on RPC failures.
+  Cache only renderer/DNA artwork; newly minted/transferred positions are picked
+  up by subsequent reads. Renderer failures retain the owned DNA and retry.
+- Set the account button to 36px high with a centered, clipped 24px avatar.
+  The existing wallet account-modal callback remains in use.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **47 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle and no-governance. All 47 frontend tests and TypeScript/Vite
+  pass again after the final presentation cleanup. Existing bundle-size warnings
+  remain. Six new tests cover deterministic identity, NFT precedence, transfers,
+  cache separation and RPC retries. No contracts or deployments changed.
+- Read-only Base Sepolia validation resolves wallet `0x1d52…d88A` to its owned
+  NFT #1 and renderer SVG. Browser inspection of the actual button component,
+  rendered in a temporary fixture with that artwork and two address fallbacks,
+  confirms each 24×24 SVG stays inside its 36px button. Fixture removed afterward;
+  connected-wallet modal interaction was not exercised in this check.

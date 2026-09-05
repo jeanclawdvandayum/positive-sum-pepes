@@ -8,7 +8,8 @@ import { ADDRESSES, FAUCET_ENABLED } from '../lib/config'
 import { faucetAbi } from '../lib/abi'
 import { useRound } from '../lib/useRound'
 import Clock from './Clock'
-import PepeChip from './PepeChip'
+import WalletAccountButton from './WalletAccountButton'
+import { useWalletPepe } from '../lib/useWalletPepe'
 import ThemeSwitcher from './ThemeSwitcher'
 import MixLogo from './MixLogo'
 
@@ -94,9 +95,7 @@ export default function Topbar() {
 }
 
 /// quiet outlined connect; connected = pepe identity chip (spec §7).
-/// Identity art is the base-pepe fallback until the on-chain primary-pepe
-/// lane + .wei registry land (VITE_WEI_REGISTRY pending) — the address is
-/// the real identity; no new chain reads here.
+/// Connected identity uses the current-round primary NFT, or stable address DNA.
 function Connect() {
   return (
     <ConnectButton.Custom>
@@ -126,20 +125,18 @@ function Connect() {
             </button>
           )
         }
-        const addr = account.address as `0x${string}`
         return (
-          <button
-            type="button"
-            onClick={openAccountModal}
-            title={account.address}
-            className="rounded-full border border-line py-1 pl-1 pr-3 transition hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-          >
-            <PepeChip name={`${addr.slice(0, 6)}…${addr.slice(-4)}`} />
-          </button>
+          <ConnectedWallet address={account.address as `0x${string}`} onClick={openAccountModal} />
         )
       }}
     </ConnectButton.Custom>
   )
+}
+
+function ConnectedWallet({ address, onClick }: { address: `0x${string}`; onClick: () => void }) {
+  const round = useRound()
+  const svg = useWalletPepe(address, round.staker)
+  return <WalletAccountButton address={address} svg={svg} onClick={onClick} />
 }
 
 /// compact testnet faucet: mixETH is free playtest scrip — click to mint
