@@ -537,3 +537,7 @@ Solidity source changed after the contract-source hash above.
   independent oracle, no-governance, TypeScript and Vite. Existing bundle warnings
   remain. Browser reviewed the rendered copy at 1280px and 678px; a scoped text
   check finds none of the removed negation/jargon phrases. Viewport restored.
+- Rebuild is available locally. The update to existing here.now site
+  `devoted-truffle-ydjx` was rejected before upload with `Unauthorized. Use
+  Authorization: Bearer <apiKey>`. Account authentication is pending; the hosting
+  manifest continues to describe the earlier published revision.
