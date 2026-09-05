@@ -92,7 +92,7 @@ export default function Landing() {
         </div>
 
         <h1 className="mt-10 font-display text-[clamp(4rem,8vw,6rem)] leading-[1.05] tracking-tight">
-          the last ten tickets split the pot
+          get in, loser. we’re taking the pot.
         </h1>
 
         <p className="mt-6 max-w-2xl text-base leading-relaxed text-text-lo">{SUBHEAD}</p>

@@ -541,3 +541,14 @@ Solidity source changed after the contract-source hash above.
   `devoted-truffle-ydjx` was rejected before upload with `Unauthorized. Use
   Authorization: Bearer <apiKey>`. The user chose to keep this as a temporary local
   UI update. The hosting manifest describes the earlier published revision.
+
+
+## 2026-09-05 — Memetic explainer headline
+
+- Replaced the explainer headline with “get in, loser. we’re taking the pot.”
+  The supporting game explanation and redemption-value disclosure remain intact.
+  The rebuilt local preview displays the headline correctly at desktop width.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **50 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle, no-governance, TypeScript and Vite. Existing bundle warnings
+  remain. This is a local UI update per the current publishing preference.
