@@ -8,6 +8,7 @@ import { ThemeProvider, useTheme } from './lib/theme'
 import { usePhase, setDeadline, type Phase } from './phase/PhaseEngine'
 import { useRound } from './lib/useRound'
 import Topbar from './components/Topbar'
+import WalletPepeAvatar from './components/WalletPepeAvatar'
 import ScanlineOverlay from './components/ScanlineOverlay' // dark-theme CRT, inert otherwise (B0)
 import Landing from './pages/Landing'
 import Trade from './pages/Trade'
@@ -89,6 +90,7 @@ function Shell() {
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
+          avatar={WalletPepeAvatar}
           theme={
             resolved === 'dark'
               ? darkTheme({

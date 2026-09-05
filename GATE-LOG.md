@@ -441,3 +441,20 @@ Solidity source changed after the contract-source hash above.
   and 100,000 mixETH ranges, including log/linear and supply views. Paths remain
   finite and live marker centers stay inside the plot. Fixture/server removed;
   viewport restored. These were simulated chart reserves, not testnet purchases.
+
+## 2026-09-05 — Pepe identity in the wallet account modal
+
+- Registered `WalletPepeAvatar` through RainbowKitProvider's supported `avatar`
+  prop. The modal shares the header's `useWalletPepe` NFT/owner lookup and stable
+  address fallback; it replaces RainbowKit's default emoji avatar. Existing
+  clipping styles respect the size supplied by RainbowKit.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **50 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle, no-governance, TypeScript and Vite. Existing bundle-size
+  warnings remain; no contract or deployment changes.
+- Browser verification used the actual RainbowKit account modal in a temporary
+  fixture with a mock connection and live read-only NFT lookup for `0x1d52…d88A`.
+  The header and modal contain identical NFT SVG artwork, sized 24px and 74px
+  respectively, with matching SVG bounds and circular clipping. Close works;
+  balance, copy-address and disconnect controls remain present. No wallet was
+  signed or connected on the user's behalf. Fixture and server removed.
