@@ -15,7 +15,7 @@ const contracts = {
   faucet:'src/testnet/MixETHFaucet.sol:MixETHFaucet', reinvestor:'src/PSPReinvestor.sol:PSPReinvestor',
   descriptor:'src/PepeDescriptor.sol:PepeDescriptor', hookDeployer:'src/HookDeployer.sol:HookDeployer',
   controllerDeployer:'src/ControllerDeployer.sol:ControllerDeployer', stakerDeployer:'src/StakerDeployer.sol:StakerDeployer',
-  tokenDeployer:'src/TokenDeployer.sol:TokenDeployer',
+  tokenDeployer:'src/ControllerDeployer.sol:TokenDeployer',
 }
 const builds = fs.readdirSync(buildDirectory).filter(f=>f.endsWith('.json')).map(f=>JSON.parse(fs.readFileSync(path.join(buildDirectory,f))))
 const base = 'https://sourcify.dev/server/v2'
