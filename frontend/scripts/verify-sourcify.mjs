@@ -16,6 +16,7 @@ const contracts = {
   descriptor:'src/PepeDescriptor.sol:PepeDescriptor', hookDeployer:'src/HookDeployer.sol:HookDeployer',
   controllerDeployer:'src/ControllerDeployer.sol:ControllerDeployer', stakerDeployer:'src/StakerDeployer.sol:StakerDeployer',
   tokenDeployer:'src/ControllerDeployer.sol:TokenDeployer',
+  hookInitCode:'src/HookInitCode.sol:HookInitCode',
 }
 const builds = fs.readdirSync(buildDirectory).filter(f=>f.endsWith('.json')).map(f=>JSON.parse(fs.readFileSync(path.join(buildDirectory,f))))
 const base = 'https://sourcify.dev/server/v2'

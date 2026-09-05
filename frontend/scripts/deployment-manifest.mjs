@@ -29,12 +29,20 @@ for(const name of ['owner','descriptor','poolManager','hookDeployer','controller
  if(name==='owner')continue // signer may be an EOA, not a code-bearing contract
  addresses[name]=address
 }
+addresses.hookInitCode=await read(addresses.hookDeployer,addressGetter('initOracle'),'initOracle')
+addresses.hookCodeFirst=await read(addresses.hookInitCode,addressGetter('first'),'first')
+addresses.hookCodeSecond=await read(addresses.hookInitCode,addressGetter('second'),'second')
 const codeHashes={}
 for(const [key,address] of Object.entries(addresses)){
  const code=await client.getCode({address,blockNumber:block.number})
  if(!code||code==='0x')throw Error(`Missing deployed code: ${key}`)
  codeHashes[key]=keccak256(code)
 }
+const shards=await Promise.all([addresses.hookCodeFirst,addresses.hookCodeSecond].map(address=>client.getCode({address,blockNumber:block.number})))
+if(shards.some(code=>!code?.startsWith('0x00')))throw Error('Hook code shard is not STOP-prefixed')
+const storedCreationCode='0x'+shards.map(code=>code.slice(4)).join('')
+const artifact=JSON.parse(fs.readFileSync(new URL('../../out/CurveHook.sol/CurveHook.json',import.meta.url)))
+if(storedCreationCode.toLowerCase()!==artifact.bytecode.object.toLowerCase())throw Error('On-chain hook creation code differs from the release artifact')
 const params=await read(hook,parseAbi(['function sineParams() view returns(uint256 p0,uint256 preK,uint256 pTarget,uint256 targetReserve,uint24 ampBps)']),'sineParams')
 const minimumBuy=await read(hook,hookAbi,'MIN_BUY_INPUT')
 const timePerUnit=await read(hook,hookAbi,'TIME_PER_UNIT')
@@ -54,7 +62,7 @@ if(addresses.reinvestor){
   if(!target||String(await read(addresses.reinvestor,addressGetter(getter),getter)).toLowerCase()!==target.toLowerCase())throw Error(`Reinvestor ${getter} wiring mismatch`)
  }
 }
-const manifest={schema:2,chainId,block:block.number,blockHash:block.hash,revision,owner,addresses,codeHashes,round:{roundId,name,symbol,destroyed},params,timings,rules:{minimumBuy,timePerUnit},sourceVerification:'see companion verification record'}
+const manifest={schema:2,chainId,block:block.number,blockHash:block.hash,revision,owner,addresses,codeHashes,hookCreationCodeMatchesArtifact:true,round:{roundId,name,symbol,destroyed},params,timings,rules:{minimumBuy,timePerUnit},sourceVerification:'see companion verification record'}
 fs.mkdirSync(path.dirname(output),{recursive:true})
 fs.writeFileSync(output,JSON.stringify(manifest,(_,v)=>typeof v==='bigint'?v.toString():v,2)+'\n',{flag:'wx'})
 console.log(`Manifest written: ${output}`)
