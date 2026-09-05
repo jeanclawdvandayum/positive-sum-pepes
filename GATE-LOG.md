@@ -495,3 +495,28 @@ Solidity source changed after the contract-source hash above.
   warnings remain. Browser inspection confirms the six rows, diagram, copy,
   source link and testnet note at 1266px and 678px; viewport restored.
   No contract or deployment changes.
+
+
+## 2026-09-05 — Current testnet frontend hosted on here.now
+
+- Installed the official `heredotnow/skill` here-now skill globally for Codex.
+  Local npm/npx failed before installation; the skill-installer git method
+  succeeded. Reviewed the current here.now docs and bundled publishing script.
+- Published frontend revision `f208da28` to
+  <https://devoted-truffle-ydjx.here.now/> with SPA routing: 208 static assets,
+  6,180,068 bytes. The finalize response identifies anonymous hosting, initially
+  expiring 2026-09-06 at 12:08:17 UTC; claiming the site can make it permanent.
+  Claim credentials remain in ignored local state and the publishing conversation.
+- The bundle retains Base Sepolia 84532, the existing factory, the AUD-14 repaired
+  ZapIn/Reinvestor, and both public RPC endpoints. Only `frontend/dist` was
+  uploaded; no environment files, private keys, broadcast files or source maps.
+  See `docs/audit/deployments/herenow-2026-09-05.json` for source/version/hash data.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **50 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle, no-governance, TypeScript and Vite. Existing bundle warnings
+  remain. Hosted entry JavaScript and CSS match local SHA-256 hashes; here.now
+  adds only social preview metadata to the HTML.
+- Browser verified live round 1, ladder, curve and reserves; the 0.005 mixETH
+  preset produces a one-seat / +4:20 quote with fee and minimum-output estimates.
+  Wallet connection modal, staking artwork and the six-beat explainer render.
+  This was a disconnected-browser check; no wallet signing or chain writes.

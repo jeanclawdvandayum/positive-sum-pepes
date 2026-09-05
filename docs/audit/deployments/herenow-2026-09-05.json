@@ -1,0 +1,28 @@
+{
+  "siteUrl": "https://devoted-truffle-ydjx.here.now/",
+  "sourceRevision": "f208da28e3f311b094574b29342902cb98adcba7",
+  "chainId": 84532,
+  "factory": "0xc79b74dacf99a82f1b1e847948338f9263913a59",
+  "frontendFileCount": 208,
+  "indexSha256": "e4dadbb7d0caf257a309d4b03d067eb5f2c5a09672fed9274e6628c69c590804",
+  "hostHtmlChanges": "here.now adds Open Graph and Twitter social metadata only",
+  "entryAssets": [
+    {
+      "path": "/assets/index-BRjjJH1B.js",
+      "sha256": "c574655722185d667f486237dfcf32e22f7c8076e03f412c6f36913474ebc036"
+    },
+    {
+      "path": "/assets/index-CusMuIej.css",
+      "sha256": "98848cefc4b394c5d04ae20d8a479dfef561a92021718c8f2f7e93cf47b17728"
+    }
+  ],
+  "publishedAt": "2026-09-05",
+  "hosting": {
+    "provider": "here.now",
+    "slug": "devoted-truffle-ydjx",
+    "versionId": "01M1RQGC3JWGK5HSTQXWZCK775",
+    "authMode": "anonymous",
+    "expiresAt": "2026-09-06T12:08:17.266Z",
+    "spaMode": true
+  }
+}

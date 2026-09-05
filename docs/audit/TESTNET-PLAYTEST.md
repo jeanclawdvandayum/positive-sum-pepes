@@ -4,10 +4,17 @@ Use chain **84532**. Test mixETH is freely minted and has no monetary value;
 Base Sepolia ETH is needed only for gas. The deployment manifest is the source
 of addresses and code hashes. Existing earlier deployments retain their old code.
 
-Open **[the local app](http://127.0.0.1:4173/#/predeposit)** in a browser with your
-wallet extension. The frontend is running on this Mac; this is not a public hosted
-URL. Without `VITE_WC_PROJECT_ID`, connection uses browser wallets only. A real
-WalletConnect project can be configured later for remote/mobile connections.
+Open **[the hosted testnet](https://devoted-truffle-ydjx.here.now/#/play)** in a
+browser with your wallet extension. This here.now preview was published from
+frontend revision `f208da28` and initially expires **2026-09-06 at 12:08 UTC**
+unless claimed into a here.now account. Its private claim link was supplied in
+the publishing conversation; it is not committed here. See the
+[frontend hosting record](deployments/herenow-2026-09-05.json).
+
+The **[local app](http://127.0.0.1:4173/#/play)** remains available on this Mac.
+Both use the same Base Sepolia contracts. Without `VITE_WC_PROJECT_ID`, connection
+uses browser wallets only. A real WalletConnect project can be configured later
+for remote/mobile connections.
 
 - Factory: `0xc79b74dacf99a82f1b1e847948338f9263913a59`.
 - [Release manifest](deployments/base-sepolia-2026-09-05.json): factory-derived
