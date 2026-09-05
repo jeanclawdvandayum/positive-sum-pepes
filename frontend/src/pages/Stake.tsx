@@ -23,11 +23,9 @@ import ReferralsCard from './stake/ReferralsCard'
 // ─────────────────────────────────────────────────────────────────────────────
 // /stake — the den: "your pepe works here" (REDESIGN-B3).
 //
-// Left column: identity panel (pepe big + name + staked + share of the 60%
-// stream + the live fees-earned accumulator) → six-pepe grid →
-// stake form (function unchanged; placeholder verbatim) → your staked pepes.
-// Right column: referrals → .wei registry notice. Round history lives in the
-// graveyard. Bottom stats fold into the TickerBar.
+// Left: identity/fees → referrals and .wei. Right: six-pepe picker → stake form.
+// Owned positions span both columns below. Mobile keeps overview → picker/form
+// → referrals → positions in source order. Round history lives in the graveyard.
 //
 // Every read/write below is StakeCard's, carried over unchanged — same
 // useRpcReads batches, same cadences, same approve→lock flow, same error
@@ -392,9 +390,9 @@ export default function Stake() {
     <div className="st-page font-body text-text-hi">
       <StakeStyles />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* ── left: the den ── */}
-        <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:grid-rows-[auto_1fr]">
+        {/* ── left: identity and earned fees ── */}
+        <div className="flex min-w-0 flex-col gap-4">
           {claimable && (
             <section className="rounded-2xl border border-pepe bg-bg-1 p-5">
               <h2 className="font-display text-lg">unclaimed genesis share</h2>
@@ -426,7 +424,10 @@ export default function Stake() {
             parked={parked}
             claimRow={claimRow}
           />
+        </div>
 
+        {/* ── right: choose a pepe, then stake ── */}
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-span-2 lg:row-start-1">
           <PepePicker
             round={round}
             selected={pickedId}
@@ -454,7 +455,7 @@ export default function Stake() {
               </div>
               <div className="mt-2 flex gap-2">
                 <input
-                  className="st-input flex-1"
+                  className="st-input min-w-0 flex-1"
                   placeholder={hasPepes ? '0.0 — new pepe' : '0.0 — or nothing, just the pepe'}
                   value={amount}
                   inputMode="decimal"
@@ -503,16 +504,10 @@ export default function Stake() {
             </div>
           </section>
 
-          {hasPepes && (
-            <section>
-              <h3 className="mb-3 text-xs text-text-lo">your staked pepes</h3>
-              <PepeCards round={round} entries={entries} pendings={pendings} vest={vest} approved={reinvestApproved} walletBalance={pspBal} onDone={refresh} />
-            </section>
-          )}
         </div>
 
-        {/* ── right: referrals → .wei ── */}
-        <div className="flex flex-col gap-4">
+        {/* ── below the overview on desktop; after the form on mobile ── */}
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
           <ReferralsCard />
 
           <div className="flex items-start gap-3 rounded-2xl border border-line bg-bg-2 p-4">
@@ -530,6 +525,13 @@ export default function Stake() {
 
         </div>
       </div>
+
+      {hasPepes && (
+        <section className="mt-6" aria-label="your staked pepes">
+          <h2 className="mb-3 font-display text-xl">your staked pepes</h2>
+          <PepeCards round={round} entries={entries} pendings={pendings} vest={vest} approved={reinvestApproved} walletBalance={pspBal} onDone={refresh} />
+        </section>
+      )}
 
       {/* bottom stats = one continuous ticker, same component as play */}
       <div className="mt-6 border-t border-line py-3">

@@ -368,3 +368,23 @@ Solidity source changed after the contract-source hash above.
   mouse and Enter direction switches, and switching a filled Sell form to the
   one-seat Buy preset. No browser warning/error logs; viewport restored. No
   wallet-signed transactions or contract/deployment changes in this update.
+
+## 2026-09-05 — Compact staking page composition
+
+- Grouped the identity/fee overview and referrals/.wei on the left, with the
+  six-Pepe picker and staking form together on the right. CSS grid lets the
+  creation flow span both overview/support rows; it no longer leaves most of
+  the right column empty. Existing owned positions span the page below both
+  columns, retaining all top-up, claim, reinvest and withdrawal controls.
+- Mobile retains source order: overview, picker/form, referrals, then owned
+  positions. Added min-width constraints for the columns and amount input.
+  No staking, approval, ownership, read or transaction logic changed.
+- `bash scripts/check-audit.sh` passes: **404 Solidity tests / 56 suites**,
+  **41 frontend tests**, **106 ABI declarations**, **32** production size checks,
+  independent oracle, no-governance, TypeScript and Vite. Existing bundle-size
+  warnings remain.
+- Browser checked the compact two-column composition at **1266px** and the
+  single-column order at **678px**. Pepe selection remains connected to the
+  staking form across responsive changes; no browser warning/error logs.
+  Viewport restored. Connected-wallet position actions were not browser-tested
+  for this layout-only change; no contract or deployment update was needed.
