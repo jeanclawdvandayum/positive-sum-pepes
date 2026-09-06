@@ -1036,3 +1036,15 @@ Solidity source changed after the contract-source hash above.
   document width equal to viewport width on mobile. Active rendering was reviewed
   in source; payout aggregation is covered by the existing round-winners tests.
   Local preview rebuilt and viewport restored. No contract or hosted-site changes.
+
+## 2026-09-06 — Remove active timer phase words
+
+- Removed calm/heating/critical labels from the shared Clock component, covering
+  full and compact timers. Phase colors still follow the existing PhaseEngine.
+  Disarmed clock labels (at launch, settled and loading) remain contextual.
+- Deterministic gate passes: **502 Solidity tests / 67 suites**, **112 frontend
+  tests**, **11 verifier tests**, **155 ABI declarations**, **36 production size
+  checks**, oracle/governance and TypeScript/Vite. Existing bundle warnings remain.
+- Browser verified the active full play clock and compact landing clock have no
+  phase label and retain the yellow clock color. Local preview rebuilt and left
+  on play. No new tests for this presentation change or contract changes.

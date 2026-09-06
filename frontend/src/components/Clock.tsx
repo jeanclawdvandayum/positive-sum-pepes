@@ -3,7 +3,7 @@
 //
 // DSEG7 numerals over a radial phosphor glow (the only sanctioned gradient),
 // breathing at a phase-scaled rate, sub-10 breathing scale 1.00→1.015,
-// +5:00 injection flash with floating chip, phase WORD alongside (WCAG).
+// time-injection flash with floating chip; urgency is shown through color.
 // The panel stays dark in both themes — it's the machine's screen.
 // Updates ride PhaseEngine's single rAF loop via imperative textContent
 // writes: no per-second React re-renders, no per-component intervals.
@@ -18,10 +18,7 @@ import {
   subscribeFrames,
   subscribeInjections,
   usePhase,
-  type Phase,
 } from '../phase/PhaseEngine'
-
-const PHASE_WORD: Record<Phase, string> = { calm: 'calm', heat: 'heating', critical: 'critical' }
 
 const LAYOUT_LEN = 8 // "HH:MM:SS"
 const GHOST = '88:88:88' // unlit seven-segment segments
@@ -48,7 +45,7 @@ export default function Clock({
   variant?: 'full' | 'mini'
   className?: string
 }) {
-  const { phase, hasDeadline } = usePhase()
+  const { hasDeadline } = usePhase()
   const round = useRound()
   const idle = round.mode === 0 && round.detWindow !== undefined
     ? fmtClock(Number(round.detWindow) * 1000) : '--:--:--'
@@ -141,7 +138,11 @@ export default function Clock({
           </span>
         )}
       </span>
-      <span className={hasDeadline ? 'clock-word' : 'clock-word clock-word--armed'}>{hasDeadline ? PHASE_WORD[phase] : round.mode === 0 ? 'at launch' : (round.mode ?? 0) >= 2 ? 'settled' : 'loading'}</span>
+      {!hasDeadline && (
+        <span className="clock-word clock-word--armed">
+          {round.mode === 0 ? 'at launch' : (round.mode ?? 0) >= 2 ? 'settled' : 'loading'}
+        </span>
+      )}
     </div>
   )
 }
