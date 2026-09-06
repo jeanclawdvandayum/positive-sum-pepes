@@ -1,0 +1,61 @@
+/tmp/psp-skills-before.log
+Ran 2 tests for test/SkillLifecycleReview.t.sol:SkillLifecycleReviewTest
+[FAIL: DeployFailed()] test_EarlyCanonicalStakerDoesNotBlockBirth() (gas: 14531394)
+[FAIL: a stranger cannot consume the reserved pool initialization] test_OnlyFactoryCanInitializeReservedPool() (gas: 13056473)
+Suite result: FAILED. 0 passed; 2 failed; 0 skipped; finished in 28.12ms (7.75ms CPU time)
+
+Ran 2 tests for test/SkillCallbackReview.t.sol:SkillCallbackReviewTest
+[FAIL: distinct third tier is not truncated: 0 != 1250000000000] test_BuyPaysDistinctAncestorsAfterDuplicateOwner() (gas: 555739)
+[FAIL: sell pays distinct third tier after duplicate: 0 != 1124887500000] test_SellPaysDistinctAncestorsAfterDuplicateOwner() (gas: 1223544)
+Suite result: FAILED. 0 passed; 2 failed; 0 skipped; finished in 29.28ms (4.70ms CPU time)
+
+Ran 2 test suites in 565.48ms (57.40ms CPU time): 0 tests passed, 4 failed, 0 skipped (4 total tests)
+
+Failing tests:
+Encountered 2 failing tests in test/SkillCallbackReview.t.sol:SkillCallbackReviewTest
+[FAIL: distinct third tier is not truncated: 0 != 1250000000000] test_BuyPaysDistinctAncestorsAfterDuplicateOwner() (gas: 555739)
+[FAIL: sell pays distinct third tier after duplicate: 0 != 1124887500000] test_SellPaysDistinctAncestorsAfterDuplicateOwner() (gas: 1223544)
+
+Encountered 2 failing tests in test/SkillLifecycleReview.t.sol:SkillLifecycleReviewTest
+[FAIL: DeployFailed()] test_EarlyCanonicalStakerDoesNotBlockBirth() (gas: 14531394)
+[FAIL: a stranger cannot consume the reserved pool initialization] test_OnlyFactoryCanInitializeReservedPool() (gas: 13056473)
+
+Encountered a total of 4 failing tests, 0 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 4 failed tests
+
+
+/tmp/psp-skills-staking-before.log
+Ran 4 tests for test/SkillStakingReview.t.sol:SkillStakingReviewTest
+[PASS] testFuzz_FreshIdsMatchIndependentOccupiedSet(uint256) (runs: 256, μ: 4142272, ~: 4122350)
+[PASS] test_ChosenIdsAtUintBoundaryRemainValid() (gas: 315570)
+[FAIL: assertion failed: 115792089237316195423570985008687907853269984665640564039457584007913129639935 != 518400] test_EpochZeroWithdrawalViewMatchesExecutableExit() (gas: 322084)
+[FAIL: chosen ID run must not make the next genesis claim scan every NFT] test_GenesisClaimGasIndependentOfChosenIdRun() (gas: 153909044)
+Suite result: FAILED. 2 passed; 2 failed; 0 skipped; finished in 297.82ms (327.06ms CPU time)
+
+Ran 1 test suite in 562.85ms (297.82ms CPU time): 2 tests passed, 2 failed, 0 skipped (4 total tests)
+
+Failing tests:
+Encountered 2 failing tests in test/SkillStakingReview.t.sol:SkillStakingReviewTest
+[FAIL: assertion failed: 115792089237316195423570985008687907853269984665640564039457584007913129639935 != 518400] test_EpochZeroWithdrawalViewMatchesExecutableExit() (gas: 322084)
+[FAIL: chosen ID run must not make the next genesis claim scan every NFT] test_GenesisClaimGasIndependentOfChosenIdRun() (gas: 153909044)
+
+Encountered a total of 2 failing tests, 2 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 2 failed tests
+
+
+/tmp/psp-skills-qualification-before.log
+Ran 1 test for test/SkillStakingReview.t.sol:SkillStakingReviewTest
+[FAIL: unsolicited empty NFTs must not increase referral qualification cost] test_ReferralStakeLookupGasIndependentOfUnsolicitedNfts() (gas: 152156232)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 30.68ms (29.85ms CPU time)
+
+Ran 1 test suite in 499.69ms (30.68ms CPU time): 0 tests passed, 1 failed, 0 skipped (1 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/SkillStakingReview.t.sol:SkillStakingReviewTest
+[FAIL: unsolicited empty NFTs must not increase referral qualification cost] test_ReferralStakeLookupGasIndependentOfUnsolicitedNfts() (gas: 152156232)
+
+Encountered a total of 1 failing tests, 0 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 1 failed test

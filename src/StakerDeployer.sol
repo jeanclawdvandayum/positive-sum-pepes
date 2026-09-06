@@ -34,15 +34,19 @@ contract StakerDeployer {
     // derives its staker salt from its own (create2-predicted) address,
     // keeping the whole round's address set computable from one root.
 
-    /// @dev CREATE2 variant. Occupied-address create2 reverts; callers
-    ///      probe `predictStaker(...).code.length` first (idempotent birth).
+    /// @dev AUD-17: idempotent CREATE2. An early canonical deployment must
+    ///      not block the controller constructor during staged birth. The
+    ///      address commits to this vessel, salt, creation code and all args.
     function deployStakerAt(
         bytes32 salt,
         IERC20 psp,
         IRoundController controller,
         address descriptor
     ) external returns (PSPStaker staker) {
-        staker = new PSPStaker{salt: salt}(psp, controller, descriptor);
+        staker = PSPStaker(predictStaker(salt, psp, controller, descriptor));
+        if (address(staker).code.length == 0) {
+            staker = new PSPStaker{salt: salt}(psp, controller, descriptor);
+        }
     }
 
     /// @dev Pure create2 address prediction — must be called on the SAME
@@ -52,7 +56,7 @@ contract StakerDeployer {
         IERC20 psp,
         IRoundController controller,
         address descriptor
-    ) external view returns (address) {
+    ) public view returns (address) {
         return address(uint160(uint256(keccak256(abi.encodePacked(
             bytes1(0xff),
             address(this),

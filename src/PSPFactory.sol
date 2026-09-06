@@ -477,10 +477,9 @@ contract PSPFactory is Ownable2Step {
 
     /// @dev Birth phase 3: stale-context re-check (fail closed before ANY
     ///      irreversible wiring), final wiring, carry, pool init, record.
-    ///      Everything that can fail runs BEFORE poolManager.initialize:
-    ///      the pool manager's state does not roll back with this tx, so a
-    ///      post-initialize revert would brick the reservation against
-    ///      AlreadyInitialized.
+    ///      Pool initialization is factory-only (AUD-18), so another caller
+    ///      cannot consume it between phases. A revert rolls back this entire
+    ///      transaction, including writes inside the pool manager.
     function _birthWire() internal returns (uint256 roundId, address hookAddr) {
         SpawnReservation storage r = reservation;
         CurveMath.CurveConfig memory cfg = _configWithTimings();

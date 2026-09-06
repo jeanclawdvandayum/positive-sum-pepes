@@ -47,6 +47,7 @@ contract CurveHook is BaseHook {
     error ZeroOutput(); // a swap must deliver a nonzero user output — never absorb input silently
     error WrongPoolCurrencies(); // L-2 fix: pool-key gate on initialization
     error WrongPoolParams(); // NK24: canonical fee/tickSpacing gate — no decoy pools
+    error NotFactoryInitializer();
     error ZeroDeployerCut(); // CLOCK-REDESIGN §3: deployerCutTo must be a real address
     error TradingHalted(); // CLOCK-REDESIGN §1: block.timestamp >= detonationAt — the round is dead
     error NotDetonated(); // claims open only once the clock struck zero and detonate() ran
@@ -286,7 +287,7 @@ contract CurveHook is BaseHook {
     ///      NK24: currency-gating alone still allowed decoy pools at other fee
     ///      tiers / tick spacings — accounting-safe (state is shared) but a
     ///      pure phishing surface. Gate the canonical parameters too.
-    function _beforeInitialize(address, PoolKey calldata key, uint160)
+    function _beforeInitialize(address sender, PoolKey calldata key, uint160)
         internal
         view
         override
@@ -303,6 +304,11 @@ contract CurveHook is BaseHook {
         if (key.fee != CANONICAL_FEE || key.tickSpacing != CANONICAL_TICK_SPACING) {
             revert WrongPoolParams();
         }
+
+        // AUD-18: the hook exists one transaction before factory wiring.
+        // Only the factory may consume the canonical pool's one-time init;
+        // anyone can still advance the reservation through birthStep().
+        if (sender != controller.factory()) revert NotFactoryInitializer();
 
         return IHooks.beforeInitialize.selector;
     }
@@ -394,7 +400,9 @@ contract CurveHook is BaseHook {
         if (who[0] == address(0)) return 0; // unattributed — caller re-splits
         IERC20 mix = IERC20(Currency.unwrap(mixETH));
         for (uint256 i = 0; i < 5; i++) {
-            if (who[i] == address(0)) break;
+            // AUD-16: owner deduplication leaves holes inside a valid chain.
+            // Preserve later ancestors' original tiers instead of truncating.
+            if (who[i] == address(0)) continue;
             uint256 cut = (legMixETH * bps[i]) / 10000;
             if (cut > 0) {
                 mix.safeTransfer(who[i], cut);

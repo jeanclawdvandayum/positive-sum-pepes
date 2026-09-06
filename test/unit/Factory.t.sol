@@ -198,6 +198,7 @@ contract FactoryTest is Test {
         // Sorted order (exactly what the factory initialized in setUp —
         // re-invoking through the mock proves the gate accepts it explicitly)
         PoolKey memory key = _canonicalKey();
+        vm.prank(address(factory));
         poolManager.initialize(key, SQRT_RATIO_1_1);
 
         // Reversed order: the gate is pair-based, not order-based
@@ -208,6 +209,7 @@ contract FactoryTest is Test {
             tickSpacing: 60,
             hooks: hook
         });
+        vm.prank(address(factory));
         poolManager.initialize(reversed, SQRT_RATIO_1_1);
     }
 

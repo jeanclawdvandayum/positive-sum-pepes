@@ -239,7 +239,7 @@ contract PSPReferralRegistry is ReentrancyGuard {
             // trader (or anyone) own multiple nodes of their own chain —
             // without this check one address stacked ALL five tier weights
             // (the walk self-looped ownerOf→same owner). Each address collects
-            // at most ONE tier per trade; skipped weight flows to stakers.
+            // at most ONE tier per trade; skipped weight flows to the pot.
             bool seen;
             for (uint256 j = 0; j < i; j++) {
                 if (who[j] == nodeOwner) {

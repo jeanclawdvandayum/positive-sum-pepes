@@ -87,7 +87,7 @@ contract PSPStaker is ReentrancyGuard {
     struct Position {
         uint256 amount;          // principal PSP
         uint256 startEpoch;      // weight live immediately from this epoch
-        uint256 requestEpoch;    // 0 = indefinite lock; E = decay armed at E (full through E)
+        uint256 requestEpoch;    // decay armed at E; isWithdrawing distinguishes epoch zero from no request
         uint256 creditCheckpoint; // creditPerWeight at last settle (claims are O(1) deltas)
         uint256 feesPaid;        // cumulative fees paid out
     }
@@ -158,7 +158,14 @@ contract PSPStaker is ReentrancyGuard {
     string public constant symbol = "PSPP";
     uint256 public nextTokenId = 1;
     mapping(uint256 => address) private _ownerOf;
+    // AUD-19: contiguous minted runs store end at start and start at end.
+    // NFTs never burn, so merging neighboring runs needs two boundary reads
+    // and writes. Fresh IDs stay sequential without an owner-controlled scan.
+    mapping(uint256 => uint256) private _mintedRunBoundary;
     mapping(address => uint256[]) private _owned;
+    // AUD-21: referral qualification must not scan unsolicited empty NFTs.
+    // Principal follows ownership; virtual genesis is credited only on claim.
+    mapping(address => uint256) private _stakedByOwner;
     mapping(uint256 => uint256) private _ownedIndex; // id => position in _owned
     mapping(address => mapping(address => bool)) private _operator;
 
@@ -204,6 +211,13 @@ contract PSPStaker is ReentrancyGuard {
     }
 
     function _mint(address to, uint256 id) internal {
+        uint256 start = id;
+        uint256 end = id;
+        if (id > 1 && _ownerOf[id - 1] != address(0)) start = _mintedRunBoundary[id - 1];
+        if (id < type(uint256).max && _ownerOf[id + 1] != address(0)) end = _mintedRunBoundary[id + 1];
+        _mintedRunBoundary[start] = end;
+        _mintedRunBoundary[end] = start;
+        if (id == nextTokenId) nextTokenId = end + 1;
         _ownerOf[id] = to;
         _ownedIndex[id] = _owned[to].length;
         _owned[to].push(id);
@@ -233,6 +247,10 @@ contract PSPStaker is ReentrancyGuard {
         address o = _ownerOf[tokenId];
         if (o == address(0) || o != from) revert NotNftOwner();
         if (msg.sender != from && !_operator[from][msg.sender]) revert NotAuthorizedNft();
+
+        uint256 principal = positions[tokenId].amount;
+        _stakedByOwner[from] -= principal;
+        _stakedByOwner[to] += principal;
 
         // swap-and-pop from sender's list, append to recipient's
         uint256[] storage fromIds = _owned[from];
@@ -459,8 +477,7 @@ contract PSPStaker is ReentrancyGuard {
     }
 
     function _mintFresh(address to) private returns (uint256 id) {
-        while (_ownerOf[nextTokenId] != address(0)) ++nextTokenId;
-        id = nextTokenId++;
+        id = nextTokenId;
         _mint(to, id);
     }
 
@@ -494,6 +511,7 @@ contract PSPStaker is ReentrancyGuard {
         points[p.epoch] = p;
         pos.amount += amount;
         totalLocked += amount;
+        _stakedByOwner[user] += amount;
 
         emit Locked(user, pepeId, amount);
     }
@@ -565,6 +583,7 @@ contract PSPStaker is ReentrancyGuard {
         p.weight -= currentWeight;
         points[p.epoch] = p;
         totalLocked -= amount;
+        _stakedByOwner[msg.sender] -= amount;
         // Keep deferred fees and fractional credits on the surviving NFT.
         delete positions[pepeId];
         delete isWithdrawing[pepeId];
@@ -663,6 +682,7 @@ contract PSPStaker is ReentrancyGuard {
         uint256 id = _mintFresh(user);
         Position storage pos = positions[id];
         pos.amount = share;
+        _stakedByOwner[user] += share;
         pos.startEpoch = _epoch();
         pos.creditCheckpoint = creditPerWeight;
         accruedFees[id] = shareFees;
@@ -728,12 +748,7 @@ contract PSPStaker is ReentrancyGuard {
 
     /// @notice Σ staked PSP across all of `user`'s pepes (principal).
     function stakedTotalOf(address user) external view returns (uint256) {
-        uint256[] storage ids = _owned[user];
-        uint256 total;
-        for (uint256 i; i < ids.length; ++i) {
-            total += positions[ids[i]].amount;
-        }
-        return total;
+        return _stakedByOwner[user];
     }
 
     // ─────────────── UI views ───────────────
@@ -748,7 +763,8 @@ contract PSPStaker is ReentrancyGuard {
     ///         (type(uint).max while locked indefinitely).
     function withdrawableAt(uint256 pepeId) external view returns (uint256) {
         uint256 r = positions[pepeId].requestEpoch;
-        return r == 0 ? type(uint256).max : (r + VEST_EPOCHS) * epochSize();
+        // AUD-20: epoch zero can contain an active withdrawal request.
+        return isWithdrawing[pepeId] ? (r + VEST_EPOCHS) * epochSize() : type(uint256).max;
     }
 
     // ─────────────── Vote views — REMOVED (CLOCK-REDESIGN §4, 2026-09-01) ───────────────

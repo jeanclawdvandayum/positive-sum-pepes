@@ -1,7 +1,7 @@
 # Audit preparation — September 2026
 
 This is a review packet for the current source tree, not a security certification.
-Final local gates: **426 Solidity tests / 57 suites**, including 64 invariant runs
+Final local gates: **437 Solidity tests / 60 suites**, including 64 invariant runs
 and 2,048 calls per real-V4 handler with zero reverts; an additional three-wallet
 campaign passed 256 runs / 32,768 calls and complete exits; **68 frontend tests**; TypeScript/Vite;
 111 ABI declarations; 32 production size checks; independent oracle and governance
@@ -16,6 +16,10 @@ referral purchase implementation is prepared in source and requires a fresh
 factory/round deployment; the current live registry is unchanged. See
 [REFERRALS.md](REFERRALS.md). Old misattributed
 events/seats are immutable and are not silently relabeled as repaired history.
+The AUD-16 through AUD-21 hardening is also prepared in source only and requires
+fresh contracts. See the [September 6 review](2026-09-06-hardening/REVIEW.md)
+for the six confirmed fixes, reproductions, static triage and review limits.
+The separate full ERC-721 interface proposal awaits the user's decision.
 
 ## Binding game rules (2026-09-05 approval)
 
@@ -73,12 +77,20 @@ blocked; matching constants is compatibility checking, not source verification.
 | AUD-13 | Permissionless top-ups paid a victim NFT’s accrued fees to the donor and could erase them on a shortfall | Settle to NFT owner; third-party top-ups revert on shortfall; fee-theft and forced-forfeit pins |
 | AUD-15 | Separate referral bind added a wallet transaction; acquiring a primary NFT could override a recorded payout entry | Atomic caller-authenticated registry purchase; immutable wallet entry and NFT ancestry; 22 real-V4 referral tests, 10 frontend referral tests |
 | AUD-14 | Reinvestment credited the wrapper with ladder seats, Buy/TimeAdded events and referral lookup, stranding any resulting pot entitlement on the wrapper | Owner forwarded via buyWithMixFor; single/batch owner/operator tests verify events, referrals and owner pot claims; live-round fork; legacy-wrapper UI guard |
+| AUD-16 | A duplicate NFT owner left a zero tier that incorrectly truncated later referral payouts | Real-V4 buy/sell pins; randomized five-tier ownership and pot conservation |
+| AUD-17 | An early canonical staker deployment blocked the controller's CREATE2 dependency | Idempotent staker deployment; real-V4 staged birth completes with the early object |
+| AUD-18 | A stranger could initialize the reserved pool between birth phases and prevent final wiring | Factory-only pool initialization; public birthStep remains permissionless |
+| AUD-19 | Chosen NFT IDs made fresh minting and genesis claims scan an unbounded occupied range | Bounded minted-run index; 2,048-ID claim gas check, occupied-set fuzz and uint256 boundary pins |
+| AUD-20 | Epoch-zero withdrawal view returned the indefinite-lock sentinel despite an active request | Explicit flag in view; timestamp and actual withdrawal agree |
+| AUD-21 | Unsolicited empty NFTs increased on-chain referral qualification cost | Cached owner principal; 1,024-NFT gas test, partial genesis/top-up/transfer/exit pin and stateful position-sum invariant |
 
 The PoolKey object/tuple explanation in the earlier handoff was not reproduced:
 installed viem produces identical bytes and the correct uint24 0x800000 flag.
 The ABI gate pins this behavior and checks declared functions/events against artifacts.
 
-Static detector inventory and manual triage: [STATIC-ANALYSIS.md](STATIC-ANALYSIS.md).
+Latest static detector inventory and manual triage:
+[September 6 static review](2026-09-06-hardening/STATIC-ANALYSIS.md).
+Earlier inventories remain in [STATIC-ANALYSIS.md](STATIC-ANALYSIS.md).
 Dependency review: [DEPENDENCIES.md](DEPENDENCIES.md), including the remaining
 moderate decoder advisory in the wallet stack. Compounding controls also verify
 that the configured wrapper belongs to the current round before operator approval.

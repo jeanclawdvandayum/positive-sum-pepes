@@ -1,5 +1,9 @@
 # Static analysis review — 2026-09-05
 
+Latest source snapshot and triage:
+[September 6 hardening review](2026-09-06-hardening/STATIC-ANALYSIS.md).
+The inventory below remains the historical September 5 snapshot.
+
 Fresh production-only compilation; no mixed historical build-info. Slither ran
 102 detectors across 156 contracts and reported 234 findings: 9 High, 53 Medium,
 60 Low, 110 Informational, 2 Optimization. These are detector classifications,

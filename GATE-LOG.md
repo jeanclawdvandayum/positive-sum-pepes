@@ -644,3 +644,35 @@ Solidity source changed after the contract-source hash above.
   prize of 126.526653601617144074 mixETH matches claimablePot at the read snapshot.
   Viewport restored. Local preview rebuilt; no wallet transactions or contract
   deployments are required for this UI change.
+
+## 2026-09-06 — Skill-guided security hardening (AUD-16 through AUD-21)
+
+- Baseline `926e4b46`. Used the installed Pashov/Simao accounting and contract
+  review references with Trail of Bits differential, variant, token integration
+  and property-testing methods. Review scope, incomplete delegated passes and
+  human-audit limits are explicit in `docs/audit/2026-09-06-hardening/REVIEW.md`.
+- Reproduced and fixed sparse referral payout truncation, early canonical
+  staker CREATE2 interference, premature canonical pool initialization,
+  unbounded fresh-ID scans, epoch-zero withdrawal view inconsistency, and
+  owner-wide referral qualification scans vulnerable to unsolicited empty NFTs.
+- Added eleven tests: real-V4 birth/payout regressions, randomized five-tier
+  ownership, independent occupied-ID modeling, bounded gas, uint256 edge IDs,
+  epoch-zero exits and partial genesis/top-up/transfer/withdrawal accounting.
+  Extended the existing multi-owner invariant with independent owner-principal sums.
+- Final `bash scripts/check-audit.sh`: **437 Solidity tests / 60 suites**,
+  **68 frontend tests**, **111 ABI declarations**, **32 production size checks**,
+  independent oracle, no-governance, TypeScript and Vite; all pass. Existing
+  bundle warnings remain. `git diff --check` passes for reviewed changes.
+- Extended three-wallet campaign: **256 runs / 32,768 handler calls / zero
+  reverts**, with complete exits and the updated accounting invariant. Calls
+  include permitted no-ops; the deterministic companion exercises every action.
+- Fresh isolated production build and Slither 0.11.6: 158 contracts / 102
+  detectors / 242 flags (10 High, 52 Medium, 63 Low, 115 Informational,
+  2 Optimization). Flags are triaged rather than claimed as vulnerabilities.
+  Source SHA-256: `7279ecbaa4cbf13648cc68faa3a1561fab50a4ef69cd54d9836a103224f75a4d`.
+  ERC method/event checks also confirm incomplete position-NFT standard support.
+- Game rules, economics and current frontend flow remain unchanged. Full ERC-721
+  safe-transfer and individual-approval support is a separate proposal awaiting
+  the user's decision. No contracts were deployed and no wallet transactions
+  were sent. Existing deployments require fresh contracts to receive these fixes;
+  their balances, NFTs, history and creation code remain unchanged.

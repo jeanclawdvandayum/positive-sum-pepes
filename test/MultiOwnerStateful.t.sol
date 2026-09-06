@@ -141,13 +141,21 @@ contract MultiOwnerStatefulTest is RealV4Base {
     function invariant_AllPositionAndEscrowLiabilitiesAreCovered() public view {
         uint256 principal;
         uint256 weight;
+        uint256[3] memory ownedPrincipal;
         uint256 owed = staking.pendingFeesOf(0) + staking.pendingFeesMixETH();
         for (uint256 i; i < ids.length; ++i) {
             principal += _amount(ids[i]);
+            address owner = staking.ownerOf(ids[i]);
+            for (uint256 j; j < actors.length; ++j) {
+                if (owner == actors[j]) ownedPrincipal[j] += _amount(ids[i]);
+            }
             weight += staking.weightAt(ids[i], block.timestamp / staking.epochSize());
             owed += staking.pendingFeesOf(ids[i]);
         }
         assertEq(principal, staking.totalLocked());
+        for (uint256 i; i < actors.length; ++i) {
+            assertEq(staking.stakedTotalOf(actors[i]), ownedPrincipal[i], "owner principal cache matches positions");
+        }
         assertEq(principal, pspToken.balanceOf(address(staking)));
         assertEq(weight, staking.totalWeight());
         assertLe(owed + staking.totalFeesPaid(), staking.totalFeesReceived());
