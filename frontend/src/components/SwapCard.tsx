@@ -1,6 +1,8 @@
 import { usePurchaseReferral, useReferral } from './ReferralCard'
 import { purchaseReferral } from '../lib/referrals'
 import { MIN_BUY_INPUT, purchaseUnits, TIME_PER_UNIT, minimumOutput } from '../lib/gameRules'
+import { usePredepositMinimum } from '../lib/usePredepositMinimum'
+import { capHeadroom, predepositLimit, predepositAmountAllowed, predepositProgress, predepositRemainder } from '../lib/predeposit'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
@@ -25,6 +27,7 @@ type Step = 'idle' | 'approve' | 'swap' | 'waiting' | 'done'
 
 export default function SwapCard() {
   const round = useRound()
+  const pdMinimum = usePredepositMinimum(round.mode === 0 ? round.controller : undefined)
   const { zero: clockZero } = usePhase()
   const { address, isConnected } = useAccount()
   const { psp: pspBal, mix: mixBal } = useBalances(round.token, round.mix)
@@ -49,6 +52,7 @@ export default function SwapCard() {
   /// the toggle so nobody wires a doomed buy.
   useEffect(() => {
     if (round.mode === 2) setSide('sell')
+    if (round.mode === 0) setSide('buy')
   }, [round.mode])
 
   const ZERO = '0x0000000000000000000000000000000000000000' as const
@@ -60,6 +64,22 @@ export default function SwapCard() {
   /// Mode stays Active until someone presses detonate, so this is the
   /// between-zero-and-boom state exactly.
   const halted = clockZero && round.mode === 1
+  const pdReads = useRpcReads([
+    { to: round.controller, abi: controllerAbi, functionName: 'predepositState' },
+    { to: round.controller, abi: controllerAbi, functionName: 'PREDEPOSIT_CAP_PER_WALLET' },
+    { to: round.controller, abi: controllerAbi, functionName: 'predeposits', args: [address ?? ZERO] },
+  ], predepositPhase && !!round.controller && !!address, 4000, step === 'done' ? 1 : 0)
+  const pdState = pdReads[0] as [bigint, bigint, bigint, boolean, boolean, boolean, boolean] | undefined
+  const pdWalletCap = pdReads[1] as bigint | undefined
+  const pdDeposit = (pdReads[2] as [bigint, boolean] | undefined)?.[0]
+  const pdTotal = pdState?.[0] ?? round.totalPredeposit
+  const pdCap = pdState?.[1] ?? round.predepositCap
+  const pdRemaining = pdTotal !== undefined && pdCap !== undefined ? capHeadroom(pdTotal, pdCap) : undefined
+  const pdMax = mixBal !== undefined && pdState && pdWalletCap !== undefined && pdDeposit !== undefined
+    ? predepositLimit(mixBal, pdState[0], pdState[1], pdWalletCap, pdDeposit) : undefined
+  const pdAllowed = side === 'buy' && !!pdState && !pdState[3]
+    && predepositAmountAllowed(amountWad, pdMinimum, pdMax)
+
 
   /// mixETH entering the curve for this input
   const mixIn = useMemo(() => {
@@ -155,7 +175,8 @@ export default function SwapCard() {
     setError(null)
     if (!address || !poolKey || busy) return
     if (side === 'buy' && !predepositPhase && referralBlocked) { setError('Referral purchases require the updated round contracts.'); return }
-    if (side === 'buy' && mixIn < MIN_BUY_INPUT) { setError('Minimum purchase is 0.005 mixETH.'); return }
+    if (predepositPhase && !pdAllowed) { setError('Check the exact remaining cap and this round’s deposit rules.'); return }
+    if (side === 'buy' && !predepositPhase && mixIn < MIN_BUY_INPUT) { setError('Minimum purchase is 0.005 mixETH.'); return }
     setStep('waiting') // lock the action before the fresh allowance RPC
     try {
       if (predepositPhase) {
@@ -275,7 +296,7 @@ export default function SwapCard() {
   }
 
   const canSubmit =
-    isConnected && !!poolKey && !(side === 'buy' && !predepositPhase && referralBlocked) && amountWad > 0n && (side !== 'buy' || mixIn >= MIN_BUY_INPUT) && (predepositPhase || (quoteRaw ?? 0n) > 0n) && payBalanceOk && !busy && !halted && (live || predepositPhase)
+    isConnected && !!poolKey && !(side === 'buy' && !predepositPhase && referralBlocked) && amountWad > 0n && (predepositPhase ? pdAllowed : (side !== 'buy' || mixIn >= MIN_BUY_INPUT) && (quoteRaw ?? 0n) > 0n) && payBalanceOk && !busy && !halted && (live || predepositPhase)
 
   const cta = !isConnected
     ? 'connect wallet'
@@ -284,9 +305,11 @@ export default function SwapCard() {
       : !payBalanceOk
         ? `insufficient ${side === 'buy' ? 'mixETH' : 'PSP'}`
         : predepositPhase
-          ? hasAllowance
-            ? `predeposit ${fmtAmount(mixIn)} mixETH`
-            : `approve ${fmtAmount(mixIn)} mixETH`
+          ? amountWad < pdMinimum ? `this round requires ${wadToExact(pdMinimum)} mixETH`
+            : pdMax !== undefined && amountWad > pdMax ? 'over the remaining cap'
+            : hasAllowance
+            ? `predeposit ${wadToExact(mixIn)} mixETH`
+            : `approve ${wadToExact(mixIn)} mixETH`
           : step === 'approve'
             ? 'approving…'
             : needsApproval && !hasAllowance
@@ -339,22 +362,28 @@ export default function SwapCard() {
         </div>
       </div>
 
-      {predepositPhase && round.totalPredeposit !== undefined && round.predepositCap && (
+      {predepositPhase && pdTotal !== undefined && pdCap !== undefined && pdCap > 0n && (
         <div className="mt-3">
-          <div className="mb-1 flex justify-between text-[11px] font-semibold text-text-lo">
+          <div className="mb-1 flex flex-wrap justify-between gap-1 text-[11px] font-semibold text-text-lo">
             <span>window fill</span>
-            <span className="tabular font-data">
-              {fmtAmount(round.totalPredeposit)} / {fmtAmount(round.predepositCap)} mix
+            <span className="tabular min-w-0 break-all font-data">
+              {predepositProgress(pdTotal, pdCap)}
             </span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-bg-2">
             <div
               className="h-full rounded-full bg-accent transition-[width]"
               style={{
-                width: `${Math.min(100, Number(round.totalPredeposit * 10000n / round.predepositCap) / 100)}%`,
+                width: `${Math.min(100, Number(pdTotal * 10000n / pdCap) / 100)}%`,
               }}
             />
           </div>
+          <p className="mt-2 break-all text-xs text-text-lo">{predepositRemainder(pdTotal, pdCap)}</p>
+          {pdWalletCap !== undefined && pdWalletCap > 0n && pdDeposit !== undefined &&
+            <p className="mt-1 break-all text-xs text-text-lo">your wallet has {wadToExact(capHeadroom(pdDeposit, pdWalletCap))} mixETH of cap remaining</p>}
+          {pdRemaining !== undefined && pdRemaining > 0n && pdRemaining < pdMinimum &&
+            <p className="mt-2 text-xs text-text-lo">This deployed round requires at least {wadToExact(pdMinimum)} mixETH per deposit.
+              The remainder is smaller than that; launch opens when the window ends.</p>}
         </div>
       )}
 
@@ -376,16 +405,16 @@ export default function SwapCard() {
           <span>{side === 'buy' ? 'pay' : 'sell'}</span>
           <button
             type="button"
-            title="fill your full balance"
+            title={predepositPhase ? 'fill the maximum allowed by your balance and both caps' : 'fill your full balance'}
             disabled={busy}
-            onClick={() => setAmount(wadToExact(side === 'buy' ? mixBal : pspBal))}
+            onClick={() => setAmount(wadToExact(predepositPhase ? pdMax : side === 'buy' ? mixBal : pspBal))}
             className="rounded-md px-1.5 py-0.5 transition hover:bg-bg-1 hover:text-text-hi"
           >
             balance{' '}
             <span className="tabular font-data">
               {side === 'buy' ? fmtAmount(mixBal) : fmtAmount(pspBal)}
             </span>
-            {((side === 'buy' ? mixBal : pspBal) ?? 0n) > 0n && (
+            {((predepositPhase ? pdMax : side === 'buy' ? mixBal : pspBal) ?? 0n) > 0n && (
               <span className="ml-1 text-[10px] text-accent">MAX</span>
             )}
           </button>
@@ -477,7 +506,7 @@ export default function SwapCard() {
 
       {side === 'buy' && (
         <p className="mt-3 text-xs text-text-lo">
-          minimum 0.005 mixETH{!predepositPhase && ` · ${purchaseUnits(mixIn) > 10n ? 10n : purchaseUnits(mixIn)} ${purchaseUnits(mixIn) === 1n ? 'seat' : 'seats'} · +${Number(purchaseUnits(mixIn) * TIME_PER_UNIT / 60n)}m ${purchaseUnits(mixIn) * TIME_PER_UNIT % 60n}s before the clock cap`}
+          {predepositPhase ? pdMinimum === 1n ? 'any positive mixETH amount' : `this round’s minimum: ${wadToExact(pdMinimum)} mixETH` : 'minimum 0.005 mixETH'}{!predepositPhase && ` · ${purchaseUnits(mixIn) > 10n ? 10n : purchaseUnits(mixIn)} ${purchaseUnits(mixIn) === 1n ? 'seat' : 'seats'} · +${Number(purchaseUnits(mixIn) * TIME_PER_UNIT / 60n)}m ${purchaseUnits(mixIn) * TIME_PER_UNIT % 60n}s before the clock cap`}
         </p>
       )}
       {/* slippage */}

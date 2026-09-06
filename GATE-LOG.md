@@ -804,3 +804,34 @@ Solidity source changed after the contract-source hash above.
   neither real domain moved. Mainnet deployment/custody activation and service
   startup remain required before enabling the name UI. Current PSP contracts,
   balances and unrelated broadcast files are preserved.
+
+## 2026-09-06 — Exact predeposit amounts and removal of its minimum
+
+- Baseline `ae9bc79e`. User explicitly removed the individual predeposit minimum.
+  Public direct/on-behalf deposits now accept any positive amount within the
+  existing global and beneficiary wallet caps; active curve buys still require
+  0.005 mixETH. Cap overshoots revert without partial acceptance. New controller
+  capability version 1 lets the frontend retain the actual floor on old rounds.
+- Both predeposit forms display exact totals and remaining headroom. MAX respects
+  balance and both caps with bigint arithmetic. Expiry permits further top-ups
+  until launch, matching existing contract behavior. Read-only simulation of the
+  current deployed controller confirmed its 100,000,000-wei remainder is rejected
+  with `PurchaseTooSmall()`. Fresh factory/controllers are required for the fix.
+- `bash scripts/check-audit.sh`: **491 Solidity tests / 66 suites**, **104 frontend
+  tests**, **11 verifier tests**, **152 ABI declarations**, **35 production size
+  checks**. Independent oracle, governance and TypeScript/Vite pass. Stateful
+  invariants retain 64 runs / 2,048 calls with zero reverts. Existing compiler,
+  dependency-annotation and bundle-size warnings remain.
+- Nine added Solidity tests cover positive sub-minimum amounts, zero rejection,
+  global/wallet dust completion, on-behalf/ETH-zap deposits and pooled claims with
+  real V4 and production sine parameters. Six frontend tests cover exact decimal
+  round-tripping, both caps/balance, legacy capability and 512 small boundaries.
+  A whole one-wei pool is numerically unrepresentable: launch reverts atomically,
+  stays open, and a post-window top-up permits launch. Existing math guards stay.
+- Browser checked the rebuilt predeposit and play routes against the actual near-
+  full round: `499.9999999999 / 500`, `0.0000000001 mixETH remaining`. Exact labels
+  fit a 390px viewport; existing navigation overflow remains outside this patch.
+  No wallet-signed transaction or live deployment was performed. See
+  `docs/audit/2026-09-06-predeposit.md` for root cause, variants and release boundary.
+- Source SHA-256 (sorted src/**/*.sol path + NUL + contents):
+  `c1d8fe5ab84e7ba670b31b4dc964324a8cbdbd2dd6e9437769e9dab99b581b20`.

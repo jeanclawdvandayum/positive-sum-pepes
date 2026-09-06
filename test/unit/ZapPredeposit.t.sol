@@ -61,6 +61,14 @@ contract ZapPredepositTest is Test {
         hook = round.hook;
     }
 
+    function test_ZapInPredeposit_OneWeiCreditsCaller() public {
+        vm.deal(alice, 1);
+        vm.prank(alice);
+        zapIn.zapInPredeposit{value: 1}(controller, 1);
+        (uint256 credited,) = controller.predeposits(alice);
+        assertEq(credited, 1);
+    }
+
     function test_ZapInPredeposit_CreditsUserNotZap() public {
         vm.deal(alice, 10e18);
         uint256 ethBefore = alice.balance;

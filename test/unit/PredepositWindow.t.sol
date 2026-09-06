@@ -108,6 +108,50 @@ contract PredepositWindowTest is Test {
         controller.predeposit(1);
     }
 
+    function testFuzzPositiveSubMinimumPredeposit(uint64 raw) public {
+        uint256 amount = bound(raw, 1, 0.005e18 - 1);
+        _deposit(alice, amount);
+        (uint256 credited,) = controller.predeposits(alice);
+        assertEq(credited, amount);
+        assertEq(controller.totalPredepositMixETH(), amount);
+        assertEq(controller.PREDEPOSIT_RULES_VERSION(), 1);
+    }
+
+    function testOneWeiAndPredepositForAreAccepted() public {
+        _deposit(alice, 1);
+        mixETH.transfer(bob, 2);
+        vm.startPrank(bob);
+        mixETH.approve(address(controller), 2);
+        controller.predepositFor(alice, 2);
+        vm.stopPrank();
+        (uint256 credited,) = controller.predeposits(alice);
+        assertEq(credited, 3);
+        assertEq(controller.totalPredepositors(), 1);
+    }
+
+    function testZeroPredepositStillRejected() public {
+        vm.expectRevert(RoundController.ZeroAmount.selector);
+        controller.predeposit(0);
+        vm.expectRevert(RoundController.ZeroAmount.selector);
+        controller.predepositFor(alice, 0);
+    }
+
+    function testFuzzDustCompletesGlobalCapAndLaunches(uint64 raw) public {
+        uint256 dust = bound(raw, 1, 0.005e18 - 1);
+        _deposit(alice, 500e18 - dust);
+        (,,,, bool reached,, bool launchable) = controller.predepositState();
+        assertFalse(reached);
+        assertFalse(launchable);
+        _deposit(bob, dust);
+        assertEq(controller.totalPredepositMixETH(), 500e18);
+        (,,,, reached,, launchable) = controller.predepositState();
+        assertTrue(reached);
+        assertTrue(launchable);
+        vm.prank(rando);
+        controller.launchPooledBuy();
+        assertTrue(controller.predepositClosed());
+    }
+
     // ─────────────── window ───────────────
 
     function test_window_RandomCannotLaunchEarly() public {

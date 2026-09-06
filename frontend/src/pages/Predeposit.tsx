@@ -1,4 +1,5 @@
-import { MIN_BUY_INPUT } from '../lib/gameRules'
+import { capHeadroom, predepositLimit, predepositAmountAllowed, predepositProgress, predepositRemainder } from '../lib/predeposit'
+import { usePredepositMinimum } from '../lib/usePredepositMinimum'
 import { predepositResult } from '../lib/chainResults'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useState } from 'react'
@@ -35,6 +36,7 @@ const MODE_BADGES: Record<number, { label: string; cls: string }> = {
 
 export default function Predeposit() {
   const round = useRound()
+  const minimum = usePredepositMinimum(round.controller)
   const { address, isConnected } = useAccount()
   const { mix: mixBal } = useBalances(round.token, round.mix)
 
@@ -49,6 +51,9 @@ export default function Predeposit() {
 
   useEffect(() => {
     setMyDep(undefined)
+    setPd(undefined)
+    setDuration(undefined)
+    setDepositors(undefined)
     if (!round.controller) return
     let dead = false
     async function tick() {
@@ -124,12 +129,13 @@ export default function Predeposit() {
 
   const amountWad = parseAmountToWad(amount)
   const hasAllowance = allowance !== undefined && amountWad > 0n && allowance >= amountWad
-  const balanceOk = amountWad > 0n && (mixBal === undefined || amountWad <= mixBal)
+  const balanceOk = amountWad > 0n && mixBal !== undefined && amountWad <= mixBal
   const busy = step === 'approve' || step === 'tx'
 
   /// per-wallet predeposit cap (0 = uncapped, e.g. mainnet profile)
   const [walletCap, setWalletCap] = useState<bigint | undefined>(undefined)
   useEffect(() => {
+    setWalletCap(undefined)
     if (!round.controller) return
     let dead = false
     rpcCall(round.controller!, controllerAbi, 'PREDEPOSIT_CAP_PER_WALLET')
@@ -142,12 +148,12 @@ export default function Predeposit() {
   const walletCapExceeded =
     walletCap !== undefined && walletCap > 0n && amountWad > 0n && myDepAmount + amountWad > walletCap
   /// the most THIS wallet can still deposit: balance ∧ wallet headroom ∧ global headroom
-  const maxDeposit =
-    mixBal !== undefined && pd
-      ? [mixBal, pd.cap - pd.total, walletCap !== undefined && walletCap > 0n ? walletCap - myDepAmount : undefined]
-          .filter((x): x is bigint => x !== undefined)
-          .reduce((a, b) => (a < b ? a : b))
-      : undefined
+  const maxDeposit = mixBal !== undefined && pd && walletCap !== undefined && myDep !== undefined
+    ? predepositLimit(mixBal, pd.total, pd.cap, walletCap, myDepAmount) : undefined
+  const globalRemaining = pd ? capHeadroom(pd.total, pd.cap) : undefined
+  const globalCapExceeded = globalRemaining !== undefined && amountWad > globalRemaining
+  const belowMinimum = amountWad > 0n && amountWad < minimum
+  const legacyDust = globalRemaining !== undefined && globalRemaining > 0n && globalRemaining < minimum
 
   const endTime = pd && duration !== undefined ? pd.startTime + duration : undefined
   const remaining = endTime !== undefined ? Math.max(0, Number(endTime - BigInt(nowSec))) : undefined
@@ -155,7 +161,7 @@ export default function Predeposit() {
   const badge = mode !== undefined ? MODE_BADGES[mode] : undefined
   const launched = pd?.closed === true && (mode ?? 0) >= 1
   const canSubmit =
-    isConnected && !!round.controller && amountWad >= MIN_BUY_INPUT && balanceOk && !walletCapExceeded && !busy && !pd?.closed && !pd?.launchable
+    isConnected && !!round.controller && predepositAmountAllowed(amountWad, minimum, maxDeposit) && balanceOk && !walletCapExceeded && !busy && !pd?.closed
 
   async function fail(e: unknown) {
     setError(e instanceof Error ? e.message.slice(0, 140) : 'transaction failed')
@@ -163,7 +169,7 @@ export default function Predeposit() {
   }
 
   async function runDeposit() {
-    if (!round.controller || amountWad < MIN_BUY_INPUT) return
+    if (!round.controller || !canSubmit) return
     setError(null)
     try {
       if (!round.mix) return
@@ -221,7 +227,13 @@ export default function Predeposit() {
   const cta = !isConnected
     ? 'connect wallet'
     : amountWad <= 0n
-      ? 'enter an amount (minimum 0.005 mixETH)'
+      ? 'enter an amount'
+      : belowMinimum
+        ? `this round requires at least ${wadToExact(minimum)} mixETH`
+      : globalCapExceeded
+        ? 'over the remaining round cap'
+      : walletCapExceeded
+        ? 'over the remaining wallet cap'
       : !balanceOk
         ? 'insufficient mixETH'
         : step === 'approve'
@@ -229,8 +241,8 @@ export default function Predeposit() {
           : step === 'tx'
             ? 'confirm in wallet…'
             : hasAllowance
-              ? `predeposit ${fmtAmount(amountWad)} mixETH`
-              : `approve ${fmtAmount(amountWad)} mixETH`
+              ? `predeposit ${wadToExact(amountWad)} mixETH`
+              : `approve ${wadToExact(amountWad)} mixETH`
 
   return (
     <div className="space-y-4">
@@ -259,7 +271,7 @@ export default function Predeposit() {
           <div className="card p-5">
             <div className="mb-1 flex justify-between text-[11px] font-bold uppercase tracking-wide text-slate-400">
               <span>window fill</span>
-              <span>{pd ? `${fmtAmount(pd.total)} / ${fmtAmount(pd.cap)} mix` : '…'}</span>
+              <span className="min-w-0 break-all text-right">{pd ? predepositProgress(pd.total, pd.cap) : '…'}</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-sky-100">
               <div
@@ -267,6 +279,7 @@ export default function Predeposit() {
                 style={{ width: `${pct}%` }}
               />
             </div>
+            {pd && <p className="mt-2 break-all text-xs text-slate-500">{predepositRemainder(pd.total, pd.cap)}</p>}
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-white/80 px-3 py-3 shadow-sm">
                 <div className="text-lg font-black text-slate-900">
@@ -275,8 +288,8 @@ export default function Predeposit() {
                 <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">depositors</div>
               </div>
               <div className="rounded-2xl bg-white/80 px-3 py-3 shadow-sm">
-                <div className="flex items-center gap-2 text-lg font-black text-slate-900">
-                  {!isConnected ? '—' : myDep === undefined ? '…' : fmtAmount(myDep.mixETHAmount)}
+                <div className="flex flex-wrap items-center gap-2 break-all text-lg font-black text-slate-900">
+                  {!isConnected ? '—' : myDep === undefined ? '…' : wadToExact(myDep.mixETHAmount)}
                   {myDep?.claimed && <span className="text-xs font-bold text-emerald-600">claimed ✓</span>}
                 </div>
                 <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">your predeposit (mix)</div>
@@ -317,17 +330,24 @@ export default function Predeposit() {
                 onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
               />
               {walletCap !== undefined && walletCap > 0n && myDep !== undefined && (
-                <div className="mt-1 text-[11px] font-bold text-slate-400">
-                  per-wallet cap {fmtAmount(walletCap)} mix · yours {fmtAmount(myDep.mixETHAmount)} ·{' '}
-                  {fmtAmount(walletCap - myDep.mixETHAmount > 0n ? walletCap - myDep.mixETHAmount : 0n)} left
+                <div className="mt-1 break-words text-[11px] font-bold text-slate-400">
+                  per-wallet cap {wadToExact(walletCap)} mix · yours {wadToExact(myDep.mixETHAmount)} ·{' '}
+                  {wadToExact(capHeadroom(myDep.mixETHAmount, walletCap))} left
                 </div>
               )}
+              {globalCapExceeded && <p className="mt-1 break-words text-xs font-bold text-rose-500">
+                {wadToExact(globalRemaining)} mixETH remaining in this round
+              </p>}
+              {legacyDust && <p className="mt-2 text-xs text-slate-500">
+                This deployed round requires at least {wadToExact(minimum)} mixETH per deposit.
+                The remainder is smaller than that; launch opens when the window ends.
+              </p>}
               {amountWad > 0n && !balanceOk && (
                 <div className="mt-1 text-xs font-bold text-rose-500">insufficient balance</div>
               )}
               {amountWad > 0n && walletCapExceeded && (
                 <div className="mt-1 text-xs font-bold text-rose-500">
-                  over the per-wallet cap — max is {fmtAmount(walletCap)} mixETH
+                  over the per-wallet cap — {wadToExact(walletCap === undefined ? undefined : capHeadroom(myDepAmount, walletCap))} mixETH remaining
                 </div>
               )}
             </div>
@@ -348,7 +368,7 @@ export default function Predeposit() {
               </div>
             )}
 
-            <button className="btn-primary mt-4 w-full" disabled={!canSubmit} onClick={runDeposit}>
+            <button className="btn-primary mt-4 w-full break-words" disabled={!canSubmit} onClick={runDeposit}>
               {step === 'done' ? '✅ deposited' : cta}
             </button>
             {pd?.closed && (

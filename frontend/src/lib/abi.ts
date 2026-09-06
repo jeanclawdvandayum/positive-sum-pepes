@@ -28,6 +28,7 @@ export const controllerAbi = parseAbi([
   'function claimPredepositPSP()',
   'function predeposit(uint256 mixETHAmount)',
   'function launchPooledBuy()',
+  'function PREDEPOSIT_RULES_VERSION() view returns (uint256)',
   'function PREDEPOSIT_DURATION() view returns (uint256)',
   'function PREDEPOSIT_CAP_PER_WALLET() view returns (uint256)',
   'function totalPredepositors() view returns (uint256)',

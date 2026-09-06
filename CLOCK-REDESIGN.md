@@ -12,10 +12,11 @@ bonding curve, and immediate withdrawal from staked PSP positions."
 This doc is the single source of truth for both lanes (src/ contracts,
 frontend/). ABI shapes below are BINDING for the frontend child.
 
-## 2026-09-05 amendment (supersedes conflicting historical sections below)
+## 2026-09-06 amendment (supersedes conflicting historical sections below)
 
 Binding current rules and audit notes: [docs/audit/READINESS.md](docs/audit/READINESS.md).
-Minimum purchase/public predeposit is 0.005 mixETH. Each whole 0.005 mixETH of
+Minimum active purchase is 0.005 mixETH. Public predeposits accept any positive
+amount within the global and per-wallet caps. Each whole 0.005 mixETH of
 GROSS purchase earns a ticket and adds 4m20s, capped by the round window.
 TimeAdded reports actual seconds added; genesis earns neither seats nor time.
 Empty-board pot returns to backing. Capped detonation settles independently;

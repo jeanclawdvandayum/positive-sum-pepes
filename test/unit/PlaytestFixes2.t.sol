@@ -115,6 +115,19 @@ contract PlaytestFixes2 is Test {
         vm.stopPrank();
     }
 
+    function testDustCompletesBeneficiaryWalletCapWithoutExceedingIt() public {
+        RoundController c = _cappedController();
+        vm.startPrank(alice);
+        mixETH.approve(address(c), type(uint256).max);
+        c.predepositFor(bob, 10e18 - 1);
+        c.predepositFor(bob, 1);
+        (uint256 credited,) = c.predeposits(bob);
+        assertEq(credited, 10e18);
+        vm.expectRevert(RoundController.WalletCapExceeded.selector);
+        c.predepositFor(bob, 1);
+        vm.stopPrank();
+    }
+
     function test_PerWalletCapIsPerBeneficiary() public {
         RoundController c = _cappedController();
         // predepositFor credits the BENEFICIARY — the cap guards bob, even

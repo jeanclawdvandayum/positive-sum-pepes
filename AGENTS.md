@@ -1,4 +1,4 @@
-# Current amendment — 2026-09-05
+# Current amendment — 2026-09-06
 
 Follow-up: earned fees survive vesting and payout failures. Use the explicit
 `isWithdrawing` flag for epoch-zero correctness; fees integrate earning-time
@@ -8,7 +8,8 @@ keeper is disabled; the testnet embedded HTML is a read-only deployment record.
 
 
 Read `docs/audit/READINESS.md` before editing. It supersedes the historical
-rules below: 0.005 mixETH minimum gross buy/public predeposit and per ticket;
+rules below: 0.005 mixETH minimum active gross buy and per ticket;
+public predeposits accept any positive amount within both caps (September 6 approval);
 4m20s per purchase unit; actual-seconds TimeAdded payload; independent
 Decimal/Simpson oracle; owner/operator reinvestment; resumable three-step birth.
 `bash scripts/check-audit.sh` is the deterministic gate. Counts come from the

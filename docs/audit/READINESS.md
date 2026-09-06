@@ -1,10 +1,10 @@
 # Audit preparation — September 2026
 
 This is a review packet for the current source tree, not a security certification.
-Final local gates: **482 Solidity tests / 65 suites**, including 64 invariant runs
+Final local gates: **491 Solidity tests / 66 suites**, including 64 invariant runs
 and 2,048 calls per real-V4 handler with zero reverts; the previous hardening
-revision also passed a 256-run / 32,768-call three-wallet campaign and complete exits; **98 frontend tests**, **11 verifier tests**; TypeScript/Vite;
-151 ABI declarations; 35 production size checks; independent oracle and governance
+revision also passed a 256-run / 32,768-call three-wallet campaign and complete exits; **104 frontend tests**, **11 verifier tests**; TypeScript/Vite;
+152 ABI declarations; 35 production size checks; independent oracle and governance
 gates. Static-analysis flags remain triaged separately. See GATE-LOG.md.
 A fresh Base Sepolia release is deployed and configured in the local frontend.
 See [TESTNET-PLAYTEST.md](TESTNET-PLAYTEST.md) for the running app, release manifest,
@@ -35,10 +35,16 @@ introduced. Mainnet deployment/custody activation remain pending; see the
 [naming integration review](2026-09-06-names/REVIEW.md). Names have their own admin
 and fee balance; this work does not add admin powers to the PSP game contracts.
 
-## Binding game rules (2026-09-05 approval)
+## Binding game rules (September 5 approval, September 6 predeposit amendment)
 
-- Minimum gross purchase and public predeposit: **0.005 mixETH**. Sell/redemption
+- Minimum active gross purchase: **0.005 mixETH**. Sell/redemption
   rules remain independent; accrued fees below the threshold cannot compound yet.
+- Public predeposits accept **any positive amount**, including one wei, within the
+  global and per-wallet caps. Overshoots revert without partial acceptance. Both
+  frontend forms show exact cap amounts and use integer MAX calculations. This
+  amendment requires fresh contracts; legacy rounds retain their deployed minimum.
+  See [predeposit review](2026-09-06-predeposit.md) for deployment detection and the
+  distinction between a tiny individual deposit and a representable pooled launch.
 - Every `floor(gross mixETH / 0.005 mixETH)` purchase unit earns one ladder ticket.
   Only the latest ten remain in storage; absolute ticket numbers include evicted
   units. Fractional remainders do not earn tickets or time. No per-wallet dedup.

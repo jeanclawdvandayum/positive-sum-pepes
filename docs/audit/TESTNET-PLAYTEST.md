@@ -73,6 +73,12 @@ ticket and 260 seconds, subject to the clock cap. The total predeposit cap is
 500 mixETH. To start immediately, fill that cap with free test mixETH and launch;
 a smaller raise becomes publicly launchable when its window ends.
 
+September 6 source amendment: freshly deployed controllers accept any positive
+predeposit amount, down to one wei; active buys still require 0.005 mixETH.
+The existing deployment described above retains its old predeposit minimum.
+The UI checks the controller's capability and displays exact cap headroom on
+both predeposit forms. See [predeposit review](2026-09-06-predeposit.md).
+
 ## Wallet test sequence
 
 1. Open the app and connect a test wallet on Base Sepolia. Use its faucet to get

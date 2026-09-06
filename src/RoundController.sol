@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
-import {GameRules} from "./libraries/GameRules.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -30,7 +29,6 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // ─────────────── Errors ───────────────
     error NotHook();
     error NotActive();
-    error PurchaseTooSmall();
     error ClockStillLive(); // CLOCK-REDESIGN §4: detonate() before the clock struck zero
     error NotPredeposit();
     error PredepositClosed();
@@ -109,6 +107,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // 2026-08-24/2026-08-18: hand-set widths drift from data reality).
     uint256 public immutable PREDEPOSIT_DURATION; // default 7 days
     uint256 public constant PREDEPOSIT_CAP = 500e18; // 500 mixETH
+    /// @notice Version 1 accepts any positive predeposit, subject to the caps.
+    uint256 public constant PREDEPOSIT_RULES_VERSION = 1;
     /// @dev Genesis pooled buy routes this share of the boot into the hook's
     ///      ladder pot at launch (mirrors the sine pre-wave fee). The rest
     ///      seeds the curve; predepositors claim their pro-rata of the PSP
@@ -324,7 +324,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             revert WalletCapExceeded();
         }
 
-        if (mixETHAmount < GameRules.MIN_BUY) revert PurchaseTooSmall();
+        // PD-1: predeposit accepts every positive amount. The minimum gross
+        // purchase applies to active curve buys, not pooled predeposits.
 
         // Use balanceBefore/After to support fee-on-transfer tokens safely
         uint256 balBefore = mixETH.balanceOf(address(this));
