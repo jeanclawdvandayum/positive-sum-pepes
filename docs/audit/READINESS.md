@@ -1,9 +1,9 @@
 # Audit preparation — September 2026
 
 This is a review packet for the current source tree, not a security certification.
-Final local gates: **502 Solidity tests / 67 suites**, including 64 invariant runs
+Final local gates: **505 Solidity tests / 67 suites**, including 64 invariant runs
 and 2,048 calls per real-V4 handler with zero reverts; the previous hardening
-revision also passed a 256-run / 32,768-call three-wallet campaign and complete exits; **121 frontend tests**, **11 verifier tests**; TypeScript/Vite;
+revision also passed a 256-run / 32,768-call three-wallet campaign and complete exits; **122 frontend tests**, **11 verifier tests**; TypeScript/Vite;
 155 ABI declarations; 36 production size checks; independent oracle and governance
 gates. Static-analysis flags remain triaged separately. See GATE-LOG.md.
 A fresh Base Sepolia release is deployed and configured in the local frontend.
@@ -45,11 +45,13 @@ and fee balance; this work does not add admin powers to the PSP game contracts.
   amendment requires fresh contracts; legacy rounds retain their deployed minimum.
   See [predeposit review](2026-09-06-predeposit.md) for deployment detection and the
   distinction between a tiny individual deposit and a representable pooled launch.
-- Predeposit claims mint the wallet avatar's DNA, using its address as the preferred
-  NFT ID. Every mint reserves a unique canonical v2 trait combination in that round.
+- Predeposit claims use cosmetic pseudorandom DNA from a block hash captured at
+  staker creation, mixed with the chain, staker and wallet. The seed stays fixed
+  within the round, and the address remains the preferred NFT ID. Every mint
+  reserves a unique canonical v2 trait combination in that round.
   Chosen duplicate art reverts; automatic/genesis mints resolve collisions to the
   first available combination without scanning. Transfers and withdrawals retain
-  the reservation. See [wallet-DNA review](2026-09-06-wallet-dna.md). Requires fresh
+  the reservation. See [block-hash art review](2026-09-06-blockhash-pepes.md). Requires fresh
   contracts; existing art stays unchanged.
 - Every `floor(gross mixETH / 0.005 mixETH)` purchase unit earns one ladder ticket.
   Only the latest ten remain in storage; absolute ticket numbers include evicted

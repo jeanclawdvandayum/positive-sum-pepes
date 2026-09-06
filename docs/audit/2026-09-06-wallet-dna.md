@@ -3,6 +3,10 @@
 Baseline: `8808f3fb`. The user requested predeposit NFTs matching their wallet
 avatar, then required that the same DNA never mint twice in a round.
 
+The later [block-hash art amendment](2026-09-06-blockhash-pepes.md) supersedes the
+address-only genesis DNA below. The canonical uniqueness guard, collision handling
+and immutable minted art described here continue to apply.
+
 ## Rules implemented
 
 A genesis claim prefers NFT ID `uint256(uint160(wallet))` and DNA

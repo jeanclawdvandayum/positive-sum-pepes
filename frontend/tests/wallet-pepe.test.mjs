@@ -35,7 +35,7 @@ test('address DNA is stable across casing/reloads and differs for different wall
   assert.notEqual(walletPepeKey(address, staker), walletPepeKey(address, descriptor))
 })
 
-test('wallet DNA matches the contract golden vectors including full-width and padded addresses', () => {
+test('legacy address placeholders retain their full-width and padded-address golden vectors', () => {
   for (const [wallet, dna] of [
     ['0x0000000000000000000000000000000000000001', 'b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6'],
     [address, 'fc377260a69a39dd786235c89f4bcd5d9639157731cac38071a0508750eb115a'],
@@ -56,6 +56,18 @@ test('an unminted wallet uses the collision-aware preview, then its immutable mi
   assert.deepEqual(await read(address, staker), { dna: 0n })
   minted = true; preview = 123n
   assert.deepEqual(await read(address, staker), { tokenId: BigInt(address), dna: 0n })
+})
+
+test('the same unminted wallet uses each round’s own seeded preview', async () => {
+  const nextStaker = '0x0000000000000000000000000000000000000003'
+  const read = createWalletPepeReader(async (to, _abi, name) => {
+    if (name === 'primaryOf') return 0n
+    if (name === 'genesisPepeDna') return to === staker ? 42n : 123n
+    throw Error(name)
+  })
+  assert.deepEqual(await read(address, staker), { dna: 42n })
+  assert.deepEqual(await read(address, nextStaker), { dna: 123n })
+  assert.deepEqual(await read(address, staker), { dna: 42n })
 })
 
 test('large address-derived NFT IDs fit labels without changing bigint identity', () => {

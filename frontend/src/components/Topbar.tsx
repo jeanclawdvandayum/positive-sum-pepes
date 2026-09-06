@@ -172,7 +172,7 @@ export default function Topbar() {
 }
 
 /// quiet outlined connect; connected = pepe identity chip (spec §7).
-/// Connected identity uses the current-round primary NFT, or stable address DNA.
+/// Connected identity uses the current-round NFT or genesis preview, with an address fallback.
 function Connect({ onOpen }: { onOpen: () => void }) {
   return (
     <ConnectButton.Custom>

@@ -5,8 +5,8 @@ type Address = `0x${string}`
 type Read = (to: Address, abi: readonly unknown[], name: string, args?: readonly unknown[]) => Promise<unknown>
 export interface WalletPepe { dna: bigint; tokenId?: bigint; svg?: string }
 
-/** Same address mapping used by the ladder: hash the zero-padded address.
- * Address casing, browser sessions and round changes cannot change this DNA. */
+/** Stable placeholder while round art is loading, or for legacy deployments.
+ * Genesis previews and owned NFTs use the DNA returned by their staker. */
 export function addressPepeDna(address: Address): bigint {
   return BigInt(keccak256(toHex(BigInt(address), { size: 32 })))
 }
@@ -23,7 +23,7 @@ export function createWalletPepeReader(read: Read) {
     if (!staker || /^0x0*$/.test(staker)) return fallback
     const tokenId = await read(staker, stakerAbi, 'primaryOf', [address]) as bigint
     if (tokenId === 0n) {
-      // New rounds resolve already-used wallet art to an available combination.
+      // The staker previews its round-seeded art and resolves used combinations.
       // Legacy rounds have no preview getter; keep their stable address avatar.
       try { return { dna: await read(staker, stakerAbi, 'genesisPepeDna', [address]) as bigint } }
       catch { return fallback }

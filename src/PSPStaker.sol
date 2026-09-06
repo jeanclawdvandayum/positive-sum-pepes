@@ -191,6 +191,10 @@ contract PSPStaker is ReentrancyGuard {
     mapping(uint256 => uint256) private _artRunBoundary;
     uint256 private _nextArtKey = 1;
     uint256 public constant PEPE_DNA_VERSION = 1;
+    /// @dev Cosmetic pseudorandomness, frozen per round so waiting to claim
+    /// cannot reroll art. Block producers/deployers can influence this seed;
+    /// it never controls principal, fee weights or rewards.
+    bytes32 private immutable _genesisArtSeed;
 
     constructor(IERC20 _psp, IRoundController _controller, address descriptor_) {
         if (address(_psp) == address(0)) revert ZeroAddress();
@@ -198,6 +202,9 @@ contract PSPStaker is ReentrancyGuard {
         psp = _psp;
         controller = _controller;
         descriptor = descriptor_;
+        _genesisArtSeed = keccak256(abi.encode(
+            blockhash(block.number == 0 ? 0 : block.number - 1), block.chainid, address(this)
+        ));
     }
 
     // ─────────────── ERC-165 / ERC-721 surface ───────────────
@@ -237,12 +244,16 @@ contract PSPStaker is ReentrancyGuard {
         return id != 0 && _ownerOf[id] == address(0) && _artToken[PepeDna.key(_hashDna(id))] == 0;
     }
 
-    /// @notice Wallet avatar used by a genesis claim at the current state.
+    /// @notice Pseudorandom art used by a genesis claim at the current state.
     /// An occupied combination gets the first free one. Another mint can change
     /// this preview before the claim confirms; the minted DNA is then immutable.
     function genesisPepeDna(address wallet) external view returns (uint256) {
         if (wallet == address(0)) revert ZeroAddress();
-        return _availableDna(_hashDna(uint256(uint160(wallet))));
+        return _availableDna(_genesisDna(wallet));
+    }
+
+    function _genesisDna(address wallet) private view returns (uint256) {
+        return uint256(keccak256(abi.encode(_genesisArtSeed, wallet)));
     }
 
     function _availableDna(uint256 preferred) private view returns (uint256) {
@@ -753,7 +764,7 @@ contract PSPStaker is ReentrancyGuard {
     }
 
     /// @dev Predeposit share claim: move `share` out of the genesis position
-    ///      into a fresh wallet-derived pepe minted to `user`, paying the
+    ///      into a fresh pseudorandom pepe minted to `user`, paying the
     ///      share's accrued fees alongside (deferred if payout is unavailable).
     function claimGenesisShare(address user, uint256 share) external nonReentrant {
         if (msg.sender != address(controller)) revert NotController();
@@ -769,11 +780,11 @@ contract PSPStaker is ReentrancyGuard {
         feeRemainder[0] -= shareRemainder;
         genesis.amount -= share;
 
-        // PD-2: uint160(address), padded to 32 bytes before hashing, matches
-        // the wallet avatar. Resolve ID/art collisions independently, without
-        // overwriting another NFT or creating a duplicate trait combination.
+        // PD-3: the round's frozen block-hash seed chooses art for this wallet.
+        // PD-2: keep the preferred address ID and resolve ID/art collisions
+        // independently, preserving existing NFTs and round art uniqueness.
         uint256 id = uint256(uint160(user));
-        uint256 dna = _availableDna(_hashDna(id));
+        uint256 dna = _availableDna(_genesisDna(user));
         if (_ownerOf[id] != address(0)) id = nextTokenId;
         _mint(user, id, dna);
         Position storage pos = positions[id];

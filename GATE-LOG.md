@@ -1076,3 +1076,27 @@ Solidity source changed after the contract-source hash above.
   showed loading placeholders followed by those trades and rounded totals; actual
   Stake → Play navigation retained populated data immediately. The graph label is
   absent. Local preview rebuilt. No contract, wallet or hosted-site changes.
+
+## 2026-09-06 — Block-hash pseudorandom predeposit art
+
+- Genesis art now uses a seed frozen from the previous block hash, chain and
+  staker address at construction, then mixed with the wallet. Available previews
+  remain stable across claim delays; different rounds have separate seeds. The
+  preferred NFT ID remains the address, and stored DNA stays immutable.
+- Canonical v2 trait reservations and bounded collision fallback still apply to
+  all mint paths. The seed affects cosmetic art only. Chosen-art staking and the
+  existing share/fee/accounting paths retain their behavior.
+- Updated genesis properties, collision fixtures and real-V4 tiny-deposit claims.
+  Replaying deployment at the same address with a different block hash changes
+  DNA; reversed claims after 900 blocks preserve available previews. Same-block
+  round separation and block-zero construction also pass. The frontend regression
+  confirms each round's contract preview is used for the same unminted wallet.
+- `bash scripts/check-audit.sh` passes: **505 Solidity tests / 67 suites**, **122
+  frontend tests**, **11 verifier tests**, **155 ABI declarations**, **36 production
+  size checks**, independent oracle/governance and TypeScript/Vite. The focused
+  genesis suite passes all 14 tests, including fuzz and bounded-gas cases. Existing
+  compiler and frontend bundle warnings remain. Local preview rebuilt.
+- Fresh factory/staker deployment is required. Existing deployed NFTs and old
+  factory successors keep their code. No deployment or wallet transaction was
+  performed. See `docs/audit/2026-09-06-blockhash-pepes.md` for entropy assumptions,
+  collision behavior and compatibility details.

@@ -16,7 +16,7 @@ contract GenesisArtHarness is PSPStaker {
 }
 
 /// @title GenesisPepeTest
-/// @notice Wallet-derived art, immutable round uniqueness and bounded collision handling.
+/// @notice Block-hash art, immutable round uniqueness and bounded collision handling.
 contract GenesisPepeTest is Test {
     ReviewPSP token;
     ReviewController c;
@@ -26,6 +26,8 @@ contract GenesisPepeTest is Test {
     address bob = address(0xcd);
 
     function setUp() public {
+        vm.roll(100);
+        vm.setBlockhash(99, keccak256("round birth"));
         token = new ReviewPSP();
         c = new ReviewController();
         s = _newStaker();
@@ -42,19 +44,16 @@ contract GenesisPepeTest is Test {
         return keccak256(abi.encode(renderer.decode(dna)));
     }
 
-    function test_WalletMatchesFrontendGoldenHashes() public {
-        // Captured from frontend addressPepeDna (viem keccak over 32-byte padding).
-        assertEq(s.genesisPepeDna(address(1)), 0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6);
-        assertEq(s.genesisPepeDna(alice), 0xfc377260a69a39dd786235c89f4bcd5d9639157731cac38071a0508750eb115a);
-        assertEq(s.genesisPepeDna(address(type(uint160).max)), 0xd4e438d33b9d837cd8ac2c60c0ab93462b774f17bb358eb7e74d97f49064fd72);
+    function test_GenesisPreviewMatchesMintInsteadOfAddressPlaceholder() public {
         uint256 preview = s.genesisPepeDna(alice);
+        assertTrue(preview != uint256(keccak256(abi.encode(uint256(uint160(alice))))));
         c.claim(s, alice, 100e18);
         assertEq(s.primaryOf(alice), uint256(uint160(alice)));
         assertEq(s.dnaOf(s.primaryOf(alice)), preview);
         assertEq(s.stakedTotalOf(alice), 100e18);
     }
 
-    function testFuzz_ClaimOrderAndRoundDoNotChangeAvailableWalletArt(uint160 a, uint160 b) public {
+    function testFuzz_ClaimTimingAndOrderDoNotRerollAvailableArt(uint160 a, uint160 b) public {
         a = uint160(bound(a, 1, type(uint160).max));
         b = uint160(bound(b, 1, type(uint160).max));
         vm.assume(a != b);
@@ -63,19 +62,51 @@ contract GenesisPepeTest is Test {
         uint256 da = s.genesisPepeDna(first);
         uint256 db = s.genesisPepeDna(second);
         vm.assume(_traits(da) != _traits(db));
-        GenesisArtHarness otherRound = _newStaker();
+        uint256 snapshot = vm.snapshotState();
         c.claim(s, first, 100e18);
         c.claim(s, second, 200e18);
-        skip(1 days);
-        c.claim(otherRound, second, 200e18);
-        c.claim(otherRound, first, 100e18);
-        assertEq(s.primaryOf(first), otherRound.primaryOf(first));
         assertEq(s.dnaOf(a), da);
         assertEq(s.dnaOf(b), db);
-        assertEq(otherRound.dnaOf(a), da);
-        assertEq(otherRound.dnaOf(b), db);
+        assertTrue(vm.revertToStateAndDelete(snapshot));
+        // The source block hash is outside the EVM's 256-block window, and
+        // the claim block has different entropy. The stored seed still applies.
+        vm.roll(1000);
+        vm.setBlockhash(999, keccak256("later claim"));
+        skip(1 days);
+        assertEq(s.genesisPepeDna(first), da);
+        assertEq(s.genesisPepeDna(second), db);
+        c.claim(s, second, 200e18);
+        c.claim(s, first, 100e18);
+        assertEq(s.dnaOf(a), da);
+        assertEq(s.dnaOf(b), db);
         assertEq(s.totalLocked(), 1000e18);
         assertEq(s.totalWeight(), 1000e18);
+    }
+
+    function testFuzz_BirthBlockhashChangesArtAtSameContractAddress(bytes32 entropy) public {
+        uint256 snapshot = vm.snapshotState();
+        vm.setBlockhash(99, entropy);
+        GenesisArtHarness first = _newStaker();
+        address deployedAt = address(first);
+        uint256 dna = first.genesisPepeDna(alice);
+        assertTrue(vm.revertToStateAndDelete(snapshot));
+        vm.setBlockhash(99, entropy ^ bytes32(uint256(1)));
+        GenesisArtHarness replay = _newStaker();
+        assertEq(address(replay), deployedAt, "isolate block hash from address entropy");
+        assertTrue(replay.genesisPepeDna(alice) != dna, "birth block hash must affect DNA");
+    }
+
+    function test_RoundAddressSeparatesArtEvenWithSameBirthBlockhash() public {
+        GenesisArtHarness otherRound = _newStaker();
+        assertTrue(otherRound.genesisPepeDna(alice) != s.genesisPepeDna(alice));
+    }
+
+    function test_BlockZeroCanStillCreateAndClaim() public {
+        vm.roll(0);
+        GenesisArtHarness genesisBlockRound = _newStaker();
+        uint256 preview = genesisBlockRound.genesisPepeDna(alice);
+        c.claim(genesisBlockRound, alice, 100e18);
+        assertEq(genesisBlockRound.dnaOf(genesisBlockRound.primaryOf(alice)), preview);
     }
 
     function test_ChosenIdsWithDifferentHashesButSameTraitsRevert() public {
@@ -142,10 +173,14 @@ contract GenesisPepeTest is Test {
     }
 
     function test_CollisionLookupSkipsAnOccupiedArtRunWithinFixedGas() public {
-        for (uint256 i = 1; i <= 1024; ++i) s.mintDna(bob, 10000 + i, PepeDna.fromKey(i));
-        s.lockWithPepe(0, uint256(uint160(alice)));
+        // Occupy the round-seeded art and wallet ID independently of chosen-ID hashing.
+        uint256 reservedKey = PepeDna.key(s.genesisPepeDna(alice));
+        s.mintDna(bob, uint256(uint160(alice)), s.genesisPepeDna(alice));
+        for (uint256 i = 1; i <= 1024; ++i) {
+            if (i != reservedKey) s.mintDna(bob, 10000 + i, PepeDna.fromKey(i));
+        }
         uint256 preview = s.genesisPepeDna(alice);
-        assertEq(PepeDna.key(preview), 1025);
+        assertEq(PepeDna.key(preview), reservedKey == 1025 ? 1026 : 1025);
         vm.prank(address(c));
         (bool ok,) = address(s).call{gas: 450_000}(abi.encodeCall(s.claimGenesisShare, (alice, 100e18)));
         assertTrue(ok, "claim must not scan occupied art or NFT IDs");
@@ -163,7 +198,9 @@ contract GenesisPepeTest is Test {
 
     function testFuzz_FirstFreeArtMatchesIndependentOccupiedSet(uint256 seed) public {
         bool[129] memory used;
-        s.lockWithPepe(0, uint256(uint160(alice)));
+        uint256 reservedKey = PepeDna.key(s.genesisPepeDna(alice));
+        s.mintDna(bob, uint256(uint160(alice)), s.genesisPepeDna(alice));
+        if (reservedKey <= 128) used[reservedKey] = true;
         for (uint256 i; i < 64; ++i) {
             seed = uint256(keccak256(abi.encode(seed, i)));
             if (seed % 3 != 0) {

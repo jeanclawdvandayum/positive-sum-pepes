@@ -29,6 +29,7 @@ contract PredepositPrecisionTest is BBase {
         controller.predeposit(amount);
         vm.stopPrank();
         _launch(100e18);
+        uint256 preview = stakerV.genesisPepeDna(bob);
         vm.prank(bob);
         controller.claimPredepositPSP();
         assertEq(controller.totalPredepositMixETH(), 100e18 + amount);
@@ -36,7 +37,7 @@ contract PredepositPrecisionTest is BBase {
         assertGt(psp.totalSupply(), 0);
         assertEq(stakerV.balanceOf(bob), 1);
         assertEq(stakerV.primaryOf(bob), uint256(uint160(bob)));
-        assertEq(stakerV.dnaOf(stakerV.primaryOf(bob)), uint256(keccak256(abi.encode(bob))));
+        assertEq(stakerV.dnaOf(stakerV.primaryOf(bob)), preview);
     }
 
     function testUnrepresentableOneWeiWholePoolCanBeToppedUpAfterWindow() public {

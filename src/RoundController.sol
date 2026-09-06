@@ -495,7 +495,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // For now, depositors call claimPredepositPSP()
     }
 
-    /// @notice Claim predeposit PSP into a staked NFT matching the wallet's pepe.
+    /// @notice Claim predeposit PSP into a staked NFT with the round's pseudorandom art.
     /// @dev The share and its accrued fees move out of the virtual genesis
     ///      position into a fresh NFT. PSP stays in the staker; the normal
     ///      withdrawal-request rules apply, and detonation opens the lock.
@@ -517,7 +517,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         dep.claimed = true;
 
         // Move the share (and its accrued fees) from the staker's genesis
-        // lock into a fresh wallet-derived NFT. Accrued-fee accounting and
+        // lock into a fresh NFT. Accrued-fee accounting and
         // deferred-payout handling live in the staker.
         staker.claimGenesisShare(msg.sender, share);
     }
