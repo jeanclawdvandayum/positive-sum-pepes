@@ -619,3 +619,28 @@ Solidity source changed after the contract-source hash above.
   performed. Existing Base Sepolia contracts are immutable, including the registry
   creation code used by that factory's future rounds. This feature needs a fresh
   factory/round deployment; current balances, NFTs and recorded referrals are intact.
+
+
+## 2026-09-06 — Graveyard winners accordion
+
+- Each round in the hall of detonations now expands into its final winners list.
+  Rows group a wallet's winning seats and show its Pepe, seat ranks, share and
+  total mixETH prize. Each avatar reads that round's staker and current primary
+  NFT; wallets without one use the existing deterministic address Pepe. The UI
+  labels this as current artwork, rather than a snapshot of NFT ownership at death.
+- Read the settled hook's frozen pot and occupied final board on expansion.
+  Amounts include prizes already claimed and sum individually floored seat payouts,
+  matching claimPot. Failed or partial reads offer retry and cannot become a false
+  empty/renormalized winners list. Existing exit controls remain independently usable.
+- Added eight frontend regressions covering canonical shares, repeated wallets,
+  per-seat rounding, short/empty ladders, bounded final-ten reads, failed reads,
+  active-round rejection and separation between round hooks.
+- `bash scripts/check-audit.sh` passes: **426 Solidity tests / 57 suites**,
+  **68 frontend tests**, **111 ABI declarations**, **32** production size checks,
+  independent oracle, no-governance, TypeScript and Vite. Existing bundle warnings
+  remain. `git diff --check` passes.
+- Browser checked the real Base Sepolia round-1 winner with on-chain Pepe artwork,
+  accordion open/close, and 320px, 390px, 678px and desktop layouts. Its ten-seat
+  prize of 126.526653601617144074 mixETH matches claimablePot at the read snapshot.
+  Viewport restored. Local preview rebuilt; no wallet transactions or contract
+  deployments are required for this UI change.

@@ -113,6 +113,7 @@ export const hookAbi = parseAbi([
   'function detWindow() view returns (uint256)',
   // rolling last-10 ticket board: (buyer, pspAmount, mixPaid, ts), newest first
   'function board(uint256 i) view returns (address, uint256, uint256, uint256)',
+  'function ticketCount() view returns (uint256)',
   'function potBalance() view returns (uint256)',
   'function claimablePot(address who) view returns (uint256 amount)',
   'function claimPot()',

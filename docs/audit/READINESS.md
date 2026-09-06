@@ -3,8 +3,8 @@
 This is a review packet for the current source tree, not a security certification.
 Final local gates: **426 Solidity tests / 57 suites**, including 64 invariant runs
 and 2,048 calls per real-V4 handler with zero reverts; an additional three-wallet
-campaign passed 256 runs / 32,768 calls and complete exits; **60 frontend tests**; TypeScript/Vite;
-110 ABI declarations; 32 production size checks; independent oracle and governance
+campaign passed 256 runs / 32,768 calls and complete exits; **68 frontend tests**; TypeScript/Vite;
+111 ABI declarations; 32 production size checks; independent oracle and governance
 gates. Static-analysis flags remain triaged separately. See GATE-LOG.md.
 A fresh Base Sepolia release is deployed and configured in the local frontend.
 See [TESTNET-PLAYTEST.md](TESTNET-PLAYTEST.md) for the running app, release manifest,
