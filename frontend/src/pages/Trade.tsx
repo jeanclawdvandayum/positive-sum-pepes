@@ -66,7 +66,7 @@ export default function Trade() {
         <RefBanner />
       </div>
       <div className="mt-4">
-        <Tape entries={tape.entries} />
+        <Tape entries={tape.entries} loading={!tape.complete} error={tape.error} />
       </div>
       {settled && (
         <div className="flex items-center gap-3 rounded-xl border border-line bg-bg-1 p-5 text-sm text-text-lo">
@@ -109,6 +109,11 @@ export default function Trade() {
       </div>
       <div className="mt-4">
         <TickerBar items={tickerItems} />
+        {(tape.error || !tape.complete) && (
+          <p className="mt-2 text-xs text-text-lo" role="status">
+            {tape.error ? 'round volume and fees are reconnecting. retrying automatically.' : 'loading round volume and fees…'}
+          </p>
+        )}
       </div>
     </div>
   )

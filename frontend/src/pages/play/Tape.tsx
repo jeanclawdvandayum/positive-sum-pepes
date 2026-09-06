@@ -11,8 +11,8 @@ import WalletName from '../../components/WalletName'
 // One-line entries with pepe avatars for buys and sells, newest on top,
 // fed by useTradeTape (the StatsPanel getLogs lane). Time injections and
 // stake events join when their lanes exist — until then the tape shows
-// exactly what the logs say, or its designed §8 empty state. Never a
-// spinner.
+// exactly what the logs say. Loading and failed reads stay distinct from a
+// confirmed empty round.
 //
 // Avatars share the header's round-aware NFT/available-wallet identity.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,14 +26,17 @@ function fmtAdded(ms: number): string {
   return `+${m}:${String(s).padStart(2, '0')}`
 }
 
-export default function Tape({ entries }: { entries: TapeEntry[] }) {
+export default function Tape({ entries, loading, error }: { entries: TapeEntry[]; loading: boolean; error: boolean }) {
   const round = useRound()
   const shown = useMemo(() => entries.slice(0, MAX_ROWS), [entries])
 
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-bg-1" aria-label="live activity">
       {shown.length === 0 ? (
-        <p className="px-4 py-2.5 text-sm text-text-lo">waiting for trades. the tape keeps receipts.</p>
+        <p className="px-4 py-2.5 text-sm text-text-lo" role="status">
+          {error ? 'trade history is reconnecting. retrying automatically.'
+            : loading ? 'loading round trades…' : 'waiting for trades. the tape keeps receipts.'}
+        </p>
       ) : (
         shown.map((e) => (
           <div
@@ -66,6 +69,11 @@ export default function Tape({ entries }: { entries: TapeEntry[] }) {
             </span>
           </div>
         ))
+      )}
+      {shown.length > 0 && (loading || error) && (
+        <p className="border-t border-line px-4 py-2 text-xs text-text-lo" role="status">
+          {error ? 'showing the latest loaded trades. reconnecting…' : 'loading earlier trades and round totals…'}
+        </p>
       )}
     </div>
   )

@@ -33,6 +33,7 @@ export interface RoundInfo {
   detonationAt: bigint | undefined
   detWindow: bigint | undefined
   predepositClosed: boolean | undefined
+  predepositStartTime: bigint | undefined
   totalPredeposit: bigint | undefined
   predepositCap: bigint | undefined
   curve: CurveConfig | undefined
@@ -52,7 +53,7 @@ const EMPTY: RoundInfo = {
   mode: undefined, reserve: undefined, supply: undefined, marginalPrice: undefined,
   potBalance: undefined,
   swapFeeBps: undefined,
-  totalLocked: undefined, predepositClosed: undefined, totalPredeposit: undefined,
+  totalLocked: undefined, predepositClosed: undefined, predepositStartTime: undefined, totalPredeposit: undefined,
   predepositCap: undefined, curve: undefined, flatTime: undefined, sine: null,
   detonationAt: undefined,
   detWindow: undefined,
@@ -140,7 +141,7 @@ function startRoundLoop() {
         potBalance,
         swapFeeBps,
         totalLocked,
-        predepositClosed: pd[3], totalPredeposit: pd[0], predepositCap: pd[1],
+        predepositClosed: pd[3], predepositStartTime: pd[2], totalPredeposit: pd[0], predepositCap: pd[1],
         flatTime,
         curve: { p0: cfg[0], zones: zones.map((z) => ({ ...z })) },
         sine: shared.hook === rHook ? shared.sine : null,

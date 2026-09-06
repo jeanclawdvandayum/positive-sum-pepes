@@ -1048,3 +1048,31 @@ Solidity source changed after the contract-source hash above.
 - Browser verified the active full play clock and compact landing clock have no
   phase label and retain the yellow clock color. Local preview rebuilt and left
   on play. No new tests for this presentation change or contract changes.
+
+## 2026-09-06 — Reliable trade feed and round totals
+
+- Reproduced the delay: the current round was over 52,000 blocks after the
+  configured factory deployment. Each mount scanned only 4,000 blocks per 12s
+  poll and displayed partial/failed history as zero volume, zero fees and an
+  empty tape. Both configured RPCs returned the recent round's logs successfully.
+- The history reader now locates the current controller's inclusive construction
+  block using its existing predepositState timestamp. Recent trades load first;
+  bounded history pages catch up promptly, retain successful progress on retry,
+  and coalesce concurrent polls. Four per-client/round sessions survive route
+  changes. Round switches start with their own history.
+- Totals remain pending until the round scan is complete. Failed refreshes retain
+  known data, show reconnecting states and back off. Overlapping/reorganized logs
+  replace earlier copies, and batch buys consume their individual TimeAdded events.
+  Volume retains the existing buy-input plus sell-proceeds accounting; staker fees
+  come from controller FeesAdded events. Removed the chart's "you are here" label.
+- Added nine frontend regression tests for inclusive start lookup, late rounds,
+  backfill, failed pages/refreshes, concurrency/round isolation, event aggregation,
+  batch clock additions and short reorgs. Deterministic gate passes: **502 Solidity
+  tests / 67 suites**, **121 frontend tests**, **11 verifier tests**, **155 ABI
+  declarations**, **36 production size checks**, oracle/governance and TypeScript/
+  Vite. Existing bundle warnings remain.
+- A live round-3 reader completed in 5.5s from block 46464196, yielding two buys,
+  420.69 mixETH volume and 25.2414 mixETH staker fees. Browser fresh-load checks
+  showed loading placeholders followed by those trades and rounded totals; actual
+  Stake → Play navigation retained populated data immediately. The graph label is
+  absent. Local preview rebuilt. No contract, wallet or hosted-site changes.

@@ -1,192 +1,77 @@
 import { DEPLOYMENT_BLOCK, CHAIN_ID } from '../../lib/config'
-import { createLogScanner } from '../../lib/logScanner'
 import { useEffect, useMemo, useState } from 'react'
 import { usePublicClient } from 'wagmi'
-import { parseAbiItem } from 'viem'
 import { useRound } from '../../lib/useRound'
+import { createTradeHistoryReader, EMPTY_HISTORY, tradeEvents, type TradeHistory } from '../../lib/tradeHistory'
+export type { TapeEntry, LastTimeAdded } from '../../lib/tradeHistory'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// useTradeTape — the play page's ONE getLogs lane (REDESIGN-B2 §2/§6).
-//
-// This is the StatsPanel lane moved 1:1 into the play tree (StatsPanel was
-// dissolved when its cards folded into the TickerBar): same three getLogs
-// pulls — Buy + Sell from the hook, FeesAdded from the controller, fromBlock
-// 0 — and the same watchBlockNumber re-pull per new block. NO new chain
-// calls, NO new cadence (red-line: read fan-out stays centralized; this is
-// the lane's single new home).
-//
-// Feeds: the live tape (per-trade entries), the TickerBar (volume / fees to
-// stakers), the curve's entry mark (vw avg buy price of the connected
-// address — derived from these same logs, nothing extra read), and the
-// clock's TimeAdded lane (CLOCK-REDESIGN §6.6: same getLogs pull, one more
-// event — a buy that injected time renders as one row with its +5:00, and
-// the newest injection drives the clock panel's "last added" line).
-// ─────────────────────────────────────────────────────────────────────────────
-
-export interface TapeEntry {
-  id: string // `${block}-${logIndex}` — stable keys across per-block re-pulls
-  kind: 'buy' | 'sell'
-  addr: `0x${string}`
-  pspWad: bigint
-  mixWad: bigint
-  price: number // mixETH per PSP
-  block: bigint
-  logIndex: number
-  /// CLOCK-REDESIGN §1/§6: set when this buy's tx also emitted TimeAdded —
-  /// the whole-PSP time injection (+5:00 per whole psp) rides the SAME tx
-  /// as the Buy, so the tape folds both into one row instead of duplicating.
-  addedMs?: number
-}
-
-/// newest TimeAdded — feeds the clock panel's "last added by X · Ym ago" line.
-export interface LastTimeAdded {
-  addr: `0x${string}`
-  secondsAdded: bigint
-  /** block timestamp in unix seconds, when the RPC provides it on logs */
-  atSec: number | undefined
-}
-
-const buyEvent = parseAbiItem(
-  'event Buy(address indexed buyer, uint256 mixETHIn, uint256 pspOut, uint256 newSupply, uint256 newReserveMixETH)',
-)
-const sellEvent = parseAbiItem(
-  'event Sell(address indexed seller, uint256 pspIn, uint256 mixETHOut, uint256 newSupply, uint256 newReserveMixETH)',
-)
-const feesEvent = parseAbiItem('event FeesAdded(uint256 mixETHAmount)')
-const timeEvent = parseAbiItem(
-  'event TimeAdded(address indexed buyer, uint256 secondsAdded, uint256 newDetonationAt)',
-)
+type HistoryReader = ReturnType<typeof createTradeHistoryReader>
+// Keep a few round sessions across route changes. Each reader coalesces in-flight
+// polls, and its key includes the client/network plus both contract addresses.
+const readers = new Map<string, HistoryReader>()
 
 export function useTradeTape() {
   const round = useRound()
   const client = usePublicClient({ chainId: CHAIN_ID })
-  const [entries, setEntries] = useState<TapeEntry[]>([]) // newest first
-  const [feesWad, setFeesWad] = useState<bigint>(0n)
-  const [volumeWad, setVolumeWad] = useState<bigint>(0n)
-  const [lastTime, setLastTime] = useState<LastTimeAdded | undefined>(undefined)
+  const reader = useMemo(() => {
+    if (!client || !round.hook || !round.controller || round.predepositStartTime === undefined) return undefined
+    const { hook, controller, predepositStartTime } = round
+    const key = `${client.uid}:${hook}:${controller}:${predepositStartTime}`
+    let cached = readers.get(key)
+    if (!cached) {
+      cached = createTradeHistoryReader({
+        head: () => client.getBlockNumber({ cacheTime: 0 }),
+        timestamp: async blockNumber => (await client.getBlock({ blockNumber })).timestamp,
+        logs: (fromBlock, toBlock) => client.getLogs({
+          address: [hook, controller], events: tradeEvents, fromBlock, toBlock, strict: true,
+        }),
+      }, predepositStartTime, DEPLOYMENT_BLOCK)
+      readers.set(key, cached)
+      if (readers.size > 4) readers.delete(readers.keys().next().value!)
+    }
+    return cached
+  }, [client, round.hook, round.controller, round.predepositStartTime])
+  const [state, setState] = useState<{ reader?: HistoryReader; history: TradeHistory }>({ history: EMPTY_HISTORY })
+  // Never carry an earlier round's events or totals into a newly selected round.
+  const history = state.reader === reader ? state.history : reader?.snapshot ?? EMPTY_HISTORY
 
   useEffect(() => {
-    if (!client || !round.hook || !round.controller) return
-    const c = client
-    const hookAddr = round.hook
-    const ctrlAddr = round.controller
+    if (!reader) return
     let dead = false
-    const scanner = createLogScanner((fromBlock, toBlock) => c.getLogs({
-      address: [hookAddr, ctrlAddr], events: [buyEvent, sellEvent, feesEvent, timeEvent],
-      fromBlock, toBlock, strict: true,
-    }), DEPLOYMENT_BLOCK)
-
-    async function load() {
-      const logs = await scanner.poll(await c.getBlockNumber())
-      const buys = logs.filter(log => log.eventName === 'Buy')
-      const sells = logs.filter(log => log.eventName === 'Sell')
-      const feeLogs = logs.filter(log => log.eventName === 'FeesAdded')
-      const timeLogs = logs.filter(log => log.eventName === 'TimeAdded')
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let backoff = 0
+    async function tick() {
+      const history = await reader!.poll()
       if (dead) return
-
-      // TimeAdded(txHash) → secondsAdded: buys fold their actual clock extension into one row
-      const addedByTx = new Map<string, bigint>()
-      let newest: LastTimeAdded | undefined
-      let newestBn = -1n
-      let newestLi = -1
-      for (const l of timeLogs) {
-        const who = l.args.buyer
-        const whole = l.args.secondsAdded
-        if (!who || whole === undefined) continue
-        if (l.transactionHash) addedByTx.set(l.transactionHash, whole)
-        // numeric recency (block, then logIndex) — string keys mis-sort
-        // across digit lengths ("999-9" > "1000-0")
-        const li = l.logIndex ?? 0
-        if (l.blockNumber > newestBn || (l.blockNumber === newestBn && li > newestLi)) {
-          newestBn = l.blockNumber
-          newestLi = li
-          newest = {
-            addr: who as `0x${string}`,
-            secondsAdded: whole,
-            atSec: l.blockTimestamp !== undefined ? Number(l.blockTimestamp) : undefined,
-          }
-        }
-      }
-      setLastTime(newest)
-
-      const t: TapeEntry[] = []
-      let volume = 0n
-      for (const l of buys) {
-        const mix = l.args.mixETHIn
-        const psp = l.args.pspOut
-        if (mix === undefined || psp === undefined || psp <= 0n) continue
-        const whole = l.transactionHash ? addedByTx.get(l.transactionHash) : undefined
-        t.push({
-          id: `${l.blockNumber}-${l.logIndex ?? 0}`,
-          kind: 'buy',
-          addr: l.args.buyer as `0x${string}`,
-          pspWad: psp,
-          mixWad: mix,
-          price: Number(mix) / Number(psp),
-          block: l.blockNumber,
-          logIndex: l.logIndex ?? 0,
-          addedMs: whole !== undefined ? Number(whole) * 1000 : undefined, // actual seconds after the clock cap
-        })
-        volume += mix
-      }
-      for (const l of sells) {
-        const psp = l.args.pspIn
-        const mix = l.args.mixETHOut
-        if (mix === undefined || psp === undefined || psp <= 0n) continue
-        t.push({
-          id: `${l.blockNumber}-${l.logIndex ?? 0}`,
-          kind: 'sell',
-          addr: l.args.seller as `0x${string}`,
-          pspWad: psp,
-          mixWad: mix,
-          price: Number(mix) / Number(psp),
-          block: l.blockNumber,
-          logIndex: l.logIndex ?? 0,
-        })
-        volume += mix
-      }
-      // ascending by block, then logIndex (stable tape order within a block)
-      t.sort((a, b) =>
-        a.block < b.block ? -1 : a.block > b.block ? 1 : a.logIndex - b.logIndex,
-      )
-      setEntries(t.reverse())
-      setVolumeWad(volume)
-      setFeesWad(feeLogs.reduce((acc, l) => acc + (l.args.mixETHAmount ?? 0n), 0n))
+      setState({ reader, history })
+      backoff = history.error ? Math.min(backoff ? backoff * 2 : 2000, 60_000) : 0
+      // Catch up bounded pages promptly. Only the live poll waits twelve seconds.
+      timer = setTimeout(tick, backoff || (history.complete ? 12_000 : 500))
     }
-
-    load().catch(() => {})
-    const timer = setInterval(() => { load().catch(() => {}) }, 12_000)
-    return () => {
-      dead = true
-      clearInterval(timer)
-    }
-  }, [client, round.hook, round.controller])
+    tick()
+    return () => { dead = true; if (timer) clearTimeout(timer) }
+  }, [reader])
 
   const counts = useMemo(() => {
-    let buys = 0
-    for (const e of entries) if (e.kind === 'buy') buys++
-    return { buys, sells: entries.length - buys, count: entries.length }
-  }, [entries])
-
-  // per-address buy sums → vw avg entry price (mixETH per PSP), logs only
+    const buys = history.entries.filter(entry => entry.kind === 'buy').length
+    return { buys, sells: history.entries.length - buys, count: history.entries.length }
+  }, [history.entries])
   const entryByAddr = useMemo(() => {
-    const m = new Map<`0x${string}`, { mix: bigint; psp: bigint }>()
-    for (const e of entries) {
-      if (e.kind !== 'buy') continue
-      const acc = m.get(e.addr) ?? { mix: 0n, psp: 0n }
-      acc.mix += e.mixWad
-      acc.psp += e.pspWad
-      m.set(e.addr, acc)
+    const sums = new Map<string, { mix: bigint; psp: bigint }>()
+    if (!history.complete) return sums
+    for (const entry of history.entries) {
+      if (entry.kind !== 'buy') continue
+      const key = entry.addr.toLowerCase()
+      const sum = sums.get(key) ?? { mix: 0n, psp: 0n }
+      sum.mix += entry.mixWad
+      sum.psp += entry.pspWad
+      sums.set(key, sum)
     }
-    return m
-  }, [entries])
-
+    return sums
+  }, [history.entries, history.complete])
   function entryPriceOf(addr: `0x${string}` | undefined): number | undefined {
-    if (!addr) return undefined
-    const acc = entryByAddr.get(addr)
-    if (!acc || acc.psp <= 0n) return undefined
-    return Number(acc.mix) / Number(acc.psp)
+    const sum = addr ? entryByAddr.get(addr.toLowerCase()) : undefined
+    return sum && sum.psp > 0n ? Number(sum.mix) / Number(sum.psp) : undefined
   }
-
-  return { entries, feesWad, volumeWad, lastTime, ...counts, entryPriceOf }
+  return { ...history, ...counts, entryPriceOf }
 }

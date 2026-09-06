@@ -377,7 +377,6 @@ export function CurveChartView({ round, hasTrades = true, entryPrice }: ChartPro
               {chartPrice(round.marginalPrice)}
             </span>
           </span>
-          <span>● you are here</span>
         </div>
       )}
     </div>
