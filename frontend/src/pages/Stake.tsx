@@ -19,6 +19,8 @@ import { useEthUsd } from '../lib/useEthUsd'
 import StakeStyles from './stake/StakeStyles'
 import IdentityPanel from './stake/IdentityPanel'
 import ReferralsCard from './stake/ReferralsCard'
+import { useNftVersion } from '../lib/useNftVersion'
+import { useNftReinvestment } from '../lib/useNftReinvestment'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // /stake — the den: "your pepe works here" (REDESIGN-B3).
@@ -38,6 +40,8 @@ type Step = 'idle' | 'approve' | 'tx' | 'done'
 
 export default function Stake() {
   const round = useRound()
+  const nftVersion = useNftVersion(round.staker)
+  const nftReinvestment = useNftReinvestment(round.staker, nftVersion)
   const { address, isConnected } = useAccount()
   const [pepeKey, setPepeKey] = useState(0)
   const { psp: pspBal } = useBalances(round.token, round.mix, pepeKey)
@@ -246,18 +250,12 @@ export default function Stake() {
     setError(null)
     try {
       setMultiStep('tx')
-      if (!reinvestApproved) {
-        await writeContractAsync({
-          address: round.staker!,
-          abi: stakerAbi,
-          functionName: 'setApprovalForAll',
-          args: [ADDRESSES.reinvestor, true],
-        })
-      }
+      await nftReinvestment.prepare(stakeableIds)
       const key = buildPoolKey(round.mix!, round.token!, round.hook!)
       const fees = (await Promise.all(stakeableIds.map(id => rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as Promise<bigint>))).reduce((sum, fee) => sum + fee, 0n)
       if (fees < MIN_BUY_INPUT) throw new Error('Reinvest requires at least 0.005 mixETH in accrued fees.')
       const quote = await rpcCall(round.hook!, hookAbi, 'getBuyOutput', [fees]) as bigint
+      nftReinvestment.assertSession()
       await writeContractAsync({
         address: ADDRESSES.reinvestor,
         abi: reinvestorAbi,
@@ -377,10 +375,13 @@ export default function Stake() {
         <button
           type="button"
           className="st-btn flex-1"
-          disabled={!isConnected || totalPending === 0n || stakeableIds.length === 0 || multiBusy}
+          disabled={!isConnected || totalPending === 0n || stakeableIds.length === 0 || multiBusy || nftVersion === undefined}
           onClick={reinvestAll}
         >
           {multiStep === 'done' ? '✓' : reinvestApproved ? '↻ reinvest all' : 'approve & reinvest all'}
+          {!reinvestApproved && <span className="mt-1 block text-[10px] font-normal">
+            {nftVersion === 1 ? 'approve each included Pepe · transfer and fee-claim permission' : nftVersion === 0 ? 'collection approval · transfers and fee claims for all Pepes' : 'checking approvals…'}
+          </span>}
         </button>
       )}
     </div>
@@ -529,7 +530,7 @@ export default function Stake() {
       {hasPepes && (
         <section className="mt-6" aria-label="your staked pepes">
           <h2 className="mb-3 font-display text-xl">your staked pepes</h2>
-          <PepeCards round={round} entries={entries} pendings={pendings} vest={vest} approved={reinvestApproved} walletBalance={pspBal} onDone={refresh} />
+          <PepeCards round={round} entries={entries} pendings={pendings} vest={vest} approved={reinvestApproved} nftVersion={nftVersion} walletBalance={pspBal} onDone={refresh} />
         </section>
       )}
 

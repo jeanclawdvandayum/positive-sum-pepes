@@ -7,13 +7,14 @@ interface IPSPStaker {
     struct PositionView {
         uint256 amount;
         uint256 startEpoch;
-        uint256 requestEpoch; // 0 = indefinitely locked (reinvestable)
+        uint256 requestEpoch; // isWithdrawing distinguishes an epoch-zero request
         uint256 creditCheckpoint;
         uint256 feesPaid;
     }
 
     function isWithdrawing(uint256 pepeId) external view returns (bool);
     function ownerOf(uint256 pepeId) external view returns (address);
+    function getApproved(uint256 pepeId) external view returns (address);
     function isApprovedForAll(address owner, address operator) external view returns (bool);
     function positions(uint256 pepeId) external view returns (PositionView memory);
     function primaryOf(address user) external view returns (uint256);

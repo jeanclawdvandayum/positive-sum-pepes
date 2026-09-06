@@ -44,8 +44,10 @@ per-token approval event/state. balanceOf(0) returns zero instead of reverting.
 It also does not advertise metadata support, despite name/symbol/tokenURI.
 Standard wallet/marketplace interoperability is therefore incomplete; existing
 transferFrom callers must check that recipients can control the position.
-Full interface work is awaiting the user's decision because it adds transfer
-callbacks and individual-NFT permission behavior. See NFT-INTERFACE-PROPOSAL.md.
+Those findings describe the source at this review's baseline. The user later
+approved the interface work; [safe transfers and individual approvals are now
+implemented](../2026-09-06-nft-interface/REVIEW.md), with passing ERC-721 interface
+checks and behavioral tests. Existing deployed NFTs retain their original code.
 
 Free transferable empty NFTs exposed two gas-growth paths, corrected by AUD-19
 and AUD-21. The owner principal cache is checked against positions after transfers,

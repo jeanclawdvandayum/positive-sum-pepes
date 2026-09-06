@@ -16,6 +16,10 @@ import { useEthUsd } from '../lib/useEthUsd'
 import { parseTopUpAmount, topUpPosition, type TopUpStep } from '../lib/stakeTopUp'
 import { userFacingRpcError } from '../lib/rpcErrors'
 import PositionTopUp from './PositionTopUp'
+import PositionNftControls from './PositionNftControls'
+import { useRpcReads } from '../lib/useRpcReads'
+import { useNftReinvestment } from '../lib/useNftReinvestment'
+import type { NftVersion } from '../lib/nftPermissions'
 
 /// One card per staked pepe. Rows: art · amount + value · unlock state ·
 /// [cancel-request|withdraw] · [claim – X mixETH] [reinvest].
@@ -46,6 +50,7 @@ export function PepeCard({
   pending,
   isFlat,
   approved,
+  nftVersion,
   walletBalance,
   onDone,
 }: {
@@ -55,6 +60,7 @@ export function PepeCard({
   pending: bigint | undefined
   isFlat: boolean
   approved: boolean | undefined
+  nftVersion: NftVersion
   walletBalance: bigint | undefined
   onDone: () => void
 }) {
@@ -63,6 +69,12 @@ export function PepeCard({
   const ethUsd = useEthUsd()
   const [step, setStep] = useState<CardStep>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [nftBusy, setNftBusy] = useState(false)
+  const [nftRefresh, setNftRefresh] = useState(0)
+  const [tokenApproved] = useRpcReads([{ to: round.staker, abi: stakerAbi, functionName: 'getApproved', args: [entry.id] }], nftVersion === 1, 6000, nftRefresh)
+  const approvedForPepe = approved === true || (typeof tokenApproved === 'string' && tokenApproved.toLowerCase() === ADDRESSES.reinvestor.toLowerCase())
+  const nftReinvestment = useNftReinvestment(round.staker, nftVersion)
+  const refreshNft = () => { setNftRefresh(key => key + 1); onDone() }
   const [topUpOpen, setTopUpOpen] = useState(false)
   const [topUpAmount, setTopUpAmount] = useState('')
   const [topUpStep, setTopUpStep] = useState<TopUpStep | undefined>()
@@ -94,12 +106,12 @@ export function PepeCard({
   const valueMix = round.marginalPrice ? (amount * round.marginalPrice) / 10n ** 18n : undefined
   const valueUsd = valueMix !== undefined && ethUsd ? (Number(valueMix) / 1e18) * ethUsd : undefined
 
-  const busy = step === 'tx' || topUpStep !== undefined
+  const busy = step === 'tx' || topUpStep !== undefined || nftBusy
   const canWithdraw = amount > 0n && (isFlat || decayed)
   const canCancel = decaying && amount > 0n
   const canRequest = entry.withdrawing === false && amount > 0n && !isFlat
   const canClaim = isConnected && pending !== undefined && pending > 0n
-  const canReinvest = canClaim && entry.withdrawing === false && round.reinvestorReady && !isFlat
+  const canReinvest = nftVersion !== undefined && canClaim && entry.withdrawing === false && round.reinvestorReady && !isFlat
   const topUpBlocked = isFlat || (round.mode !== undefined && round.mode >= 2)
     ? 'This round has ended; top-ups are closed.'
     : decaying ? 'Choose “keep staking” to cancel withdrawal before adding PSP.'
@@ -174,20 +186,14 @@ export function PepeCard({
   async function reinvest() {
     setError(null)
     try {
-      if (!approved) {
-        setStep('tx')
-        await writeContractAsync({
-          address: round.staker!,
-          abi: stakerAbi,
-          functionName: 'setApprovalForAll',
-          args: [ADDRESSES.reinvestor, true],
-        })
-      }
       setStep('tx')
+      await nftReinvestment.prepare([id])
+      setNftRefresh(key => key + 1)
       const key = buildPoolKey(round.mix!, round.token!, round.hook!)
       const fees = await rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as bigint
       if (fees < MIN_BUY_INPUT) throw new Error('Reinvest requires at least 0.005 mixETH in accrued fees.')
       const quote = await rpcCall(round.hook!, hookAbi, 'getBuyOutput', [fees]) as bigint
+      nftReinvestment.assertSession()
       await writeContractAsync({
         address: ADDRESSES.reinvestor,
         abi: reinvestorAbi,
@@ -287,10 +293,18 @@ export function PepeCard({
         </button>
         {round.reinvestorReady && (
           <button className="st-btn text-xs" disabled={busy || !canReinvest} onClick={reinvest}>
-            {step === 'done' ? '✓' : busy ? 'confirm…' : approved ? '↻ reinvest' : 'approve & reinvest'}
+            {step === 'done' ? '✓' : busy ? 'confirm…' : approvedForPepe ? '↻ reinvest' : 'approve & reinvest'}
           </button>
         )}
       </div>
+
+      {round.reinvestorReady && !approvedForPepe && <p className="text-[10px] text-text-lo">
+        {nftVersion === 1 ? 'Approve this Pepe for reinvestment. Permission covers its transfers and fee claims.'
+          : nftVersion === 0 ? 'This older round requires approval for all your Pepes: transfers and fee claims.' : 'Checking approval support…'}
+      </p>}
+      {round.staker && <PositionNftControls staker={round.staker} roundId={round.id} id={id} amount={amount}
+        version={nftVersion} approved={tokenApproved as `0x${string}` | undefined} approvedAll={approved}
+        disabled={busy} onBusy={setNftBusy} onDone={refreshNft} />}
 
       {error && <div className="break-words text-[10px] text-phase-critical">{error}</div>}
     </div>
@@ -303,6 +317,7 @@ export default function PepeCards({
   pendings,
   vest,
   approved,
+  nftVersion,
   walletBalance,
   onDone,
 }: {
@@ -311,6 +326,7 @@ export default function PepeCards({
   pendings: Map<bigint, bigint | undefined>
   vest: bigint | undefined
   approved: boolean | undefined
+  nftVersion: NftVersion
   walletBalance: bigint | undefined
   onDone: () => void
 }) {
@@ -327,6 +343,7 @@ export default function PepeCards({
           pending={pendings.get(e.id)}
           isFlat={isFlat}
           approved={approved}
+          nftVersion={nftVersion}
           walletBalance={walletBalance}
           onDone={onDone}
         />

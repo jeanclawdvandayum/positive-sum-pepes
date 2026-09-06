@@ -42,6 +42,8 @@ export const controllerAbi = parseAbi([
 
 /// PSPStaker — ERC-721 staking positions + pepe art (2026-08-22).
 export const stakerAbi = parseAbi([
+  'function NFT_INTERFACE_VERSION() view returns (uint256)',
+  'function supportsInterface(bytes4 interfaceId) pure returns (bool)',
   'function positions(uint256) view returns (uint256 amount, uint256 startEpoch, uint256 requestEpoch, uint256 creditCheckpoint, uint256 feesPaid)',
   'function pendingFeesOf(uint256 pepeId) view returns (uint256)',
   'function pendingFeesMixETH() view returns (uint256)',
@@ -71,8 +73,14 @@ export const stakerAbi = parseAbi([
   'function claimFeesTo(uint256 pepeId, address to)',
   'function claimAllTo(uint256[] pepeIds, address to)',
   'function setApprovalForAll(address operator, bool approved)',
+  'function approve(address approved, uint256 tokenId)',
+  'function getApproved(uint256 tokenId) view returns (address)',
   'function isApprovedForAll(address owner, address operator) view returns (bool)',
   'function transferFrom(address from, address to, uint256 tokenId)',
+  'function safeTransferFrom(address from, address to, uint256 tokenId)',
+  'function safeTransferFrom(address from, address to, uint256 tokenId, bytes data)',
+  'event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId)',
+  'event ApprovalForAll(address indexed owner, address indexed operator, bool approved)',
   'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
   'event Locked(address indexed user, uint256 indexed pepeId, uint256 amount)',
   'event Withdrawn(address indexed user, uint256 indexed pepeId, uint256 amount)',

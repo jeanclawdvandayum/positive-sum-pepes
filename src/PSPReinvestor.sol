@@ -54,7 +54,7 @@ contract PSPReinvestor is ReentrancyGuard {
         address owner = staker.ownerOf(pepeId);
         // AUD-9: approving this contract does not authorize strangers to
         // choose a victim's trade timing or slippage (or mix owners in a batch).
-        if (msg.sender != owner && !staker.isApprovedForAll(owner, msg.sender)) revert Unauthorized();
+        _requireAuthorized(owner, pepeId);
         // fail fast: stakeFor reverts on a decaying position (RequestActive) —
         // surface that BEFORE the claim+buy legs run
         if (staker.isWithdrawing(pepeId)) revert NothingToReinvest();
@@ -89,9 +89,9 @@ contract PSPReinvestor is ReentrancyGuard {
     ) external nonReentrant {
         if (pepeIds.length == 0 || pepeIds.length > 64) revert InvalidBatch();
         address owner = staker.ownerOf(pepeIds[0]);
-        if (msg.sender != owner && !staker.isApprovedForAll(owner, msg.sender)) revert Unauthorized();
         for (uint256 i; i < pepeIds.length; ++i) {
             if (staker.ownerOf(pepeIds[i]) != owner) revert Unauthorized();
+            _requireAuthorized(owner, pepeIds[i]);
             for (uint256 j; j < i; ++j) if (pepeIds[i] == pepeIds[j]) revert InvalidBatch();
         }
         uint256 mixBefore = mix.balanceOf(address(this));
@@ -123,5 +123,12 @@ contract PSPReinvestor is ReentrancyGuard {
         if (left > pspBefore && left > 1e3) revert DustStranded(left);
 
         emit ReinvestedAll(owner, pepeIds.length, mixIn, bought);
+    }
+
+    /// @dev Approving the wrapper never authorizes an unrelated caller. An
+    /// individual external operator must be approved for every batched Pepe.
+    function _requireAuthorized(address owner, uint256 pepeId) private view {
+        if (msg.sender != owner && !staker.isApprovedForAll(owner, msg.sender)
+            && staker.getApproved(pepeId) != msg.sender) revert Unauthorized();
     }
 }

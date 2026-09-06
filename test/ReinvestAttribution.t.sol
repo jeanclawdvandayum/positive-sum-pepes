@@ -46,6 +46,72 @@ contract ReinvestAttributionTest is RealV4Base {
     function test_OwnerBatchReinvestCreditsSeatsEventsReferralsAndPot() public { _exercise(true, false); }
     function test_OperatorBatchReinvestCreditsOwnerNotCallerOrOrigin() public { _exercise(true, true); }
 
+    function test_IndividualWrapperApprovalReinvestsOnlyItsPepe() public {
+        vm.startPrank(bob);
+        staking.setApprovalForAll(address(reinvestor), false);
+        staking.approve(address(reinvestor), ownerId);
+        vm.stopPrank();
+        _exercise(false, false);
+    }
+
+    function test_IndividualExternalOperatorCanReinvestWithoutCollectionApproval() public {
+        vm.startPrank(bob);
+        staking.setApprovalForAll(operator, false);
+        staking.approve(operator, ownerId);
+        vm.stopPrank();
+        _exercise(false, true);
+    }
+
+    function test_IndividualApprovalCannotAuthorizeAnotherBatchEntry() public {
+        vm.startPrank(bob);
+        staking.lockWithPepe(0, 888);
+        staking.setApprovalForAll(operator, false);
+        staking.approve(operator, ownerId);
+        vm.stopPrank();
+        uint256[] memory ids = new uint256[](2);
+        ids[0] = ownerId; ids[1] = 888;
+        uint256 fees = staking.pendingFeesOf(ownerId);
+        uint256 tickets = hook.ticketCount();
+        vm.prank(operator); vm.expectRevert(PSPReinvestor.Unauthorized.selector);
+        reinvestor.reinvestAll(ids, poolKey, 1, block.timestamp);
+        assertEq(staking.pendingFeesOf(ownerId), fees);
+        assertEq(hook.ticketCount(), tickets);
+    }
+
+    function test_TransferCarriesFeesAndRevokesOldClaimPermission() public {
+        vm.prank(bob); staking.requestWithdraw(ownerId);
+        zapIn.buyWithMix(poolKey, 2e18, 1, block.timestamp);
+        uint256 fees = staking.pendingFeesOf(ownerId);
+        assertGt(fees, 0);
+        vm.startPrank(bob);
+        staking.approve(operator, ownerId);
+        staking.safeTransferFrom(bob, alice, ownerId);
+        vm.stopPrank();
+        assertEq(staking.pendingFeesOf(ownerId), fees);
+        vm.prank(bob); vm.expectRevert(PSPStaker.NotNftOwner.selector); staking.claimFees(ownerId);
+        vm.prank(operator); vm.expectRevert(PSPStaker.NotNftOwner.selector); staking.claimFees(ownerId);
+        uint256 balance = mixETH.balanceOf(alice);
+        vm.prank(alice); staking.claimFees(ownerId);
+        assertEq(mixETH.balanceOf(alice) - balance, fees);
+        assertTrue(staking.isWithdrawing(ownerId));
+    }
+
+    function test_IndividualFeeClaimsAreScopedAndRevocable() public {
+        zapIn.buyWithMix(poolKey, 2e18, 1, block.timestamp);
+        vm.startPrank(bob);
+        staking.setApprovalForAll(operator, false);
+        staking.approve(operator, ownerId);
+        vm.stopPrank();
+        uint256 fees = staking.pendingFeesOf(ownerId);
+        uint256 before = mixETH.balanceOf(operator);
+        vm.prank(operator); staking.claimFeesTo(ownerId, operator);
+        assertEq(mixETH.balanceOf(operator) - before, fees);
+        vm.prank(operator); vm.expectRevert(PSPStaker.NotNftOwner.selector); staking.claimFees(777);
+        zapIn.buyWithMix(poolKey, 2e18, 1, block.timestamp);
+        vm.prank(bob); staking.approve(address(0), ownerId);
+        vm.prank(operator); vm.expectRevert(PSPStaker.NotNftOwner.selector); staking.claimFees(ownerId);
+    }
+
     function _exercise(bool batch, bool viaOperator) internal {
         uint256[] memory ids = new uint256[](batch ? 2 : 1);
         ids[0] = ownerId;

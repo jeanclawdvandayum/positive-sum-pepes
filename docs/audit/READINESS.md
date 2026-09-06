@@ -1,10 +1,10 @@
 # Audit preparation — September 2026
 
 This is a review packet for the current source tree, not a security certification.
-Final local gates: **437 Solidity tests / 60 suites**, including 64 invariant runs
-and 2,048 calls per real-V4 handler with zero reverts; an additional three-wallet
-campaign passed 256 runs / 32,768 calls and complete exits; **68 frontend tests**; TypeScript/Vite;
-111 ABI declarations; 32 production size checks; independent oracle and governance
+Final local gates: **450 Solidity tests / 61 suites**, including 64 invariant runs
+and 2,048 calls per real-V4 handler with zero reverts; the previous hardening
+revision also passed a 256-run / 32,768-call three-wallet campaign and complete exits; **77 frontend tests**; TypeScript/Vite;
+119 ABI declarations; 32 production size checks; independent oracle and governance
 gates. Static-analysis flags remain triaged separately. See GATE-LOG.md.
 A fresh Base Sepolia release is deployed and configured in the local frontend.
 See [TESTNET-PLAYTEST.md](TESTNET-PLAYTEST.md) for the running app, release manifest,
@@ -19,7 +19,9 @@ events/seats are immutable and are not silently relabeled as repaired history.
 The AUD-16 through AUD-21 hardening is also prepared in source only and requires
 fresh contracts. See the [September 6 review](2026-09-06-hardening/REVIEW.md)
 for the six confirmed fixes, reproductions, static triage and review limits.
-The separate full ERC-721 interface proposal awaits the user's decision.
+The user subsequently approved the full ERC-721 interface. Safe transfers, individual
+transfer/fee approvals and frontend controls are implemented in source; see the
+[NFT interface review](2026-09-06-nft-interface/REVIEW.md). These also require fresh contracts.
 
 ## Binding game rules (2026-09-05 approval)
 
@@ -89,7 +91,9 @@ installed viem produces identical bytes and the correct uint24 0x800000 flag.
 The ABI gate pins this behavior and checks declared functions/events against artifacts.
 
 Latest static detector inventory and manual triage:
-[September 6 static review](2026-09-06-hardening/STATIC-ANALYSIS.md).
+[NFT interface static review](2026-09-06-nft-interface/REVIEW.md).
+The [earlier September 6 static review](2026-09-06-hardening/STATIC-ANALYSIS.md)
+contains the unchanged detector-family triage.
 Earlier inventories remain in [STATIC-ANALYSIS.md](STATIC-ANALYSIS.md).
 Dependency review: [DEPENDENCIES.md](DEPENDENCIES.md), including the remaining
 moderate decoder advisory in the wallet stack. Compounding controls also verify
@@ -156,8 +160,11 @@ all stakes and redeems all supply at each campaign’s end.
 5. Factory owner powers: descriptor, future curve configuration, HTML and reservation
    cancellation remain privileged. Clock death authority has no governance voting,
    but that does not mean the whole deployment has no admin surface.
-6. Reinvestor approval is a broad NFT operator approval. Only owners or their explicitly
-   approved operators may call the wrapper. Legacy third-party automation must change;
+6. Reinvestor approval can cover an individual NFT or the whole collection. The
+   upgraded UI uses individual approvals; legacy rounds use collection approval.
+   Only owners or explicitly approved callers may invoke the wrapper, with every
+   batch entry checked. Both approval types permit transfers and fee claims.
+   Legacy third-party automation must change;
    the root Keeper.ts now fails immediately with migration instructions; archived
    code also fails closed. The current release has no autonomous yield keeper.
 7. Canonical mixETH behavior and backing must be assessed on the actual production

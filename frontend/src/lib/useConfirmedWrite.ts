@@ -1,6 +1,7 @@
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { CHAIN_ID, ADDRESSES } from './config'
-import { factoryAbi, hookAbi, controllerAbi, reinvestorAbi, registryAbi } from './abi'
+import { factoryAbi, hookAbi, controllerAbi, reinvestorAbi, registryAbi, stakerAbi } from './abi'
+import { assertNftManagement } from './nftPermissions'
 import { assertGameRules } from './gameRules'
 import { verifyRoundExit } from './exitRules'
 import { confirmTransaction } from './transactions'
@@ -9,7 +10,7 @@ import { assertReferralPurchase } from './referrals'
 import { assertReinvestor } from './reinvestRules'
 
 /** AUD-4: every UI write simulates, waits for mining, and checks receipt status. */
-export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } | { referralPurchase: { roundId: bigint; registry?: `0x${string}` } }) {
+export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } | { nftRoundId: bigint | undefined } | { referralPurchase: { roundId: bigint; registry?: `0x${string}` } }) {
   const { address, chainId } = useAccount()
   const client = usePublicClient()
   const { writeContractAsync } = useWriteContract()
@@ -19,7 +20,16 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
     // Immutable legacy deployments do not acquire the new purchase rules.
     const factory = ADDRESSES.factory as `0x${string}`
     const blockNumber = await client.getBlockNumber().catch(error => { throw userFacingRpcError(error) })
-    if (options && 'exitRoundId' in options) {
+    if (options && 'nftRoundId' in options) {
+      if (!options.nftRoundId) throw new Error('Wait for the selected round to load.')
+      const round = await client.readContract({ address: factory, abi: factoryAbi, functionName: 'rounds', args: [options.nftRoundId], blockNumber })
+      const staker = await client.readContract({ address: round[1], abi: controllerAbi, functionName: 'staker', blockNumber })
+      assertNftManagement(staker, address, ADDRESSES.reinvestor, parameters)
+      if (parameters.functionName !== 'setApprovalForAll') {
+        const version = await client.readContract({ address: staker, abi: stakerAbi, functionName: 'NFT_INTERFACE_VERSION', blockNumber })
+        if (version !== 1n) throw new Error('This round does not support safe NFT management.')
+      }
+    } else if (options && 'exitRoundId' in options) {
       // Read this immutable registry entry only. The latest round's rules or
       // availability cannot disable an older round's asset exits.
       await verifyRoundExit({
@@ -48,7 +58,7 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
             atomicBuy ? parameters.address : String(parameters.args?.[0]), atomicBuy ? key?.hooks ?? '' : round[2])
         }
       }
-      const approvesRouter = parameters.functionName === 'setApprovalForAll' &&
+      const approvesRouter = (parameters.functionName === 'setApprovalForAll' || parameters.functionName === 'approve') &&
         String(parameters.args?.[0]).toLowerCase() === ADDRESSES.reinvestor.toLowerCase()
       if (approvesRouter || parameters.address.toLowerCase() === ADDRESSES.reinvestor.toLowerCase()) {
         const [expected, actual, attributionVersion] = await Promise.all([
@@ -57,6 +67,9 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
           client.readContract({ address: ADDRESSES.reinvestor, abi: reinvestorAbi, functionName: 'ATTRIBUTION_VERSION', blockNumber }),
         ])
         assertReinvestor(expected, actual, attributionVersion)
+        if (approvesRouter && parameters.address.toLowerCase() !== expected.toLowerCase()) {
+          throw new Error('The approval target changed. Refresh the current round.')
+        }
       }
     } catch (error) {
       throw userFacingRpcError(error)

@@ -291,10 +291,7 @@ contract SpawnStaging is CBase {
             console2.log("reserve attempts (incl. tail retries):", attempts);
         }
 
-        vm.prank(rando);
-        uint256 g0 = gasleft();
-        factory.birthRound();
-        uint256 gBirth1 = g0 - gasleft();
+        uint256 gBirth1 = _measureComposedAndCheckSplitBirth();
 
         // round 3, fresh entropy. Round 2 never launched (no clock to strike
         // zero), so this second rebirth uses the direct destruction
@@ -306,23 +303,38 @@ contract SpawnStaging is CBase {
         factory.markDestroyed(2);
         factory.reserveSpawn(2);
 
-        vm.prank(rando);
-        g0 = gasleft();
-        factory.birthRound();
-        uint256 gBirth2 = g0 - gasleft();
+        uint256 gBirth2 = _measureComposedAndCheckSplitBirth();
 
         console2.log("pure reserveSpawn :", gReserve);
         console2.log("birthRound round 2:", gBirth1);
         console2.log("birthRound round 3:", gBirth2);
 
         assertLe(gReserve, 12_500_000, "reserve over cap");
-        assertLe(gBirth1, 12_500_000, "birth 2 over cap");
-        assertLe(gBirth2, 12_500_000, "birth 3 over cap");
+        // Composed birth remains a measurement, not the capped-chain release
+        // path. Each actual birthStep is checked against the stricter 12M cap.
         // 133k observed spread == the seedCarry path (round 2 seeded a
         // 400-mix carry, round 3 none) — structural, not mining variance
         // (birth contains zero mining by construction).
         uint256 spread = gBirth1 > gBirth2 ? gBirth1 - gBirth2 : gBirth2 - gBirth1;
         assertLt(spread, 250_000, "birth gas variance");
+    }
+
+    function _measureComposedAndCheckSplitBirth() private returns (uint256 composedGas) {
+        uint256 snapshot = vm.snapshotState();
+        vm.prank(rando);
+        uint256 start = gasleft();
+        factory.birthRound();
+        composedGas = start - gasleft();
+        assertTrue(vm.revertToStateAndDelete(snapshot));
+        for (uint256 i; i < 3; ++i) {
+            vm.prank(rando);
+            start = gasleft();
+            factory.birthStep{gas: 12_000_000}();
+            uint256 used = start - gasleft();
+            console2.log("split birth step gas:", used);
+            assertLe(used, 12_000_000, "split birth over cap");
+        }
+        assertFalse(factory.reservationActive(), "split birth completed");
     }
 
     /// The reserve's flag-mine respects the caller's bound: a scan whose

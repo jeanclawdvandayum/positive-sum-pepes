@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ERC721Utils} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol";
 
 import {ICurveHook} from "./interfaces/ICurveHook.sol";
 import {IRoundController} from "./interfaces/IRoundController.sol";
@@ -63,6 +64,7 @@ contract PSPStaker is ReentrancyGuard {
 
     // ─────────────── Events ───────────────
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+    event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
     event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
 
     event Locked(address indexed user, uint256 indexed pepeId, uint256 amount);
@@ -156,6 +158,8 @@ contract PSPStaker is ReentrancyGuard {
     // ─────────────── ERC-721 state ───────────────
     string public constant name = "Positive Sum Pepe Position";
     string public constant symbol = "PSPP";
+    /// @notice Full safe-transfer and individual transfer/fee approval support.
+    uint256 public constant NFT_INTERFACE_VERSION = 1;
     uint256 public nextTokenId = 1;
     mapping(uint256 => address) private _ownerOf;
     // AUD-19: contiguous minted runs store end at start and start at end.
@@ -168,6 +172,7 @@ contract PSPStaker is ReentrancyGuard {
     mapping(address => uint256) private _stakedByOwner;
     mapping(uint256 => uint256) private _ownedIndex; // id => position in _owned
     mapping(address => mapping(address => bool)) private _operator;
+    mapping(uint256 => address) private _tokenApproval;
 
     // ─────────────── Pepe art state ───────────────
     /// @dev PepeDescriptor (SVG + metadata), wired at construction via the
@@ -185,7 +190,7 @@ contract PSPStaker is ReentrancyGuard {
     // ─────────────── ERC-165 / ERC-721 surface ───────────────
 
     function supportsInterface(bytes4 id) external pure returns (bool) {
-        return id == 0x80ac58cd || id == 0x01ffc9a7; // ERC-721, ERC-165
+        return id == 0x80ac58cd || id == 0x01ffc9a7 || id == 0x5b5e139f; // ERC-721, ERC-165, metadata
     }
 
     function ownerOf(uint256 tokenId) external view returns (address) {
@@ -195,6 +200,7 @@ contract PSPStaker is ReentrancyGuard {
     }
 
     function balanceOf(address owner) external view returns (uint256) {
+        if (owner == address(0)) revert ZeroAddress();
         return _owned[owner].length;
     }
 
@@ -226,11 +232,26 @@ contract PSPStaker is ReentrancyGuard {
 
     function tokenURI(uint256 tokenId) external view returns (string memory) {
         if (_ownerOf[tokenId] == address(0)) revert NotNftOwner();
+        if (descriptor == address(0)) return "";
         return IPepeDescriptor(descriptor).tokenURI(dnaOf(tokenId));
     }
 
-    /// @dev per-token approvals dropped (EIP-170): operator approvals remain
-    ///      — the only path marketplaces (Seaport) use.
+    /// @notice Approve transfers and fee claims for one Pepe; zero revokes.
+    /// @dev An individually approved account cannot delegate its permission.
+    function approve(address approved, uint256 tokenId) external {
+        address owner = _ownerOf[tokenId];
+        if (owner == address(0)) revert NotNftOwner();
+        if (msg.sender != owner && !_operator[owner][msg.sender]) revert NotAuthorizedNft();
+        _tokenApproval[tokenId] = approved;
+        emit Approval(owner, approved, tokenId);
+    }
+
+    function getApproved(uint256 tokenId) external view returns (address) {
+        if (_ownerOf[tokenId] == address(0)) revert NotNftOwner();
+        return _tokenApproval[tokenId];
+    }
+
+    /// @notice Approve transfers and fee claims across all the owner's Pepes.
     function setApprovalForAll(address operator, bool approved) external {
         _operator[msg.sender][operator] = approved;
         emit ApprovalForAll(msg.sender, operator, approved);
@@ -243,10 +264,32 @@ contract PSPStaker is ReentrancyGuard {
     /// @notice Transfer a pepe NFT — moves principal + fee state + decay
     ///         clock together. Multi-position: no recipient constraints.
     function transferFrom(address from, address to, uint256 tokenId) external nonReentrant {
+        _transfer(from, to, tokenId);
+    }
+
+    /// @notice Transfer a position only if a contract recipient accepts ERC-721s.
+    function safeTransferFrom(address from, address to, uint256 tokenId) external nonReentrant {
+        _transfer(from, to, tokenId);
+        ERC721Utils.checkOnERC721Received(msg.sender, from, to, tokenId, "");
+    }
+
+    /// @notice Safe transfer with recipient callback data.
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data) external nonReentrant {
+        _transfer(from, to, tokenId);
+        ERC721Utils.checkOnERC721Received(msg.sender, from, to, tokenId, data);
+    }
+
+    /// @dev Complete ownership, enumeration and approval effects before any
+    /// receiver callback. The shared guard prevents nested financial/transfer
+    /// writes; rejection rolls back all effects, including approval clearing.
+    function _transfer(address from, address to, uint256 tokenId) private {
         if (to == address(0) || to == address(this)) revert BadNftTransfer();
         address o = _ownerOf[tokenId];
         if (o == address(0) || o != from) revert NotNftOwner();
-        if (msg.sender != from && !_operator[from][msg.sender]) revert NotAuthorizedNft();
+        if (msg.sender != from && !_operator[from][msg.sender] && _tokenApproval[tokenId] != msg.sender) {
+            revert NotAuthorizedNft();
+        }
+        delete _tokenApproval[tokenId];
 
         uint256 principal = positions[tokenId].amount;
         _stakedByOwner[from] -= principal;
@@ -731,10 +774,14 @@ contract PSPStaker is ReentrancyGuard {
         if (_ownerOf[pepeId] != msg.sender) revert NotNftOwner();
     }
 
-    /// @dev owner OR approved-for-all operator (the reinvestor flow).
+    /// @dev Individual and collection operators can transfer or claim fees.
+    /// Withdrawal requests, cancellation and principal withdrawal stay owner-only.
     function _requireAuthorized(uint256 pepeId) private view {
         address owner = _ownerOf[pepeId];
-        if (owner != msg.sender && !_operator[owner][msg.sender]) revert NotNftOwner();
+        if (owner == address(0) ||
+            (owner != msg.sender && !_operator[owner][msg.sender] && _tokenApproval[pepeId] != msg.sender)) {
+            revert NotNftOwner();
+        }
     }
 
     // ─────────────── Registry oracle views ───────────────

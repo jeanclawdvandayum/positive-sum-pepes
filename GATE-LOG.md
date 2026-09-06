@@ -676,3 +676,45 @@ Solidity source changed after the contract-source hash above.
   the user's decision. No contracts were deployed and no wallet transactions
   were sent. Existing deployments require fresh contracts to receive these fixes;
   their balances, NFTs, history and creation code remain unchanged.
+
+## 2026-09-06 — Approved NFT safe transfers and individual approvals
+
+- Implements the user's explicit approval of NFT-INTERFACE-PROPOSAL: both safe
+  transfer overloads, approve/getApproved/Approval, metadata interface, zero-owner
+  balance rejection and per-token approval clearing on all transfers. Position
+  principal, accrued fees and withdrawal state follow the owner. OpenZeppelin
+  receiver checks execute after state changes under the shared financial guard.
+- Individual approvals also authorize fee claims and scoped reinvestor calls.
+  Every batched NFT requires the same owner and caller authorization. Withdrawal
+  management stays owner-only; approval-for-all remains available; no NFT burn or
+  safe-mint change. Unknown IDs revert; descriptor-free NFTs return an empty URI.
+- UI single/batch reinvestment uses individual permissions on upgraded stakers,
+  verifies each receipt and rechecks wallet/ownership/approvals between prompts.
+  Position controls offer safe transfer with recipient review and individual or
+  reinvestor collection revocation. Capability failures stay disabled; legacy
+  rounds retain their explicitly labeled approval-for-all flow. NFT management
+  binds to a registered round independently of current trade rules.
+- `bash scripts/check-audit.sh`: **450/450 Solidity tests, 61 suites**;
+  **77/77 frontend tests**, **119 ABI declarations**, **32 production size checks**;
+  oracle, governance, TypeScript/Vite all pass. New 256-case transfer fuzz executes
+  32 transfers/approvals per case with independent ownership and principal totals.
+  Existing real-V4 stateful campaigns pass with 64 runs / 2,048 calls and zero reverts.
+- Initial gate failures resolved: a new test had sampled fees before the automatic
+  payout in requestWithdraw; reordered the actual actions to generate fees during
+  withdrawal and prove they follow transfer. Historical composed-birth gas canary
+  now records 12,623,711 / 12,616,411 gas and validates the supported split path
+  under the unchanged stricter 12M per-call cap: 6,155,471 / 6,276,997 / 189,213 gas.
+  Variance/reservation checks remain. No production gas cap was raised.
+- Production-only static build: Slither 0.11.6, 160 contracts, 102 detectors;
+  **243 flags** (10 High / 52 Medium / 64 Low / 115 Info / 2 Opt). The sole added
+  low flag is the <=64-item reinvestment permission read loop; manually reviewed.
+  ERC-721 checker passes every required function and event/index check. Staker
+  runtime **13,133**, StakerDeployer **14,352**, Reinvestor **4,786** bytes; other
+  production budgets remain green. See docs/audit/2026-09-06-nft-interface/REVIEW.md.
+- Browser checked new transfer review and revocation controls with a local mock
+  wallet fixture, plus the legacy notice; rebuilt local stake page remains usable.
+  Temporary fixture removed and TypeScript/Vite rebuilt. No live signatures,
+  transactions or deployment occurred. Requires new factory/deployers and a
+  second-pass reinvestor; the existing testnet NFTs remain unchanged.
+- Source SHA-256 (sorted src/**/*.sol path + NUL + contents):
+  `8f27c8742190b1a86456e62fd1f5a373dd2b7ef26c2d71214530056e4b5d44a9`.

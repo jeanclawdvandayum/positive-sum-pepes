@@ -1,0 +1,998 @@
+detector,severity,confidence,description
+arbitrary-send-erc20,High,High,"PSPReferralRegistry.unlockCallback(bytes) (src/PSPReferralRegistry.sol#161-180) uses arbitrary from in transferFrom: IERC20(Currency.unwrap(mix)).safeTransferFrom(p.buyer,msg.sender,p.mixIn) (src/PSPReferralRegistry.sol#169)"
+arbitrary-send-eth,High,Medium,"PSPZapOut.zapOut(PoolKey,uint256,uint256,uint256) (src/PSPZapOut.sol#55-85) sends eth to arbitrary user
+	Dangerous calls:
+	- (ok,None) = msg.sender.call{value: ethOut}() (src/PSPZapOut.sol#83)"
+weak-prng,High,Medium,"PSPStaker._distribute() (src/PSPStaker.sol#752-771) uses a weak PRNG: ""numerator % CREDIT_PRECISION != 0 (src/PSPStaker.sol#763)"""
+reentrancy-balance,High,Medium,"Reentrancy in PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126):
+	External call allowing reentrancy:
+	- staker.claimAllTo(pepeIds,address(this)) (src/PSPReinvestor.sol#98)
+	Balance read before the call:
+	- mixBefore = mix.balanceOf(address(this)) (src/PSPReinvestor.sol#97)
+	Possible stale balance used after the call in a condition:
+	- mixIn < GameRules.MIN_BUY (src/PSPReinvestor.sol#100)
+		- stale variable `mixIn`"
+reentrancy-balance,High,Medium,"Reentrancy in PSPReinvestor.reinvest(uint256,PoolKey,uint256,uint256) (src/PSPReinvestor.sol#53-80):
+	External call allowing reentrancy:
+	- zapIn.buyWithMixFor(key,mixIn,minPspOut,deadline,owner) (src/PSPReinvestor.sol#68)
+	Balance read before the call:
+	- pspBefore = psp.balanceOf(address(this)) (src/PSPReinvestor.sol#67)
+	Possible stale balance used after the call in a condition:
+	- left > pspBefore && left > 1e3 (src/PSPReinvestor.sol#77)
+		- stale variable `pspBefore`"
+reentrancy-balance,High,Medium,"Reentrancy in PSPReinvestor.reinvest(uint256,PoolKey,uint256,uint256) (src/PSPReinvestor.sol#53-80):
+	External call allowing reentrancy:
+	- staker.claimFeesTo(pepeId,address(this)) (src/PSPReinvestor.sol#63)
+	Balance read before the call:
+	- mixBefore = mix.balanceOf(address(this)) (src/PSPReinvestor.sol#62)
+	Possible stale balance used after the call in a condition:
+	- mixIn < GameRules.MIN_BUY (src/PSPReinvestor.sol#65)
+		- stale variable `mixIn`"
+reentrancy-balance,High,Medium,"Reentrancy in PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126):
+	External call allowing reentrancy:
+	- staker.stakeFor(owner,pepeIds[i_scope_1],share) (src/PSPReinvestor.sol#119)
+	Balance read before the call:
+	- pspBefore = psp.balanceOf(address(this)) (src/PSPReinvestor.sol#112)
+	Possible stale balance used after the call in a condition:
+	- left > pspBefore && left > 1e3 (src/PSPReinvestor.sol#123)
+		- stale variable `pspBefore`"
+reentrancy-balance,High,Medium,"Reentrancy in PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126):
+	External call allowing reentrancy:
+	- zapIn.buyWithMixFor(key,mixIn,minPspOut,deadline,owner) (src/PSPReinvestor.sol#113)
+	Balance read before the call:
+	- pspBefore = psp.balanceOf(address(this)) (src/PSPReinvestor.sol#112)
+	Possible stale balance used after the call in a condition:
+	- left > pspBefore && left > 1e3 (src/PSPReinvestor.sol#123)
+		- stale variable `pspBefore`"
+reentrancy-balance,High,Medium,"Reentrancy in PSPReinvestor.reinvest(uint256,PoolKey,uint256,uint256) (src/PSPReinvestor.sol#53-80):
+	External call allowing reentrancy:
+	- staker.stakeFor(owner,pepeId,bought) (src/PSPReinvestor.sol#74)
+	Balance read before the call:
+	- pspBefore = psp.balanceOf(address(this)) (src/PSPReinvestor.sol#67)
+	Possible stale balance used after the call in a condition:
+	- left > pspBefore && left > 1e3 (src/PSPReinvestor.sol#77)
+		- stale variable `pspBefore`"
+uninitialized-state,High,High,"PSPStaker.biasAdd (src/PSPStaker.sol#115) is never initialized. It is used in:
+	- PSPStaker._advance(PSPStaker.GlobalPoint,uint256) (src/PSPStaker.sol#356-369)"
+divide-before-multiply,Medium,Medium,"PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334) performs a multiplication on the result of a division:
+	- base - k * (base / VEST_EPOCHS) (src/PSPStaker.sol#333)"
+divide-before-multiply,Medium,Medium,"PSPStaker._distribute() (src/PSPStaker.sol#752-771) performs a multiplication on the result of a division:
+	- delta = (pendingFeesMixETH * CREDIT_PRECISION) / w (src/PSPStaker.sol#756)
+	- numerator = delta * w (src/PSPStaker.sol#761)"
+divide-before-multiply,Medium,Medium,"CurveMath.slitherConstructorConstantVariables() (src/libraries/CurveMath.sol#22-587) performs a multiplication on the result of a division:
+	- TIMINGS_WIDTH = 256 / TIMINGS_COUNT (src/libraries/CurveMath.sol#542)
+	- TIMINGS_LAYOUT_GUARD = 1 << (TIMINGS_COUNT * TIMINGS_WIDTH - 1) (src/libraries/CurveMath.sol#550)"
+divide-before-multiply,Medium,Medium,"CurveHook._handleBuy(address,PoolKey,SwapParams,uint256,Currency,Currency,address) (src/CurveHook.sol#442-528) performs a multiplication on the result of a division:
+	- units = mixETHInput / MIN_BUY_INPUT (src/CurveHook.sol#477)
+	- newDet = previous + TIME_PER_UNIT * units (src/CurveHook.sol#481)"
+incorrect-equality,Medium,High,"HookDeployer.mineHook(IPoolManager,address,address,CurveMath.CurveConfig,address,uint256) (src/HookDeployer.sol#96-122) uses a dangerous strict equality:
+	- budget == 0 (src/HookDeployer.sol#111)"
+incorrect-equality,Medium,High,"HookDeployer.mineHook(IPoolManager,address,address,CurveMath.CurveConfig,address,uint256) (src/HookDeployer.sol#96-122) uses a dangerous strict equality:
+	- cand.code.length == 0 (src/HookDeployer.sol#117)"
+incorrect-equality,Medium,High,"PSPStaker.claimFeesTo(uint256,address) (src/PSPStaker.sol#665-671) uses a dangerous strict equality:
+	- paid == 0 (src/PSPStaker.sol#669)"
+incorrect-equality,Medium,High,"RoundController.potDeposit(uint256) (src/RoundController.sol#364-373) uses a dangerous strict equality:
+	- actualAmount == 0 (src/RoundController.sol#371)"
+incorrect-equality,Medium,High,"PSPStaker._distribute() (src/PSPStaker.sol#752-771) uses a dangerous strict equality:
+	- pendingFeesMixETH == 0 (src/PSPStaker.sol#753)"
+incorrect-equality,Medium,High,"PSPStaker._creditBeforeEpoch(uint256) (src/PSPStaker.sol#410-419) uses a dangerous strict equality:
+	- lo == feeEpochs.length (src/PSPStaker.sol#418)"
+incorrect-equality,Medium,High,"RoundController._predepositFor(address,uint256) (src/RoundController.sol#310-337) uses a dangerous strict equality:
+	- actualAmount == 0 (src/RoundController.sol#334)"
+incorrect-equality,Medium,High,"PSPStaker._distribute() (src/PSPStaker.sol#752-771) uses a dangerous strict equality:
+	- delta == 0 (src/PSPStaker.sol#757)"
+incorrect-equality,Medium,High,"PSPStaker._distribute() (src/PSPStaker.sol#752-771) uses a dangerous strict equality:
+	- w == 0 (src/PSPStaker.sol#755)"
+incorrect-equality,Medium,High,"RoundController.seedCarry(uint256) (src/RoundController.sol#344-356) uses a dangerous strict equality:
+	- actualAmount == 0 (src/RoundController.sol#352)"
+incorrect-equality,Medium,High,"PSPStaker.claimAllTo(uint256[],address) (src/PSPStaker.sol#674-684) uses a dangerous strict equality:
+	- totalPaid == 0 (src/PSPStaker.sol#682)"
+incorrect-equality,Medium,High,"PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482) uses a dangerous strict equality:
+	- paid == 0 (src/PSPStaker.sol#468)"
+incorrect-equality,Medium,High,"RoundController.mixETHToETH(uint256) (src/RoundController.sol#252-259) uses a dangerous strict equality:
+	- mixETHAmount == 0 (src/RoundController.sol#253)"
+incorrect-equality,Medium,High,"PSPStaker._unscheduleDecay(PSPStaker.Position,PSPStaker.GlobalPoint) (src/PSPStaker.sol#640-654) uses a dangerous strict equality:
+	- p.epoch == r (src/PSPStaker.sol#645)"
+locked-ether,Medium,High,"Contract locking ether found:
+	Contract ControllerDeployer (src/ControllerDeployer.sol#20-183) has payable functions:
+	 - ControllerDeployer.deployController(PSPToken,IERC20,CurveMath.CurveConfig,address,address,StakerDeployer) (src/ControllerDeployer.sol#38-78)
+	 - ControllerDeployer.deployControllerAt(bytes32,PSPToken,IERC20,CurveMath.CurveConfig,address,address,StakerDeployer) (src/ControllerDeployer.sol#88-119)
+	But does not have a function to withdraw the ether"
+reentrancy-no-eth,Medium,Medium,"Reentrancy in PSPFactory.birthStep() (src/PSPFactory.sol#309-323):
+	External calls:
+	- _birthContracts() (src/PSPFactory.sol#313)
+		- t = address(tokenDeployer.deployTokenAt(r.tokenSalt,r.name,r.symbol,address(this))) (src/PSPFactory.sol#423-425)
+		- c = address(controllerDeployer.deployControllerAt(r.controllerSalt,token,mixETH,cfg,address(this),descriptor,stakerDeployer)) (src/PSPFactory.sol#433-437)
+	State variables written after the call(s):
+	- r.phase = PHASE_PERIPHERY (src/PSPFactory.sol#314)
+	PSPFactory.reservation (src/PSPFactory.sol#237) can be used in cross function reentrancies:
+	- PSPFactory._birthContracts() (src/PSPFactory.sol#413-440)
+	- PSPFactory._birthPeriphery() (src/PSPFactory.sol#444-476)
+	- PSPFactory._birthWire() (src/PSPFactory.sol#483-549)
+	- PSPFactory._reserve(uint128,string,string) (src/PSPFactory.sol#354-400)
+	- PSPFactory.birthRound() (src/PSPFactory.sol#336-343)
+	- PSPFactory.birthStep() (src/PSPFactory.sol#309-323)
+	- PSPFactory.reservation (src/PSPFactory.sol#237)
+	- PSPFactory.reservationActive() (src/PSPFactory.sol#325-327)
+	- PSPFactory.reservationPhase() (src/PSPFactory.sol#329-331)
+	- PSPFactory.reserveSpawn(uint256) (src/PSPFactory.sol#273-287)
+	- PSPFactory.voidReservation() (src/PSPFactory.sol#348-351)"
+reentrancy-no-eth,Medium,Medium,"Reentrancy in PSPStaker.withdraw(uint256) (src/PSPStaker.sol#609-637):
+	External calls:
+	- _settleAndPay(pepeId,msg.sender,true) (src/PSPStaker.sol#620)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#478)
+	State variables written after the call(s):
+	- delete isWithdrawing[pepeId] (src/PSPStaker.sol#632)
+	PSPStaker.isWithdrawing (src/PSPStaker.sol#101) can be used in cross function reentrancies:
+	- PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449)
+	- PSPStaker.isWithdrawing (src/PSPStaker.sol#101)
+	- PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334)
+	- PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#811-815)
+	- delete positions[pepeId] (src/PSPStaker.sol#631)
+	PSPStaker.positions (src/PSPStaker.sol#99) can be used in cross function reentrancies:
+	- PSPStaker._accrue(uint256) (src/PSPStaker.sol#456-461)
+	- PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449)
+	- PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482)
+	- PSPStaker.positions (src/PSPStaker.sol#99)
+	- PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334)
+	- PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#811-815)"
+reentrancy-no-eth,Medium,Medium,"Reentrancy in PSPFactory._birthWire() (src/PSPFactory.sol#483-549):
+	External calls:
+	- controller.setHook(hook) (src/PSPFactory.sol#496)
+	- controller.setFactoryRoundId(r.newRoundId) (src/PSPFactory.sol#497)
+	- controller.seedCarry(carry) (src/PSPFactory.sol#510)
+	- poolManager.initialize(key,79228162514264337593543950336) (src/PSPFactory.sol#527)
+	State variables written after the call(s):
+	- reservation.active = false (src/PSPFactory.sol#546)
+	PSPFactory.reservation (src/PSPFactory.sol#237) can be used in cross function reentrancies:
+	- PSPFactory._birthContracts() (src/PSPFactory.sol#413-440)
+	- PSPFactory._birthPeriphery() (src/PSPFactory.sol#444-476)
+	- PSPFactory._birthWire() (src/PSPFactory.sol#483-549)
+	- PSPFactory._reserve(uint128,string,string) (src/PSPFactory.sol#354-400)
+	- PSPFactory.birthRound() (src/PSPFactory.sol#336-343)
+	- PSPFactory.birthStep() (src/PSPFactory.sol#309-323)
+	- PSPFactory.reservation (src/PSPFactory.sol#237)
+	- PSPFactory.reservationActive() (src/PSPFactory.sol#325-327)
+	- PSPFactory.reservationPhase() (src/PSPFactory.sol#329-331)
+	- PSPFactory.reserveSpawn(uint256) (src/PSPFactory.sol#273-287)
+	- PSPFactory.voidReservation() (src/PSPFactory.sol#348-351)
+	- r.phase = 0 (src/PSPFactory.sol#547)
+	PSPFactory.reservation (src/PSPFactory.sol#237) can be used in cross function reentrancies:
+	- PSPFactory._birthContracts() (src/PSPFactory.sol#413-440)
+	- PSPFactory._birthPeriphery() (src/PSPFactory.sol#444-476)
+	- PSPFactory._birthWire() (src/PSPFactory.sol#483-549)
+	- PSPFactory._reserve(uint128,string,string) (src/PSPFactory.sol#354-400)
+	- PSPFactory.birthRound() (src/PSPFactory.sol#336-343)
+	- PSPFactory.birthStep() (src/PSPFactory.sol#309-323)
+	- PSPFactory.reservation (src/PSPFactory.sol#237)
+	- PSPFactory.reservationActive() (src/PSPFactory.sol#325-327)
+	- PSPFactory.reservationPhase() (src/PSPFactory.sol#329-331)
+	- PSPFactory.reserveSpawn(uint256) (src/PSPFactory.sol#273-287)
+	- PSPFactory.voidReservation() (src/PSPFactory.sol#348-351)"
+reentrancy-no-eth,Medium,Medium,"Reentrancy in PSPStaker._stake(address,uint256,uint256) (src/PSPStaker.sol#530-560):
+	External calls:
+	- _settleAndPay(pepeId,user,msg.sender == user) (src/PSPStaker.sol#536)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#478)
+	State variables written after the call(s):
+	- pos.startEpoch = e (src/PSPStaker.sol#542)
+	PSPStaker.positions (src/PSPStaker.sol#99) can be used in cross function reentrancies:
+	- PSPStaker._accrue(uint256) (src/PSPStaker.sol#456-461)
+	- PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449)
+	- PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482)
+	- PSPStaker.positions (src/PSPStaker.sol#99)
+	- PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334)
+	- PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#811-815)
+	- pos.creditCheckpoint = creditPerWeight (src/PSPStaker.sol#543)
+	PSPStaker.positions (src/PSPStaker.sol#99) can be used in cross function reentrancies:
+	- PSPStaker._accrue(uint256) (src/PSPStaker.sol#456-461)
+	- PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449)
+	- PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482)
+	- PSPStaker.positions (src/PSPStaker.sol#99)
+	- PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334)
+	- PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#811-815)
+	- pos.startEpoch = e (src/PSPStaker.sol#545)
+	PSPStaker.positions (src/PSPStaker.sol#99) can be used in cross function reentrancies:
+	- PSPStaker._accrue(uint256) (src/PSPStaker.sol#456-461)
+	- PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449)
+	- PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482)
+	- PSPStaker.positions (src/PSPStaker.sol#99)
+	- PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334)
+	- PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#811-815)
+	- pos.amount += amount (src/PSPStaker.sol#555)
+	PSPStaker.positions (src/PSPStaker.sol#99) can be used in cross function reentrancies:
+	- PSPStaker._accrue(uint256) (src/PSPStaker.sol#456-461)
+	- PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449)
+	- PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482)
+	- PSPStaker.positions (src/PSPStaker.sol#99)
+	- PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334)
+	- PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#811-815)"
+reentrancy-no-eth,Medium,Medium,"Reentrancy in PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482):
+	External calls:
+	- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+	- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#478)
+	State variables written after the call(s):
+	- positions[pepeId].feesPaid += paid (src/PSPStaker.sol#480)
+	PSPStaker.positions (src/PSPStaker.sol#99) can be used in cross function reentrancies:
+	- PSPStaker._accrue(uint256) (src/PSPStaker.sol#456-461)
+	- PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449)
+	- PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482)
+	- PSPStaker.positions (src/PSPStaker.sol#99)
+	- PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334)
+	- PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#811-815)"
+reentrancy-no-eth,Medium,Medium,"Reentrancy in PSPFactory.spawnNextRound(uint256) (src/PSPFactory.sol#558-575):
+	External calls:
+	- _birthContracts() (src/PSPFactory.sol#571)
+		- t = address(tokenDeployer.deployTokenAt(r.tokenSalt,r.name,r.symbol,address(this))) (src/PSPFactory.sol#423-425)
+		- c = address(controllerDeployer.deployControllerAt(r.controllerSalt,token,mixETH,cfg,address(this),descriptor,stakerDeployer)) (src/PSPFactory.sol#433-437)
+	- _birthPeriphery() (src/PSPFactory.sol#572)
+		- token.setController(address(controller)) (src/PSPFactory.sol#450)
+		- registry = controllerDeployer.deployRegistryAt(registrySalt,controller.stakerAddress(),REFERRAL_MIN_STAKE) (src/PSPFactory.sol#458-460)
+		- h = hookDeployer.deployHookAt(r.hookSalt,poolManager,address(controller),registry,_configWithTimings(),deployerCutTo) (src/PSPFactory.sol#467-469)
+		- hook.configureSine(gameSineParams) (src/PSPFactory.sol#475)
+	- _birthWire() (src/PSPFactory.sol#573)
+		- controller.setHook(hook) (src/PSPFactory.sol#496)
+		- controller.setFactoryRoundId(r.newRoundId) (src/PSPFactory.sol#497)
+		- controller.seedCarry(carry) (src/PSPFactory.sol#510)
+		- poolManager.initialize(key,79228162514264337593543950336) (src/PSPFactory.sol#527)
+	State variables written after the call(s):
+	- _birthWire() (src/PSPFactory.sol#573)
+		- currentRoundId = r.newRoundId (src/PSPFactory.sol#538)
+	PSPFactory.currentRoundId (src/PSPFactory.sol#89) can be used in cross function reentrancies:
+	- PSPFactory._birthWire() (src/PSPFactory.sol#483-549)
+	- PSPFactory._reserve(uint128,string,string) (src/PSPFactory.sol#354-400)
+	- PSPFactory.birthRound() (src/PSPFactory.sol#336-343)
+	- PSPFactory.currentRound() (src/PSPFactory.sol#619-621)
+	- PSPFactory.currentRoundId (src/PSPFactory.sol#89)
+	- PSPFactory.deployRound(PSPFactory.RoundParams) (src/PSPFactory.sol#179-190)
+	- PSPFactory.reserveSpawn(uint256) (src/PSPFactory.sol#273-287)
+	- PSPFactory.spawnNextRound(uint256) (src/PSPFactory.sol#558-575)
+	- _birthWire() (src/PSPFactory.sol#573)
+		- reservation.active = false (src/PSPFactory.sol#546)
+		- r.phase = 0 (src/PSPFactory.sol#547)
+	PSPFactory.reservation (src/PSPFactory.sol#237) can be used in cross function reentrancies:
+	- PSPFactory._birthContracts() (src/PSPFactory.sol#413-440)
+	- PSPFactory._birthPeriphery() (src/PSPFactory.sol#444-476)
+	- PSPFactory._birthWire() (src/PSPFactory.sol#483-549)
+	- PSPFactory._reserve(uint128,string,string) (src/PSPFactory.sol#354-400)
+	- PSPFactory.birthRound() (src/PSPFactory.sol#336-343)
+	- PSPFactory.birthStep() (src/PSPFactory.sol#309-323)
+	- PSPFactory.reservation (src/PSPFactory.sol#237)
+	- PSPFactory.reservationActive() (src/PSPFactory.sol#325-327)
+	- PSPFactory.reservationPhase() (src/PSPFactory.sol#329-331)
+	- PSPFactory.reserveSpawn(uint256) (src/PSPFactory.sol#273-287)
+	- PSPFactory.voidReservation() (src/PSPFactory.sol#348-351)
+	- _birthWire() (src/PSPFactory.sol#573)
+		- rounds[r.newRoundId] = Round({token:token,controller:controller,hook:hook,destroyed:false,name:r.name,symbol:r.symbol}) (src/PSPFactory.sol#530-537)
+	PSPFactory.rounds (src/PSPFactory.sol#90) can be used in cross function reentrancies:
+	- PSPFactory._birthWire() (src/PSPFactory.sol#483-549)
+	- PSPFactory.birthRound() (src/PSPFactory.sol#336-343)
+	- PSPFactory.deployRound(PSPFactory.RoundParams) (src/PSPFactory.sol#179-190)
+	- PSPFactory.getRound(uint256) (src/PSPFactory.sol#607-609)
+	- PSPFactory.markDestroyed(uint256) (src/PSPFactory.sol#601-605)
+	- PSPFactory.pspRoundToken(uint256) (src/PSPFactory.sol#624-628)
+	- PSPFactory.reserveSpawn(uint256) (src/PSPFactory.sol#273-287)
+	- PSPFactory.roundInfo(uint256) (src/PSPFactory.sol#649-680)
+	- PSPFactory.roundPool(uint256) (src/PSPFactory.sol#631-642)
+	- PSPFactory.rounds (src/PSPFactory.sol#90)
+	- PSPFactory.spawnNextRound(uint256) (src/PSPFactory.sol#558-575)"
+reentrancy-no-eth,Medium,Medium,"Reentrancy in PSPFactory.birthStep() (src/PSPFactory.sol#309-323):
+	External calls:
+	- _birthPeriphery() (src/PSPFactory.sol#316)
+		- token.setController(address(controller)) (src/PSPFactory.sol#450)
+		- registry = controllerDeployer.deployRegistryAt(registrySalt,controller.stakerAddress(),REFERRAL_MIN_STAKE) (src/PSPFactory.sol#458-460)
+		- h = hookDeployer.deployHookAt(r.hookSalt,poolManager,address(controller),registry,_configWithTimings(),deployerCutTo) (src/PSPFactory.sol#467-469)
+		- hook.configureSine(gameSineParams) (src/PSPFactory.sol#475)
+	State variables written after the call(s):
+	- r.phase = PHASE_WIRE (src/PSPFactory.sol#317)
+	PSPFactory.reservation (src/PSPFactory.sol#237) can be used in cross function reentrancies:
+	- PSPFactory._birthContracts() (src/PSPFactory.sol#413-440)
+	- PSPFactory._birthPeriphery() (src/PSPFactory.sol#444-476)
+	- PSPFactory._birthWire() (src/PSPFactory.sol#483-549)
+	- PSPFactory._reserve(uint128,string,string) (src/PSPFactory.sol#354-400)
+	- PSPFactory.birthRound() (src/PSPFactory.sol#336-343)
+	- PSPFactory.birthStep() (src/PSPFactory.sol#309-323)
+	- PSPFactory.reservation (src/PSPFactory.sol#237)
+	- PSPFactory.reservationActive() (src/PSPFactory.sol#325-327)
+	- PSPFactory.reservationPhase() (src/PSPFactory.sol#329-331)
+	- PSPFactory.reserveSpawn(uint256) (src/PSPFactory.sol#273-287)
+	- PSPFactory.voidReservation() (src/PSPFactory.sol#348-351)"
+reentrancy-no-eth,Medium,Medium,"Reentrancy in PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482):
+	External calls:
+	- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+	State variables written after the call(s):
+	- accruedFees[pepeId] = paid (src/PSPStaker.sol#473)
+	PSPStaker.accruedFees (src/PSPStaker.sol#131) can be used in cross function reentrancies:
+	- PSPStaker._accrue(uint256) (src/PSPStaker.sol#456-461)
+	- PSPStaker._liveCredit(uint256) (src/PSPStaker.sol#451-454)
+	- PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482)
+	- PSPStaker.accruedFees (src/PSPStaker.sol#131)"
+reentrancy-no-eth,Medium,Medium,"Reentrancy in PSPStaker.cancelWithdraw(uint256) (src/PSPStaker.sol#586-603):
+	External calls:
+	- _settleAndPay(pepeId,msg.sender,true) (src/PSPStaker.sol#591)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#478)
+	State variables written after the call(s):
+	- isWithdrawing[pepeId] = false (src/PSPStaker.sol#599)
+	PSPStaker.isWithdrawing (src/PSPStaker.sol#101) can be used in cross function reentrancies:
+	- PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449)
+	- PSPStaker.isWithdrawing (src/PSPStaker.sol#101)
+	- PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334)
+	- PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#811-815)
+	- pos.requestEpoch = 0 (src/PSPStaker.sol#598)
+	PSPStaker.positions (src/PSPStaker.sol#99) can be used in cross function reentrancies:
+	- PSPStaker._accrue(uint256) (src/PSPStaker.sol#456-461)
+	- PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449)
+	- PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482)
+	- PSPStaker.positions (src/PSPStaker.sol#99)
+	- PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334)
+	- PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#811-815)
+	- pos.startEpoch = p.epoch (src/PSPStaker.sol#600)
+	PSPStaker.positions (src/PSPStaker.sol#99) can be used in cross function reentrancies:
+	- PSPStaker._accrue(uint256) (src/PSPStaker.sol#456-461)
+	- PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449)
+	- PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482)
+	- PSPStaker.positions (src/PSPStaker.sol#99)
+	- PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334)
+	- PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#811-815)"
+reentrancy-no-eth,Medium,Medium,"Reentrancy in PSPStaker.requestWithdraw(uint256) (src/PSPStaker.sol#565-582):
+	External calls:
+	- _settleAndPay(pepeId,msg.sender,true) (src/PSPStaker.sol#571)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#478)
+	State variables written after the call(s):
+	- isWithdrawing[pepeId] = true (src/PSPStaker.sol#576)
+	PSPStaker.isWithdrawing (src/PSPStaker.sol#101) can be used in cross function reentrancies:
+	- PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449)
+	- PSPStaker.isWithdrawing (src/PSPStaker.sol#101)
+	- PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334)
+	- PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#811-815)
+	- pos.requestEpoch = e (src/PSPStaker.sol#575)
+	PSPStaker.positions (src/PSPStaker.sol#99) can be used in cross function reentrancies:
+	- PSPStaker._accrue(uint256) (src/PSPStaker.sol#456-461)
+	- PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449)
+	- PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482)
+	- PSPStaker.positions (src/PSPStaker.sol#99)
+	- PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334)
+	- PSPStaker.withdrawableAt(uint256) (src/PSPStaker.sol#811-815)"
+reentrancy-no-eth,Medium,Medium,"Reentrancy in PSPFactory.deployRound(PSPFactory.RoundParams) (src/PSPFactory.sol#179-190):
+	External calls:
+	- _birthContracts() (src/PSPFactory.sol#186)
+		- t = address(tokenDeployer.deployTokenAt(r.tokenSalt,r.name,r.symbol,address(this))) (src/PSPFactory.sol#423-425)
+		- c = address(controllerDeployer.deployControllerAt(r.controllerSalt,token,mixETH,cfg,address(this),descriptor,stakerDeployer)) (src/PSPFactory.sol#433-437)
+	- _birthPeriphery() (src/PSPFactory.sol#187)
+		- token.setController(address(controller)) (src/PSPFactory.sol#450)
+		- registry = controllerDeployer.deployRegistryAt(registrySalt,controller.stakerAddress(),REFERRAL_MIN_STAKE) (src/PSPFactory.sol#458-460)
+		- h = hookDeployer.deployHookAt(r.hookSalt,poolManager,address(controller),registry,_configWithTimings(),deployerCutTo) (src/PSPFactory.sol#467-469)
+		- hook.configureSine(gameSineParams) (src/PSPFactory.sol#475)
+	- _birthWire() (src/PSPFactory.sol#188)
+		- controller.setHook(hook) (src/PSPFactory.sol#496)
+		- controller.setFactoryRoundId(r.newRoundId) (src/PSPFactory.sol#497)
+		- controller.seedCarry(carry) (src/PSPFactory.sol#510)
+		- poolManager.initialize(key,79228162514264337593543950336) (src/PSPFactory.sol#527)
+	State variables written after the call(s):
+	- _birthWire() (src/PSPFactory.sol#188)
+		- currentRoundId = r.newRoundId (src/PSPFactory.sol#538)
+	PSPFactory.currentRoundId (src/PSPFactory.sol#89) can be used in cross function reentrancies:
+	- PSPFactory._birthWire() (src/PSPFactory.sol#483-549)
+	- PSPFactory._reserve(uint128,string,string) (src/PSPFactory.sol#354-400)
+	- PSPFactory.birthRound() (src/PSPFactory.sol#336-343)
+	- PSPFactory.currentRound() (src/PSPFactory.sol#619-621)
+	- PSPFactory.currentRoundId (src/PSPFactory.sol#89)
+	- PSPFactory.deployRound(PSPFactory.RoundParams) (src/PSPFactory.sol#179-190)
+	- PSPFactory.reserveSpawn(uint256) (src/PSPFactory.sol#273-287)
+	- PSPFactory.spawnNextRound(uint256) (src/PSPFactory.sol#558-575)
+	- _birthWire() (src/PSPFactory.sol#188)
+		- reservation.active = false (src/PSPFactory.sol#546)
+		- r.phase = 0 (src/PSPFactory.sol#547)
+	PSPFactory.reservation (src/PSPFactory.sol#237) can be used in cross function reentrancies:
+	- PSPFactory._birthContracts() (src/PSPFactory.sol#413-440)
+	- PSPFactory._birthPeriphery() (src/PSPFactory.sol#444-476)
+	- PSPFactory._birthWire() (src/PSPFactory.sol#483-549)
+	- PSPFactory._reserve(uint128,string,string) (src/PSPFactory.sol#354-400)
+	- PSPFactory.birthRound() (src/PSPFactory.sol#336-343)
+	- PSPFactory.birthStep() (src/PSPFactory.sol#309-323)
+	- PSPFactory.reservation (src/PSPFactory.sol#237)
+	- PSPFactory.reservationActive() (src/PSPFactory.sol#325-327)
+	- PSPFactory.reservationPhase() (src/PSPFactory.sol#329-331)
+	- PSPFactory.reserveSpawn(uint256) (src/PSPFactory.sol#273-287)
+	- PSPFactory.voidReservation() (src/PSPFactory.sol#348-351)"
+uninitialized-local,Medium,Medium,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256).totalShare (src/PSPReinvestor.sol#104) is a local variable never initialized"
+uninitialized-local,Medium,Medium,CurveHook.claimPot().amount (src/CurveHook.sol#773) is a local variable never initialized
+uninitialized-local,Medium,Medium,"PSPStaker.claimAllTo(uint256[],address).totalPaid (src/PSPStaker.sol#676) is a local variable never initialized"
+uninitialized-local,Medium,Medium,"CurveHook._beforeSwap(address,PoolKey,SwapParams,bytes).refTrader (src/CurveHook.sol#365) is a local variable never initialized"
+uninitialized-local,Medium,Medium,PSPStaker._creditBeforeEpoch(uint256).lo (src/PSPStaker.sol#411) is a local variable never initialized
+uninitialized-local,Medium,Medium,"SineMath.reserveAt(SineMath.Curve,uint256).candidate (src/libraries/SineMath.sol#232) is a local variable never initialized"
+uninitialized-local,Medium,Medium,"CurveMath.computeBuyOutput(uint256,uint256,CurveMath.CurveConfig).lo (src/libraries/CurveMath.sol#237) is a local variable never initialized"
+uninitialized-local,Medium,Medium,CurveHook.getLadder().out (src/CurveHook.sol#725) is a local variable never initialized
+uninitialized-local,Medium,Medium,"HookDeployer.mineHook(IPoolManager,address,address,CurveMath.CurveConfig,address,uint256).scanFrom (src/HookDeployer.sol#107) is a local variable never initialized"
+uninitialized-local,Medium,Medium,PSPReferralRegistry.payoutFor(address).seen (src/PSPReferralRegistry.sol#243) is a local variable never initialized
+uninitialized-local,Medium,Medium,PSPFactory._itoa(uint256).digits (src/PSPFactory.sol#586) is a local variable never initialized
+uninitialized-local,Medium,Medium,RoundController.detonate().nextRound (src/RoundController.sol#579) is a local variable never initialized
+uninitialized-local,Medium,Medium,PSPFactory._birthWire().carry (src/PSPFactory.sol#502) is a local variable never initialized
+unused-return,Medium,Medium,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) ignores return value by zapIn.buyWithMixFor(key,mixIn,minPspOut,deadline,owner) (src/PSPReinvestor.sol#113)"
+unused-return,Medium,Medium,"CurveHook._settleCurrency(Currency,uint256) (src/CurveHook.sol#239-246) ignores return value by poolManager.settle() (src/CurveHook.sol#245)"
+unused-return,Medium,Medium,PSPZapIn._wrap(uint256) (src/PSPZapIn.sol#154-159) ignores return value by mixETH.depositETH{value: ethAmount}() (src/PSPZapIn.sol#157)
+unused-return,Medium,Medium,PSPZapOut.unlockCallback(bytes) (src/PSPZapOut.sol#122-162) ignores return value by poolManager.settle() (src/PSPZapOut.sol#133)
+unused-return,Medium,Medium,"PSPReinvestor.reinvest(uint256,PoolKey,uint256,uint256) (src/PSPReinvestor.sol#53-80) ignores return value by zapIn.buyWithMixFor(key,mixIn,minPspOut,deadline,owner) (src/PSPReinvestor.sol#68)"
+unused-return,Medium,Medium,PSPZapIn.unlockCallback(bytes) (src/PSPZapIn.sol#163-204) ignores return value by poolManager.settle() (src/PSPZapIn.sol#173)
+unused-return,Medium,Medium,"PSPFactory._birthWire() (src/PSPFactory.sol#483-549) ignores return value by poolManager.initialize(key,79228162514264337593543950336) (src/PSPFactory.sol#527)"
+unused-return,Medium,Medium,"PSPZapOut.zapOut(PoolKey,uint256,uint256,uint256) (src/PSPZapOut.sol#55-85) ignores return value by mixETH.redeemETH(mixOut) (src/PSPZapOut.sol#81)"
+unused-return,Medium,Medium,PSPReferralRegistry.unlockCallback(bytes) (src/PSPReferralRegistry.sol#161-180) ignores return value by manager.settle() (src/PSPReferralRegistry.sol#170)
+events-maths,Low,Medium,"PSPStaker.addFees(uint256) (src/PSPStaker.sol#741-746) should emit an event for:
+	- pendingFeesMixETH += mixETHAmount (src/PSPStaker.sol#744)"
+events-maths,Low,Medium,"PSPStaker.lockGenesis(uint256) (src/PSPStaker.sol#691-706) should emit an event for:
+	- totalLocked += amount (src/PSPStaker.sol#705)"
+events-maths,Low,Medium,"RoundController.setFactoryRoundId(uint256) (src/RoundController.sol#238-240) should emit an event for:
+	- factoryRoundId = _roundId (src/RoundController.sol#239)"
+missing-zero-check,Low,Medium,"PSPFactory.setDescriptor(address).descriptor_ (src/PSPFactory.sol#85) lacks a zero-check on :
+		- descriptor = descriptor_ (src/PSPFactory.sol#86)"
+missing-zero-check,Low,Medium,"PSPStaker.constructor(IERC20,IRoundController,address).descriptor_ (src/PSPStaker.sol#182) lacks a zero-check on :
+		- descriptor = descriptor_ (src/PSPStaker.sol#187)"
+calls-loop,Low,Medium,"PSPReinvestor._requireAuthorized(address,uint256) (src/PSPReinvestor.sol#130-133) has external calls inside a loop: msg.sender != owner && ! staker.isApprovedForAll(owner,msg.sender) && staker.getApproved(pepeId) != msg.sender (src/PSPReinvestor.sol#131-132)
+	Calls stack containing the loop:
+		PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256)"
+calls-loop,Low,Medium,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) has external calls inside a loop: share = (bought * staker.positions(pepeIds[i_scope_1]).amount) / totalShare (src/PSPReinvestor.sol#118)"
+calls-loop,Low,Medium,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) has external calls inside a loop: staker.stakeFor(owner,pepeIds[i_scope_1],share) (src/PSPReinvestor.sol#119)"
+calls-loop,Low,Medium,"PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482) has external calls inside a loop: ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+	Calls stack containing the loop:
+		PSPStaker.claimAllTo(uint256[],address)"
+calls-loop,Low,Medium,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) has external calls inside a loop: staker.ownerOf(pepeIds[i]) != owner (src/PSPReinvestor.sol#93)"
+calls-loop,Low,Medium,PSPFactory.birthRound() (src/PSPFactory.sol#336-343) has external calls inside a loop: this.birthStep() (src/PSPFactory.sol#339)
+calls-loop,Low,Medium,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) has external calls inside a loop: staker.isWithdrawing(pepeIds[i_scope_0]) (src/PSPReinvestor.sol#107)"
+calls-loop,Low,Medium,"PSPReferralRegistry._ownerOf(uint256) (src/PSPReferralRegistry.sol#214-219) has external calls inside a loop: (ok,data) = address(staker).staticcall(abi.encodeWithSignature(ownerOf(uint256),nftId)) (src/PSPReferralRegistry.sol#215-216)
+	Calls stack containing the loop:
+		PSPReferralRegistry.chainOf(address)
+		PSPReferralRegistry._nextEdge(uint256)"
+calls-loop,Low,Medium,"PSPReferralRegistry._ownerOf(uint256) (src/PSPReferralRegistry.sol#214-219) has external calls inside a loop: (ok,data) = address(staker).staticcall(abi.encodeWithSignature(ownerOf(uint256),nftId)) (src/PSPReferralRegistry.sol#215-216)
+	Calls stack containing the loop:
+		PSPReferralRegistry.payoutFor(address)"
+calls-loop,Low,Medium,"PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482) has external calls inside a loop: ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#478)
+	Calls stack containing the loop:
+		PSPStaker.claimAllTo(uint256[],address)"
+calls-loop,Low,Medium,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) has external calls inside a loop: pos = staker.positions(pepeIds[i_scope_0]) (src/PSPReinvestor.sol#106)"
+reentrancy-benign,Low,Medium,"Reentrancy in CurveHook._handleBuy(address,PoolKey,SwapParams,uint256,Currency,Currency,address) (src/CurveHook.sol#442-528):
+	External calls:
+	- poolManager.take(mixETH,address(this),mixETHInput) (src/CurveHook.sol#504)
+	- controller.mintPSPForSwap(pspOut) (src/CurveHook.sol#507)
+	State variables written after the call(s):
+	- stakerFeeMixETH = _splitFee(refTrader,feeMixETH,mixETH) (src/CurveHook.sol#511)
+		- deployerCredit += deployerLeg (src/CurveHook.sol#435)
+	- stakerFeeMixETH = _splitFee(refTrader,feeMixETH,mixETH) (src/CurveHook.sol#511)
+		- potBalance += potLeg + (refLeg - paid) (src/CurveHook.sol#432)
+		- potBalance += potLeg + (refLeg - deployerLeg) (src/CurveHook.sol#436)"
+reentrancy-benign,Low,Medium,"Reentrancy in RoundController.detonate() (src/RoundController.sol#552-591):
+	External calls:
+	- h.setMode(CurveHook.Mode.Flat) (src/RoundController.sol#559)
+	State variables written after the call(s):
+	- flatTime = block.timestamp (src/RoundController.sol#561)"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPStaker.withdraw(uint256) (src/PSPStaker.sol#609-637):
+	External calls:
+	- _settleAndPay(pepeId,msg.sender,true) (src/PSPStaker.sol#620)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#478)
+	State variables written after the call(s):
+	- _stakedByOwner[msg.sender] -= amount (src/PSPStaker.sol#629)
+	- p = _checkpoint() (src/PSPStaker.sol#623)
+		- anchored = true (src/PSPStaker.sol#404)
+	- p = _unscheduleDecay(pos,p) (src/PSPStaker.sol#625)
+		- biasSub[r] -= pos.amount - base (src/PSPStaker.sol#647)
+	- p = _checkpoint() (src/PSPStaker.sol#623)
+		- lastPointEpoch = p.epoch (src/PSPStaker.sol#403)
+	- p = _checkpoint() (src/PSPStaker.sol#623)
+		- points[p.epoch] = p (src/PSPStaker.sol#402)
+	- points[p.epoch] = p (src/PSPStaker.sol#627)
+	- p = _unscheduleDecay(pos,p) (src/PSPStaker.sol#625)
+		- slopeAdd[r] -= slope (src/PSPStaker.sol#646)
+	- p = _unscheduleDecay(pos,p) (src/PSPStaker.sol#625)
+		- slopeSub[r + VEST_EPOCHS] -= slope (src/PSPStaker.sol#648)
+		- slopeSub[r + VEST_EPOCHS] -= slope (src/PSPStaker.sol#651)
+	- totalLocked -= amount (src/PSPStaker.sol#628)"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPFactory._birthWire() (src/PSPFactory.sol#483-549):
+	External calls:
+	- controller.setHook(hook) (src/PSPFactory.sol#496)
+	- controller.setFactoryRoundId(r.newRoundId) (src/PSPFactory.sol#497)
+	- controller.seedCarry(carry) (src/PSPFactory.sol#510)
+	- poolManager.initialize(key,79228162514264337593543950336) (src/PSPFactory.sol#527)
+	State variables written after the call(s):
+	- currentRoundId = r.newRoundId (src/PSPFactory.sol#538)
+	- rounds[r.newRoundId] = Round({token:token,controller:controller,hook:hook,destroyed:false,name:r.name,symbol:r.symbol}) (src/PSPFactory.sol#530-537)"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPStaker.requestWithdraw(uint256) (src/PSPStaker.sol#565-582):
+	External calls:
+	- _settleAndPay(pepeId,msg.sender,true) (src/PSPStaker.sol#571)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#478)
+	State variables written after the call(s):
+	- e = _checkpoint().epoch (src/PSPStaker.sol#573)
+		- anchored = true (src/PSPStaker.sol#404)
+	- biasSub[e] += pos.amount - base (src/PSPStaker.sol#579)
+	- e = _checkpoint().epoch (src/PSPStaker.sol#573)
+		- lastPointEpoch = p.epoch (src/PSPStaker.sol#403)
+	- e = _checkpoint().epoch (src/PSPStaker.sol#573)
+		- points[p.epoch] = p (src/PSPStaker.sol#402)
+	- slopeAdd[e] += slope (src/PSPStaker.sol#577)
+	- slopeSub[e + VEST_EPOCHS] += slope (src/PSPStaker.sol#578)"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPFactory.spawnNextRound(uint256) (src/PSPFactory.sol#558-575):
+	External calls:
+	- _birthContracts() (src/PSPFactory.sol#571)
+		- t = address(tokenDeployer.deployTokenAt(r.tokenSalt,r.name,r.symbol,address(this))) (src/PSPFactory.sol#423-425)
+		- c = address(controllerDeployer.deployControllerAt(r.controllerSalt,token,mixETH,cfg,address(this),descriptor,stakerDeployer)) (src/PSPFactory.sol#433-437)
+	- _birthPeriphery() (src/PSPFactory.sol#572)
+		- token.setController(address(controller)) (src/PSPFactory.sol#450)
+		- registry = controllerDeployer.deployRegistryAt(registrySalt,controller.stakerAddress(),REFERRAL_MIN_STAKE) (src/PSPFactory.sol#458-460)
+		- h = hookDeployer.deployHookAt(r.hookSalt,poolManager,address(controller),registry,_configWithTimings(),deployerCutTo) (src/PSPFactory.sol#467-469)
+		- hook.configureSine(gameSineParams) (src/PSPFactory.sol#475)
+	State variables written after the call(s):
+	- _birthPeriphery() (src/PSPFactory.sol#572)
+		- referralRegistryOf[r.newRoundId] = registry (src/PSPFactory.sol#462)"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482):
+	External calls:
+	- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+	- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#478)
+	State variables written after the call(s):
+	- totalFeesPaid += paid (src/PSPStaker.sol#481)"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPReferralRegistry.buyWithMix(PoolKey,uint256,uint256,uint256,uint256) (src/PSPReferralRegistry.sol#130-158):
+	External calls:
+	- pspOut = abi.decode(manager.unlock(data),(uint256)) (src/PSPReferralRegistry.sol#155)
+	State variables written after the call(s):
+	- activeManager = address(0) (src/PSPReferralRegistry.sol#156)
+	- activePurchase = bytes32(0) (src/PSPReferralRegistry.sol#157)"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPStaker._stake(address,uint256,uint256) (src/PSPStaker.sol#530-560):
+	External calls:
+	- _settleAndPay(pepeId,user,msg.sender == user) (src/PSPStaker.sol#536)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#478)
+	State variables written after the call(s):
+	- _stakedByOwner[user] += amount (src/PSPStaker.sol#557)
+	- p = _checkpoint() (src/PSPStaker.sol#552)
+		- anchored = true (src/PSPStaker.sol#404)
+	- p = _checkpoint() (src/PSPStaker.sol#552)
+		- lastPointEpoch = p.epoch (src/PSPStaker.sol#403)
+	- p = _checkpoint() (src/PSPStaker.sol#552)
+		- points[p.epoch] = p (src/PSPStaker.sol#402)
+	- points[p.epoch] = p (src/PSPStaker.sol#554)
+	- totalLocked += amount (src/PSPStaker.sol#556)"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPFactory.deployRound(PSPFactory.RoundParams) (src/PSPFactory.sol#179-190):
+	External calls:
+	- _birthContracts() (src/PSPFactory.sol#186)
+		- t = address(tokenDeployer.deployTokenAt(r.tokenSalt,r.name,r.symbol,address(this))) (src/PSPFactory.sol#423-425)
+		- c = address(controllerDeployer.deployControllerAt(r.controllerSalt,token,mixETH,cfg,address(this),descriptor,stakerDeployer)) (src/PSPFactory.sol#433-437)
+	- _birthPeriphery() (src/PSPFactory.sol#187)
+		- token.setController(address(controller)) (src/PSPFactory.sol#450)
+		- registry = controllerDeployer.deployRegistryAt(registrySalt,controller.stakerAddress(),REFERRAL_MIN_STAKE) (src/PSPFactory.sol#458-460)
+		- h = hookDeployer.deployHookAt(r.hookSalt,poolManager,address(controller),registry,_configWithTimings(),deployerCutTo) (src/PSPFactory.sol#467-469)
+		- hook.configureSine(gameSineParams) (src/PSPFactory.sol#475)
+	- _birthWire() (src/PSPFactory.sol#188)
+		- controller.setHook(hook) (src/PSPFactory.sol#496)
+		- controller.setFactoryRoundId(r.newRoundId) (src/PSPFactory.sol#497)
+		- controller.seedCarry(carry) (src/PSPFactory.sol#510)
+		- poolManager.initialize(key,79228162514264337593543950336) (src/PSPFactory.sol#527)
+	State variables written after the call(s):
+	- _birthWire() (src/PSPFactory.sol#188)
+		- rounds[r.newRoundId] = Round({token:token,controller:controller,hook:hook,destroyed:false,name:r.name,symbol:r.symbol}) (src/PSPFactory.sol#530-537)"
+reentrancy-benign,Low,Medium,"Reentrancy in CurveHook._handleSell(PoolKey,SwapParams,uint256,Currency,Currency,address) (src/CurveHook.sol#532-592):
+	External calls:
+	- poolManager.take(psp,address(this),pspInputAmount) (src/CurveHook.sol#571)
+	- controller.burnPSPForSwap(pspInputAmount) (src/CurveHook.sol#574)
+	- _settleCurrency(mixETH,mixETHToUser) (src/CurveHook.sol#577)
+		- poolManager.sync(currency) (src/CurveHook.sol#243)
+		- poolManager.settle() (src/CurveHook.sol#245)
+	State variables written after the call(s):
+	- stakerFeeMixETH = _splitFee(refTrader,feeMixETH,mixETH) (src/CurveHook.sol#580)
+		- deployerCredit += deployerLeg (src/CurveHook.sol#435)
+	- stakerFeeMixETH = _splitFee(refTrader,feeMixETH,mixETH) (src/CurveHook.sol#580)
+		- potBalance += potLeg + (refLeg - paid) (src/CurveHook.sol#432)
+		- potBalance += potLeg + (refLeg - deployerLeg) (src/CurveHook.sol#436)"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPStaker.cancelWithdraw(uint256) (src/PSPStaker.sol#586-603):
+	External calls:
+	- _settleAndPay(pepeId,msg.sender,true) (src/PSPStaker.sol#591)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+		- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#478)
+	State variables written after the call(s):
+	- p = _checkpoint() (src/PSPStaker.sol#593)
+		- anchored = true (src/PSPStaker.sol#404)
+	- p = _unscheduleDecay(pos,p) (src/PSPStaker.sol#595)
+		- biasSub[r] -= pos.amount - base (src/PSPStaker.sol#647)
+	- p = _checkpoint() (src/PSPStaker.sol#593)
+		- lastPointEpoch = p.epoch (src/PSPStaker.sol#403)
+	- p = _checkpoint() (src/PSPStaker.sol#593)
+		- points[p.epoch] = p (src/PSPStaker.sol#402)
+	- points[p.epoch] = p (src/PSPStaker.sol#597)
+	- p = _unscheduleDecay(pos,p) (src/PSPStaker.sol#595)
+		- slopeAdd[r] -= slope (src/PSPStaker.sol#646)
+	- p = _unscheduleDecay(pos,p) (src/PSPStaker.sol#595)
+		- slopeSub[r + VEST_EPOCHS] -= slope (src/PSPStaker.sol#648)
+		- slopeSub[r + VEST_EPOCHS] -= slope (src/PSPStaker.sol#651)"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPFactory._birthPeriphery() (src/PSPFactory.sol#444-476):
+	External calls:
+	- token.setController(address(controller)) (src/PSPFactory.sol#450)
+	- registry = controllerDeployer.deployRegistryAt(registrySalt,controller.stakerAddress(),REFERRAL_MIN_STAKE) (src/PSPFactory.sol#458-460)
+	State variables written after the call(s):
+	- referralRegistryOf[r.newRoundId] = registry (src/PSPFactory.sol#462)"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPFactory.deployRound(PSPFactory.RoundParams) (src/PSPFactory.sol#179-190):
+	External calls:
+	- _birthContracts() (src/PSPFactory.sol#186)
+		- t = address(tokenDeployer.deployTokenAt(r.tokenSalt,r.name,r.symbol,address(this))) (src/PSPFactory.sol#423-425)
+		- c = address(controllerDeployer.deployControllerAt(r.controllerSalt,token,mixETH,cfg,address(this),descriptor,stakerDeployer)) (src/PSPFactory.sol#433-437)
+	- _birthPeriphery() (src/PSPFactory.sol#187)
+		- token.setController(address(controller)) (src/PSPFactory.sol#450)
+		- registry = controllerDeployer.deployRegistryAt(registrySalt,controller.stakerAddress(),REFERRAL_MIN_STAKE) (src/PSPFactory.sol#458-460)
+		- h = hookDeployer.deployHookAt(r.hookSalt,poolManager,address(controller),registry,_configWithTimings(),deployerCutTo) (src/PSPFactory.sol#467-469)
+		- hook.configureSine(gameSineParams) (src/PSPFactory.sol#475)
+	State variables written after the call(s):
+	- _birthPeriphery() (src/PSPFactory.sol#187)
+		- referralRegistryOf[r.newRoundId] = registry (src/PSPFactory.sol#462)"
+reentrancy-events,Low,Medium,"Reentrancy in PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482):
+	External calls:
+	- ICurveHook(controller.hookAddress()).sendFees(to,paid) (src/PSPStaker.sol#471-476)
+	Event emitted after the call(s):
+	- FeesDeferred(to,pepeId,paid) (src/PSPStaker.sol#474)"
+reentrancy-events,Low,Medium,"Reentrancy in PSPFactory.deployRound(PSPFactory.RoundParams) (src/PSPFactory.sol#179-190):
+	External calls:
+	- _birthContracts() (src/PSPFactory.sol#186)
+		- t = address(tokenDeployer.deployTokenAt(r.tokenSalt,r.name,r.symbol,address(this))) (src/PSPFactory.sol#423-425)
+		- c = address(controllerDeployer.deployControllerAt(r.controllerSalt,token,mixETH,cfg,address(this),descriptor,stakerDeployer)) (src/PSPFactory.sol#433-437)
+	- _birthPeriphery() (src/PSPFactory.sol#187)
+		- token.setController(address(controller)) (src/PSPFactory.sol#450)
+		- registry = controllerDeployer.deployRegistryAt(registrySalt,controller.stakerAddress(),REFERRAL_MIN_STAKE) (src/PSPFactory.sol#458-460)
+		- h = hookDeployer.deployHookAt(r.hookSalt,poolManager,address(controller),registry,_configWithTimings(),deployerCutTo) (src/PSPFactory.sol#467-469)
+		- hook.configureSine(gameSineParams) (src/PSPFactory.sol#475)
+	- _birthWire() (src/PSPFactory.sol#188)
+		- controller.setHook(hook) (src/PSPFactory.sol#496)
+		- controller.setFactoryRoundId(r.newRoundId) (src/PSPFactory.sol#497)
+		- controller.seedCarry(carry) (src/PSPFactory.sol#510)
+		- poolManager.initialize(key,79228162514264337593543950336) (src/PSPFactory.sol#527)
+	Event emitted after the call(s):
+	- ETHCarried(r.fromRoundId,r.newRoundId,carry) (src/PSPFactory.sol#540)
+		- _birthWire() (src/PSPFactory.sol#188)
+	- RoundDeployed(r.newRoundId,address(token),address(controller),address(hook),controller.stakerAddress()) (src/PSPFactory.sol#542-544)
+		- _birthWire() (src/PSPFactory.sol#188)"
+reentrancy-events,Low,Medium,"Reentrancy in CurveHook._handleBuy(address,PoolKey,SwapParams,uint256,Currency,Currency,address) (src/CurveHook.sol#442-528):
+	External calls:
+	- poolManager.take(mixETH,address(this),mixETHInput) (src/CurveHook.sol#504)
+	- controller.mintPSPForSwap(pspOut) (src/CurveHook.sol#507)
+	Event emitted after the call(s):
+	- ReferralPaid(trader,who[i],i,cut) (src/CurveHook.sol#410)
+		- stakerFeeMixETH = _splitFee(refTrader,feeMixETH,mixETH) (src/CurveHook.sol#511)"
+reentrancy-events,Low,Medium,"Reentrancy in RoundController.addFees(uint256) (src/RoundController.sol#285-288):
+	External calls:
+	- staker.addFees(mixETHAmount) (src/RoundController.sol#286)
+	Event emitted after the call(s):
+	- FeesAdded(mixETHAmount) (src/RoundController.sol#287)"
+reentrancy-events,Low,Medium,"Reentrancy in CurveHook._handleSell(PoolKey,SwapParams,uint256,Currency,Currency,address) (src/CurveHook.sol#532-592):
+	External calls:
+	- poolManager.take(psp,address(this),pspInputAmount) (src/CurveHook.sol#571)
+	- controller.burnPSPForSwap(pspInputAmount) (src/CurveHook.sol#574)
+	- _settleCurrency(mixETH,mixETHToUser) (src/CurveHook.sol#577)
+		- poolManager.sync(currency) (src/CurveHook.sol#243)
+		- poolManager.settle() (src/CurveHook.sol#245)
+	Event emitted after the call(s):
+	- ReferralPaid(trader,who[i],i,cut) (src/CurveHook.sol#410)
+		- stakerFeeMixETH = _splitFee(refTrader,feeMixETH,mixETH) (src/CurveHook.sol#580)"
+reentrancy-events,Low,Medium,"Reentrancy in PSPFactory.spawnNextRound(uint256) (src/PSPFactory.sol#558-575):
+	External calls:
+	- _birthContracts() (src/PSPFactory.sol#571)
+		- t = address(tokenDeployer.deployTokenAt(r.tokenSalt,r.name,r.symbol,address(this))) (src/PSPFactory.sol#423-425)
+		- c = address(controllerDeployer.deployControllerAt(r.controllerSalt,token,mixETH,cfg,address(this),descriptor,stakerDeployer)) (src/PSPFactory.sol#433-437)
+	- _birthPeriphery() (src/PSPFactory.sol#572)
+		- token.setController(address(controller)) (src/PSPFactory.sol#450)
+		- registry = controllerDeployer.deployRegistryAt(registrySalt,controller.stakerAddress(),REFERRAL_MIN_STAKE) (src/PSPFactory.sol#458-460)
+		- h = hookDeployer.deployHookAt(r.hookSalt,poolManager,address(controller),registry,_configWithTimings(),deployerCutTo) (src/PSPFactory.sol#467-469)
+		- hook.configureSine(gameSineParams) (src/PSPFactory.sol#475)
+	- _birthWire() (src/PSPFactory.sol#573)
+		- controller.setHook(hook) (src/PSPFactory.sol#496)
+		- controller.setFactoryRoundId(r.newRoundId) (src/PSPFactory.sol#497)
+		- controller.seedCarry(carry) (src/PSPFactory.sol#510)
+		- poolManager.initialize(key,79228162514264337593543950336) (src/PSPFactory.sol#527)
+	Event emitted after the call(s):
+	- ETHCarried(r.fromRoundId,r.newRoundId,carry) (src/PSPFactory.sol#540)
+		- _birthWire() (src/PSPFactory.sol#573)
+	- RoundDeployed(r.newRoundId,address(token),address(controller),address(hook),controller.stakerAddress()) (src/PSPFactory.sol#542-544)
+		- _birthWire() (src/PSPFactory.sol#573)"
+reentrancy-events,Low,Medium,"Reentrancy in PSPFactory._birthWire() (src/PSPFactory.sol#483-549):
+	External calls:
+	- controller.setHook(hook) (src/PSPFactory.sol#496)
+	- controller.setFactoryRoundId(r.newRoundId) (src/PSPFactory.sol#497)
+	- controller.seedCarry(carry) (src/PSPFactory.sol#510)
+	- poolManager.initialize(key,79228162514264337593543950336) (src/PSPFactory.sol#527)
+	Event emitted after the call(s):
+	- ETHCarried(r.fromRoundId,r.newRoundId,carry) (src/PSPFactory.sol#540)
+	- RoundDeployed(r.newRoundId,address(token),address(controller),address(hook),controller.stakerAddress()) (src/PSPFactory.sol#542-544)"
+return-bomb,Low,Medium,"RoundController.detonate() (src/RoundController.sol#552-591) tries to limit the gas of an external call that controls implicit decoding
+	(okSpawn,spawned) = factory.call{gas: gasleft()() - 100_000}(abi.encodeWithSelector(bytes4(0x1c9424dc),factoryRoundId)) (src/RoundController.sol#584-586)"
+timestamp,Low,Medium,"PSPZapOut.sellToMix(PoolKey,uint256,uint256,uint256) (src/PSPZapOut.sol#95-120) uses timestamp for comparisons
+	Dangerous comparisons:
+	- deadline != 0 && block.timestamp > deadline (src/PSPZapOut.sol#100)"
+timestamp,Low,Medium,"PSPStaker.claimFeesTo(uint256,address) (src/PSPStaker.sol#665-671) uses timestamp for comparisons
+	Dangerous comparisons:
+	- paid == 0 (src/PSPStaker.sol#669)"
+timestamp,Low,Medium,"PSPStaker._unscheduleDecay(PSPStaker.Position,PSPStaker.GlobalPoint) (src/PSPStaker.sol#640-654) uses timestamp for comparisons
+	Dangerous comparisons:
+	- p.epoch == r (src/PSPStaker.sol#645)
+	- p.epoch <= r + VEST_EPOCHS (src/PSPStaker.sol#649)"
+timestamp,Low,Medium,"CurveHook._beforeSwap(address,PoolKey,SwapParams,bytes) (src/CurveHook.sol#324-375) uses timestamp for comparisons
+	Dangerous comparisons:
+	- mode == Mode.Active && block.timestamp >= detonationAt (src/CurveHook.sol#334)"
+timestamp,Low,Medium,"CurveHook._handleBuy(address,PoolKey,SwapParams,uint256,Currency,Currency,address) (src/CurveHook.sol#442-528) uses timestamp for comparisons
+	Dangerous comparisons:
+	- newDet > cap (src/CurveHook.sol#483)"
+timestamp,Low,Medium,"PSPStaker._feeSlice(uint256,uint256,uint256) (src/PSPStaker.sol#421-427) uses timestamp for comparisons
+	Dangerous comparisons:
+	- nextRemainder >= CREDIT_PRECISION (src/PSPStaker.sol#426)"
+timestamp,Low,Medium,"PSPReferralRegistry.buyWithMix(PoolKey,uint256,uint256,uint256,uint256) (src/PSPReferralRegistry.sol#130-158) uses timestamp for comparisons
+	Dangerous comparisons:
+	- deadline != 0 && block.timestamp > deadline (src/PSPReferralRegistry.sol#135)"
+timestamp,Low,Medium,"RoundController.detonate() (src/RoundController.sol#552-591) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < h.detonationAt() (src/RoundController.sol#555)"
+timestamp,Low,Medium,"PSPStaker.claimAllTo(uint256[],address) (src/PSPStaker.sol#674-684) uses timestamp for comparisons
+	Dangerous comparisons:
+	- totalPaid == 0 (src/PSPStaker.sol#682)"
+timestamp,Low,Medium,"PSPStaker._advance(PSPStaker.GlobalPoint,uint256) (src/PSPStaker.sol#356-369) uses timestamp for comparisons
+	Dangerous comparisons:
+	- e < end (src/PSPStaker.sol#360)
+	- to < p.epoch + VEST_EPOCHS + 1 (src/PSPStaker.sol#359)"
+timestamp,Low,Medium,"PSPStaker._distribute() (src/PSPStaker.sol#752-771) uses timestamp for comparisons
+	Dangerous comparisons:
+	- pendingFeesMixETH == 0 (src/PSPStaker.sol#753)
+	- w == 0 (src/PSPStaker.sol#755)
+	- delta == 0 (src/PSPStaker.sol#757)
+	- numerator % CREDIT_PRECISION != 0 (src/PSPStaker.sol#763)
+	- feeEpochs.length == 0 || feeEpochs[feeEpochs.length - 1].epoch != epoch (src/PSPStaker.sol#765)"
+timestamp,Low,Medium,"PSPStaker.withdraw(uint256) (src/PSPStaker.sol#609-637) uses timestamp for comparisons
+	Dangerous comparisons:
+	- ! flat && _epoch() < pos.requestEpoch + VEST_EPOCHS (src/PSPStaker.sol#616)"
+timestamp,Low,Medium,"CurveHook.getBuyOutput(uint256) (src/CurveHook.sol#901-917) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= detonationAt (src/CurveHook.sol#910)"
+timestamp,Low,Medium,"HookDeployer.mineHook(IPoolManager,address,address,CurveMath.CurveConfig,address,uint256) (src/HookDeployer.sol#96-122) uses timestamp for comparisons
+	Dangerous comparisons:
+	- budget == 0 (src/HookDeployer.sol#111)
+	- cand.code.length == 0 (src/HookDeployer.sol#117)
+	- scanned >= maxIter (src/HookDeployer.sol#120)"
+timestamp,Low,Medium,"RoundController.predepositState() (src/RoundController.sol#401-425) uses timestamp for comparisons
+	Dangerous comparisons:
+	- (totalPredepositMixETH,PREDEPOSIT_CAP,predepositStartTime,predepositClosed,capReached,windowOver,(capReached || windowOver) && ! predepositClosed) (src/RoundController.sol#416-424)"
+timestamp,Low,Medium,"PSPStaker.requestWithdraw(uint256) (src/PSPStaker.sol#565-582) uses timestamp for comparisons
+	Dangerous comparisons:
+	- base != pos.amount (src/PSPStaker.sol#579)"
+timestamp,Low,Medium,"PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482) uses timestamp for comparisons
+	Dangerous comparisons:
+	- paid == 0 (src/PSPStaker.sol#468)"
+timestamp,Low,Medium,"RoundController._windowOver() (src/RoundController.sol#396-398) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= predepositStartTime + PREDEPOSIT_DURATION (src/RoundController.sol#397)"
+timestamp,Low,Medium,"RoundController.launchPooledBuy() (src/RoundController.sol#432-486) uses timestamp for comparisons
+	Dangerous comparisons:
+	- msg.sender != owner() && ! _capReached() && ! _windowOver() (src/RoundController.sol#434)"
+timestamp,Low,Medium,"PSPStaker._creditBeforeEpoch(uint256) (src/PSPStaker.sol#410-419) uses timestamp for comparisons
+	Dangerous comparisons:
+	- lo < hi (src/PSPStaker.sol#413)
+	- feeEpochs[mid].epoch < epoch (src/PSPStaker.sol#415)
+	- lo == feeEpochs.length (src/PSPStaker.sol#418)"
+timestamp,Low,Medium,"CurveHook.getSellOutput(uint256) (src/CurveHook.sol#920-933) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp >= detonationAt (src/CurveHook.sol#928)"
+timestamp,Low,Medium,"PSPZapIn._buyWithMix(PoolKey,uint256,uint256,uint256,address) (src/PSPZapIn.sol#131-151) uses timestamp for comparisons
+	Dangerous comparisons:
+	- deadline != 0 && block.timestamp > deadline (src/PSPZapIn.sol#136)"
+timestamp,Low,Medium,"PSPStaker._earnedFees(uint256) (src/PSPStaker.sol#431-449) uses timestamp for comparisons
+	Dangerous comparisons:
+	- end > from (src/PSPStaker.sol#442)
+	- start > pos.creditCheckpoint (src/PSPStaker.sol#441)"
+timestamp,Low,Medium,"PSPZapIn.zapInBuy(PoolKey,uint256,uint256) (src/PSPZapIn.sol#78-101) uses timestamp for comparisons
+	Dangerous comparisons:
+	- deadline != 0 && block.timestamp > deadline (src/PSPZapIn.sol#84)"
+timestamp,Low,Medium,"PSPStaker.weightAt(uint256,uint256) (src/PSPStaker.sol#326-334) uses timestamp for comparisons
+	Dangerous comparisons:
+	- pos.amount == 0 || e < pos.startEpoch (src/PSPStaker.sol#328)
+	- ! isWithdrawing[pepeId] || e <= pos.requestEpoch (src/PSPStaker.sol#329)
+	- k >= VEST_EPOCHS (src/PSPStaker.sol#331)"
+timestamp,Low,Medium,"PSPZapOut.zapOut(PoolKey,uint256,uint256,uint256) (src/PSPZapOut.sol#55-85) uses timestamp for comparisons
+	Dangerous comparisons:
+	- deadline != 0 && block.timestamp > deadline (src/PSPZapOut.sol#60)"
+assembly,Informational,High,"HookMiner.find(address,uint160,bytes,bytes) (src/utils/HookMiner.sol#24-74) uses assembly
+	- INLINE ASM (src/utils/HookMiner.sol#54-72)"
+assembly,Informational,High,"HookMiner.nextCandidateCapped(address,bytes32,uint160,bytes,bytes,uint256,uint256) (src/utils/HookMiner.sol#148-275) uses assembly
+	- INLINE ASM (src/utils/HookMiner.sol#170-273)"
+assembly,Informational,High,"HookDeployer.deployHookAt(bytes32,IPoolManager,address,address,CurveMath.CurveConfig,address) (src/HookDeployer.sol#128-143) uses assembly
+	- INLINE ASM (src/HookDeployer.sol#139-141)"
+assembly,Informational,High,"PSPReferralRegistry.record(uint256) (src/PSPReferralRegistry.sol#117-123) uses assembly
+	- INLINE ASM (src/PSPReferralRegistry.sol#120)"
+assembly,Informational,High,"ControllerDeployer.deployControllerAt(bytes32,PSPToken,IERC20,CurveMath.CurveConfig,address,address,StakerDeployer) (src/ControllerDeployer.sol#88-119) uses assembly
+	- INLINE ASM (src/ControllerDeployer.sol#107-109)
+	- INLINE ASM (src/ControllerDeployer.sol#111-116)"
+assembly,Informational,High,"ControllerDeployer.deployController(PSPToken,IERC20,CurveMath.CurveConfig,address,address,StakerDeployer) (src/ControllerDeployer.sol#38-78) uses assembly
+	- INLINE ASM (src/ControllerDeployer.sol#53-61)
+	- INLINE ASM (src/ControllerDeployer.sol#68-75)"
+costly-loop,Informational,Medium,"PSPStaker._settleAndPay(uint256,address,bool) (src/PSPStaker.sol#465-482) has costly operations inside a loop:
+	- totalFeesPaid += paid (src/PSPStaker.sol#481)
+	Calls stack containing the loop:
+		PSPStaker.claimAllTo(uint256[],address)"
+cyclomatic-complexity,Informational,High,"HookMiner.nextCandidateCapped(address,bytes32,uint160,bytes,bytes,uint256,uint256) (src/utils/HookMiner.sol#148-275) has a high cyclomatic complexity (13)."
+cyclomatic-complexity,Informational,High,"PSPReinvestor.reinvestAll(uint256[],PoolKey,uint256,uint256) (src/PSPReinvestor.sol#84-126) has a high cyclomatic complexity (13)."
+cyclomatic-complexity,Informational,High,"CurveMath.computeBuyOutput(uint256,uint256,CurveMath.CurveConfig) (src/libraries/CurveMath.sol#118-248) has a high cyclomatic complexity (27)."
+dead-code,Informational,Medium,PSPStaker._anchorNow() (src/PSPStaker.sol#387-397) is never used and should be removed
+low-level-calls,Informational,High,"Low level call in RoundController.detonate() (src/RoundController.sol#552-591):
+	- (okMark,None) = factory.call(abi.encodeWithSelector(bytes4(0x723c5612),factoryRoundId)) (src/RoundController.sol#565)
+	- (okSpawn,spawned) = factory.call{gas: gasleft()() - 100_000}(abi.encodeWithSelector(bytes4(0x1c9424dc),factoryRoundId)) (src/RoundController.sol#584-586)"
+low-level-calls,Informational,High,"Low level call in PSPReferralRegistry._ownerOf(uint256) (src/PSPReferralRegistry.sol#214-219):
+	- (ok,data) = address(staker).staticcall(abi.encodeWithSignature(ownerOf(uint256),nftId)) (src/PSPReferralRegistry.sol#215-216)"
+low-level-calls,Informational,High,"Low level call in SepoliaMixETH.redeemETH(uint256) (src/testnet/SepoliaMixETH.sol#50-56):
+	- (ok,None) = msg.sender.call{value: ethOut}() (src/testnet/SepoliaMixETH.sol#54)"
+low-level-calls,Informational,High,"Low level call in PSPZapOut.zapOut(PoolKey,uint256,uint256,uint256) (src/PSPZapOut.sol#55-85):
+	- (ok,None) = msg.sender.call{value: ethOut}() (src/PSPZapOut.sol#83)"
+low-level-calls,Informational,High,"Low level call in RoundController._getTotalAssets() (src/RoundController.sol#261-270):
+	- (success,data) = address(mixETH).staticcall(abi.encodeWithSelector(0x01e1d114)) (src/RoundController.sol#263-265)"
+missing-inheritance,Informational,High,PSPZapIn (src/PSPZapIn.sol#21-205) should inherit from IPSPZapIn (src/interfaces/IPSPZapIn.sol#7-14)
+missing-inheritance,Informational,High,PSPStaker (src/PSPStaker.sol#44-823) should inherit from IPepeDescriptor (src/PSPStaker.sol#14-16)
+missing-inheritance,Informational,High,SepoliaMixETH (src/testnet/SepoliaMixETH.sol#23-65) should inherit from IMixETH (src/interfaces/IMixETH.sol#7-10)
+missing-inheritance,Informational,High,PSPToken (src/PSPToken.sol#9-51) should inherit from IMintableMix (src/testnet/MixETHFaucet.sol#7-9)
+missing-inheritance,Informational,High,SepoliaMixETH (src/testnet/SepoliaMixETH.sol#23-65) should inherit from IMintableMix (src/testnet/MixETHFaucet.sol#7-9)
+missing-inheritance,Informational,High,HookInitCode (src/HookInitCode.sol#46-78) should inherit from IHookInitCode (src/HookInitCode.sol#36-44)
+naming-convention,Informational,High,"Parameter CurveMath.curveIntegral(uint256,uint256,CurveMath.CurveConfig).S1 (src/libraries/CurveMath.sol#271) is not in mixedCase"
+naming-convention,Informational,High,"Parameter SineMath.sellOut(SineMath.Curve,uint256,uint256).R (src/libraries/SineMath.sol#256) is not in mixedCase"
+naming-convention,Informational,High,"Parameter CurveHook.initializeCurve(uint256,uint256,uint256)._genesisPotFee (src/CurveHook.sol#843) is not in mixedCase"
+naming-convention,Informational,High,"Parameter CurveMath.singleCurve(uint256,uint256,uint256,uint256).P0 (src/libraries/CurveMath.sol#412) is not in mixedCase"
+naming-convention,Informational,High,Variable RoundController.VEST_DURATION (src/RoundController.sol#130) is not in mixedCase
+naming-convention,Informational,High,"Parameter SineMath.buyOut(SineMath.Curve,uint256,uint256).R (src/libraries/SineMath.sol#247) is not in mixedCase"
+naming-convention,Informational,High,"Parameter CurveHook.initializeCurve(uint256,uint256,uint256)._initialSupply (src/CurveHook.sol#843) is not in mixedCase"
+naming-convention,Informational,High,"Parameter CurveMath.curveIntegral(uint256,uint256,CurveMath.CurveConfig).S2 (src/libraries/CurveMath.sol#271) is not in mixedCase"
+naming-convention,Informational,High,Variable RoundController.PREDEPOSIT_CAP_PER_WALLET (src/RoundController.sol#123) is not in mixedCase
+naming-convention,Informational,High,Variable PSPReferralRegistry.TIER_BPS (src/PSPReferralRegistry.sol#85) is not in mixedCase
+naming-convention,Informational,High,Parameter CurveHook.sinePriceAt(uint256).R (src/CurveHook.sol#881) is not in mixedCase
+naming-convention,Informational,High,Parameter RoundController.setHook(CurveHook)._hook (src/RoundController.sol#234) is not in mixedCase
+naming-convention,Informational,High,Parameter RoundController.setFactoryRoundId(uint256)._roundId (src/RoundController.sol#238) is not in mixedCase
+naming-convention,Informational,High,Variable RoundController.PREDEPOSIT_DURATION (src/RoundController.sol#110) is not in mixedCase
+naming-convention,Informational,High,"Parameter CurveMath.marginalPrice(uint256,CurveMath.CurveConfig).S (src/libraries/CurveMath.sol#48) is not in mixedCase"
+naming-convention,Informational,High,"Parameter CurveHook.initializeCurve(uint256,uint256,uint256)._reserveMixETH (src/CurveHook.sol#843) is not in mixedCase"
+naming-convention,Informational,High,"Parameter CurveMath.multiCurve(uint256,uint256[],uint256[],bool[]).P0 (src/libraries/CurveMath.sol#438) is not in mixedCase"
+naming-convention,Informational,High,Function IRoundController.VEST_DURATION() (src/interfaces/IRoundController.sol#25) is not in mixedCase
+naming-convention,Informational,High,"Parameter SineMath.supplyAt(SineMath.Curve,uint256).R (src/libraries/SineMath.sol#179) is not in mixedCase"
+naming-convention,Informational,High,Parameter PSPToken.setController(address)._controller (src/PSPToken.sol#35) is not in mixedCase
+naming-convention,Informational,High,Variable PSPReferralRegistry.MIN_STAKE_PSP (src/PSPReferralRegistry.sol#88) is not in mixedCase
+naming-convention,Informational,High,"Parameter SineMath.priceAt(SineMath.Curve,uint256).R (src/libraries/SineMath.sol#157) is not in mixedCase"
+naming-convention,Informational,High,"Parameter CurveMath.singleCurve(uint256,uint256,uint256,uint256).S_inf (src/libraries/CurveMath.sol#413) is not in mixedCase"
+too-many-digits,Informational,Medium,"Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+	- r[14] = 250000000000000000 (src/curves/Curve2Zones.sol#51)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[4] = 584000000000000128 (src/curves/LinearZones.sol#61)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[26] = 500000000000000000 (src/curves/Curve1Zones.sol#77)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[14] = 704000000000000128 (src/curves/LinearZones.sol#71)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[24] = 824000000000000128 (src/curves/LinearZones.sol#81)"
+too-many-digits,Informational,Medium,"PepeArtData8Bit.slitherConstructorConstantVariables() (src/PepeArtData8Bit.sol#13-191) uses literals with too many digits:
+	- BG_COLORS = 0x98dbc998dbc9f5b7c9c8c1f7ffa233843d522d284b000000ffa233e85def (src/PepeArtData8Bit.sol#84)"
+too-many-digits,Informational,Medium,"Curve1Zones.slitherConstructorConstantVariables() (src/curves/Curve1Zones.sol#14-116) uses literals with too many digits:
+	- P0_WAD = 100000000000000 (src/curves/Curve1Zones.sol#15)"
+too-many-digits,Informational,Medium,"Curve3Zones.config() (src/curves/Curve3Zones.sol#17-175) uses literals with too many digits:
+	- b[1] = 510512625000000010584064 (src/curves/Curve3Zones.sol#20)"
+too-many-digits,Informational,Medium,"LinearZones.slitherConstructorConstantVariables() (src/curves/LinearZones.sol#16-130) uses literals with too many digits:
+	- P0_WAD = 100000000000000 (src/curves/LinearZones.sol#17)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[10] = 656000000000000000 (src/curves/LinearZones.sol#67)"
+too-many-digits,Informational,Medium,"Curve3Zones.config() (src/curves/Curve3Zones.sol#17-175) uses literals with too many digits:
+	- r[49] = 100000000000000000 (src/curves/Curve3Zones.sol#120)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[14] = 500000000000000000 (src/curves/Curve1Zones.sol#65)"
+too-many-digits,Informational,Medium,"Curve2Zones.slitherConstructorConstantVariables() (src/curves/Curve2Zones.sol#14-74) uses literals with too many digits:
+	- P0_WAD = 100000000000000 (src/curves/Curve2Zones.sol#15)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[32] = 920000000000000000 (src/curves/LinearZones.sol#89)"
+too-many-digits,Informational,Medium,"PSPReferralRegistry.buyWithMix(PoolKey,uint256,uint256,uint256,uint256) (src/PSPReferralRegistry.sol#130-158) uses literals with too many digits:
+	- address(key.hooks) != ctl.hookAddress() || IReferralHook(address(key.hooks)).referralRegistry() != address(this) || Currency.unwrap(key.currency1) != psp || Currency.unwrap(key.currency0) != mix || key.fee != 0x800000 || key.tickSpacing != 60 (src/PSPReferralRegistry.sol#140-144)"
+too-many-digits,Informational,Medium,"LinearZonesLean.config() (src/curves/LinearZonesLean.sol#24-62) uses literals with too many digits:
+	- r[4] = 680000000000000000 (src/curves/LinearZonesLean.sol#42)"
+too-many-digits,Informational,Medium,"Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+	- r[4] = 250000000000000000 (src/curves/Curve2Zones.sol#41)"
+too-many-digits,Informational,Medium,"SineMath._sinWad(uint256) (src/libraries/SineMath.sol#295-328) uses literals with too many digits:
+	- term = FixedPointMathLib.mulWad(term,FixedPointMathLib.mulWad(t,50000000000000000)) (src/libraries/SineMath.sol#309)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[28] = 500000000000000000 (src/curves/Curve1Zones.sol#79)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[30] = 896000000000000128 (src/curves/LinearZones.sol#87)"
+too-many-digits,Informational,Medium,"ControllerDeployer.predictRegistry(bytes32,address,uint256) (src/ControllerDeployer.sol#168-182) uses literals with too many digits:
+	- address(uint160(uint256(keccak256(bytes)(abi.encodePacked(bytes1(0xff),address(this),salt,keccak256(bytes)(abi.encodePacked(type()(PSPReferralRegistry).creationCode,abi.encode(staker,minStakePSP)))))))) (src/ControllerDeployer.sol#173-181)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[8] = 632000000000000128 (src/curves/LinearZones.sol#65)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[12] = 500000000000000000 (src/curves/Curve1Zones.sol#63)"
+too-many-digits,Informational,Medium,"ControllerDeployer.deployController(PSPToken,IERC20,CurveMath.CurveConfig,address,address,StakerDeployer) (src/ControllerDeployer.sol#38-78) uses literals with too many digits:
+	- initCode = type()(RoundController).creationCode (src/ControllerDeployer.sol#52)"
+too-many-digits,Informational,Medium,"Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+	- b[1] = 510512625000000010584064 (src/curves/Curve2Zones.sol#20)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[6] = 608000000000000128 (src/curves/LinearZones.sol#63)"
+too-many-digits,Informational,Medium,"PSPReferralRegistry.buyWithMix(PoolKey,uint256,uint256,uint256,uint256) (src/PSPReferralRegistry.sol#130-158) uses literals with too many digits:
+	- address(key.hooks) != ctl.hookAddress() || IReferralHook(address(key.hooks)).referralRegistry() != address(this) || Currency.unwrap(key.currency0) != psp || Currency.unwrap(key.currency1) != mix || key.fee != 0x800000 || key.tickSpacing != 60 (src/PSPReferralRegistry.sol#140-144)"
+too-many-digits,Informational,Medium,"PSPReferralRegistry.buyWithMix(PoolKey,uint256,uint256,uint256,uint256) (src/PSPReferralRegistry.sol#130-158) uses literals with too many digits:
+	- address(key.hooks) != ctl.hookAddress() || IReferralHook(address(key.hooks)).referralRegistry() != address(this) || Currency.unwrap(key.currency1) != psp || Currency.unwrap(key.currency1) != mix || key.fee != 0x800000 || key.tickSpacing != 60 (src/PSPReferralRegistry.sol#140-144)"
+too-many-digits,Informational,Medium,"LinearZonesLean.config() (src/curves/LinearZonesLean.sol#24-62) uses literals with too many digits:
+	- r[2] = 560000000000000064 (src/curves/LinearZonesLean.sol#40)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[33] = 100000000000000000 (src/curves/LinearZones.sol#90)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[10] = 500000000000000000 (src/curves/Curve1Zones.sol#61)"
+too-many-digits,Informational,Medium,"ControllerDeployer.predictController(bytes32,PSPToken,IERC20,CurveMath.CurveConfig,address,address,StakerDeployer) (src/ControllerDeployer.sol#125-143) uses literals with too many digits:
+	- address(uint160(uint256(keccak256(bytes)(abi.encodePacked(bytes1(0xff),address(this),salt,keccak256(bytes)(abi.encodePacked(type()(RoundController).creationCode,abi.encode(token,mixETH,config,ownerFactory,descriptor,stakerDeployer)))))))) (src/ControllerDeployer.sol#134-142)"
+too-many-digits,Informational,Medium,"PepeArtData8Bit.slitherConstructorConstantVariables() (src/PepeArtData8Bit.sol#13-191) uses literals with too many digits:
+	- IRIS_COLORS = 0x50505072a497ea7d2754786f984227000000007cb4 (src/PepeArtData8Bit.sol#81)"
+too-many-digits,Informational,Medium,"HookInitCode.constructor() (src/HookInitCode.sol#50-58) uses literals with too many digits:
+	- code = type()(CurveHook).creationCode (src/HookInitCode.sol#54)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- b[1] = 510512625000000010584064 (src/curves/Curve1Zones.sol#20)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[6] = 500000000000000000 (src/curves/Curve1Zones.sol#57)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[28] = 872000000000000128 (src/curves/LinearZones.sol#85)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[8] = 500000000000000000 (src/curves/Curve1Zones.sol#59)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[20] = 776000000000000000 (src/curves/LinearZones.sol#77)"
+too-many-digits,Informational,Medium,"CurveHook.slitherConstructorConstantVariables() (src/CurveHook.sol#33-934) uses literals with too many digits:
+	- CANONICAL_FEE = 0x800000 (src/CurveHook.sol#103)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[26] = 848000000000000128 (src/curves/LinearZones.sol#83)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[20] = 500000000000000000 (src/curves/Curve1Zones.sol#71)"
+too-many-digits,Informational,Medium,"LinearZonesLean.config() (src/curves/LinearZonesLean.sol#24-62) uses literals with too many digits:
+	- r[6] = 800000000000000000 (src/curves/LinearZonesLean.sol#44)"
+too-many-digits,Informational,Medium,"ControllerDeployer.deployControllerAt(bytes32,PSPToken,IERC20,CurveMath.CurveConfig,address,address,StakerDeployer) (src/ControllerDeployer.sol#88-119) uses literals with too many digits:
+	- initCode = bytes.concat(type()(RoundController).creationCode,abi.encode(token,mixETH,config,ownerFactory,descriptor,stakerDeployer)) (src/ControllerDeployer.sol#103-106)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[2] = 560000000000000064 (src/curves/LinearZones.sol#59)"
+too-many-digits,Informational,Medium,"LinearZonesLean.config() (src/curves/LinearZonesLean.sol#24-62) uses literals with too many digits:
+	- b[2] = 400400000000000029360128 (src/curves/LinearZonesLean.sol#28)"
+too-many-digits,Informational,Medium,"StakerDeployer.predictStaker(bytes32,IERC20,IRoundController,address) (src/StakerDeployer.sol#54-69) uses literals with too many digits:
+	- address(uint160(uint256(keccak256(bytes)(abi.encodePacked(bytes1(0xff),address(this),salt,keccak256(bytes)(abi.encodePacked(type()(PSPStaker).creationCode,abi.encode(psp,controller,descriptor)))))))) (src/StakerDeployer.sol#60-68)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[22] = 500000000000000000 (src/curves/Curve1Zones.sol#73)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[24] = 500000000000000000 (src/curves/Curve1Zones.sol#75)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[29] = 100000000000000000 (src/curves/Curve1Zones.sol#80)"
+too-many-digits,Informational,Medium,"LinearZonesLean.config() (src/curves/LinearZonesLean.sol#24-62) uses literals with too many digits:
+	- r[9] = 100000000000000000 (src/curves/LinearZonesLean.sol#47)"
+too-many-digits,Informational,Medium,"LinearZonesLean.config() (src/curves/LinearZonesLean.sol#24-62) uses literals with too many digits:
+	- r[8] = 920000000000000128 (src/curves/LinearZonesLean.sol#46)"
+too-many-digits,Informational,Medium,"PSPReferralRegistry.buyWithMix(PoolKey,uint256,uint256,uint256,uint256) (src/PSPReferralRegistry.sol#130-158) uses literals with too many digits:
+	- address(key.hooks) != ctl.hookAddress() || IReferralHook(address(key.hooks)).referralRegistry() != address(this) || Currency.unwrap(key.currency0) != psp || Currency.unwrap(key.currency0) != mix || key.fee != 0x800000 || key.tickSpacing != 60 (src/PSPReferralRegistry.sol#140-144)"
+too-many-digits,Informational,Medium,"Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+	- r[6] = 250000000000000000 (src/curves/Curve2Zones.sol#43)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[22] = 800000000000000000 (src/curves/LinearZones.sol#79)"
+too-many-digits,Informational,Medium,"Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+	- r[15] = 100000000000000000 (src/curves/Curve2Zones.sol#52)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[12] = 680000000000000000 (src/curves/LinearZones.sol#69)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- b[1] = 510512625000000077692928 (src/curves/LinearZones.sol#22)"
+too-many-digits,Informational,Medium,"PSPFactory._birthWire() (src/PSPFactory.sol#483-549) uses literals with too many digits:
+	- key = PoolKey({currency0:currency0,currency1:currency1,fee:0x800000,tickSpacing:tickSpacing,hooks:hook}) (src/PSPFactory.sol#520-526)"
+too-many-digits,Informational,Medium,"Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+	- r[10] = 250000000000000000 (src/curves/Curve2Zones.sol#47)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[16] = 728000000000000128 (src/curves/LinearZones.sol#73)"
+too-many-digits,Informational,Medium,"LinearZonesLean.slitherConstructorConstantVariables() (src/curves/LinearZonesLean.sol#21-63) uses literals with too many digits:
+	- P0_WAD = 100000000000000 (src/curves/LinearZonesLean.sol#22)"
+too-many-digits,Informational,Medium,"Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+	- r[12] = 250000000000000000 (src/curves/Curve2Zones.sol#49)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[16] = 500000000000000000 (src/curves/Curve1Zones.sol#67)"
+too-many-digits,Informational,Medium,"TokenDeployer.predictToken(bytes32,string,string,address) (src/ControllerDeployer.sol#211-226) uses literals with too many digits:
+	- address(uint160(uint256(keccak256(bytes)(abi.encodePacked(bytes1(0xff),address(this),salt,keccak256(bytes)(abi.encodePacked(type()(PSPToken).creationCode,abi.encode(name,symbol,admin)))))))) (src/ControllerDeployer.sol#217-225)"
+too-many-digits,Informational,Medium,"Curve1Zones.config() (src/curves/Curve1Zones.sol#17-115) uses literals with too many digits:
+	- r[18] = 500000000000000000 (src/curves/Curve1Zones.sol#69)"
+too-many-digits,Informational,Medium,"PSPFactory.roundPool(uint256) (src/PSPFactory.sol#631-642) uses literals with too many digits:
+	- (currency0,currency1,0x800000,tickSpacing,address(r.hook)) (src/PSPFactory.sol#641)"
+too-many-digits,Informational,Medium,"LinearZones.config() (src/curves/LinearZones.sol#19-129) uses literals with too many digits:
+	- r[18] = 752000000000000000 (src/curves/LinearZones.sol#75)"
+too-many-digits,Informational,Medium,"Curve3Zones.slitherConstructorConstantVariables() (src/curves/Curve3Zones.sol#14-176) uses literals with too many digits:
+	- P0_WAD = 100000000000000 (src/curves/Curve3Zones.sol#15)"
+too-many-digits,Informational,Medium,"Curve2Zones.config() (src/curves/Curve2Zones.sol#17-73) uses literals with too many digits:
+	- r[8] = 250000000000000000 (src/curves/Curve2Zones.sol#45)"
+constable-states,Optimization,High,PSPFactory.baseSymbol (src/PSPFactory.sol#125) should be constant
+constable-states,Optimization,High,PSPFactory.baseName (src/PSPFactory.sol#124) should be constant

@@ -44,7 +44,8 @@ identifies that free ID, including after chosen-ID mints.
 The NFT interface advertises ERC-721 while omitting safe transfers and
 individual-NFT approvals. Completing that interface changes the public
 permission/transfer surface, so it was submitted to the user separately in
-NFT-INTERFACE-PROPOSAL.md. It is not silently bundled into these fixes.
+NFT-INTERFACE-PROPOSAL.md. The user subsequently approved it; the separate
+[implementation review](../2026-09-06-nft-interface/REVIEW.md) records its changes and validation.
 
 These contracts are not upgradeable. A fresh deployment is required to use
 the changes. A legacy factory continues using its original deployers and
