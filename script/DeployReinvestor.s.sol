@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {Script, console} from "forge-std/Script.sol";
+import {console} from "forge-std/Script.sol";
+import {DeploymentSupport} from "./DeploymentSupport.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {PSPFactory} from "../src/PSPFactory.sol";
@@ -23,20 +24,25 @@ import {IPSPZapIn} from "../src/interfaces/IPSPZapIn.sol";
 ///
 /// Env:
 ///   PSP_FACTORY  deployed PSPFactory (required)
-///   PSP_ROUND    round to wire the reinvestor to (default: current)
-contract DeployReinvestor is Script {
+///   PSP_ZAPIN    owner-attributing router from the same release (required)
+///   PSP_ROUND    completed current round (defaults to factory.currentRoundId)
+///   PSP_TESTNET  true for Base Sepolia checks; PSP_ANVIL for local mocks
+contract DeployReinvestor is DeploymentSupport {
     function run() external {
+        bool testnet = vm.envOr("PSP_TESTNET", false);
+        _validateModes(vm.envOr("PSP_ANVIL", false), testnet);
         PSPFactory factory = PSPFactory(vm.envAddress("PSP_FACTORY"));
+        _validateFactory(factory, testnet);
         uint256 roundId = vm.envOr("PSP_ROUND", factory.currentRoundId());
         PSPZapIn zapIn = PSPZapIn(vm.envAddress("PSP_ZAPIN"));
-
-        PSPFactory.Round memory r = factory.getRound(roundId);
-        require(address(r.controller) != address(0), "round missing");
+        _validateZapIn(address(zapIn), factory);
+        PSPFactory.Round memory r = _validateCurrentRound(factory, roundId);
 
         vm.startBroadcast();
         PSPReinvestor reinvestor =
             new PSPReinvestor(IPSPStaker(r.controller.stakerAddress()), IPSPZapIn(address(zapIn)), IERC20(address(factory.mixETH())), IERC20(address(r.token)));
         vm.stopBroadcast();
+        require(reinvestor.ATTRIBUTION_VERSION() == 1, "reinvestor attribution mismatch");
 
         console.log("round:", roundId);
         console.log("token:", address(r.token));

@@ -1,86 +1,56 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {Script, console} from "forge-std/Script.sol";
-import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
-
+import {console} from "forge-std/Script.sol";
+import {DeploymentSupport} from "./DeploymentSupport.sol";
 import {PSPFactory} from "../src/PSPFactory.sol";
-import {CurveMath} from "../src/libraries/CurveMath.sol";
-import {Curve1Zones} from "../src/curves/Curve1Zones.sol";
 import {PSPZapIn} from "../src/PSPZapIn.sol";
 import {PSPZapOut} from "../src/PSPZapOut.sol";
 import {IMixETH} from "../src/interfaces/IMixETH.sol";
 
-/// @title CompleteBaseDeploy — finish a DeployPSP broadcast that a node's
-///        per-tx gas cap cut short.
-/// @notice 2026-09-03 Base Sepolia: the genesis deployRound leg (~12M
-///        constant + salt-mine tail, see PSPFactory staging notes) breached
-///        the RPC's per-tx cap ON SEND after mocks/factory/sine landed.
-///        This script finishes the remaining legs idempotently: each leg
-///        checks chain state first, so re-running is safe. If the birth
-///        still bounces on send, just retry — every attempt re-rolls the
-///        mine entropy and a failed send costs nothing.
-/// Env: PSP_FACTORY (required), PSP_TESTNET + timing knobs (same as
-///      DeployPSP), PSP_HTML (default script/app.html).
-contract CompleteBaseDeploy is Script {
+/// @title CompleteBaseDeploy
+/// @notice Resume genesis after factory, descriptor and sine configuration land.
+/// Provide PSP_ZAPIN / PSP_ZAPOUT to reuse already deployed routers. Missing
+/// router addresses deploy fresh instances, so retain their successful receipts.
+/// PSP_TESTNET defaults the embedded page to the read-only testnet record.
+contract CompleteBaseDeploy is DeploymentSupport {
     function run() external {
-        PSPFactory factory = PSPFactory(vm.envAddress("PSP_FACTORY"));
         bool testnet = vm.envOr("PSP_TESTNET", false);
-
-        // 1) genesis round — owner reserves, then 3 permissionless birth
-        //    steps (each its own tx, deterministic, under every per-tx cap)
-        uint256 roundId = factory.currentRoundId();
-        if (roundId == 0) {
-            if (!factory.reservationActive()) {
-                CurveMath.CurveConfig memory cc = Curve1Zones.config();
-                cc.timings = testnet
-                    ? CurveMath.packTimingsCapped(
-                        vm.envOr("PSP_PREDEPOSIT_SEC", uint256(2 hours)),
-                        vm.envOr("PSP_VEST_SEC", uint256(1 hours)),
-                        vm.envOr("PSP_DET_SEC", uint256(2 hours)),
-                        vm.envOr("PSP_WALLET_CAP_MIX", uint256(10))
-                    )
-                    : 0;
-                vm.startBroadcast();
-                factory.reserveGenesis(
-                    PSPFactory.RoundParams({name: "Positive Sum Pepes", symbol: "PSP", curveConfig: cc})
-                );
-                vm.stopBroadcast();
-            }
-            for (uint256 i; i < 4 && factory.currentRoundId() == 0; i++) {
-                vm.startBroadcast();
-                factory.birthStep(); // 1..3; a 4th call reverting is harmless
-                vm.stopBroadcast();
-            }
-            require(factory.currentRoundId() != 0, "genesis birth did not complete");
-            roundId = factory.currentRoundId();
-            console.log("round born:", roundId);
-        } else {
-            console.log("round already live:", roundId);
+        _validateModes(vm.envOr("PSP_ANVIL", false), testnet);
+        PSPFactory factory = PSPFactory(vm.envAddress("PSP_FACTORY"));
+        _validateFactory(factory, testnet);
+        address zapIn = vm.envOr("PSP_ZAPIN", address(0));
+        address zapOut = vm.envOr("PSP_ZAPOUT", address(0));
+        // Validate supplied routers and the HTML input before any new writes.
+        if (zapIn != address(0)) _validateZapIn(zapIn, factory);
+        if (zapOut != address(0)) _validateZapOut(zapOut, factory);
+        bool publishHtml = bytes(factory.html()).length == 0;
+        string memory html;
+        if (publishHtml) {
+            require(factory.owner() == msg.sender, "HTML publication requires factory owner");
+            html = vm.replace(vm.readFile(_htmlPath(testnet)), "__FACTORY__", vm.toString(address(factory)));
         }
 
-        // 2) on-chain UI — skip if already published
-        if (bytes(factory.html()).length == 0) {
-            string memory h = vm.readFile(vm.envOr("PSP_HTML", string("script/app.html")));
-            h = vm.replace(h, "__FACTORY__", vm.toString(address(factory)));
+        _completeGenesis(factory);
+        _validateCurrentRound(factory, factory.currentRoundId());
+        if (publishHtml) {
             vm.startBroadcast();
-            factory.setHtml(h);
+            factory.setHtml(html);
             vm.stopBroadcast();
-            console.log("ui bytes:", bytes(h).length);
-        } else {
-            console.log("ui already published");
         }
-
-        // 3) quality-of-life routers (standalone contracts; the UI gets
-        //    their addresses from env, the reinvestor pass needs zapIn)
-        vm.startBroadcast();
-        IPoolManager pm = factory.poolManager();
-        IMixETH mix = IMixETH(address(factory.mixETH()));
-        PSPZapIn zapIn = new PSPZapIn(mix, pm);
-        PSPZapOut zapOut = new PSPZapOut(mix, pm);
-        vm.stopBroadcast();
-        console.log("zapIn:", address(zapIn));
-        console.log("zapOut:", address(zapOut));
+        if (zapIn == address(0)) {
+            vm.startBroadcast();
+            zapIn = address(new PSPZapIn(IMixETH(address(factory.mixETH())), factory.poolManager()));
+            vm.stopBroadcast();
+        }
+        if (zapOut == address(0)) {
+            vm.startBroadcast();
+            zapOut = address(new PSPZapOut(IMixETH(address(factory.mixETH())), factory.poolManager()));
+            vm.stopBroadcast();
+        }
+        console.log("round:", factory.currentRoundId());
         console.log("factory:", address(factory));
+        console.log("zapIn:", zapIn);
+        console.log("zapOut:", zapOut);
     }
 }

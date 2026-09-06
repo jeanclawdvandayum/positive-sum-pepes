@@ -3,6 +3,16 @@
 End-to-end checklist for shipping a playtest round of PSP. Work top to
 bottom; every box is a verifiable step.
 
+**2026-09-07 FRESH BASE SEPOLIA RELEASE PREPARATION.** Use
+[BASE-SEPOLIA-DEPLOY.md](docs/audit/BASE-SEPOLIA-DEPLOY.md) and
+`node scripts/deployment/base-sepolia.mjs --dry-run`. That runbook supersedes
+the historical commands and defaults below. The current profile is 2h predeposit,
+1h vesting, 2h clock and an uncapped wallet within the 500 mixETH global cap.
+Predeposits accept positive dust; active buys/tickets use 0.005 mixETH and +4:20.
+The runner isolates receipts, verifies current code and wiring, deploys the
+reinvestor from confirmed state, and generates frontend settings. Real writes
+require `--broadcast` with a keystore/sender. Names remain a separate rollout.
+
 **2026-09-03 BASE SEPOLIA DEPLOY-READY (sigma-testnet).** Everything below is
 prepared; the only manual step is filling `example.env` (→ `.env`):
 1. `example.env` rewritten Base-Sepolia-first: `BASE_SEPOLIA_RPC_URL`,

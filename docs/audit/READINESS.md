@@ -1,14 +1,18 @@
 # Audit preparation — September 2026
 
 This is a review packet for the current source tree, not a security certification.
-Final local gates: **505 Solidity tests / 67 suites**, including 64 invariant runs
+Final local gates: **513 Solidity tests / 68 suites**, including 64 invariant runs
 and 2,048 calls per real-V4 handler with zero reverts; the previous hardening
-revision also passed a 256-run / 32,768-call three-wallet campaign and complete exits; **122 frontend tests**, **11 verifier tests**; TypeScript/Vite;
+revision also passed a 256-run / 32,768-call three-wallet campaign and complete exits; **133 frontend tests**, **11 verifier tests**; TypeScript/Vite;
 155 ABI declarations; 36 production size checks; independent oracle and governance
 gates. Static-analysis flags remain triaged separately. See GATE-LOG.md.
-A fresh Base Sepolia release is deployed and configured in the local frontend.
+The existing Base Sepolia release remains configured in the local frontend.
 See [TESTNET-PLAYTEST.md](TESTNET-PLAYTEST.md) for the running app, release manifest,
 source verification and wallet test sequence. Earlier deployments remain unchanged.
+Fresh deployment scripts now cover the changes below, with a default local-fork
+rehearsal, confirmed-address exports and an explicit live broadcast command. See
+[BASE-SEPOLIA-DEPLOY.md](BASE-SEPOLIA-DEPLOY.md). Preparing these scripts does not
+replace the existing deployment or frontend configuration.
 The current testnet frontend uses the AUD-14 replacement ZapIn/Reinvestor; see
 the [repair manifest](deployments/base-sepolia-2026-09-05-reinvest-repair.json).
 Original round contracts, balances and NFTs remain in place. The AUD-15 atomic

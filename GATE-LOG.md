@@ -1100,3 +1100,50 @@ Solidity source changed after the contract-source hash above.
   factory successors keep their code. No deployment or wallet transaction was
   performed. See `docs/audit/2026-09-06-blockhash-pepes.md` for entropy assumptions,
   collision behavior and compatibility details.
+
+
+## 2026-09-07 — Fresh Base Sepolia deployment preparation
+
+- Added `scripts/deployment/base-sepolia.mjs`. Its default is a disposable local
+  Base Sepolia fork. Live writes require an explicit broadcast flag, named
+  encrypted keystore, sender, chain/PoolManager checks and a clean reviewed
+  revision rechecked before each deployment pass. Separate per-run receipts,
+  cache, build inputs and exports preserve the existing release and UI config.
+- Aligned scripts and `example.env` with the current playtest profile: two-hour
+  predeposit, one-hour vest (six ten-minute epochs), two-hour clock, uncapped
+  per-wallet deposits within the 500 mixETH global cap. Predeposit accepts one
+  wei; active buys/tickets remain 0.005 mixETH and add up to 260 seconds per unit.
+  Testnet embedded HTML remains read-only. Naming remains a separate rollout.
+- Added shared deployment preflights, current-round reinvestor wiring checks,
+  and recovery scripts that preserve reservations and completed birth phases.
+  Fixed reservation gas estimation after an actual local broadcast exhausted
+  the simulation-derived allowance. Both fresh/recovery paths now specify a
+  15,000,000-gas reservation call. The bounded miner can still exhaust its search
+  on an unlucky block; retry only the unfinished phase in a later block.
+- The schema-3 manifest checks 17 executable artifacts except compiler-declared
+  immutable slots, hook creation-code shards, reciprocal wiring, feature
+  versions, fees and four-field timings at one block. Frontend history begins
+  at a verified canonical factory CREATE receipt. Exports leave naming disabled
+  and never copy deployment credentials into frontend configuration.
+- Final deterministic gate passed: **513 Solidity tests / 68 suites**,
+  **133 frontend tests**, **11 verifier tests**, **155 ABI declarations**,
+  **36 production size checks**, independent oracle/governance and TypeScript/
+  Vite. This includes eight deployment-script regressions and eleven new JS
+  runner/manifest tests. Existing compiler/bundle warnings remain. The script
+  test harness uses the shared helpers directly, avoiding an embedded copy of
+  the complete deployment script.
+- Successful local rehearsal: `out/releases/base-sepolia-rehearsal-2026-09-07-r4/`.
+  **17/17 deployment receipts succeeded**; total gas **53,126,650**, largest
+  transaction **9,049,335**. Forge preserved the reservation's explicit gas
+  limit (`isFixedGasLimit=true`); that call used **4,341,384** gas. Both opt-in
+  release tests passed against the freshly deployed contracts at local block
+  **46,473,483**: predeposit/claim, block-hash art and uniqueness, atomic referral
+  rollback/binding/reset, individual approvals, safe transfers, owner-attributed
+  reinvestment, two rounds, old-round fees and exits.
+- The rehearsal records source base `8805c023` plus the then-uncommitted changes
+  (`sourceDirty=true`, `rehearsal=true`). Its node stopped afterwards; its
+  addresses/frontend env are local evidence only. Public source verification
+  remains part of the explicit live command. No public-chain transactions,
+  mainnet/name-custody actions, production-contract edits, or active UI env
+  changes were made. See `docs/audit/BASE-SEPOLIA-DEPLOY.md` for release/recovery
+  commands and `result.json` in the rehearsal directory for completion status.
