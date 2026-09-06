@@ -157,6 +157,12 @@ export default function Predeposit() {
 
   const endTime = pd && duration !== undefined ? pd.startTime + duration : undefined
   const remaining = endTime !== undefined ? Math.max(0, Number(endTime - BigInt(nowSec))) : undefined
+  const countdownParts = remaining === undefined ? [] : [
+    ...(remaining >= 86400 ? [{ label: 'days', value: Math.floor(remaining / 86400) }] : []),
+    { label: 'hours', value: Math.floor(remaining / 3600) % 24 },
+    { label: 'minutes', value: Math.floor(remaining / 60) % 60 },
+    { label: 'seconds', value: remaining % 60 },
+  ]
   const mode = round.mode
   const badge = mode !== undefined ? MODE_BADGES[mode] : undefined
   const launched = pd?.closed === true && (mode ?? 0) >= 1
@@ -256,13 +262,31 @@ export default function Predeposit() {
           {badge && <span className={`chip ${badge.cls}`}>{badge.label}</span>}
           {pd?.capReached && <span className="chip bg-emerald-100 text-emerald-700">cap reached</span>}
           {pd?.windowOver && <span className="chip bg-amber-100 text-amber-700">window over</span>}
-          {pd && !pd.closed && remaining !== undefined && (
-            <span className="chip border border-sky-100 bg-white text-slate-500">⏳ {fmtCountdown(remaining)}</span>
-          )}
         </div>
         <p className="mt-1 text-sm text-slate-500">
           get your frog in the door. deposit mixETH before launch to join the pooled first buy. after launch, claim your share as PSP staked in a pepe NFT.
         </p>
+        {pd && !pd.closed && remaining !== undefined && (
+          <div className="mt-6 rounded-2xl border border-line bg-bg-2 px-3 py-6 sm:px-8 sm:py-8">
+            <p className="text-center font-data text-xs uppercase tracking-widest text-text-lo sm:text-sm">
+              {remaining > 0 ? 'predeposit window ends in' : 'predeposit window elapsed'}
+            </p>
+            <div
+              role="timer"
+              aria-label={`predeposit window: ${fmtCountdown(remaining)} remaining`}
+              className={`mx-auto mt-5 grid max-w-3xl gap-2 sm:gap-6 ${countdownParts.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}
+            >
+              {countdownParts.map(({ label, value }) => (
+                <div key={label} aria-hidden="true" className="min-w-0 text-center">
+                  <div className={`font-clock leading-none tabular-nums text-phase-calm ${countdownParts.length === 4 ? 'text-[clamp(1.5rem,9vw,5.5rem)]' : 'text-[clamp(2rem,12vw,6.5rem)]'}`}>
+                    {String(value).padStart(2, '0')}
+                  </div>
+                  <div className="mt-4 font-data text-[10px] uppercase tracking-widest text-text-lo sm:text-xs">{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

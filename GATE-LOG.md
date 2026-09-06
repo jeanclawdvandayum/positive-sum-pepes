@@ -877,3 +877,18 @@ Solidity source changed after the contract-source hash above.
   `docs/audit/2026-09-06-wallet-dna.md`.
 - Source SHA-256 (sorted src/**/*.sol path + NUL + contents):
   `0175b88cf9ad42c52c6ccc6e08b52b28ac78bb2568f33d8393c9c6aa3f762021`.
+
+## 2026-09-06 — Prominent predeposit countdown
+
+- Replaced the small header chip with a full-width countdown panel using the
+  existing seven-segment font, up to 104px digits. Separate time-unit labels,
+  optional days and an elapsed-window label retain the actual predeposit timing
+  and shared PhaseEngine heartbeat. Contract and transaction logic are unchanged.
+- Deterministic gate passes: **502 Solidity tests / 67 suites**, **107 frontend
+  tests**, **11 verifier tests**, **155 ABI declarations**, **36 production size
+  checks**, oracle/governance and TypeScript/Vite. Final responsive font adjustment
+  also passes TypeScript/Vite. No new tests were added for this presentation change.
+- Browser checked desktop and 390px/320px widths against the current elapsed
+  predeposit window. Final 320px timer width/scrollWidth both measure 220px;
+  digits fit their 68px columns. Viewport override restored. Existing mobile
+  navigation overflow remains outside this change. No wallet transaction occurred.
