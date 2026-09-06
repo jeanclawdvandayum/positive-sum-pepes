@@ -11,7 +11,7 @@ import {INameEligibility} from "./PSPStakeNameGate.sol";
 /// Registration is not round-scoped; the latest registered/selected name is the
 /// wallet's PSP display name, subject to WNS ownership, resolution and expiry.
 contract PSPNameRegistrar is PSPNameCustody {
-    uint256 public constant REGISTRAR_VERSION = 1;
+    uint256 public constant REGISTRAR_VERSION = 2;
     uint256 public constant REGISTRATION_FEE = 0.0005 ether;
     uint256 public constant MIN_COMMIT_AGE = 60;
     uint256 public constant MAX_COMMIT_AGE = 1 days;
@@ -20,6 +20,9 @@ contract PSPNameRegistrar is PSPNameCustody {
 
     struct Commitment { bytes32 hash; uint64 createdAt; uint64 epoch; uint256 gateVersion; }
     mapping(address => Commitment) public commitments;
+    // Monotonic even when the same hash is committed twice in one block.
+    // Remote fee permits cannot survive consumption or a replacement commit.
+    mapping(address => uint256) public commitNonce;
     mapping(address => uint256) public primaryName;
 
     error InvalidGate();
@@ -66,6 +69,7 @@ contract PSPNameRegistrar is PSPNameCustody {
     function commit(bytes32 hash) external nonReentrant {
         _requireActiveParent();
         if (hash == bytes32(0)) revert InvalidCommitment();
+        ++commitNonce[msg.sender];
         commitments[msg.sender] = Commitment(hash, uint64(block.timestamp), parentEpoch, gateVersion);
         emit NameCommitted(msg.sender, hash);
     }

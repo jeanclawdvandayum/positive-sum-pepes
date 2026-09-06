@@ -1,10 +1,10 @@
 # Audit preparation — September 2026
 
 This is a review packet for the current source tree, not a security certification.
-Final local gates: **472 Solidity tests / 64 suites**, including 64 invariant runs
+Final local gates: **482 Solidity tests / 65 suites**, including 64 invariant runs
 and 2,048 calls per real-V4 handler with zero reverts; the previous hardening
-revision also passed a 256-run / 32,768-call three-wallet campaign and complete exits; **94 frontend tests**; TypeScript/Vite;
-144 ABI declarations; 34 production size checks; independent oracle and governance
+revision also passed a 256-run / 32,768-call three-wallet campaign and complete exits; **98 frontend tests**, **11 verifier tests**; TypeScript/Vite;
+151 ABI declarations; 35 production size checks; independent oracle and governance
 gates. Static-analysis flags remain triaged separately. See GATE-LOG.md.
 A fresh Base Sepolia release is deployed and configured in the local frontend.
 See [TESTNET-PLAYTEST.md](TESTNET-PLAYTEST.md) for the running app, release manifest,
@@ -26,9 +26,12 @@ transfer/fee approvals and frontend controls are implemented in source; see the
 WNS naming now has a registrar, same-chain PSP eligibility gate, parent custody
 and recovery controls, plus verified name display and a registration UI. This is
 a source implementation and local-fork rehearsal, **not a live hybrid release**.
-Both real parent domains remain in the user's wallet. Ethereum cannot directly
-read Base Sepolia PSP positions; the cross-chain verifier and free-claim policy
-decisions are pending. See [NAMES.md](NAMES.md) and the
+Both real parent domains remain in the user's wallet. The user approved the
+owner-run cross-chain verifier. Its EIP-712 gate, bounded HTTP service, dedicated
+permit key and hybrid registration UI are implemented and rehearsed against local
+forks of actual WNS and deployed PSP contracts. No additional free-claim caps were
+introduced. Mainnet deployment/custody activation remain pending; see the
+[remote naming review](2026-09-06-remote-names/REVIEW.md). See [NAMES.md](NAMES.md) and the
 [naming integration review](2026-09-06-names/REVIEW.md). Names have their own admin
 and fee balance; this work does not add admin powers to the PSP game contracts.
 

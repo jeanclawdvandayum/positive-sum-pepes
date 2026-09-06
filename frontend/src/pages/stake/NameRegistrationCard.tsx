@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAccount, useSwitchChain, useWriteContract } from 'wagmi'
 import { getAccount } from '@wagmi/core'
-import { toHex } from 'viem'
+import { toHex, decodeAbiParameters, parseAbiParameters } from 'viem'
 import { ADDRESSES, CHAIN_ID, wagmiConfig } from '../../lib/config'
-import { nameClient, nameNamespace as ns, nameQueryKey } from '../../lib/nameConfig'
+import { nameClient, nameNamespace as ns, nameQueryKey, nameSource, nameVerifierUrl } from '../../lib/nameConfig'
 import { assertNameFeeQuote, isNameLabel, nameCommitment, nameRegistrarAbi, normalizeNameLabel, parseNamePlan,
   readNameRegistration, type NamePlan } from '../../lib/nameRegistration'
+import { requestNamePermit } from '../../lib/namePermit'
 import { wnsAbi } from '../../lib/weiNames'
 import { confirmTransaction } from '../../lib/transactions'
 import { isRpcUnavailable } from '../../lib/rpcErrors'
@@ -30,14 +31,12 @@ export default function NameRegistrationCard() {
   const key = `psp-name-commit:${ns.chainId}:${ns.registrar}:${ns.parentId}:${address?.toLowerCase()}`
   const plan = planState?.key === key ? planState.plan : undefined
   const status = activity?.key === key ? activity : undefined
-  // A same-chain gate cannot read Base Sepolia from Ethereum. Cross-chain
-  // registration stays disabled until its trust model and adapter are approved.
-  const ready = !!ns.registrar && ns.chainId === CHAIN_ID
+  const ready = !!ns.registrar && (ns.chainId === CHAIN_ID || (ns.chainId === 1 && !!nameSource))
   const queryKey = ['name-registration', key, ADDRESSES.factory]
   const query = useQuery({
     queryKey,
     enabled: ready && !!address,
-    queryFn: ({ signal }) => readNameRegistration(nameClient, ns, ADDRESSES.factory, address!, signal),
+    queryFn: ({ signal }) => readNameRegistration(nameClient, ns, ADDRESSES.factory, address!, signal, nameSource),
     refetchInterval: 15_000, staleTime: 10_000, retry: false,
   })
   useEffect(() => {
@@ -68,7 +67,7 @@ export default function NameRegistrationCard() {
         }
       }
       assertWallet()
-      const fresh = await readNameRegistration(nameClient, ns, ADDRESSES.factory, address)
+      const fresh = await readNameRegistration(nameClient, ns, ADDRESSES.factory, address, undefined, nameSource)
       const canReveal = plan && fresh.commitment[0] === nameCommitment(ns, address, plan)
         && fresh.commitment[2] === fresh.epoch && fresh.commitment[3] === fresh.gateVersion
         && fresh.timestamp <= fresh.commitment[1] + fresh.maxAge
@@ -87,9 +86,17 @@ export default function NameRegistrationCard() {
         localStorage.setItem(key, JSON.stringify(next))
         setPlanState({ key, plan: next })
       }
+      let proof = fresh.proof
+      if (canReveal && nameSource && fresh.price === 0n) {
+        const [roundId, pepeId] = decodeAbiParameters(parseAbiParameters('uint256,uint256'), fresh.proof)
+        proof = await requestNamePermit(nameVerifierUrl, address, roundId, pepeId)
+        const price = await nameClient.readContract({ address: ns.registrar, abi: nameRegistrarAbi,
+          functionName: 'registrationPrice', args: [address, proof] })
+        assertNameFeeQuote(fresh.price, price)
+      }
       const params = canReveal
         ? { address: ns.registrar, abi: nameRegistrarAbi, functionName: 'register' as const,
-            args: [next.label, next.salt, fresh.proof] as const, value: fresh.price }
+            args: [next.label, next.salt, proof] as const, value: fresh.price }
         : { address: ns.registrar, abi: nameRegistrarAbi, functionName: 'commit' as const,
             args: [nameCommitment(ns, address, next)] as const }
       await confirmTransaction({
@@ -97,8 +104,8 @@ export default function NameRegistrationCard() {
         submit: p => {
           assertWallet()
           return p.functionName === 'register'
-            ? writeContractAsync({ ...p, account: address, chainId: CHAIN_ID })
-            : writeContractAsync({ ...p, account: address, chainId: CHAIN_ID })
+            ? writeContractAsync({ ...p, account: address, chainId: ns.chainId })
+            : writeContractAsync({ ...p, account: address, chainId: ns.chainId })
         },
         wait: async hash => {
           let replacementReason: string | undefined
@@ -129,6 +136,10 @@ export default function NameRegistrationCard() {
     {!ready ? <p className="mt-3 text-xs leading-relaxed text-text-lo">
       {ns.parentLabel}.wei lives on Ethereum. Registration is being prepared for this PSP deployment.
     </p> : <>
+      {nameSource && <p className="mt-3 text-xs leading-relaxed text-text-lo">
+        Names register on Ethereum. A verifier checks your PSP stake on {CHAIN_ID === 84532 ? 'Base Sepolia' : 'the game network'}.
+        Fresh stakes and transfers qualify once finalized. Your wallet handles the two registration transactions.
+      </p>}
       <label className="mt-4 block text-xs text-text-lo" htmlFor="pepe-name">your alias</label>
       <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-line bg-bg-1 p-3">
         <input id="pepe-name" className="min-w-0 flex-1 bg-transparent font-data text-text-hi outline-none"
@@ -143,7 +154,7 @@ export default function NameRegistrationCard() {
         {reveal && wait > 0 ? ` ready in about ${wait}s.` : ''}
       </p>}
       {query.isError && <p className="mt-2 break-words text-xs text-phase-critical">{errorMessage(query.error)}</p>}
-      {address && chainId !== CHAIN_ID ? <button type="button" onClick={() => switchChainAsync({ chainId: CHAIN_ID }).catch(error => setActivity({ key, error: errorMessage(error) }))}
+      {address && chainId !== ns.chainId ? <button type="button" onClick={() => switchChainAsync({ chainId: ns.chainId }).catch(error => setActivity({ key, error: errorMessage(error) }))}
         className="mt-3 rounded-lg border border-line px-4 py-2 text-sm">switch to the registration network</button> :
         <button type="button" onClick={registerName} disabled={!address || !state || status?.busy || (reveal ? wait > 0 : !validLabel)}
           className="mt-3 w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-black disabled:opacity-40">
@@ -155,6 +166,10 @@ export default function NameRegistrationCard() {
       }}>choose another name</button>}
     </>}
     {status?.error && <p className="mt-2 break-words text-xs text-phase-critical">{status.error}</p>}
+    {nameSource && address && chainId !== CHAIN_ID && <button type="button" className="mt-3 text-xs text-text-lo underline"
+      onClick={() => switchChainAsync({ chainId: CHAIN_ID }).catch(error => setActivity({ key, error: errorMessage(error) }))}>
+      back to the PSP network
+    </button>}
     {status?.done && <p className="mt-2 break-words text-sm text-phase-calm">{status.done} is yours. Your name follows you around PSP.</p>}
     <p className="mt-3 text-xs leading-relaxed text-text-lo">names stay with their WNS wallet owner and depend on the parent domain’s renewal. The domain admin can recover the parent and reassign subdomains.</p>
   </section>

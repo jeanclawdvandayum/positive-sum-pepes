@@ -1,6 +1,6 @@
 import { cookieStorage, createStorage } from 'wagmi'
 import { base, baseSepolia, mainnet, sepolia } from 'wagmi/chains'
-import { defineChain } from 'viem'
+import { defineChain, type Transport } from 'viem'
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { injectedWallet } from '@rainbow-me/rainbowkit/wallets'
 import { rpcTransport } from './rpcTransport'
@@ -57,17 +57,21 @@ export const RPC_URL = env.VITE_RPC_URL || targetChain.rpcUrls.default.http[0]
 export const RPC_FALLBACK_URL = env.VITE_RPC_FALLBACK_URL as string | undefined
 export const DEPLOYMENT_BLOCK = BigInt(env.VITE_DEPLOYMENT_BLOCK || '0')
 
+// Naming lives on Ethereum even while the game lives on Base Sepolia.
+const separateNameChain = Boolean(env.VITE_NAME_REGISTRAR) && Number(env.VITE_NAME_CHAIN_ID || 1) === 1 && CHAIN_ID !== 1
+
 export const wagmiConfig = getDefaultConfig({
   appName: 'Positive Sum Pepes',
   projectId: env.VITE_WC_PROJECT_ID || '',
   // Browser extensions use EIP-6963/injection without a relay project.
   // Offer remote wallets only when their real project is configured.
   wallets: env.VITE_WC_PROJECT_ID ? undefined : [{ groupName: 'Browser wallets', wallets: [injectedWallet] }],
-  chains: [targetChain],
+  chains: separateNameChain ? [targetChain, mainnet] : [targetChain],
   batch: { multicall: { batchSize: 4096, wait: 20 } },
   storage: createStorage({ storage: cookieStorage }),
   transports: {
+    ...(separateNameChain ? { [mainnet.id]: rpcTransport(env.VITE_NAME_RPC_URL || 'https://ethereum-rpc.publicnode.com') } : {}),
     [targetChain.id]: rpcTransport(RPC_URL, RPC_FALLBACK_URL),
-  },
+  } as Record<number, Transport>,
   ssr: false,
 })

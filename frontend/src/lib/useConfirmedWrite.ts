@@ -12,7 +12,7 @@ import { assertReinvestor } from './reinvestRules'
 /** AUD-4: every UI write simulates, waits for mining, and checks receipt status. */
 export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } | { nftRoundId: bigint | undefined } | { referralPurchase: { roundId: bigint; registry?: `0x${string}` } }) {
   const { address, chainId } = useAccount()
-  const client = usePublicClient()
+  const client = usePublicClient({ chainId: CHAIN_ID })
   const { writeContractAsync } = useWriteContract()
   const confirmed = async (parameters: Parameters<typeof writeContractAsync>[0]) => {
     if (!client || !address) throw new Error('Connect a wallet first.')

@@ -52,10 +52,10 @@ function reader(overrides = {}) {
       if (overrides.failAt === c.functionName) throw Error('RPC unavailable')
       if (c.functionName in overrides) return overrides[c.functionName]
       const defaults = {
-        REGISTRAR_VERSION: 1n, REGISTRATION_FEE: NAME_REGISTRATION_FEE, MIN_COMMIT_AGE: 60n,
+        REGISTRAR_VERSION: 2n, REGISTRATION_FEE: NAME_REGISTRATION_FEE, MIN_COMMIT_AGE: 60n,
         MAX_COMMIT_AGE: 86400n, names: ns.names, parentId: ns.parentId, registrationEnabled: true,
         eligibilityGate: gate, commitments: [`0x${'00'.repeat(32)}`, 0n, 1n, 1n], parentEpoch: 1n,
-        gateVersion: 1n, ownerOf: c.address === ns.names ? registrar : account, resolve: registrar,
+        gateVersion: 1n, commitNonce: 0n, ownerOf: c.address === ns.names ? registrar : account, resolve: registrar,
         records: ['pepetesters', 0n, 999999n, 1n, 0n], factory, currentRoundId: 0n,
         registrationPrice: NAME_REGISTRATION_FEE,
       }
@@ -74,7 +74,7 @@ test('registration preflight pins custody, rules, proof and fee to one block', a
 })
 test('wrong network, ABI rules, parent, custody, epoch and source block registration', async () => {
   for (const change of [
-    { chainId: 84532 }, { REGISTRAR_VERSION: 2n }, { REGISTRATION_FEE: 1n },
+    { chainId: 84532 }, { REGISTRAR_VERSION: 1n }, { REGISTRATION_FEE: 1n },
     { parentId: 1n }, { names: factory }, { MIN_COMMIT_AGE: 0n }, { MAX_COMMIT_AGE: 100000n },
     { registrationEnabled: false }, { ownerOf: account }, { parentEpoch: 2n },
     { resolve: '0x0000000000000000000000000000000000000000' }, { factory: account },

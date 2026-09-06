@@ -1,0 +1,41 @@
+{
+  "status": "prepared and simulated; NOT broadcast or activated",
+  "preparedAt": "2026-09-06T04:17:21.746669+00:00",
+  "sourceCommitBaseline": "35c53afd",
+  "sourceSha256": "77848d96cb74f958c49d803e00a1852557c7b804a28d5d9aeaff4ffc0afe9e42",
+  "destinationChainId": 1,
+  "sourceChainId": 84532,
+  "sourceFactory": "0xc79b74dacf99a82f1b1e847948338f9263913a59",
+  "names": "0x0000000000696760E15f265e828DB644A0c242EB",
+  "namesRuntimeHash": "0x5b791c832d4373a8d4f977c37d6973a5dbe0924c6d287a2effaa549be31c0221",
+  "parentLabel": "pepetesters.wei",
+  "parentId": "6361740363536127648378182158538670061512393038427336338828631921647240523046",
+  "admin": "0x1d52Ad18c074b8125fBCFDFcD01773c6BEdbd88A",
+  "permitSigner": "0x1016bA06d17774AD34085cdDe38Ec3540C7F34f8",
+  "registrarVersion": 2,
+  "gateVersion": 1,
+  "maxPermitAgeSeconds": 180,
+  "registrationFeeWei": "500000000000000",
+  "extraFreeClaimCaps": false,
+  "simulatedDeploymentGas": "3922741",
+  "sampledGasPriceGwei": "0.167702781",
+  "sampledDeploymentEstimateETH": "0.000657854574842721",
+  "estimateExcludes": [
+    "parent safe transfer",
+    "registration activation",
+    "user registration transactions"
+  ],
+  "confirmedRegistrar": null,
+  "confirmedGate": null,
+  "activationSteps": [
+    "Deploy PSPRemoteNameGate(admin, permitSigner, sourceChainId, sourceFactory).",
+    "Deploy PSPNameRegistrar(names, parentId, admin, confirmedGate).",
+    "Verify receipts, runtime, administrator, parent ID, source chain/factory and signer.",
+    "Configure and start the loopback verifier with confirmed addresses and the dedicated private key.",
+    "As admin, call WNS.safeTransferFrom(admin, confirmedRegistrar, parentId).",
+    "As admin, call confirmedRegistrar.setRegistrationEnabled(true).",
+    "Verify parent owner/resolve/epoch, set frontend name env and rebuild, then perform a wallet playtest."
+  ],
+  "mainnetTransactionsBroadcast": false,
+  "realParentCustodyChanged": false
+}

@@ -1,0 +1,16 @@
+{
+  "result": "PASS: Base Sepolia PSP state -> HTTP permit -> local canonical WNS free/paid mint, display, replay rejection and parent recovery",
+  "sourceIsFork": true,
+  "sourceChainId": 84532,
+  "sourceFactory": "0xc79b74dacf99a82f1b1e847948338f9263913a59",
+  "roundId": "1",
+  "pepeId": "1",
+  "sourceFinalizedBlock": "46417135",
+  "destinationChainId": 31337,
+  "gate": "0xd09deaaa17528748a781024213249d5c89bb6b11",
+  "registrar": "0xde0f25e61767bc115bf67915469a1e16fd0087aa",
+  "freeGas": "258923",
+  "paidGas": "247073",
+  "realDomainsTransferred": false,
+  "mainnetTransactionsBroadcast": false
+}

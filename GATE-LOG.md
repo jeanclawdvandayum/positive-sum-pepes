@@ -762,3 +762,45 @@ Solidity source changed after the contract-source hash above.
   source/API observations, the two parent manifests and remaining release work.
 - Source SHA-256 (sorted src/**/*.sol path + NUL + contents):
   `82ec707f2f2a86a1ba5700b40d9272a549ace78e71138a35cee3d98744af8340`.
+
+## 2026-09-06 — Approved remote WNS eligibility verifier
+
+- Baseline `35c53afd`. User approved the owner-run verifier; retain the original
+  funded-NFT rule without adding per-wallet/per-NFT free-name caps. Added
+  PSPRemoteNameGate, EIP-712 permits, dedicated signer/rotation, registrar version
+  2 with monotonic commit nonce, bounded Node HTTP service, source/destination UI
+  separation, deployment script and local two-fork end-to-end rehearsal.
+- Permits bind source chain/factory, destination chain/gate/registrar, wallet,
+  name commitment/nonce, parent/gate/signer epochs, round/NFT and finalized source
+  block/hash. Maximum 180 seconds. Finalized and latest NFT ownership/principal
+  must agree; stale/reorganized blocks fail issuance. Invalid proof reverts rather
+  than changing a free transaction into a paid one. Requests require no additional
+  user wallet signature beyond the existing on-chain commitment.
+- Final `bash scripts/check-audit.sh`: **482 Solidity tests / 65 suites**,
+  **98 frontend tests**, **11 verifier tests**, **151 ABI declarations**,
+  **35 production size checks**; independent oracle, governance, TypeScript/Vite
+  pass. Verifier tests are now included in the deterministic gate.
+- Four canonical WNS fork tests pass. Full HTTP/two-fork rehearsal uses actual PSP
+  factory/staker storage at Base Sepolia **46,417,019** and canonical Ethereum WNS
+  at **25,915,356**; local mining supplies simulated fresh/finalized blocks.
+  Free and exact 0.0005-ETH mints, verified display, consumed-permit rejection and
+  parent recovery pass. Gas: free **258,923**, paid **247,073**. An initial live
+  read correctly quoted paid because the test wallet's positions currently hold
+  no principal; the free rehearsal uses the older funded snapshot, not altered
+  eligibility or live balances.
+- Focused Slither naming closure: **28 contracts / 102 detectors / 13 flags**
+  (8 Medium, 4 Low, 1 Informational). Four added flags are deliberate timestamp
+  expiry, zero-signer revocation and ignored diagnostics/commit-age projection;
+  triaged in docs/audit/2026-09-06-remote-names/REVIEW.md. Missing build-info blocked
+  an initial cached run; an isolated naming-only build succeeded without cleaning
+  shared artifacts. This is not a new whole-game static campaign.
+- Runtime/initcode bytes: registrar **8,588 / 9,527**; remote gate **3,977 / 4,789**.
+  Full source SHA-256 (sorted path + NUL + contents):
+  `77848d96cb74f958c49d803e00a1852557c7b804a28d5d9aeaff4ffc0afe9e42`.
+- A dedicated, unfunded permit signer was generated outside the repo; only its
+  public address appears in preparation records. Ethereum deployment simulation
+  passed: **3,922,741** estimated gas at the sampled price (about **0.000658 ETH**,
+  excluding parent transfer/activation). No live transaction was broadcast, and
+  neither real domain moved. Mainnet deployment/custody activation and service
+  startup remain required before enabling the name UI. Current PSP contracts,
+  balances and unrelated broadcast files are preserved.

@@ -1,0 +1,12 @@
+Compiling 1 files with Solc 0.8.26
+Solc 0.8.26 finished in 6.84s
+Compiler run successful!
+
+Ran 4 tests for test/integration/WeiNames.t.sol:WeiNamesForkTest
+[PASS] testActualWNSFreeAndPaidRegistrarFlow() (gas: 2593253)
+[PASS] testApprovalAloneCannotRegisterChildren() (gas: 47616)
+[PASS] testExpiredParentNeedsRenewalBeforeRecoveryAndChildResolution() (gas: 276717)
+[PASS] testRealCustodyMintResolveRecoverAndRenew() (gas: 419989)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 409.39ms (3.46ms CPU time)
+
+Ran 1 test suite in 413.10ms (409.39ms CPU time): 4 tests passed, 0 failed, 0 skipped (4 total tests)

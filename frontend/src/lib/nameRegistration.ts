@@ -1,5 +1,6 @@
 import { encodeAbiParameters, keccak256, parseAbi, parseAbiParameters, stringToHex, type Address, type Hex, type PublicClient } from 'viem'
 import { controllerAbi, factoryAbi, stakerAbi } from './abi.ts'
+import { remoteNameGateAbi } from './namePermit.ts'
 import { type NameNamespace, wnsAbi } from './weiNames.ts'
 
 export const NAME_REGISTRATION_FEE = 500_000_000_000_000n
@@ -17,6 +18,7 @@ export const nameRegistrarAbi = parseAbi([
   'function registrationEnabled() view returns (bool)',
   'function eligibilityGate() view returns (address)',
   'function gateVersion() view returns (uint256)',
+  'function commitNonce(address account) view returns (uint256)',
   'function primaryName(address account) view returns (uint256)',
   'function commitments(address account) view returns (bytes32 hash, uint64 createdAt, uint64 epoch, uint256 gateVersion)',
   'function makeCommitment(address account, string label, bytes32 salt) view returns (bytes32)',
@@ -72,11 +74,11 @@ export async function findNameEligibilityProof(client: Pick<PublicClient, 'readC
   return '0x'
 }
 
-export async function readNameRegistration(client: Reader, ns: NameNamespace, factory: Address, account: Address, signal?: AbortSignal) {
+export async function readNameDeployment(client: Reader, ns: NameNamespace, account: Address) {
   if (!ns.registrar || await client.getChainId() !== ns.chainId) throw Error('Check the configured name network.')
   const block = await client.getBlock({ blockTag: 'latest' })
   const read = { address: ns.registrar, abi: nameRegistrarAbi, blockNumber: block.number }
-  const [version, fee, names, parentId, enabled, gate, commitment, epoch, gateVersion, minAge, maxAge, parentOwner, parentResolved, parentRecord] = await Promise.all([
+  const [version, fee, names, parentId, enabled, gate, commitment, epoch, gateVersion, minAge, maxAge, parentOwner, parentResolved, parentRecord, nonce] = await Promise.all([
     client.readContract({ ...read, functionName: 'REGISTRAR_VERSION' }),
     client.readContract({ ...read, functionName: 'REGISTRATION_FEE' }),
     client.readContract({ ...read, functionName: 'names' }),
@@ -91,15 +93,57 @@ export async function readNameRegistration(client: Reader, ns: NameNamespace, fa
     client.readContract({ address: ns.names, abi: wnsAbi, functionName: 'ownerOf', args: [ns.parentId], blockNumber: block.number }),
     client.readContract({ address: ns.names, abi: wnsAbi, functionName: 'resolve', args: [ns.parentId], blockNumber: block.number }),
     client.readContract({ address: ns.names, abi: wnsAbi, functionName: 'records', args: [ns.parentId], blockNumber: block.number }),
+    client.readContract({ ...read, functionName: 'commitNonce', args: [account] }),
   ])
-  if (version !== 1n || fee !== NAME_REGISTRATION_FEE || names.toLowerCase() !== ns.names.toLowerCase()
+  if (version !== 2n || fee !== NAME_REGISTRATION_FEE || names.toLowerCase() !== ns.names.toLowerCase()
     || parentId !== ns.parentId || minAge !== 60n || maxAge !== 86400n) throw Error('The name deployment does not match these registration rules.')
   if (!enabled || parentOwner.toLowerCase() !== ns.registrar.toLowerCase()
     || BigInt(parentResolved) === 0n || parentRecord[3] !== epoch) throw Error('Name registration is paused or the parent needs renewal.')
-  const gateFactory = await client.readContract({ address: gate, abi: nameGateAbi, functionName: 'factory', blockNumber: block.number })
-  if (gateFactory.toLowerCase() !== factory.toLowerCase()) throw Error('The name eligibility source does not match this PSP deployment.')
-  const proof = await findNameEligibilityProof(client, factory, account, block.number, signal)
-  const price = await client.readContract({ ...read, functionName: 'registrationPrice', args: [account, proof] })
+  return { blockHash: block.hash, blockNumber: block.number, timestamp: block.timestamp, commitment, epoch, gateVersion, minAge, maxAge, gate, nonce }
+}
+
+export async function readRemoteGate(client: Reader, gate: Address, blockNumber: bigint, sourceChainId: number, factory: Address) {
+  const read = { address: gate, abi: remoteNameGateAbi, blockNumber }
+  const [version, chain, gateFactory, maxAge, signer, signerEpoch] = await Promise.all([
+    client.readContract({ ...read, functionName: 'GATE_VERSION' }),
+    client.readContract({ ...read, functionName: 'sourceChainId' }),
+    client.readContract({ ...read, functionName: 'factory' }),
+    client.readContract({ ...read, functionName: 'MAX_PERMIT_AGE' }),
+    client.readContract({ ...read, functionName: 'signer' }),
+    client.readContract({ ...read, functionName: 'signerEpoch' }),
+  ])
+  if (version !== 1n || chain !== BigInt(sourceChainId) || gateFactory.toLowerCase() !== factory.toLowerCase() || maxAge !== 180n)
+    throw Error('The name eligibility source does not match this PSP deployment.')
+  return { signer, signerEpoch, maxPermitAge: maxAge }
+}
+
+function assertFreshSource(timestamp: bigint) {
+  const now = BigInt(Math.floor(Date.now() / 1000))
+  if (timestamp > now + 15n || now - timestamp > 60n) throw Error('The PSP network snapshot is stale. Refresh before registering a name.')
+}
+
+export type RemoteNameSource = { client: Reader; chainId: number }
+export async function readNameRegistration(client: Reader, ns: NameNamespace, factory: Address, account: Address,
+  signal?: AbortSignal, remote?: RemoteNameSource) {
+  const state = await readNameDeployment(client, ns, account)
+  let proof: Hex
+  if (remote) {
+    if (await remote.client.getChainId() !== remote.chainId) throw Error('Check the configured PSP network.')
+    const gate = await readRemoteGate(client, state.gate, state.blockNumber, remote.chainId, factory)
+    const block = await remote.client.getBlock({ blockTag: 'latest' })
+    assertFreshSource(block.timestamp)
+    proof = await findNameEligibilityProof(remote.client, factory, account, block.number, signal)
+    assertFreshSource(block.timestamp)
+    if (proof !== '0x' && BigInt(gate.signer) === 0n) throw Error('Free name registration is paused. Please try again later.')
+  } else {
+    const gateFactory = await client.readContract({ address: state.gate, abi: nameGateAbi, functionName: 'factory', blockNumber: state.blockNumber })
+    if (gateFactory.toLowerCase() !== factory.toLowerCase()) throw Error('The name eligibility source does not match this PSP deployment.')
+    proof = await findNameEligibilityProof(client, factory, account, state.blockNumber, signal)
+  }
+  const price = remote && proof !== '0x' ? 0n : await client.readContract({ address: ns.registrar!, abi: nameRegistrarAbi,
+    functionName: 'registrationPrice', args: [account, proof], blockNumber: state.blockNumber })
   if (price !== (proof === '0x' ? NAME_REGISTRATION_FEE : 0n)) throw Error('The name fee does not match your PSP position.')
-  return { blockNumber: block.number, timestamp: block.timestamp, commitment, epoch, gateVersion, minAge, maxAge, price, proof }
+  // Remote proof identifies the source NFT; it is exchanged for a signed
+  // destination permit only when the user reveals an existing reservation.
+  return { ...state, price, proof }
 }

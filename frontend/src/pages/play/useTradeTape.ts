@@ -1,4 +1,4 @@
-import { DEPLOYMENT_BLOCK } from '../../lib/config'
+import { DEPLOYMENT_BLOCK, CHAIN_ID } from '../../lib/config'
 import { createLogScanner } from '../../lib/logScanner'
 import { useEffect, useMemo, useState } from 'react'
 import { usePublicClient } from 'wagmi'
@@ -59,7 +59,7 @@ const timeEvent = parseAbiItem(
 
 export function useTradeTape() {
   const round = useRound()
-  const client = usePublicClient()
+  const client = usePublicClient({ chainId: CHAIN_ID })
   const [entries, setEntries] = useState<TapeEntry[]>([]) // newest first
   const [feesWad, setFeesWad] = useState<bigint>(0n)
   const [volumeWad, setVolumeWad] = useState<bigint>(0n)

@@ -1,0 +1,17 @@
+{
+  "chainId": 1,
+  "blockNumber": "25915772",
+  "blockHash": "0xef4d4dadf17374312b3259d202fed7d8796cfc977edd291555c8862e74643807",
+  "blockTimestamp": "1788667223",
+  "registry": "0x0000000000696760E15f265e828DB644A0c242EB",
+  "registryCodeHash": "0x5b791c832d4373a8d4f977c37d6973a5dbe0924c6d287a2effaa549be31c0221",
+  "parentId": "6361740363536127648378182158538670061512393038427336338828631921647240523046",
+  "fullName": "pepetesters.wei",
+  "owner": "0x1d52Ad18c074b8125fBCFDFcD01773c6BEdbd88A",
+  "expiresAt": "1820141459",
+  "expiresAtUTC": "2027-09-05T10:50:59.000Z",
+  "epoch": "1",
+  "sourceRepository": "https://github.com/src-company/wei-names",
+  "sourceCommit": "8eb07215182bacbfa5ca624f9a147998b57ba90e",
+  "sourceMatch": "Repository API reviewed; deployed bytecode hash recorded, not a reproducible source-verification claim."
+}

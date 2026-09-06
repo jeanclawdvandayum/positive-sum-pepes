@@ -1,0 +1,25 @@
+detector,impact,confidence,description
+unused-return,Medium,Medium,"PSPStakeNameGate.isEligible(address,bytes) (src/names/PSPStakeNameGate.sol#33-47) ignores return value by (token,controller,None,None,None,None) = factory.rounds(roundId) (src/names/PSPStakeNameGate.sol#37)"
+unused-return,Medium,Medium,"PSPNameRegistrar.selectPrimaryName(uint256) (src/names/PSPNameRegistrar.sol#114-123) ignores return value by (None,parent,None,None,None) = names.records(id) (src/names/PSPNameRegistrar.sol#116)"
+unused-return,Medium,Medium,"PSPNameCustody._requireActiveParent() (src/names/PSPNameCustody.sol#107-112) ignores return value by (None,None,None,epoch,None) = names.records(parentId) (src/names/PSPNameCustody.sol#110)"
+unused-return,Medium,Medium,"PSPRemoteNameGate.isEligible(address,bytes) (src/names/PSPRemoteNameGate.sol#75-93) ignores return value by (hash,None,epoch,version) = registrar.commitments(account) (src/names/PSPRemoteNameGate.sol#87)"
+unused-return,Medium,Medium,"PSPNameCustody.constructor(IWeiNames,uint256,address) (src/names/PSPNameCustody.sol#31-37) ignores return value by (label,parent,None,epoch,None) = names_.records(parentId_) (src/names/PSPNameCustody.sol#35)"
+unused-return,Medium,Medium,"PSPNameCustody.renewParent() (src/names/PSPNameCustody.sol#75-81) ignores return value by (label,None,None,None,None) = names.records(parentId) (src/names/PSPNameCustody.sol#76)"
+unused-return,Medium,Medium,"PSPNameCustody.setRegistrationEnabled(bool) (src/names/PSPNameCustody.sol#51-61) ignores return value by (None,None,None,epoch,None) = names.records(parentId) (src/names/PSPNameCustody.sol#56)"
+unused-return,Medium,Medium,"PSPRemoteNameGate.isEligible(address,bytes) (src/names/PSPRemoteNameGate.sol#75-93) ignores return value by (recovered,err,None) = ECDSA.tryRecover(permitDigest(p),v,r,s) (src/names/PSPRemoteNameGate.sol#84)"
+missing-zero-check,Low,Medium,"PSPRemoteNameGate.setSigner(address).next (src/names/PSPRemoteNameGate.sol#59) lacks a zero-check on :
+		- signer = next (src/names/PSPRemoteNameGate.sol#60)"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPNameRegistrar.register(string,bytes32,bytes) (src/names/PSPNameRegistrar.sol#85-110):
+	External calls:
+	- id = names.registerSubdomainFor(label,parentId,msg.sender) (src/names/PSPNameRegistrar.sol#100)
+	State variables written after the call(s):
+	- primaryName[msg.sender] = id (src/names/PSPNameRegistrar.sol#107)"
+timestamp,Low,Medium,"PSPNameRegistrar.register(string,bytes32,bytes) (src/names/PSPNameRegistrar.sol#85-110) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < uint256(c.createdAt) + MIN_COMMIT_AGE (src/names/PSPNameRegistrar.sol#92)
+	- block.timestamp > uint256(c.createdAt) + MAX_COMMIT_AGE (src/names/PSPNameRegistrar.sol#93)"
+timestamp,Low,Medium,"PSPRemoteNameGate.isEligible(address,bytes) (src/names/PSPRemoteNameGate.sol#75-93) uses timestamp for comparisons
+	Dangerous comparisons:
+	- signer == address(0) || p.signerEpoch != signerEpoch || account == address(0) || p.account != account || p.registrar != msg.sender || p.commitment == bytes32(0) || p.roundId == 0 || p.sourceBlock == 0 || p.sourceBlockHash == bytes32(0) || p.issuedAt > block.timestamp || p.deadline < block.timestamp || p.deadline < p.issuedAt || p.deadline - p.issuedAt > MAX_PERMIT_AGE (src/names/PSPRemoteNameGate.sol#79-83)"
+low-level-calls,Informational,High,"Low level call in PSPNameRegistrar.withdrawFees(address) (src/names/PSPNameRegistrar.sol#127-133):
+	- (ok,None) = to.call{value: amount}() (src/names/PSPNameRegistrar.sol#130)"

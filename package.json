@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "keeper": "tsx scripts/Keeper.ts",
-    "keeper:dry": "tsx scripts/Keeper.ts --dry-run"
+    "keeper:dry": "tsx scripts/Keeper.ts --dry-run",
+    "names:verifier": "node --experimental-strip-types scripts/names/server.mjs",
+    "names:test": "node --experimental-strip-types --test scripts/names/*.test.mjs"
   },
   "dependencies": {
     "viem": "^2.21.0"

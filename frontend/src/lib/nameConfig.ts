@@ -1,4 +1,5 @@
 import { createPublicClient, isAddress, type Address } from 'viem'
+import { CHAIN_ID, RPC_URL, RPC_FALLBACK_URL } from './config'
 import { rpcTransport } from './rpcTransport'
 import { childNameId, WEI_NODE, WNS_ADDRESS, type NameNamespace } from './weiNames'
 
@@ -14,3 +15,8 @@ export const nameNamespace: NameNamespace = {
 }
 export const nameClient = createPublicClient({ transport: rpcTransport(env.VITE_NAME_RPC_URL || 'https://ethereum-rpc.publicnode.com') })
 export const nameQueryKey = ['wei-name', nameNamespace.chainId, nameNamespace.names, nameNamespace.parentId.toString(), registrar ?? 'wns'] as const
+
+export const nameVerifierUrl = env.VITE_NAME_VERIFIER_URL || ''
+export const nameSource = nameVerifierUrl ? {
+  chainId: CHAIN_ID, client: createPublicClient({ transport: rpcTransport(RPC_URL, RPC_FALLBACK_URL) }),
+} : undefined
