@@ -61,6 +61,7 @@ const RULES: [string, string][] = [
   ['trading fees', '60% of each trading fee goes to stakers and 35% goes to the pot.'],
   ['referrals', 'with a recorded referral, the final 5% goes to the referral chain. for everyone else, 4% goes to the pot and 1% goes to the deployer.'],
   ['cashing out', 'ladder winnings stay claimable after detonation. PSP redeems for its proportional share of that round’s remaining mixETH, with payouts rounded down.'],
+  ['what’s immutable', 'each round’s deployed contract code stays fixed. the factory owner retains controls for future curves and artwork, the stored UI and pending round reservations.'],
 ]
 
 export default function Landing() {
@@ -74,7 +75,7 @@ export default function Landing() {
       <section className="grid items-center gap-10 pt-10 pb-4 sm:pt-14 lg:grid-cols-[minmax(0,1fr)_17.25rem] lg:gap-12">
         <div className="min-w-0">
           <h1 className="max-w-3xl font-display text-[clamp(3.25rem,7.5vw,6rem)] leading-[1.05] tracking-tight">
-            the anti meme,<br />
+            the anti memecoin,<br />
             <span className="text-accent">memecoin.</span>
           </h1>
           <p className="mt-6 text-xl leading-snug sm:text-2xl">
@@ -85,7 +86,9 @@ export default function Landing() {
             everyone else gets the sales pitch. launch, dump, repeat.
           </p>
           <p className="mt-4 max-w-xl leading-relaxed text-text-lo">
-            PSP takes DeFi locking, bonding curves and NFTs and throws them into one game.
+            PSP creates something <em>new</em>, mashing together defi locking, bonding curves,
+            passive yield, and NFTs, and turbocharging them with human greed as fellow degens
+            fight for the pot.
           </p>
           <Link
             to="/play"
@@ -163,6 +166,10 @@ export default function Landing() {
 
       <section className="py-16 sm:py-24">
         <h2 className="max-w-4xl font-display text-[clamp(2.75rem,6vw,5rem)] leading-[1.1]">let the game respawn.</h2>
+        <p className="mt-6 max-w-2xl leading-relaxed text-text-lo">
+          immutable round code. anyone can settle an expired round and help launch the next.
+          the game keeps going as long as people keep coming back.
+        </p>
         <Link to="/play" className="mt-6 inline-flex items-center gap-3 text-accent underline underline-offset-4">
           get in, loser. we’re taking the pot. <span aria-hidden="true">↗</span>
         </Link>

@@ -73,16 +73,53 @@ export function DiagramStyles() {
   50%, 85% { transform: scaleY(0); }
   100% { transform: scaleY(1); }
 }
-.xd-new-chart { stroke-dasharray: 1; stroke-dashoffset: 0; animation: xd-respawn 6s ease-in-out infinite; }
-@keyframes xd-respawn {
-  0%, 15% { stroke-dashoffset: 1; opacity: 0.3; }
-  70%, 90% { stroke-dashoffset: 0; opacity: 1; }
-  100% { stroke-dashoffset: 0; opacity: 0.3; }
+.xd-respawn-pepe, .xd-respawn-ghost {
+  position: absolute;
+  left: 45px;
+  top: 23px;
+  width: 69px;
+  height: 69px;
+  overflow: hidden;
+  border-radius: 5px;
+  image-rendering: pixelated;
+}
+.xd-respawn-pepe > svg, .xd-respawn-ghost > svg { width: 100%; height: 100%; }
+.xd-respawn-pepe { animation: xd-die-revive 8s ease-in-out infinite; }
+.xd-respawn-ghost { opacity: 0; filter: grayscale(1) brightness(1.5); animation: xd-ghost-rise 8s ease-in-out infinite; }
+.xd-respawn-scene { position: absolute; inset: 0; width: 100%; height: 100%; }
+.xd-grave { opacity: 0; animation: xd-grave-appear 8s ease-in-out infinite; }
+.xd-revive-ring { opacity: 0; transform-origin: 80px 66px; animation: xd-revive-flash 8s ease-out infinite; }
+.xd-respawn-still-arrow { display: none; }
+@keyframes xd-die-revive {
+  0%, 14%, 84%, 100% { transform: translate(0, 0) rotate(0deg); filter: grayscale(0); opacity: 1; }
+  25% { transform: translate(8px, 7px) rotate(80deg); filter: grayscale(1); opacity: 1; }
+  33% { transform: translate(8px, 7px) rotate(80deg); filter: grayscale(1); opacity: 0; }
+  60% { transform: translate(0, 20px) scale(0.7); filter: grayscale(1); opacity: 0; }
+  74% { transform: translate(0, -3px) scale(1.08); filter: grayscale(0); opacity: 1; }
+}
+@keyframes xd-ghost-rise {
+  0%, 29%, 54%, 100% { opacity: 0; }
+  29% { transform: translateY(14px) scale(0.65); }
+  36% { transform: translateY(0) scale(0.65); opacity: 0.45; }
+  54% { transform: translateY(-40px) scale(0.5); }
+}
+@keyframes xd-grave-appear {
+  0%, 28%, 70%, 100% { opacity: 0; transform: translateY(8px); }
+  38%, 57% { opacity: 1; transform: translateY(0); }
+}
+@keyframes xd-revive-flash {
+  0%, 58%, 85%, 100% { opacity: 0; }
+  58% { transform: scale(0.4); }
+  65% { opacity: 0.8; }
+  85% { transform: scale(1.5); }
 }
 @media (prefers-reduced-motion: reduce) {
   .xd-stage *, .xd-curve-detail * { animation: none !important; }
   .xd-motion-toggle { display: none; }
   .xd-deposit { transform: translateY(22px); }
+  .xd-respawn-pepe { transform: translateX(30px); }
+  .xd-grave { opacity: 1; transform: translateX(-45px); }
+  .xd-respawn-still-arrow { display: block; }
 }
 `}</style>
   )
@@ -179,15 +216,21 @@ export function BeatDiagram({ kind, pepeSvg }: { kind: BeatKind; pepeSvg: string
       )}
 
       {kind === 'respawn' && (
-        <svg viewBox="0 0 160 112">
-          <text x="16" y="18">next round</text>
-          <path d="M124 13 A10 10 0 1 0 143 20 M143 11 V20 H134" fill="none" stroke="var(--accent)" strokeWidth="2" />
-          <path d="M18 37 V87 H143" fill="none" stroke="var(--line)" />
-          <path d="M19 81 H142" stroke="var(--text-lo)" strokeDasharray="2 4" opacity="0.4" />
-          <path d="M20 81 C48 81 49 67 65 67 S94 46 109 46 S124 33 142 33" fill="none"
-            stroke="var(--accent)" strokeWidth="3" pathLength="1" className="xd-new-chart" />
-          <text x="80" y="103" textAnchor="middle">fresh chart</text>
-        </svg>
+        <>
+          <span className="xd-respawn-ghost" dangerouslySetInnerHTML={{ __html: pepeSvg }} />
+          <span className="xd-respawn-pepe" dangerouslySetInnerHTML={{ __html: pepeSvg }} />
+          <svg viewBox="0 0 160 112" className="xd-respawn-scene">
+            <path d="M16 94 H144" stroke="var(--line)" />
+            <g className="xd-grave">
+              <path d="M62 93 V57 A18 18 0 0 1 98 57 V93 Z" fill="var(--bg-2)" stroke="var(--text-lo)" />
+              <text x="80" y="67" textAnchor="middle" className="xd-label">RIP</text>
+              <path d="M76 75 H84 M80 75 V85" stroke="var(--text-lo)" strokeWidth="2" />
+            </g>
+            <circle cx="80" cy="66" r="31" fill="none" stroke="var(--pepe)" strokeWidth="2" className="xd-revive-ring" />
+            <path d="M57 68 H70 L65 63 M70 68 L65 73" fill="none" stroke="var(--pepe)" strokeWidth="2" className="xd-respawn-still-arrow" />
+            <text x="80" y="15" textAnchor="middle" className="xd-label">die. respawn. repeat.</text>
+          </svg>
+        </>
       )}
     </div>
   )

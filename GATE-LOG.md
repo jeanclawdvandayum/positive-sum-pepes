@@ -937,3 +937,21 @@ Solidity source changed after the contract-source hash above.
   Restored the viewport override. No new tests for this presentation-only change.
 - Updated the local preview build only. Game contracts, transaction behavior,
   deployment configuration, hosted here.now sites and broadcast files are untouched.
+
+## 2026-09-06 — Pepe resurrection and landing copy refinements
+
+- Applied the requested "anti memecoin, memecoin" headline and exact new intro,
+  including italic emphasis on "new". Added continued public settlement/respawn
+  copy scoped to immutable deployed round code, with existing factory controls
+  for future curves/art, stored UI and pending reservations stated in the rules.
+- Replaced the respawn chart with a CSS sequence using the existing rendered pepe:
+  fall/grayscale, rising ghost, RIP grave, then revival. The shared pause control
+  covers it. Reduced motion shows the grave and living pepe together with an arrow.
+- Deterministic gate passes: **502 Solidity tests / 67 suites**, **112 frontend
+  tests**, **11 verifier tests**, **155 ABI declarations**, **36 production size
+  checks**, oracle/governance and TypeScript/Vite. Final wording adjustment also
+  passes TypeScript/Vite. Existing bundle-size warnings remain.
+- Browser inspected grave/ghost and revival frames and the longer headline at
+  826px and 320px. Narrow landing and headline client/scroll widths both equal
+  288px. Viewport override restored and the local preview rebuilt. No new tests
+  for this presentation change. No contract, transaction or hosted-site changes.
