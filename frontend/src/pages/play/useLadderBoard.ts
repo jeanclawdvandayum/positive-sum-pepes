@@ -24,11 +24,11 @@ const EMPTY: BoardState = {
 const isZeroAddr = (a: string) => !a || /^0x0+$/.test(a)
 
 export function useLadderBoard(hook: `0x${string}` | undefined): BoardState {
-  const [state, setState] = useState<BoardState>(EMPTY)
+  const [state, setState] = useState<{ hook?: `0x${string}`; board: BoardState }>({ board: EMPTY })
 
   useEffect(() => {
     if (!hook) {
-      setState(EMPTY)
+      setState({ board: EMPTY })
       return
     }
     const target: `0x${string}` = hook
@@ -62,7 +62,10 @@ export function useLadderBoard(hook: `0x${string}` | undefined): BoardState {
 
         if (dead) return
 
-        setState((prev) => {
+        setState((snapshot) => {
+          // Stale data is useful only for the SAME hook. A new round starts
+          // empty even when its first read fails; never inherit old winners.
+          const prev = snapshot.hook === target ? snapshot.board : EMPTY
           // stale-while-revalidate: if a seat read failed (undefined) but the
           // previous state had data, keep the old data instead of flashing empty
           const tc = ticketCount ?? prev.ticketCount ?? 0n
@@ -72,9 +75,12 @@ export function useLadderBoard(hook: `0x${string}` | undefined): BoardState {
             return prev.seats[i] // read failed — keep stale
           })
           return {
-            seats: merged,
-            pot: pot !== undefined ? pot : prev.pot,
-            ticketCount: ticketCount !== undefined ? ticketCount : prev.ticketCount,
+            hook: target,
+            board: {
+              seats: merged,
+              pot: pot !== undefined ? pot : prev.pot,
+              ticketCount: ticketCount !== undefined ? ticketCount : prev.ticketCount,
+            },
           }
         })
         backoff = 0
@@ -91,5 +97,5 @@ export function useLadderBoard(hook: `0x${string}` | undefined): BoardState {
     }
   }, [hook])
 
-  return state
+  return state.hook === hook ? state.board : EMPTY
 }

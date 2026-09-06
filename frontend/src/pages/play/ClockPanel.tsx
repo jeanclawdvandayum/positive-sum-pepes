@@ -92,7 +92,7 @@ export default function ClockPanel({
             </span>
           </p>
         )}
-        <DetonateButton round={round} onDetonated={onDetonated} />
+        <DetonateButton key={round.controller} round={round} onDetonated={onDetonated} />
       </div>
     </section>
   )

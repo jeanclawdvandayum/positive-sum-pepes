@@ -16,6 +16,7 @@ import { useLadderBoard } from './play/useLadderBoard'
 import SpawnRoundPanel from './play/SpawnRoundPanel'
 import { ADDRESSES } from '../lib/config'
 import { useDeadRound } from './play/useDeadRound'
+import { playRoundState } from '../lib/playRoundState'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // /play — the command center (REDESIGN-B2, spec §6 play, CLOCK-REDESIGN §6).
@@ -31,7 +32,8 @@ import { useDeadRound } from './play/useDeadRound'
 // redemption-portal state — the portal panel appears, the ladder settles to
 // the frozen distribution with claims-forever rows, and the clock retires
 // (DeadlineWire disarms it). Same state for anyone arriving later: the
-// dead-round lane finds the corpse on its own.
+// dead-round lane confirms claims for this round. Historical corpses never
+// replace a successor's board or expose an already-completed spawn.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Trade() {
@@ -40,15 +42,12 @@ export default function Trade() {
   const dead = useDeadRound()
   /// set by DetonateButton on tx success — flips the page instantly; the
   /// dead-round lane confirms the settled state within one 6s tick
-  const [detonated, setDetonated] = useState(false)
-
-  // the ladder reads the LIVE hook's rolling board while the round trades…
-  const liveBoard = useLadderBoard(round.mode === 1 ? round.hook : undefined)
-  const ticketCount = liveBoard.ticketCount
-  // …and the dead hook's frozen board once a round has settled
-  const settledBoard = useLadderBoard(dead.dead ? dead.hook : undefined)
-
-  const postRound = detonated || dead.dead
+  const [detonatedRoundId, setDetonatedRoundId] = useState<bigint>()
+  const { settled, spawnFromRoundId, claimable } = playRoundState(round, dead, detonatedRoundId)
+  // The clock, pot, tickets and avatars always belong to the current round,
+  // including while it is settled and its successor is still being created.
+  const board = useLadderBoard(round.hook)
+  const ticketCount = board.ticketCount
   const { address } = useAccount()
   const entryPrice = address !== undefined ? tape.entryPriceOf(address) : undefined
 
@@ -62,23 +61,23 @@ export default function Trade() {
   return (
     <div className="pl-page font-body text-text-hi">
       <PlayStyles />
-      <ClockPanel round={round} lastTime={tape.lastTime} onDetonated={() => setDetonated(true)} />
+      <ClockPanel round={round} lastTime={tape.lastTime} onDetonated={() => setDetonatedRoundId(round.id)} />
       <div className="mt-4">
         <RefBanner />
       </div>
       <div className="mt-4">
         <Tape entries={tape.entries} />
       </div>
-      {postRound && dead.dead && (
+      {settled && (
         <div className="flex items-center gap-3 rounded-xl border border-line bg-bg-1 p-5 text-sm text-text-lo">
           <span>
-            round {dead.roundId?.toString()} is flat — redeem your psp from the{' '}
+            round {round.id.toString()} is flat — redeem your psp from the{' '}
             <Link to="/graveyard" className="text-accent underline">graveyard</Link>.
           </span>
         </div>
       )}
-      {postRound && dead.roundId !== undefined && (
-        <SpawnRoundPanel factory={ADDRESSES.factory} destroyedRoundId={dead.roundId} />
+      {spawnFromRoundId !== undefined && (
+        <SpawnRoundPanel key={`${ADDRESSES.factory}:${spawnFromRoundId}`} factory={ADDRESSES.factory} destroyedRoundId={spawnFromRoundId} />
       )}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-5">
         {/* Stretch both cards to the shared row height on wide screens. */}
@@ -87,15 +86,16 @@ export default function Trade() {
         </div>
         <div className="min-w-0 lg:col-span-3">
           <PotBoard
-            pot={postRound && dead.dead ? settledBoard.pot : liveBoard.pot}
-            tickets={postRound && dead.dead ? settledBoard.seats : liveBoard.seats}
-            ticketCount={liveBoard.ticketCount}
-            staker={postRound && dead.dead ? dead.staker : round.staker}
-            settled={postRound && dead.dead}
-            roundId={dead.roundId}
-            roundLabel={dead.roundId !== undefined ? `round ${dead.roundId}` : undefined}
-            claimable={dead.claimable}
-            claimHook={dead.hook}
+            key={round.hook}
+            pot={board.pot}
+            tickets={board.seats}
+            ticketCount={ticketCount}
+            staker={round.staker}
+            settled={settled}
+            roundId={round.id}
+            roundLabel={`round ${round.id}`}
+            claimable={claimable}
+            claimHook={settled ? round.hook : undefined}
           />
         </div>
       </div>

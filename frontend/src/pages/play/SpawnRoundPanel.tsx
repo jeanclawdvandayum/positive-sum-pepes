@@ -15,18 +15,20 @@ export default function SpawnRoundPanel({
   destroyedRoundId: bigint
 }) {
   const { writeContractAsync } = useConfirmedWrite()
-  const [step, setStep] = useState<'idle' | 'reserving' | 'birthing' | 'done'>('idle')
+  const [step, setStep] = useState<'idle' | 'checking' | 'reserving' | 'birthing' | 'done'>('idle')
   const [err, setErr] = useState<string | null>(null)
 
   if (!factory || destroyedRoundId === undefined) return null
 
   async function spawn() {
     if (step !== 'idle') return
+    setStep('checking')
     setErr(null)
     try {
       for (let attempt = 0; attempt < 6; attempt++) {
         const current = await rpcCall(factory, factoryAbi, 'currentRoundId') as bigint
         if (current > destroyedRoundId) { setStep('done'); return }
+        if (current !== destroyedRoundId) throw new Error('Round data changed. Wait for the page to refresh before retrying.')
         const active = await rpcCall(factory, factoryAbi, 'reservationActive') as boolean
         const phase = active ? Number(await rpcCall(factory, factoryAbi, 'reservationPhase')) : 0
         setStep(active ? 'birthing' : 'reserving')
@@ -55,19 +57,13 @@ export default function SpawnRoundPanel({
     }
   }
 
-  if (step === 'done') {
-    return (
-      <div className="flex items-center gap-3 rounded-xl border border-line bg-bg-1 p-5 text-sm">
-        <span className="text-text-hi">round {Number(destroyedRoundId) + 1} is ready — its predeposit window is open.</span>
-      </div>
-    )
-  }
+  if (step === 'done') return null
 
   return (
     <section aria-label="spawn next round" className="mt-4">
       <div className="rounded-xl border border-line bg-bg-1 p-5">
         <div className="flex items-baseline gap-3">
-          <h2 className="font-display text-xl text-text-hi">another round of frog business · {Number(destroyedRoundId) + 1}</h2>
+          <h2 className="font-display text-xl text-text-hi">another round of frog business · {(destroyedRoundId + 1n).toString()}</h2>
           <span className="rounded-full border border-line px-2.5 py-0.5 text-xs text-text-lo">
             permissionless
           </span>
@@ -79,13 +75,13 @@ export default function SpawnRoundPanel({
         {err && <p className="mt-2 break-words text-xs text-phase-critical">{err}</p>}
         <button
           onClick={spawn}
-          disabled={step === 'reserving' || step === 'birthing'}
-          data-pending={step === 'reserving' || step === 'birthing' || undefined}
+          disabled={step !== 'idle'}
+          data-pending={step !== 'idle' || undefined}
           className="relative mt-4 w-full overflow-hidden rounded-xl border border-line bg-bg-2 px-5 py-3 font-semibold text-text-hi transition hover:border-accent disabled:cursor-wait"
         >
           <span className="pl-btn-fill" aria-hidden="true" />
           <span className="relative">
-            {step === 'reserving' ? 'reserving the next round…' : step === 'birthing' ? 'creating the next round…' : 'spawn round ' + (Number(destroyedRoundId) + 1)}
+            {step === 'checking' ? 'checking round state…' : step === 'reserving' ? 'reserving the next round…' : step === 'birthing' ? 'creating the next round…' : 'spawn round ' + (destroyedRoundId + 1n)}
           </span>
         </button>
         <p className="mt-2 text-xs text-text-lo">

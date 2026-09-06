@@ -892,3 +892,26 @@ Solidity source changed after the contract-source hash above.
   predeposit window. Final 320px timer width/scrollWidth both measure 220px;
   digits fit their 68px columns. Viewport override restored. Existing mobile
   navigation overflow remains outside this change. No wallet transaction occurred.
+
+## 2026-09-06 — Spawn visibility and current-round play state
+
+- Baseline `2605bffa`. The play page treated any historical dead round as current
+  settlement. It kept offering to spawn round 2 after round 2 existed and selected
+  round 1's ladder beside round 2's clock. Current-round ID/hook now determine
+  settlement, spawn eligibility, the board and claim data. A completed local spawn
+  hides immediately; stale round-read errors suppress the action until recovery.
+- The local detonation receipt is scoped by round ID. Detonate, spawn and claim
+  controls reset with their contract/round targets. Board stale-data merging is
+  restricted to the same hook. The existing pre-write factory check remains;
+  checking disables repeat clicks and a backwards round mismatch stops the flow.
+  Partial births retain the existing reservation/three-step resume behavior.
+- `bash scripts/check-audit.sh`: **502 Solidity tests / 67 suites**, **112 frontend
+  tests**, **11 verifier tests**, **155 ABI declarations**, **36 production size
+  checks**, oracle/governance and TypeScript/Vite pass. Five new frontend tests
+  cover successor predeposit/active, subsequent detonation, delayed readers,
+  matching claim targets, unknown state and RPC recovery. Existing warnings remain.
+- Browser verified the rebuilt localhost play page on the actual active round 2:
+  no spawn panel or stale round-1 banner, current live ladder/payouts match the
+  55.25-mixETH pot. No wallet transaction or contract deployment occurred. This
+  frontend fix works with the current testnet. Review and bounded variant search:
+  `docs/audit/2026-09-06-round-ui-state.md`.
