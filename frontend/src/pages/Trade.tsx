@@ -61,7 +61,7 @@ export default function Trade() {
   return (
     <div className="pl-page font-body text-text-hi">
       <PlayStyles />
-      <ClockPanel round={round} lastTime={tape.lastTime} onDetonated={() => setDetonatedRoundId(round.id)} />
+      <ClockPanel round={round} leadingBuyer={board.seats[0]?.addr} lastTime={tape.lastTime} onDetonated={() => setDetonatedRoundId(round.id)} />
       <div className="mt-4">
         <RefBanner />
       </div>

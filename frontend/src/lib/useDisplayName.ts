@@ -5,7 +5,7 @@ import { nameClient, nameNamespace, nameQueryKey } from './nameConfig'
 
 /** Reads on the name network independently of game RPC and wallet chain.
  * Shared queries deduplicate the same person across the header, feed and ladder. */
-export function useDisplayName(address: Address) {
+export function useDisplayName(address: Address, fallback = shortAddress(address)) {
   const { data, isError } = useQuery({
     queryKey: [...nameQueryKey, address.toLowerCase()],
     queryFn: async () => ({ name: await readVerifiedName(nameClient, nameNamespace, address) }),
@@ -14,5 +14,5 @@ export function useDisplayName(address: Address) {
     refetchInterval: 60_000,
     retry: false,
   })
-  return (!isError && data?.name) || shortAddress(address)
+  return (!isError && data?.name) || fallback
 }

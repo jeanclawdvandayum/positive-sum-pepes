@@ -4,6 +4,7 @@ import Skeleton from '../../components/Skeleton'
 import WalletPepeArt from '../../components/WalletPepeArt'
 import { useNow } from '../../phase/PhaseEngine'
 import type { RoundInfo } from '../../lib/useRound'
+import { useDisplayName } from '../../lib/useDisplayName'
 import type { LastTimeAdded } from './useTradeTape'
 import DetonateButton from './DetonateButton'
 
@@ -28,6 +29,11 @@ function short(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
 }
 
+function BombingBuyer({ address }: { address: `0x${string}` }) {
+  const name = useDisplayName(address, 'anon pepe')
+  return <span className="pl-bombing-buyer" title={address}>{name}</span>
+}
+
 /// recency for the "last added" line — seconds → dry human time
 function ago(sec: number | undefined, now: number): string | undefined {
   if (sec === undefined) return undefined
@@ -40,10 +46,12 @@ function ago(sec: number | undefined, now: number): string | undefined {
 
 export default function ClockPanel({
   round,
+  leadingBuyer,
   lastTime,
   onDetonated,
 }: {
   round: RoundInfo
+  leadingBuyer: `0x${string}` | undefined
   lastTime: LastTimeAdded | undefined
   onDetonated: () => void
 }) {
@@ -56,6 +64,14 @@ export default function ClockPanel({
       className="pl-clockband relative left-1/2 w-screen -translate-x-1/2"
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 pb-7 pt-6 sm:pb-9 sm:pt-8">
+        <h1 className="mb-5 w-full max-w-4xl text-center font-display text-2xl leading-tight text-[#e8f0f7] [overflow-wrap:anywhere] sm:mb-6 sm:text-3xl">
+          {round.mode === 1 ? (
+            <>
+              {leadingBuyer ? <BombingBuyer address={leadingBuyer} /> : <span className="pl-bombing-buyer">anon pepe</span>}
+              {' '}is <em>carpet bombing</em> in:
+            </>
+          ) : 'awaiting arming of carpet bomb'}
+        </h1>
         <Clock />
         <div className="mt-5 text-2xl sm:text-3xl" title="the pot gets the launch fee and at least 35% of each trading fee. the last ten tickets split it at detonation; an empty ladder sends it to redemption backing.">
           {round.potBalance === undefined ? (

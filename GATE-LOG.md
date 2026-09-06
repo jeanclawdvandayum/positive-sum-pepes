@@ -1003,3 +1003,19 @@ Solidity source changed after the contract-source hash above.
   checks**, oracle/governance and TypeScript/Vite. Existing bundle warnings remain.
 - Rebuilt and refreshed the local preview. Browser confirms the toggle is absent
   and the respawn animation is running. No new tests for this presentation change.
+
+## 2026-09-06 — Carpet-bomb countdown title
+
+- Added a pixel-font heading above the play clock. Active rounds identify the
+  latest buyer from the existing ladder's first seat, using the shared verified
+  subdomain lookup with an "anon pepe" fallback. "carpet bombing" is emphasized.
+  The identity uses the clock's green, yellow or red phase with a subtle glow.
+- Predeposit and settled states say "awaiting arming of carpet bomb". Long names
+  can wrap, and no extra game polling or animation loop was introduced.
+- Deterministic gate passes: **502 Solidity tests / 67 suites**, **112 frontend
+  tests**, **11 verifier tests**, **155 ABI declarations**, **36 production size
+  checks**, oracle/governance and TypeScript/Vite. Existing bundle warnings remain.
+- Browser checked the current settled round at regular and 320px widths. The
+  heading uses Geist Pixel, and page width equals viewport width on mobile.
+  Active identity and phase branches were reviewed in source; no live round was
+  spawned for this UI check. Local preview rebuilt and viewport restored.

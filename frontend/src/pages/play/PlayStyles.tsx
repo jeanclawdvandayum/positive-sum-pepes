@@ -20,8 +20,15 @@ export function PlayStyles() {
 
 /* ── clock band (B2 §1) — dark in BOTH themes: the machine's screen ─────── */
 .pl-clockband {
+  --bombing-accent: var(--lum-calm);
   background: #0b1424;
   border-bottom: 1px solid #22344f;
+}
+html[data-phase="heat"] .pl-clockband { --bombing-accent: var(--lum-heat); }
+html[data-phase="critical"] .pl-clockband { --bombing-accent: var(--lum-critical); }
+.pl-bombing-buyer {
+  color: var(--bombing-accent);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--bombing-accent) 35%, transparent);
 }
 /* the pot odometer lives on the dark screen → ride the luminous constants,
    not the paper-theme remap (same rule as the clock numerals) */
