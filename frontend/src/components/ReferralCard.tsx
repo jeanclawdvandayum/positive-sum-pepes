@@ -6,6 +6,7 @@ import { rpcCall, rpcBatchCall } from '../lib/rpc'
 import { ADDRESSES, CHAIN_ID } from '../lib/config'
 import { matchingReferral, parseReferral, referralKey, referralParams, savedReferral, type ReferralHint } from '../lib/referrals'
 import { useRound } from '../lib/useRound'
+import ReferralShare from './ReferralShare'
 
 const ZERO_ADDR = /^0x0+$/
 const registryVersions = new Map<string, bigint>()
@@ -210,6 +211,7 @@ export default function ReferralCard() {
           <button className="btn-primary mt-3 w-full" disabled={!link || canRefer !== true} onClick={copyLink}>
             {copied ? 'copied ✓' : 'copy referral link'}
           </button>
+          <ReferralShare tokenId={active} link={link} enabled={canRefer === true} />
           {canRefer === false && (
             <div className="mt-2 text-xs font-bold text-amber-600">
               pepe #{active?.toString()} needs referral eligibility before purchases can record its referral.

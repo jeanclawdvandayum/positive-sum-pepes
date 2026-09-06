@@ -1147,3 +1147,25 @@ Solidity source changed after the contract-source hash above.
   mainnet/name-custody actions, production-contract edits, or active UI env
   changes were made. See `docs/audit/BASE-SEPOLIA-DEPLOY.md` for release/recovery
   commands and `result.json` in the rehearsal directory for completion status.
+
+
+## 2026-09-07 — Referral sharing on X
+
+- Added a shared post preview to the stake and predeposit referral areas: twenty
+  quips with reroll, selected NFT art from on-chain DNA/descriptor, and the full
+  registry/network-scoped referral URL. Testnet posts identify the playtest.
+- Export prepares a crisp 828×828 PNG for the clipboard. X Web Intent prefills
+  the quip and URL; the user pastes the image and submits the post. PNG download
+  and a normal composer link handle clipboard denial and blocked popups.
+  Wallet/staker/NFT/link changes reset the panel. Existing eligibility and
+  compatible-registry guards remain. No X credentials or posting service added.
+- Deterministic gate passed: **513 Solidity tests / 68 suites**, **139 frontend
+  tests**, **11 verifier tests**, **155 ABI declarations**, **36 production size
+  checks**, independent oracle/governance and TypeScript/Vite. Six new frontend
+  regressions cover uint256 referral scope, quip budget/reroll, network labels,
+  canonical selected art including DNA zero, and retryable RPC failures.
+- Chromium smoke check used mocked chain reads and intercepted X opening. Actual
+  image clipboard read returned a 14,508-byte 828×828 PNG. Checked 375px/desktop
+  layouts, denial/download fallback, reroll, selection and wallet resets, and
+  eligibility guards. Inspected both the mobile panel and downloaded art.
+  No X post or public-chain transaction was submitted. No contracts/env changed.

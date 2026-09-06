@@ -75,6 +75,20 @@ than silently discarded or submitted as a separate transaction. Link sharing is 
 produces the scoped URL format. An old-round or other-network hint cannot be
 carried into a new round by local storage.
 
+## Sharing on X
+
+Stake and predeposit referral cards offer a share preview with 20 rotating quips,
+the selected position's on-chain art and the full scoped referral URL. Testnet
+posts identify the playtest. Wallet, staker, NFT or link changes reset the preview.
+
+[X Web Intent](https://docs.x.com/x-for-websites/post-button/overview) prefills text
+and the URL. It cannot attach a local PNG. The share
+button copies an 828×828 PNG and opens the composer, where the user pastes the
+image and reviews the post. A PNG download and ordinary composer link remain
+available when clipboard permissions or popup blocking intervene. This uses no
+X account credentials, upload backend or automatic posting. Incompatible legacy
+registries retain the existing disabled-link guard.
+
 ## Regression evidence
 
 `test/ReferralPurchase.t.sol` runs 22 tests against an actual local V4 PoolManager,

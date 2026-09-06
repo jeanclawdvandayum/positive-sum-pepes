@@ -1,8 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // ReferralsCard — the den's right column lead (REDESIGN-B3 item 4): link
 // generator and referral fee share. This is the STAKE page's own
-// presentation; the shared components/ReferralCard.tsx keeps serving the
-// predeposit page untouched — we only reuse its 4s data hooks (no new lanes).
+// presentation; data hooks and the X sharing panel are shared with predeposit.
 //
 // Referral chains split 5% of attributed trade fees; the closest tier gets
 // 80% of that leg. These are live transfers, not a per-block accumulator.
@@ -12,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { fmtPepeId } from '../../lib/format'
 import { useCanRefer, refLinkFor, useReferral } from '../../components/ReferralCard'
+import ReferralShare from '../../components/ReferralShare'
 
 export default function ReferralsCard() {
   const { isConnected } = useAccount()
@@ -69,6 +69,7 @@ export default function ReferralsCard() {
           <button type="button" className="st-btn st-btn-primary mt-3 w-full" disabled={!link || canRefer !== true} onClick={copyLink}>
             {copied ? 'copied ✓' : 'copy referral link'}
           </button>
+          <ReferralShare tokenId={active} link={link} enabled={canRefer === true} />
           {canRefer === false && (
             <p className="mt-2 text-xs text-phase-heat">
               pepe #{active === null ? '…' : fmtPepeId(active)} needs referral eligibility before purchases can record its referral.
