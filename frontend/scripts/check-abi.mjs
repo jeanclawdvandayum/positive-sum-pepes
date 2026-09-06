@@ -4,15 +4,18 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { encodeFunctionData, decodeFunctionData, toFunctionSelector, toEventSelector } from 'viem'
 import * as declared from '../src/lib/abi.ts'
+import { wnsAbi } from '../src/lib/weiNames.ts'
+import { nameRegistrarAbi, nameGateAbi } from '../src/lib/nameRegistration.ts'
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..')
-const sources={factoryAbi:'PSPFactory',controllerAbi:'RoundController',hookAbi:'CurveHook',stakerAbi:'PSPStaker',registryAbi:'PSPReferralRegistry',zapInAbi:'PSPZapIn',zapOutAbi:'PSPZapOut',reinvestorAbi:'PSPReinvestor',faucetAbi:'MixETHFaucet',descriptorAbi:'PepeDescriptor'}
+const sources={factoryAbi:'PSPFactory',controllerAbi:'RoundController',hookAbi:'CurveHook',stakerAbi:'PSPStaker',registryAbi:'PSPReferralRegistry',zapInAbi:'PSPZapIn',zapOutAbi:'PSPZapOut',reinvestorAbi:'PSPReinvestor',faucetAbi:'MixETHFaucet',descriptorAbi:'PepeDescriptor',wnsAbi:'IWeiNames',nameRegistrarAbi:'PSPNameRegistrar',nameGateAbi:'PSPStakeNameGate'}
+const allDeclared = { ...declared, wnsAbi, nameRegistrarAbi, nameGateAbi }
 // Static tuples and flat outputs encode identically. Preserve dynamic tuple
 // boundaries while normalizing static struct return shapes (positions).
 function types(params=[]) { return params.flatMap(p=>p.type==='tuple' && p.components.every(c=>!['string','bytes','tuple'].includes(c.type)&&!c.type.includes('[')) ? types(p.components) : [p.type==='tuple'?`(${types(p.components)})`:p.type]) }
 let checked=0
 for(const [key,name] of Object.entries(sources)) {
  const abi=JSON.parse(fs.readFileSync(path.join(root,'out',name+'.sol',name+'.json'))).abi
- for(const item of declared[key]) {
+ for(const item of allDeclared[key]) {
   if(!['function','event'].includes(item.type))continue
   const selector=item.type==='function'?toFunctionSelector:toEventSelector
   const actual=abi.find(a=>a.type===item.type&&selector(a)===selector(item))

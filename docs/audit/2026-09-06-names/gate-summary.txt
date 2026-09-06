@@ -1,0 +1,8 @@
+Ran 64 test suites in 16.72s (96.70s CPU time): 472 tests passed, 0 failed, 0 skipped (472 total tests)
+✓ no-governance gate: clean (proposeCarpetBomb|voteCarpetBomb|castWeightOn|QUORUM_BIPS all dead)
+Size gate: 34 production artifacts passed (constructor arguments require deployment checks).
+ABI gate: 144 functions/events match Foundry artifacts; PoolKey encoding exact.
+# tests 94
+# pass 94
+# fail 0
+✓ built in 5.91s

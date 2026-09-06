@@ -7,6 +7,7 @@ import { fmtAmount } from '../../lib/format'
 import { hookAbi } from '../../lib/abi'
 import type { BoardTicket } from './useLadderBoard'
 import { useSeatPepes } from './useSeatPepes'
+import WalletName from '../../components/WalletName'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PotBoard — the ladder, right of the swap (REDESIGN-B2 §3, CLOCK-REDESIGN
@@ -33,10 +34,6 @@ import { useSeatPepes } from './useSeatPepes'
 // ladder shares, newest → oldest — mirrors the contract split 25/18/14/…
 // ("the math, straight"; renormalizes under 10 seated tickets)
 const LADDER = [25, 18, 14, 10, 8, 7, 6, 5, 4, 3]
-
-function short(addr: string): string {
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
-}
 
 const avatars = new Map<string, string>()
 function avatarFor(addr: string): string {
@@ -223,7 +220,7 @@ export default function PotBoard({
                 <p className="min-w-0 flex-1 truncate text-text-lo">
                   {s ? (
                     <>
-                      <span className="font-data text-text-hi">{short(s.addr)}</span> ·{' '}
+                      <WalletName address={s.addr} className="font-data text-text-hi" /> ·{' '}
                       <span className="tabular font-data text-text-hi">
                         {fmtAmount(s.pspWad)} psp
                       </span>{' '}

@@ -1,0 +1,17 @@
+{
+  "chainId": 1,
+  "blockNumber": "25915356",
+  "blockHash": "0xc4598fb44ff4c17b780632b5efb52ee9e8149bee71ffb7227e85d86067dbe5f9",
+  "blockTimestamp": "1788662231",
+  "registry": "0x0000000000696760E15f265e828DB644A0c242EB",
+  "registryCodeHash": "0x5b791c832d4373a8d4f977c37d6973a5dbe0924c6d287a2effaa549be31c0221",
+  "parentId": "94182133599781870843718031741765253846932864129246119961144558591519387470673",
+  "fullName": "pepe.wei",
+  "owner": "0x1d52Ad18c074b8125fBCFDFcD01773c6BEdbd88A",
+  "expiresAt": "1819770563",
+  "expiresAtUTC": "2027-09-01T03:49:23.000Z",
+  "epoch": "1",
+  "sourceRepository": "https://github.com/src-company/wei-names",
+  "sourceCommit": "8eb07215182bacbfa5ca624f9a147998b57ba90e",
+  "sourceMatch": "Repository API reviewed; deployed bytecode hash recorded, not a reproducible source-verification claim."
+}

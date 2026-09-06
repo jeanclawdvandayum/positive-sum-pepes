@@ -1,10 +1,10 @@
 # Audit preparation — September 2026
 
 This is a review packet for the current source tree, not a security certification.
-Final local gates: **450 Solidity tests / 61 suites**, including 64 invariant runs
+Final local gates: **472 Solidity tests / 64 suites**, including 64 invariant runs
 and 2,048 calls per real-V4 handler with zero reverts; the previous hardening
-revision also passed a 256-run / 32,768-call three-wallet campaign and complete exits; **77 frontend tests**; TypeScript/Vite;
-119 ABI declarations; 32 production size checks; independent oracle and governance
+revision also passed a 256-run / 32,768-call three-wallet campaign and complete exits; **94 frontend tests**; TypeScript/Vite;
+144 ABI declarations; 34 production size checks; independent oracle and governance
 gates. Static-analysis flags remain triaged separately. See GATE-LOG.md.
 A fresh Base Sepolia release is deployed and configured in the local frontend.
 See [TESTNET-PLAYTEST.md](TESTNET-PLAYTEST.md) for the running app, release manifest,
@@ -22,6 +22,15 @@ for the six confirmed fixes, reproductions, static triage and review limits.
 The user subsequently approved the full ERC-721 interface. Safe transfers, individual
 transfer/fee approvals and frontend controls are implemented in source; see the
 [NFT interface review](2026-09-06-nft-interface/REVIEW.md). These also require fresh contracts.
+
+WNS naming now has a registrar, same-chain PSP eligibility gate, parent custody
+and recovery controls, plus verified name display and a registration UI. This is
+a source implementation and local-fork rehearsal, **not a live hybrid release**.
+Both real parent domains remain in the user's wallet. Ethereum cannot directly
+read Base Sepolia PSP positions; the cross-chain verifier and free-claim policy
+decisions are pending. See [NAMES.md](NAMES.md) and the
+[naming integration review](2026-09-06-names/REVIEW.md). Names have their own admin
+and fee balance; this work does not add admin powers to the PSP game contracts.
 
 ## Binding game rules (2026-09-05 approval)
 
@@ -111,9 +120,10 @@ by the presence of this script.
 Per the user’s direction, current work stays on testnet. No mainnet transactions
 were sent; the authenticated mainnet fork check is deferred.
 
-The deterministic gate excludes `test/integration/*`. Mainnet integration tests
-remain deferred until a valid MAINNET_RPC_URL is available and mainnet work is
-authorized. Separately, `BaseSepoliaReleaseTest` attaches the actual new deployment
+The deterministic gate excludes `test/integration/*`. Mainnet game/mixETH integration tests
+remain deferred until a valid MAINNET_RPC_URL is available and that work is
+authorized. The separately requested WNS integration passed four tests against a
+pinned Ethereum fork using WNS_FORK_RPC_URL; all mutations stayed on the local fork. Separately, `BaseSepoliaReleaseTest` attaches the actual new deployment
 on a local Base Sepolia fork and passes two rounds, reinvestment, staged rebirth,
 and old-round exits. Real deployment receipts and browser checks are recorded in
 GATE-LOG.md; no wallet-signed browser playtest is claimed.

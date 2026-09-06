@@ -3,6 +3,7 @@ import { renderPepeSvg } from '../../lib/pepeRender'
 import { dnaOfId } from '../../components/PepePicker'
 import { fmtAmount } from '../../lib/format'
 import type { TapeEntry } from './useTradeTape'
+import WalletName from '../../components/WalletName'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tape — the slim live activity feed under the clock (REDESIGN-B2 §2).
@@ -32,10 +33,6 @@ function avatarFor(addr: string): string {
   return svg
 }
 
-function short(addr: string): string {
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
-}
-
 /// +5:00 per whole psp — same shape the clock's chip floats
 function fmtAdded(ms: number): string {
   const m = Math.floor(ms / 60_000)
@@ -63,9 +60,7 @@ export default function Tape({ entries }: { entries: TapeEntry[] }) {
               aria-hidden="true"
               dangerouslySetInnerHTML={{ __html: avatarFor(e.addr) }}
             />
-            <span className="hidden shrink-0 font-data text-xs text-text-lo sm:inline">
-              {short(e.addr)}
-            </span>
+            <WalletName address={e.addr} className="max-w-[34%] shrink-0 truncate font-data text-xs text-text-lo" />
             <span className="min-w-0 truncate text-text-lo">
               {e.kind === 'buy' ? 'bought' : 'sold'}{' '}
               <span className="tabular font-data text-text-hi">{fmtAmount(e.pspWad, 2)} psp</span>

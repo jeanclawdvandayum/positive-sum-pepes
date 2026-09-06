@@ -417,6 +417,9 @@ html.dark .scanlines {
   height: 100%;
 }
 .pepe-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--font-data);
   font-size: 0.8rem;
   color: var(--text-hi);

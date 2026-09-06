@@ -1,0 +1,27 @@
+detector,impact,confidence,description
+unused-return,Medium,Medium,"PSPStakeNameGate.isEligible(address,bytes) (src/names/PSPStakeNameGate.sol#33-47) ignores return value by (token,controller,None,None,None,None) = factory.rounds(roundId) (src/names/PSPStakeNameGate.sol#37)
+"
+unused-return,Medium,Medium,"PSPNameCustody._requireActiveParent() (src/names/PSPNameCustody.sol#107-112) ignores return value by (None,None,None,epoch,None) = names.records(parentId) (src/names/PSPNameCustody.sol#110)
+"
+unused-return,Medium,Medium,"PSPNameCustody.constructor(IWeiNames,uint256,address) (src/names/PSPNameCustody.sol#31-37) ignores return value by (label,parent,None,epoch,None) = names_.records(parentId_) (src/names/PSPNameCustody.sol#35)
+"
+unused-return,Medium,Medium,"PSPNameRegistrar.selectPrimaryName(uint256) (src/names/PSPNameRegistrar.sol#110-119) ignores return value by (None,parent,None,None,None) = names.records(id) (src/names/PSPNameRegistrar.sol#112)
+"
+unused-return,Medium,Medium,"PSPNameCustody.renewParent() (src/names/PSPNameCustody.sol#75-81) ignores return value by (label,None,None,None,None) = names.records(parentId) (src/names/PSPNameCustody.sol#76)
+"
+unused-return,Medium,Medium,"PSPNameCustody.setRegistrationEnabled(bool) (src/names/PSPNameCustody.sol#51-61) ignores return value by (None,None,None,epoch,None) = names.records(parentId) (src/names/PSPNameCustody.sol#56)
+"
+reentrancy-benign,Low,Medium,"Reentrancy in PSPNameRegistrar.register(string,bytes32,bytes) (src/names/PSPNameRegistrar.sol#81-106):
+	External calls:
+	- id = names.registerSubdomainFor(label,parentId,msg.sender) (src/names/PSPNameRegistrar.sol#96)
+	State variables written after the call(s):
+	- primaryName[msg.sender] = id (src/names/PSPNameRegistrar.sol#103)
+"
+timestamp,Low,Medium,"PSPNameRegistrar.register(string,bytes32,bytes) (src/names/PSPNameRegistrar.sol#81-106) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < uint256(c.createdAt) + MIN_COMMIT_AGE (src/names/PSPNameRegistrar.sol#88)
+	- block.timestamp > uint256(c.createdAt) + MAX_COMMIT_AGE (src/names/PSPNameRegistrar.sol#89)
+"
+low-level-calls,Informational,High,"Low level call in PSPNameRegistrar.withdrawFees(address) (src/names/PSPNameRegistrar.sol#123-129):
+	- (ok,None) = to.call{value: amount}() (src/names/PSPNameRegistrar.sol#126)
+"

@@ -13,12 +13,12 @@ import MixLogo from '../components/MixLogo'
 import PepePicker from '../components/PepePicker'
 import PepeCards, { type PepeEntry } from '../components/PepeCards'
 import { PspIcon } from '../components/TokenIcon'
-import { PixelIcon } from '../components/PixelIcon'
 import TickerBar, { type TickerItem } from '../components/TickerBar'
 import { useEthUsd } from '../lib/useEthUsd'
 import StakeStyles from './stake/StakeStyles'
 import IdentityPanel from './stake/IdentityPanel'
 import ReferralsCard from './stake/ReferralsCard'
+import NameRegistrationCard from './stake/NameRegistrationCard'
 import { useNftVersion } from '../lib/useNftVersion'
 import { useNftReinvestment } from '../lib/useNftReinvestment'
 
@@ -511,18 +511,7 @@ export default function Stake() {
         <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
           <ReferralsCard />
 
-          <div className="flex items-start gap-3 rounded-2xl border border-line bg-bg-2 p-4">
-            <span className="mt-0.5 shrink-0">
-              <PixelIcon name="diamond" size={18} />
-            </span>
-            <div>
-              <div className="text-sm font-semibold">pepe names — .wei</div>
-              <p className="mt-1 text-xs leading-relaxed text-text-lo">
-                give your accomplice an alias. .wei names are planned for a future registry launch.
-                your pepe number identifies your NFT today.
-              </p>
-            </div>
-          </div>
+          <NameRegistrationCard />
 
         </div>
       </div>

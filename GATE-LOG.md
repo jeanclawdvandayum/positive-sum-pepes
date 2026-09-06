@@ -718,3 +718,47 @@ Solidity source changed after the contract-source hash above.
   second-pass reinvestor; the existing testnet NFTs remain unchanged.
 - Source SHA-256 (sorted src/**/*.sol path + NUL + contents):
   `8f27c8742190b1a86456e62fd1f5a373dd2b7ef26c2d71214530056e4b5d44a9`.
+
+## 2026-09-06 — WNS naming source and local-fork rehearsal
+
+- Baseline `8523fb44`. Added `PSPNameRegistrar`, parent custody/recovery/record
+  management, and a same-chain factory/NFT/principal eligibility gate. Free
+  registration for positive-principal NFT owners; otherwise exactly 0.0005 native
+  ETH. Names persist across rounds and are user-owned WNS NFTs. Additional
+  one-name/one-free-NFT-claim restrictions remain a pending user policy choice.
+- Commit/reveal hides labels for at least 60 seconds; commitments bind wallet,
+  destination, parent, label and secret, and expire after 24 hours. Availability
+  checks prevent public use of WNS's parent overwrite power. Gate/parent changes,
+  callback reentry, receiver forwarding and exact fees have regression coverage.
+- UI persists commitment secrets before submission, finds funded NFTs across all
+  rounds, validates deployment/fee/custody at one block, checks receipts, and
+  requires fee review if qualification changes. Header, tape and ladder use
+  forward-verified owned WNS names, bounded typography and address fallbacks.
+- Final `bash scripts/check-audit.sh`: **472 Solidity tests / 64 suites**,
+  **94 frontend tests**, **144 ABI declarations**, **34 production size checks**;
+  independent oracle, governance, TypeScript and Vite pass. The full via-IR rebuild
+  took 792.45 seconds. Existing dependency-annotation and bundle-size warnings
+  remain. An initial property test exceeded Foundry's uint64 chain-ID cheatcode
+  domain; its generator was corrected to uint64 and the complete property passes.
+- Four canonical WNS fork tests pass at Ethereum block **25,915,356**, runtime hash
+  `0x5b791c832d4373a8d4f977c37d6973a5dbe0924c6d287a2effaa549be31c0221`.
+  They cover approval-only rejection, actual free/paid name registration, automatic
+  app mapping, resolution, renewal and recovery through parent expiry. Publicnode
+  denied a later archive read; the full pinned run passed through eth.drpc.org.
+  Real WNS parent custody remains with the user; no mainnet transaction was sent.
+- Slither 0.11.6: 104 contracts / 102 detectors / **252 flags** (10 High, 58 Medium,
+  66 Low, 116 Informational, 2 Optimization). The nine new entries are triaged in
+  docs/audit/2026-09-06-names/REVIEW.md. Runtime/initcode bytes:
+  **PSPNameRegistrar 8,499 / 9,438**; **PSPStakeNameGate 1,200 / 1,354**.
+- Browser checked the rebuilt stake card and a transaction-disabled long-name
+  fixture on desktop and 390px mobile. Header/feed/ladder names remain contained;
+  mobile content width is 390px, account button 174px. Temporary fixture/server
+  removed and viewport restored. No injected-wallet name transaction was tested.
+- Real hybrid registration remains disabled. WNS is on Ethereum while current PSP
+  is on Base Sepolia; an owner-run permit verifier requires the user's trust-model
+  decision and further implementation/review. The deployed game is unchanged.
+  DeployNames is explicitly a 31337 fork-rehearsal script and leaves custody with
+  the admin until a separate transfer. See docs/audit/NAMES.md for admin calls,
+  source/API observations, the two parent manifests and remaining release work.
+- Source SHA-256 (sorted src/**/*.sol path + NUL + contents):
+  `82ec707f2f2a86a1ba5700b40d9272a549ace78e71138a35cee3d98744af8340`.
