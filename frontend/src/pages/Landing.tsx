@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import Clock from '../components/Clock'
 import { randomDna, renderPepeSvg } from '../lib/pepeRender'
@@ -66,10 +66,9 @@ const RULES: [string, string][] = [
 
 export default function Landing() {
   const greeter = useMemo(() => renderPepeSvg(randomDna()), [])
-  const [illustrationsPaused, setIllustrationsPaused] = useState(false)
 
   return (
-    <div className="xd-page font-body text-text-hi" data-illustrations-paused={illustrationsPaused}>
+    <div className="xd-page font-body text-text-hi">
       <DiagramStyles />
 
       <section className="grid items-center gap-10 pt-10 pb-4 sm:pt-14 lg:grid-cols-[minmax(0,1fr)_17.25rem] lg:gap-12">
@@ -113,16 +112,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <div className="mt-14 flex flex-wrap items-center justify-between gap-3 sm:mt-20">
-        <p className="font-data text-sm text-text-lo">every piece has a job.</p>
-        <button
-          type="button"
-          onClick={() => setIllustrationsPaused(value => !value)}
-          className="xd-motion-toggle rounded-lg border border-line px-3 py-2 text-xs text-text-lo hover:border-accent hover:text-text-hi"
-        >
-          {illustrationsPaused ? 'play illustrations' : 'pause illustrations'}
-        </button>
-      </div>
+      <p className="mt-14 font-data text-sm text-text-lo sm:mt-20">every piece has a job.</p>
 
       <div className="mt-5 grid gap-x-10 lg:grid-cols-2">
         {BEATS.map(b => (

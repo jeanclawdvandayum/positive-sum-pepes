@@ -27,9 +27,6 @@ export function DiagramStyles() {
   outline: 2px solid var(--accent);
   outline-offset: 4px;
 }
-.xd-page[data-illustrations-paused="true"] :is(.xd-stage, .xd-curve-detail) * {
-  animation-play-state: paused !important;
-}
 .xd-deposit { animation: xd-pool 4s ease-in-out infinite; }
 .xd-deposit-b { animation-delay: -1.3s; }
 .xd-deposit-c { animation-delay: -2.6s; }
@@ -95,7 +92,7 @@ export function DiagramStyles() {
 .xd-revive-ring { opacity: 0; transform-origin: 80px 66px; animation: xd-revive-flash 8s ease-out infinite; }
 .xd-respawn-still-arrow { display: none; }
 /* Fire at 55% of the death/revival cycle, after the ghost fades and before
-   the new pepe rises. CSS pause/reduced-motion also stop these rerolls. */
+   the new pepe rises. Reduced motion also stops these rerolls. */
 .xd-respawn-roll { position: absolute; opacity: 0; pointer-events: none; animation: xd-respawn-roll 8s linear -3.6s infinite; }
 @keyframes xd-respawn-roll { from { opacity: 0; } to { opacity: 0; } }
 @keyframes xd-die-revive {
@@ -123,7 +120,6 @@ export function DiagramStyles() {
 }
 @media (prefers-reduced-motion: reduce) {
   .xd-stage *, .xd-curve-detail * { animation: none !important; }
-  .xd-motion-toggle { display: none; }
   .xd-deposit { transform: translateY(22px); }
   .xd-respawn-pepe { transform: translateX(30px); }
   .xd-grave { opacity: 1; transform: translateX(-45px); }

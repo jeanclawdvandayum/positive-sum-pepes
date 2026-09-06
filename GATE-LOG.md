@@ -993,3 +993,13 @@ Solidity source changed after the contract-source hash above.
 - Browser verified RIP / PSP, changing respawn artwork across cycles, and stable
   artwork while paused. Local preview rebuilt. No new tests for this presentation
   change, contract changes or hosted-site update.
+
+## 2026-09-06 — Remove illustration playback toggle
+
+- Removed the landing page pause/play button, its React state and unused pause
+  styles. Illustrations play automatically; system reduced-motion support remains.
+- Deterministic gate passes: **502 Solidity tests / 67 suites**, **112 frontend
+  tests**, **11 verifier tests**, **155 ABI declarations**, **36 production size
+  checks**, oracle/governance and TypeScript/Vite. Existing bundle warnings remain.
+- Rebuilt and refreshed the local preview. Browser confirms the toggle is absent
+  and the respawn animation is running. No new tests for this presentation change.
