@@ -6,10 +6,10 @@ import { useAccount } from 'wagmi'
 import { getAccount } from 'wagmi/actions'
 import { ADDRESSES, CHAIN_ID, wagmiConfig } from '../lib/config'
 import { controllerAbi, erc20Abi, hookAbi, stakerAbi, reinvestorAbi, buildPoolKey } from '../lib/abi'
-import { fmtAmount, fmtCountdown } from '../lib/format'
+import { fmtAmount, fmtCountdown, fmtPepeId } from '../lib/format'
 import { useNow } from '../phase/PhaseEngine'
 import { renderPepeSvg } from '../lib/pepeRender'
-import { dnaOfId } from './PepePicker'
+import { usePepeDna } from '../lib/usePepeDna'
 import MixLogo from './MixLogo'
 import type { RoundInfo } from '../lib/useRound'
 import { useEthUsd } from '../lib/useEthUsd'
@@ -33,8 +33,12 @@ export interface PepeEntry {
 
 type CardStep = 'idle' | 'tx' | 'done'
 
-function Art({ id }: { id: bigint }) {
-  const svg = useMemo(() => renderPepeSvg(dnaOfId(id)), [id])
+function Art({ id, staker }: { id: bigint; staker?: `0x${string}` }) {
+  const { data: dna, isError } = usePepeDna(staker, id)
+  const svg = useMemo(() => dna === undefined ? undefined : renderPepeSvg(dna), [dna])
+  if (!svg) return <div className="flex h-32 items-center justify-center rounded-xl bg-bg-2 text-xs text-text-lo">
+    {isError ? 'pepe image unavailable' : 'loading pepe…'}
+  </div>
   return (
     <div
       className="flex h-32 items-center justify-center rounded-xl bg-bg-2 [&>svg]:h-28 [&>svg]:w-28"
@@ -157,7 +161,7 @@ export function PepeCard({
       if (mounted.current) {
         setTopUpOpen(false)
         setTopUpAmount('')
-        setTopUpSuccess(`✓ Added ${fmtAmount(addition, 6)} PSP to pepe #${id}.`)
+        setTopUpSuccess(`✓ Added ${fmtAmount(addition, 6)} PSP to pepe #${fmtPepeId(id)}.`)
         onDone()
       }
     } catch (error) {
@@ -214,7 +218,7 @@ export function PepeCard({
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-line bg-bg-1 p-4">
       <div className="flex items-center justify-between">
-        <span className="font-data text-xs text-text-lo">pepe #{id.toString()}</span>
+        <span title={id.toString()} className="font-data text-xs text-text-lo">pepe #{fmtPepeId(id)}</span>
         {amount === 0n && <span className="text-[10px] text-text-lo">unstaked pepe</span>}
         {decaying && !decayed && (
           <span className="text-[10px] font-semibold text-phase-heat">{powerLeft !== undefined ? `${powerLeft}% power` : 'decaying'}</span>
@@ -222,7 +226,7 @@ export function PepeCard({
         {decayed && <span className="text-[10px] font-semibold text-pepe">fully unlocked</span>}
       </div>
 
-      <Art id={id} />
+      <Art id={id} staker={round.staker} />
 
       <div className="grid grid-cols-2 gap-2 text-sm">
         <div>

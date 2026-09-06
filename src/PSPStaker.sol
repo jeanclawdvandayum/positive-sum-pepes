@@ -9,6 +9,7 @@ import {ERC721Utils} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Util
 
 import {ICurveHook} from "./interfaces/ICurveHook.sol";
 import {IRoundController} from "./interfaces/IRoundController.sol";
+import {PepeDna} from "./libraries/PepeDna.sol";
 
 /// @dev Minimal descriptor slice (EIP-170 budget): metadata + SVG from DNA.
 interface IPepeDescriptor {
@@ -57,6 +58,8 @@ contract PSPStaker is ReentrancyGuard {
     error NotController();
     error BadNftTransfer();
     error BadPepeId();       // chosen-id path: zero or already owned
+    error PepeDnaTaken();    // another NFT already has this v2 trait combination
+    error PepeArtExhausted();
     error RequestActive();   // stake/top-up while decaying — cancel first
     error NotDecaying();     // cancel/withdraw without an active request
     error VestNotComplete(); // withdraw before the decay ran out
@@ -179,6 +182,16 @@ contract PSPStaker is ReentrancyGuard {
     ///      factory. Zero = this round carries no art (tokenURI is empty).
     address public immutable descriptor;
 
+    // PD-2: immutable art per NFT. A hash's unused bits and modulo aliases
+    // cannot mint duplicate v2 trait combinations. Transfers/withdrawals never
+    // release art. Contiguous used-art runs maintain the first free key in
+    // constant storage work, so collisions cannot force a claim to scan mints.
+    mapping(uint256 => uint256) private _mintedDna;
+    mapping(uint256 => uint256) private _artToken;
+    mapping(uint256 => uint256) private _artRunBoundary;
+    uint256 private _nextArtKey = 1;
+    uint256 public constant PEPE_DNA_VERSION = 1;
+
     constructor(IERC20 _psp, IRoundController _controller, address descriptor_) {
         if (address(_psp) == address(0)) revert ZeroAddress();
         if (address(_controller) == address(0)) revert ZeroAddress();
@@ -210,13 +223,47 @@ contract PSPStaker is ReentrancyGuard {
         return ids[index];
     }
 
-    /// @notice deterministic per-token generative DNA (full word; the
-    ///         descriptor clamps every axis — any dna renders). Pure view.
-    function dnaOf(uint256 tokenId) public pure returns (uint256) {
-        return uint256(keccak256(abi.encodePacked(tokenId)));
+    /// @notice Immutable NFT DNA; an unminted ID returns its chosen-art preview.
+    function dnaOf(uint256 tokenId) public view returns (uint256) {
+        return _ownerOf[tokenId] == address(0) ? _hashDna(tokenId) : _mintedDna[tokenId];
     }
 
-    function _mint(address to, uint256 id) internal {
+    function _hashDna(uint256 seed) private pure returns (uint256) {
+        return uint256(keccak256(abi.encode(seed)));
+    }
+
+    /// @notice Whether this exact chosen ID and its previewed art can be minted.
+    function isPepeAvailable(uint256 id) external view returns (bool) {
+        return id != 0 && _ownerOf[id] == address(0) && _artToken[PepeDna.key(_hashDna(id))] == 0;
+    }
+
+    /// @notice Wallet avatar used by a genesis claim at the current state.
+    /// An occupied combination gets the first free one. Another mint can change
+    /// this preview before the claim confirms; the minted DNA is then immutable.
+    function genesisPepeDna(address wallet) external view returns (uint256) {
+        if (wallet == address(0)) revert ZeroAddress();
+        return _availableDna(_hashDna(uint256(uint160(wallet))));
+    }
+
+    function _availableDna(uint256 preferred) private view returns (uint256) {
+        if (_artToken[PepeDna.key(preferred)] == 0) return preferred;
+        if (_nextArtKey > PepeDna.COMBINATIONS) revert PepeArtExhausted();
+        return PepeDna.fromKey(_nextArtKey);
+    }
+
+    function _mint(address to, uint256 id, uint256 dna) internal {
+        uint256 artKey = PepeDna.key(dna);
+        if (_artToken[artKey] != 0) revert PepeDnaTaken();
+        uint256 artStart = artKey;
+        uint256 artEnd = artKey;
+        if (artKey > 1 && _artToken[artKey - 1] != 0) artStart = _artRunBoundary[artKey - 1];
+        if (artKey < PepeDna.COMBINATIONS && _artToken[artKey + 1] != 0) artEnd = _artRunBoundary[artKey + 1];
+        _artRunBoundary[artStart] = artEnd;
+        _artRunBoundary[artEnd] = artStart;
+        if (artKey == _nextArtKey) _nextArtKey = artEnd + 1;
+        _artToken[artKey] = id;
+        _mintedDna[id] = dna;
+
         uint256 start = id;
         uint256 end = id;
         if (id > 1 && _ownerOf[id - 1] != address(0)) start = _mintedRunBoundary[id - 1];
@@ -505,7 +552,7 @@ contract PSPStaker is ReentrancyGuard {
     function lockWithPepe(uint256 amount, uint256 pepeId) external nonReentrant {
         _requireAlive();
         if (pepeId == 0 || _ownerOf[pepeId] != address(0)) revert BadPepeId();
-        _mint(msg.sender, pepeId);
+        _mint(msg.sender, pepeId, _hashDna(pepeId));
         if (amount != 0) _stake(msg.sender, pepeId, amount);
     }
 
@@ -521,7 +568,7 @@ contract PSPStaker is ReentrancyGuard {
 
     function _mintFresh(address to) private returns (uint256 id) {
         id = nextTokenId;
-        _mint(to, id);
+        _mint(to, id, _availableDna(_hashDna(id)));
     }
 
     /// @dev Shared stake body. New weight goes live after pre-topup fees
@@ -706,8 +753,8 @@ contract PSPStaker is ReentrancyGuard {
     }
 
     /// @dev Predeposit share claim: move `share` out of the genesis position
-    ///      into a FRESH sequential pepe minted to `user`, paying the share's
-    ///      accrued fees alongside (deferred if payout is unavailable).
+    ///      into a fresh wallet-derived pepe minted to `user`, paying the
+    ///      share's accrued fees alongside (deferred if payout is unavailable).
     function claimGenesisShare(address user, uint256 share) external nonReentrant {
         if (msg.sender != address(controller)) revert NotController();
 
@@ -722,7 +769,13 @@ contract PSPStaker is ReentrancyGuard {
         feeRemainder[0] -= shareRemainder;
         genesis.amount -= share;
 
-        uint256 id = _mintFresh(user);
+        // PD-2: uint160(address), padded to 32 bytes before hashing, matches
+        // the wallet avatar. Resolve ID/art collisions independently, without
+        // overwriting another NFT or creating a duplicate trait combination.
+        uint256 id = uint256(uint160(user));
+        uint256 dna = _availableDna(_hashDna(id));
+        if (_ownerOf[id] != address(0)) id = nextTokenId;
+        _mint(user, id, dna);
         Position storage pos = positions[id];
         pos.amount = share;
         _stakedByOwner[user] += share;

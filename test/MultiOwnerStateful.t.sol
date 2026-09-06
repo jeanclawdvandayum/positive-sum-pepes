@@ -40,7 +40,7 @@ contract MultiOwnerStatefulTest is RealV4Base {
             vm.stopPrank();
         }
         vm.prank(bob); controller.claimPredepositPSP();
-        ids.push(1);
+        ids.push(staking.primaryOf(bob));
         this.buy(0, 1e18); this.stake(0, 100);
         this.buy(1, 1e18); this.stake(1, 200);
         bytes4[] memory selectors = new bytes4[](10);

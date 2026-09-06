@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { fmtPepeId } from '../lib/format'
 import { useAccount } from 'wagmi'
 import { stakerAbi, descriptorAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
@@ -118,7 +119,7 @@ export default function PepePanel({ round, refreshKey = 0 }: Props) {
         )}
       </div>
       <p className="mt-3 text-sm font-black text-slate-700">
-        pepe #{tokenId.toString()} <span className="text-slate-400">· PSPP</span>
+        <span title={tokenId.toString()}>pepe #{fmtPepeId(tokenId)}</span> <span className="text-slate-400">· PSPP</span>
       </p>
       <p className="mt-1 break-all text-[10px] text-slate-400">dna 0x{dna?.toString(16)}</p>
       <p className="mt-2 text-xs font-bold text-emerald-600">

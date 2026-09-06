@@ -495,11 +495,10 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // For now, depositors call claimPredepositPSP()
     }
 
-    /// @notice Claim predeposit PSP — auto-locked for 90 days (vlCVX-style)
-    /// @dev All initial bonding curve PSP must be locked. PSP stays at controller,
-    ///      just credits the user's lock position. The share (and every fee it
-    ///      accrued since the genesis lock) is moved out of the controller's
-    ///      virtual lock (see launchPooledBuy) — claiming late costs nothing.
+    /// @notice Claim predeposit PSP into a staked NFT matching the wallet's pepe.
+    /// @dev The share and its accrued fees move out of the virtual genesis
+    ///      position into a fresh NFT. PSP stays in the staker; the normal
+    ///      withdrawal-request rules apply, and detonation opens the lock.
     function claimPredepositPSP() external nonReentrant {
         DepositInfo storage dep = predeposits[msg.sender];
         if (dep.claimed) revert PredepositClosed();
@@ -518,9 +517,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         dep.claimed = true;
 
         // Move the share (and its accrued fees) from the staker's genesis
-        // lock into the user's position — minting their position NFT if it's
-        // their first. Accrued-fee math and M-2 forfeit semantics live in
-        // the staker.
+        // lock into a fresh wallet-derived NFT. Accrued-fee accounting and
+        // deferred-payout handling live in the staker.
         staker.claimGenesisShare(msg.sender, share);
     }
 

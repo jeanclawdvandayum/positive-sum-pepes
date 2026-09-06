@@ -57,7 +57,7 @@ export default function PositionNftControls({ staker, roundId, id, amount, versi
           disabled={disabled} placeholder="0x…" autoComplete="off" spellCheck={false}
           onChange={e => { setRecipient(e.target.value); setReview(undefined); setError('') }} />
         {review ? <div className="space-y-2 rounded-lg bg-bg-2 p-3">
-          <p>Send pepe #{id.toString()} and its entire position to:</p>
+          <p className="break-all">Send pepe #{id.toString()} and its entire position to:</p>
           <p className="break-all font-data">{review}</p>
           <button className="st-btn w-full text-xs" disabled={disabled} onClick={() => act('transfer')}>confirm transfer</button>
         </div> : <button className="st-btn w-full text-xs" disabled={disabled || !recipient.trim()} onClick={reviewTransfer}>review transfer</button>}

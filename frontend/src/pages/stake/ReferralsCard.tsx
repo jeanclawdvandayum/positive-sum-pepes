@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
+import { fmtPepeId } from '../../lib/format'
 import { useCanRefer, refLinkFor, useReferral } from '../../components/ReferralCard'
 
 export default function ReferralsCard() {
@@ -60,7 +61,7 @@ export default function ReferralsCard() {
           >
             {ids.map((id) => (
               <option key={id.toString()} value={id.toString()}>
-                pepe #{id.toString()}
+                pepe #{fmtPepeId(id)}
               </option>
             ))}
           </select>
@@ -70,7 +71,7 @@ export default function ReferralsCard() {
           </button>
           {canRefer === false && (
             <p className="mt-2 text-xs text-phase-heat">
-              pepe #{active?.toString()} needs referral eligibility before purchases can record its referral.
+              pepe #{active === null ? '…' : fmtPepeId(active)} needs referral eligibility before purchases can record its referral.
             </p>
           )}
         </>

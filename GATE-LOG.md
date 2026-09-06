@@ -835,3 +835,45 @@ Solidity source changed after the contract-source hash above.
   `docs/audit/2026-09-06-predeposit.md` for root cause, variants and release boundary.
 - Source SHA-256 (sorted src/**/*.sol path + NUL + contents):
   `c1d8fe5ab84e7ba670b31b4dc964324a8cbdbd2dd6e9437769e9dab99b581b20`.
+
+## 2026-09-06 — Wallet-derived genesis art and per-round DNA uniqueness
+
+- Baseline `8808f3fb`. User requested wallet-matched predeposit NFTs and explicitly
+  required unique DNA within each round. Genesis claims now prefer the padded
+  wallet-address hash used by the wallet avatar. Every mint reserves the canonical
+  eight-trait v2 combination, including high-bit/modulo aliases. Chosen duplicates
+  revert; automatic/genesis collisions receive the first free combination through
+  a bounded occupied-run allocator. Art and its reservation survive transfers,
+  top-ups, reinvestment and withdrawal. Exhaustion of all 100M combinations reverts.
+- `bash scripts/check-audit.sh`: **502 Solidity tests / 67 suites**, **107 frontend
+  tests**, **11 verifier tests**, **155 ABI declarations**, **36 production size
+  checks**. Independent oracle, governance, TypeScript and Vite pass. Existing
+  compiler, dependency-annotation and bundle-size warnings remain. Final log:
+  `/tmp/psp-wallet-dna-audit-gate-final.log` (exit 0).
+- Eleven added Solidity tests cover matching frontend hash vectors, claim order
+  across rounds, real collision IDs 4046/5249, preferred-ID squatting, zero DNA,
+  transfer/withdrawal retention, bounded collision lookup, automatic fallback,
+  independent production-decoder agreement, mixed-mint uniqueness and an
+  independent occupied-set model. Existing accounting tests now resolve actual
+  genesis NFT IDs instead of assuming sequential IDs. Three added frontend tests
+  pin the hashes, collision-preview/owned-DNA transition and compact ID labels.
+- The initial complete gate passed 500 tests and failed the stale composed-birth
+  14M gas canary (minimum sample 14,570,501). The release script already uses three
+  birth transactions. The revised canary checks those calls under explicit
+  10M / 10M / 2M gas budgets and retains 30M composed containment. Production gas
+  limits are unchanged. NFT-ID/art-run claim tests now allow 450K instead of 300K
+  for added art-reservation writes. Runtime/initcode bytes: PSPStaker
+  **14,243 / 14,609**, StakerDeployer **15,467 / 15,493**.
+- Picker availability checks reject occupied art before approval; minted position
+  cards read assigned DNA. Wallet, feed and ladder art share queries scoped by
+  chain/staker/wallet and poll ownership. Long NFT IDs use compact labels while
+  transaction/referral values retain full precision. Browser smoke-checked the
+  rebuilt disconnected stake picker and play route against the existing testnet;
+  this does not exercise fresh-contract claims or a wallet-signed transaction.
+- Fresh factory/staker deployment is required, including for future rounds:
+  existing factories embed the old creation code. Current testnet balances, NFTs,
+  contracts and unrelated broadcast files are unchanged. No live transaction or
+  domain operation was performed. Scope, codec limits and collision behavior:
+  `docs/audit/2026-09-06-wallet-dna.md`.
+- Source SHA-256 (sorted src/**/*.sol path + NUL + contents):
+  `0175b88cf9ad42c52c6ccc6e08b52b28ac78bb2568f33d8393c9c6aa3f762021`.

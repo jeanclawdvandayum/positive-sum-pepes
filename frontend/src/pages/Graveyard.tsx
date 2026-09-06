@@ -2,7 +2,7 @@ import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useState } from 'react'
 import { useAccount } from 'wagmi'
 import { erc20Abi, hookAbi, stakerAbi, controllerAbi } from '../lib/abi'
-import { fmtAmount, fmtPrice } from '../lib/format'
+import { fmtAmount, fmtPrice, fmtPepeId } from '../lib/format'
 import { useGraveyard, type GraveyardRound } from './play/useGraveyard'
 import { PlayStyles } from './play/PlayStyles'
 import HallOfDetonations from './graveyard/HallOfDetonations'
@@ -167,7 +167,7 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
                 return (
                   <li key={key} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-bg-2 px-3 py-2 text-sm">
                     <span className="min-w-0 truncate text-text-lo">
-                      pepe <span className="font-data text-text-hi">#{pos.id.toString()}</span> ·{' '}
+                      pepe <span title={pos.id.toString()} className="font-data text-text-hi">#{fmtPepeId(pos.id)}</span> ·{' '}
                       <span className="tabular font-data text-text-hi">{fmtAmount(pos.amount)} psp</span> staked
                     </span>
                     <button

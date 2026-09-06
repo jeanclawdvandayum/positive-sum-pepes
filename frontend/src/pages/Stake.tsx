@@ -21,6 +21,7 @@ import ReferralsCard from './stake/ReferralsCard'
 import NameRegistrationCard from './stake/NameRegistrationCard'
 import { useNftVersion } from '../lib/useNftVersion'
 import { useNftReinvestment } from '../lib/useNftReinvestment'
+import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // /stake — the den: "your pepe works here" (REDESIGN-B3).
@@ -40,6 +41,7 @@ type Step = 'idle' | 'approve' | 'tx' | 'done'
 
 export default function Stake() {
   const round = useRound()
+  const dnaVersion = usePepeDnaVersion(round.staker)
   const nftVersion = useNftVersion(round.staker)
   const nftReinvestment = useNftReinvestment(round.staker, nftVersion)
   const { address, isConnected } = useAccount()
@@ -174,8 +176,17 @@ export default function Stake() {
               : 'approve & stake'
 
   async function run(fn: 'lock' | 'lockWithPepe', needsApproval = false) {
+    if (busy) return
+    setStep('tx')
     setError(null)
     try {
+      if (fn === 'lockWithPepe' && dnaVersion === 1n && round.staker && pickedId !== null) {
+        const available = await rpcCall(round.staker, stakerAbi, 'isPepeAvailable', [pickedId])
+        if (available !== true) {
+          setPickedId(null)
+          throw new Error('That pepe has already been minted. Pick another face or refresh the choices.')
+        }
+      }
       if (needsApproval && round.token && round.staker && amountWad > 0n) {
         setStep('approve')
         await writeContractAsync({

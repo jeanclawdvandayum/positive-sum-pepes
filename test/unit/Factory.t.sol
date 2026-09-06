@@ -90,26 +90,12 @@ contract FactoryTest is Test {
     //  must fit far below a mainnet block gas limit
     // ═══════════════════════════════════════════════════════════════
 
-    function test_Gas_DeployRoundUnder12M() public {
-        // The mining loop's iteration count is a geometric draw (1/16384 per
-        // candidate for the 14 permission bits), so a single deployRound gas
-        // number is a random variable — it cannot be bounded deterministically.
-        // We bound a quantile instead: the CHEAPEST of 4 independent draws
-        // (distinct round names -> distinct constructor args -> distinct
-        // codeHashes) estimates the 25th percentile.
-        //  - RECALIBRATED 2026-08-20 (wave2b): v5.1 moved the referral
-        //    registry birth into _deployRound (deployRegistry + setRecorder)
-        //    and the game curve grew — fixed cost measured ~8M, median
-        //    mining ~2.5M (148 gas/iter x 16384, HookMiner Yul rewrite), so
-        //    a typical draw lands ~10.5M. Observed min-of-4: 10.57M
-        //    (log in Run-5 evidence). P(all 4 draws > 12M) stays ~0.1%.
-        //  - With the H-2 regression class (per-iteration cold EXTCODESIZE
-        //    at 2600 gas, or re-hashing ~13.5KB of creation code at 8.3k
-        //    gas/iter), even the MIN of 4 draws exceeds 20M -> hard fail.
-        // Additionally, every individual draw must fit under 30M: worst-case
-        // MAX_LOOP mining (~25M) + fixed cost stays inside a mainnet block.
+    function test_Gas_ComposedContainmentAndStagedBudgets() public {
+        // The release script has used reserveGenesis + three birthStep calls
+        // since September 3. Mining draws remain variable; retain the original
+        // 30M composed containment check, and enforce tighter per-call budgets
+        // on the actual supported deployment path instead of min-of-four luck.
         string[4] memory names = ["Alpha Round", "Bravo Round", "Charlie Round", "Delta Round"];
-        uint256 minGas = type(uint256).max;
         for (uint256 i; i < 4; i++) {
             PSPFactory.RoundParams memory params = PSPFactory.RoundParams({
                 name: names[i],
@@ -119,17 +105,19 @@ contract FactoryTest is Test {
             uint256 gasBefore = gasleft();
             factory.deployRound(params);
             uint256 gasUsed = gasBefore - gasleft();
-            console.log("deployRound gas used:", gasUsed);
-            assertLt(gasUsed, 30_000_000, "single deployRound exceeds 30M block-gas containment");
-            if (gasUsed < minGas) minGas = gasUsed;
+            console.log("composed deployRound gas used:", gasUsed);
+            assertLt(gasUsed, 30_000_000, "single deployRound exceeds 30M containment");
+
+            factory.reserveGenesis(params);
+            uint256 expectedRound = factory.currentRoundId() + 1;
+            factory.birthStep{gas: 10_000_000}();
+            assertEq(factory.reservationPhase(), 2);
+            factory.birthStep{gas: 10_000_000}();
+            assertEq(factory.reservationPhase(), 3);
+            factory.birthStep{gas: 2_000_000}();
+            assertEq(factory.currentRoundId(), expectedRound);
+            assertFalse(factory.reservationActive());
         }
-        // H-2 regression bound: a typical mining draw must keep total
-        // deployment well under 10M (mainnet block limit is ~30-36M).
-        // RECALIBRATED 2026-08-29 (sine flavor): SineMath inlined into
-        // CurveHook added ~6KB runtime bytecode (+1.26M code-deposit gas);
-        // measured 13.26M. Binding real constraint = Base Sepolia's MEASURED
-        // 15M per-tx sequencer cap (policy) — budget 14M keeps 1M margin.
-        assertLt(minGas, 14_000_000, "deployRound gas must stay under 14M (15M Base Sepolia cap - 1M margin)");
     }
 
     // ═══════════════════════════════════════════════════════════════

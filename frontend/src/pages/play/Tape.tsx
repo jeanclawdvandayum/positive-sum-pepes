@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import { renderPepeSvg } from '../../lib/pepeRender'
-import { dnaOfId } from '../../components/PepePicker'
+import WalletPepeArt from '../../components/WalletPepeArt'
+import { useRound } from '../../lib/useRound'
 import { fmtAmount } from '../../lib/format'
 import type { TapeEntry } from './useTradeTape'
 import WalletName from '../../components/WalletName'
@@ -14,24 +14,10 @@ import WalletName from '../../components/WalletName'
 // exactly what the logs say, or its designed §8 empty state. Never a
 // spinner.
 //
-// Avatars are LOCAL derivations: keccak(address) → dna → renderPepeSvg —
-// same art data the contract renders, deterministic per address, zero
-// chain reads. Placeholder identity until the primaryOf lane ships with
-// round wiring.
+// Avatars share the header's round-aware NFT/available-wallet identity.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_ROWS = 3
-
-const avatars = new Map<string, string>()
-function avatarFor(addr: string): string {
-  let svg = avatars.get(addr)
-  if (svg === undefined) {
-    svg = renderPepeSvg(dnaOfId(BigInt(addr)))
-    if (avatars.size > 128) avatars.clear()
-    avatars.set(addr, svg)
-  }
-  return svg
-}
 
 /// +5:00 per whole psp — same shape the clock's chip floats
 function fmtAdded(ms: number): string {
@@ -41,6 +27,7 @@ function fmtAdded(ms: number): string {
 }
 
 export default function Tape({ entries }: { entries: TapeEntry[] }) {
+  const round = useRound()
   const shown = useMemo(() => entries.slice(0, MAX_ROWS), [entries])
 
   return (
@@ -54,11 +41,8 @@ export default function Tape({ entries }: { entries: TapeEntry[] }) {
             className="pl-tape-row flex items-center gap-2.5 border-t border-line px-4 py-2 text-sm first:border-t-0"
           >
             <span className={`pl-dot ${e.kind === 'buy' ? 'pl-dot--buy' : ''}`} aria-hidden="true" />
-            <span
+            <WalletPepeArt address={e.addr} staker={round.staker}
               className="h-[22px] w-[22px] shrink-0 overflow-hidden rounded border border-line"
-              style={{ imageRendering: 'pixelated' }}
-              aria-hidden="true"
-              dangerouslySetInnerHTML={{ __html: avatarFor(e.addr) }}
             />
             <WalletName address={e.addr} className="max-w-[34%] shrink-0 truncate font-data text-xs text-text-lo" />
             <span className="min-w-0 truncate text-text-lo">

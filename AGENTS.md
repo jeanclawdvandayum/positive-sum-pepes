@@ -10,6 +10,9 @@ keeper is disabled; the testnet embedded HTML is a read-only deployment record.
 Read `docs/audit/READINESS.md` before editing. It supersedes the historical
 rules below: 0.005 mixETH minimum active gross buy and per ticket;
 public predeposits accept any positive amount within both caps (September 6 approval);
+predeposit NFTs use wallet-derived art; every mint reserves a unique v2 trait
+combination for the round (including after transfer/withdrawal). Read NFT DNA
+on-chain; only unminted chosen-ID previews may assume keccak(id).
 4m20s per purchase unit; actual-seconds TimeAdded payload; independent
 Decimal/Simpson oracle; owner/operator reinvestment; resumable three-step birth.
 `bash scripts/check-audit.sh` is the deterministic gate. Counts come from the

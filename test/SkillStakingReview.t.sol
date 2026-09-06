@@ -55,12 +55,13 @@ contract SkillStakingReviewTest is Test {
     function test_GenesisClaimGasIndependentOfChosenIdRun() public {
         // These free hatches can be spread over many transactions. The claim
         // has its own fixed gas budget, independent of the setup budget.
-        for (uint256 i = 2; i <= 2048; ++i) staking.lockWithPepe(0, i);
-        staking.lockWithPepe(0, 1); // bridge into the prefilled run
+        // Automatic minting fills the same ID run and resolves any art aliases.
+        for (uint256 i = 1; i <= 2048; ++i) staking.lock(0);
+        staking.lockWithPepe(0, uint256(uint160(alice))); // occupy the preferred ID/art
         token.mint(address(staking), 600e18);
         controller.genesis(staking, 600e18);
         vm.prank(address(controller));
-        (bool ok,) = address(staking).call{gas: 300_000}(
+        (bool ok,) = address(staking).call{gas: 450_000}(
             abi.encodeCall(staking.claimGenesisShare, (alice, 600e18))
         );
         assertTrue(ok, "chosen ID run must not make the next genesis claim scan every NFT");

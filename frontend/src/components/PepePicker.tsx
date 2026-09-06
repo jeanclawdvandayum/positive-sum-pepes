@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { keccak256, toHex } from 'viem'
 import { stakerAbi, descriptorAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
 import { renderPepeSvg } from '../lib/pepeRender'
 import type { RoundInfo } from '../lib/useRound'
 import { PixelIcon } from './PixelIcon'
+import { CHAIN_ID } from '../lib/config'
+import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
+import { fmtPepeId } from '../lib/format'
 
 const isZero = (a: string | undefined) => !a || /^0x0+$/.test(a)
 
-/// dna of a candidate pepe id — mirrors PSPStaker.dnaOf (pure keccak).
+/// DNA of an unminted candidate ID. Owned NFTs must read dnaOf on-chain:
+/// automatic mints can receive different available art after a collision.
 export function dnaOfId(id: bigint): bigint {
   return BigInt(keccak256(toHex(id, { size: 32 })))
 }
@@ -28,6 +33,7 @@ interface Props {
 /// Refresh rolls 6 fresh ids. This is the "choose your accomplice" step of staking.
 export default function PepePicker({ round, selected, onSelect, seed, onReroll }: Props) {
   const staker = round.staker
+  const dnaVersion = usePepeDnaVersion(staker)
   const [descriptor, setDescriptor] = useState<string | undefined>()
   const [svgs, setSvgs] = useState<Record<string, string>>({})
   const [localMode, setLocalMode] = useState(false)
@@ -45,6 +51,16 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seed])
+
+  const { data: available } = useQuery({
+    queryKey: ['pepe-candidates', CHAIN_ID, staker, candidates.map(String)],
+    enabled: !!staker && dnaVersion === 1n,
+    queryFn: () => Promise.all(candidates.map(id => rpcCall(staker!, stakerAbi, 'isPepeAvailable', [id]) as Promise<boolean>)),
+    refetchInterval: 6000,
+  })
+  useEffect(() => {
+    if (selected !== null && available?.[candidates.indexOf(selected)] === false) onSelect(null)
+  }, [selected, available, candidates, onSelect])
 
   useEffect(() => {
     if (!staker || isZero(staker)) return
@@ -112,8 +128,9 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-3">
-        {candidates.map((id) => {
+        {candidates.map((id, index) => {
           const isSel = selected === id
+          const taken = available?.[index] === false
           const svg = svgs[id.toString()]
           return (
             <button
@@ -121,8 +138,9 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
               type="button"
               aria-label={`select pepe #${id}`}
               aria-pressed={isSel}
+              disabled={taken}
               onClick={() => onSelect(isSel ? null : id)}
-              className={`relative aspect-square w-full min-w-0 rounded-xl border p-1 transition ${
+              className={`relative aspect-square w-full min-w-0 rounded-xl border p-1 transition disabled:cursor-not-allowed disabled:opacity-40 ${
                 isSel
                   ? 'border-pepe bg-bg-2 ring-1 ring-pepe'
                   : 'border-line bg-bg-2/50 hover:border-text-lo'
@@ -135,6 +153,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
                   <div className="skeleton h-full w-full rounded-lg" />
                 )}
               </div>
+              {taken && <span className="absolute inset-x-1 bottom-1 rounded bg-bg-0 p-1 text-xs text-text-hi">already minted</span>}
               {isSel && (
                 <span className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-pepe text-xs text-bg-0">
                   ✓
@@ -147,7 +166,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
 
       <p className="mt-2 text-xs text-text-lo">
         {selected
-          ? `pepe #${selected.toString()} locked in — pick another or stake below`
+          ? `pepe #${fmtPepeId(selected)} selected — pick another or stake below`
           : 'tap a pepe to select it'}
       </p>
     </div>

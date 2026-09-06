@@ -14,7 +14,7 @@ import { useAccount } from 'wagmi'
 import { stakerAbi, descriptorAbi } from '../../lib/abi'
 import { rpcCall } from '../../lib/rpc'
 import { renderPepeSvg, randomDna } from '../../lib/pepeRender'
-import { fmtAmount } from '../../lib/format'
+import { fmtAmount, fmtPepeId } from '../../lib/format'
 import type { RoundInfo } from '../../lib/useRound'
 import Skeleton from '../../components/Skeleton'
 import FeeAccumulator from './FeeAccumulator'
@@ -120,7 +120,7 @@ export default function IdentityPanel({
     art = svg ?? (dna !== undefined ? renderPepeSvg(dna) : null)
     nameLine = (
       <>
-        pepe #{tokenId.toString()} <span className="text-text-lo">· pspp</span>
+        <span title={tokenId.toString()}>pepe #{fmtPepeId(tokenId)}</span> <span className="text-text-lo">· pspp</span>
       </>
     )
     subLine = artOnline

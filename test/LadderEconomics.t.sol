@@ -44,8 +44,9 @@ contract LadderEconomicsTest is RealV4Base {
         uint256 bought = zapIn.buyWithMix(poolKey, 0.05e18, 1, block.timestamp);
         uint256 returned = zapOut.sellToMix(poolKey, bought, 1, block.timestamp);
         zapIn.buyWithMix(poolKey, 0.05e18, 1, block.timestamp);
-        uint256 fees = controller.staker().pendingFeesOf(1);
-        controller.staker().claimFees(1);
+        uint256 id = controller.staker().primaryOf(bob);
+        uint256 fees = controller.staker().pendingFeesOf(id);
+        controller.staker().claimFees(id);
         vm.stopPrank();
         assertEq(hook.ticketCount(), 20, "buy/sell/buy earns only the two buys' tickets");
         assertGt(hook.potBalance(), potBefore);

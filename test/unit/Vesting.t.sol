@@ -348,8 +348,9 @@ contract VestingTest is Test {
         stakerV.claimGenesisShare(alice, 500e18); // 1/4 of genesis → 1/4 of its cut
 
         assertEq(mixETH.balanceOf(alice) - mixBefore, genesisCut * 500e18 / 2000e18);
-        (uint256 amt,,,,) = stakerV.positions(1);
+        uint256 id = stakerV.tokenOfOwnerByIndex(alice, 1);
+        (uint256 amt,,,,) = stakerV.positions(id);
         assertEq(amt, 500e18, "fresh pepe carries the share");
-        assertEq(stakerV.ownerOf(1), alice);
+        assertEq(stakerV.ownerOf(id), alice);
     }
 }

@@ -1,5 +1,11 @@
 import { formatUnits } from 'viem'
 
+/** Display only; transactions and referral links keep the full bigint ID. */
+export function fmtPepeId(id: bigint): string {
+  const s = id.toString()
+  return s.length > 12 ? `${s.slice(0, 6)}…${s.slice(-4)}` : s
+}
+
 export function fmtAmount(wad: bigint | undefined, maxFrac = 2): string {
   if (wad === undefined) return '…'
   const n = Number(formatUnits(wad, 18))

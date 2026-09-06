@@ -1,8 +1,7 @@
 import Clock from '../../components/Clock'
 import PotOdometer from '../../components/PotOdometer'
 import Skeleton from '../../components/Skeleton'
-import { renderPepeSvg } from '../../lib/pepeRender'
-import { dnaOfId } from '../../components/PepePicker'
+import WalletPepeArt from '../../components/WalletPepeArt'
 import { useNow } from '../../phase/PhaseEngine'
 import type { RoundInfo } from '../../lib/useRound'
 import type { LastTimeAdded } from './useTradeTape'
@@ -18,8 +17,7 @@ import DetonateButton from './DetonateButton'
 //
 // Under the pot, one thin live-context line: "last added by [pepe] · Xm
 // ago" — CLOCK-REDESIGN §6.6 wired it to TimeAdded (which rides the tape's
-// existing getLogs lane; no new reads). Avatars are LOCAL derivations,
-// same as the tape: keccak(address) → dna → renderPepeSvg. No timestamp in
+// existing getLogs lane). Avatars share the header's NFT identity. No timestamp in
 // the log payload's reach → the "ago" half simply stays off the line.
 //
 // Below that, the detonator (§6.3): hidden while the clock lives, appears
@@ -28,17 +26,6 @@ import DetonateButton from './DetonateButton'
 
 function short(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
-}
-
-const avatars = new Map<string, string>()
-function avatarFor(addr: string): string {
-  let svg = avatars.get(addr)
-  if (svg === undefined) {
-    svg = renderPepeSvg(dnaOfId(BigInt(addr)))
-    if (avatars.size > 32) avatars.clear()
-    avatars.set(addr, svg)
-  }
-  return svg
 }
 
 /// recency for the "last added" line — seconds → dry human time
@@ -96,11 +83,8 @@ export default function ClockPanel({
           </p>
         ) : (
           <p className="pl-context mt-3 flex items-center gap-1.5 font-data text-xs">
-            <span
+            <WalletPepeArt address={lastTime.addr} staker={round.staker}
               className="inline-block h-[18px] w-[18px] overflow-hidden rounded border border-[#22344f]"
-              style={{ imageRendering: 'pixelated' }}
-              aria-hidden="true"
-              dangerouslySetInnerHTML={{ __html: avatarFor(lastTime.addr) }}
             />
             <span>
               last added by <span className="text-[#e8f0f7]">{short(lastTime.addr)}</span>

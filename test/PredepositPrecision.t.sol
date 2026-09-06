@@ -35,6 +35,8 @@ contract PredepositPrecisionTest is BBase {
         assertEq(mixETH.balanceOf(address(hook)), 100e18 + amount);
         assertGt(psp.totalSupply(), 0);
         assertEq(stakerV.balanceOf(bob), 1);
+        assertEq(stakerV.primaryOf(bob), uint256(uint160(bob)));
+        assertEq(stakerV.dnaOf(stakerV.primaryOf(bob)), uint256(keccak256(abi.encode(bob))));
     }
 
     function testUnrepresentableOneWeiWholePoolCanBeToppedUpAfterWindow() public {

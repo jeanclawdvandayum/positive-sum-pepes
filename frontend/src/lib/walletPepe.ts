@@ -22,7 +22,12 @@ export function createWalletPepeReader(read: Read) {
     const fallback = { dna: addressPepeDna(address) }
     if (!staker || /^0x0*$/.test(staker)) return fallback
     const tokenId = await read(staker, stakerAbi, 'primaryOf', [address]) as bigint
-    if (tokenId === 0n) return fallback
+    if (tokenId === 0n) {
+      // New rounds resolve already-used wallet art to an available combination.
+      // Legacy rounds have no preview getter; keep their stable address avatar.
+      try { return { dna: await read(staker, stakerAbi, 'genesisPepeDna', [address]) as bigint } }
+      catch { return fallback }
+    }
     const [owner, dna, descriptor] = await Promise.all([
       read(staker, stakerAbi, 'ownerOf', [tokenId]) as Promise<Address>,
       read(staker, stakerAbi, 'dnaOf', [tokenId]) as Promise<bigint>,

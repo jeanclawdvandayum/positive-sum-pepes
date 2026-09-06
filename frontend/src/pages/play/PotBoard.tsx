@@ -6,7 +6,7 @@ import { dnaOfId } from '../../components/PepePicker'
 import { fmtAmount } from '../../lib/format'
 import { hookAbi } from '../../lib/abi'
 import type { BoardTicket } from './useLadderBoard'
-import { useSeatPepes } from './useSeatPepes'
+import WalletPepeArt from '../../components/WalletPepeArt'
 import WalletName from '../../components/WalletName'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,25 +26,12 @@ import WalletName from '../../components/WalletName'
 // reads "your cut if it blows now. everyone wants your seat.". SETTLED (post-round), the
 // pot is frozen and rows become claims-forever rows with a claimPot button.
 //
-// Holder avatars are LOCAL derivations — keccak(address) → dna →
-// renderPepeSvg, the same identity the tape shows for the same address.
-// Zero chain reads beyond the board itself.
+// Holder avatars share the header's round-aware NFT/available-wallet identity.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ladder shares, newest → oldest — mirrors the contract split 25/18/14/…
 // ("the math, straight"; renormalizes under 10 seated tickets)
 const LADDER = [25, 18, 14, 10, 8, 7, 6, 5, 4, 3]
-
-const avatars = new Map<string, string>()
-function avatarFor(addr: string): string {
-  let svg = avatars.get(addr)
-  if (svg === undefined) {
-    svg = renderPepeSvg(dnaOfId(BigInt(addr)))
-    if (avatars.size > 64) avatars.clear()
-    avatars.set(addr, svg)
-  }
-  return svg
-}
 
 // sleeping faces — one deterministic LOCAL pepe per seat (same art data the
 // contract renders; dimmed + zzz). No chain reads.
@@ -92,7 +79,6 @@ export default function PotBoard({
 }) {
   const { isConnected } = useAccount()
   const { writeContractAsync } = useConfirmedWrite(settled ? { exitRoundId: roundId } : undefined)
-  const seatDnas = useSeatPepes(staker, tickets)
   const [claimStep, setClaimStep] = useState<'idle' | 'pending' | 'done'>('idle')
   const [claimErr, setClaimErr] = useState<string | null>(null)
 
@@ -198,19 +184,12 @@ export default function PotBoard({
                   {s !== undefined && ticketNo !== undefined ? ticketNo.toString() : `#${rank}`}
                 </span>
                 <span className="relative flex shrink-0">
-                  <span
-                    className={`pl-pepe ${isTop ? 'h-12 w-12' : 'h-9 w-9'} ${
-                      s ? '' : 'pl-pepe--sleep'
-                    }`}
+                  {s ? <WalletPepeArt address={s.addr} staker={staker}
+                    className={`pl-pepe ${isTop ? 'h-12 w-12' : 'h-9 w-9'}`} /> : <span
+                    className={`pl-pepe pl-pepe--sleep ${isTop ? 'h-12 w-12' : 'h-9 w-9'}`}
                     style={{ imageRendering: 'pixelated' }}
-                    dangerouslySetInnerHTML={{
-                      __html: s
-                        ? (seatDnas.get(s.addr) ?? 0n) > 0n
-                          ? renderPepeSvg(seatDnas.get(s.addr)!)
-                          : avatarFor(s.addr)
-                        : sleeperFor(rank),
-                    }}
-                  />
+                    dangerouslySetInnerHTML={{ __html: sleeperFor(rank) }}
+                  />}
                   {!s && (
                     <span className="pl-zzz" aria-hidden="true">
                       zzz
