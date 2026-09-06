@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Clock from '../components/Clock'
 import { randomDna, renderPepeSvg } from '../lib/pepeRender'
@@ -7,168 +7,165 @@ import { targetChain } from '../lib/config'
 import PayoutSlider from './explainer/PayoutSlider'
 import CurveExplainer from './explainer/CurveExplainer'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// / — the explainer (REDESIGN-B1 §1–§4). Narrative, not a card wall:
-// hero → six beats → repeating curve → the math → settlement.
-// Game rules follow READINESS.md; the hero clock uses the shared live deadline.
-// ─────────────────────────────────────────────────────────────────────────────
-
-const SUBHEAD =
-  'buy PSP, grab a ladder spot, and make it everyone else’s problem. each new ticket pushes the older ones down and adds time to the clock. when the clock reaches zero, anyone can detonate the round. the tickets left on the ladder share the pot. stake your PSP to earn trading fees along the way.'
-
-const BEATS: { n: string; name: string; copy: string; kind: BeatKind }[] = [
+// Approved manifesto first, then the precise entry, clock and payout rules.
+// Illustrations are local CSS. The live clock stays on the shared PhaseEngine.
+const BEATS: { name: string; copy: string; kind: BeatKind }[] = [
   {
-    n: '01',
-    name: 'backed by mixETH',
-    copy: 'the game holds its reserves in Alchemix’s mixETH, an ETH vault token (ERC-4626). yield earned outside the game can increase the ETH value of each mixETH held in reserve. trades, fees and rewards are all counted in mixETH.',
+    name: 'crash the opening party.',
+    copy: 'the public predeposit pools the opening buy. anyone can join within the caps. your deposit determines your share. the opening belongs to the people who show up.',
+    kind: 'predeposit',
+  },
+  {
+    name: 'give the chart a pulse.',
+    copy: 'the sine curve moves through calmer stretches and steep climbs. room to accumulate, room for chaos. something to play beyond the opening candle.',
+    kind: 'curve',
+  },
+  {
+    name: 'get paid to stick around.',
+    copy: 'stake PSP. stakers split 60% of trading fees. the action pays the people staying for it.',
+    kind: 'stake',
+  },
+  {
+    name: 'fight over something.',
+    copy: 'buys feed the clock and take ladder spots. when someone detonates the expired round, the tickets still on the ladder split the jackpot. attention has somewhere to go. so does the money.',
+    kind: 'jackpot',
+  },
+  {
+    name: 'put a face on your bags.',
+    copy: 'your staking position is a pepe NFT. feed it, trade it, keep it after withdrawing. give your financial decisions the face they deserve.',
+    kind: 'nft',
+  },
+  {
+    name: 'make the backing work.',
+    copy: 'mixETH can earn yield outside the game, growing the ETH behind the reserves. that’s the positive-sum part. fresh value coming in while everyone’s fighting over the pot.',
     kind: 'reserve',
   },
   {
-    n: '02',
-    name: 'start the clock',
-    copy: 'the countdown starts when the round launches. buys add time, up to the round’s full starting duration.',
-    kind: 'arm',
+    name: 'settle the wreckage.',
+    copy: 'detonation opens every lock and flattens the curve. redeem PSP for its proportional share of the remaining backing whenever you’re ready.',
+    kind: 'settle',
   },
   {
-    n: '03',
-    name: 'buy a ladder spot',
-    copy: 'each full 0.005 mixETH in a buy gets you one ticket and adds up to 4 minutes and 20 seconds. a 0.05 mixETH buy takes all ten spots and adds up to 43 minutes and 20 seconds. fees are included in those amounts.',
-    kind: 'buy',
-  },
-  {
-    n: '04',
-    name: 'put your pepe to work',
-    copy: 'stake PSP in a pepe NFT to earn trading fees. stakers receive 60% of each fee. you can claim your rewards or reinvest them into your pepe.',
-    kind: 'climb',
-  },
-  {
-    n: '05',
-    name: 'detonate',
-    copy: 'when the clock reaches zero, trading stops. anyone can press detonate to settle the round and open every staked position for withdrawal.',
-    kind: 'detonate',
-  },
-  {
-    n: '06',
-    name: 'claim or redeem',
-    copy: 'claim your ladder winnings and redeem your PSP for a share of that round’s remaining mixETH. both stay available whenever you’re ready.',
-    kind: 'claim',
+    name: 'run it back.',
+    copy: 'the token factory needs another ticker and another sales pitch. PSP has another round. after detonation, anyone can help launch its successor. fresh predeposit. fresh token. fresh chart. old claims stay with the old round.',
+    kind: 'respawn',
   },
 ]
 
-const MATH: [string, string][] = [
-  ['ladder payouts', 'with ten tickets, the pot splits 25/18/14/10/8/7/6/5/4/3% from newest to oldest. one wallet can hold several spots.'],
+const RULES: [string, string][] = [
+  ['buying in', 'the minimum buy is 0.005 mixETH, including fees. every full 0.005 mixETH buys one ladder ticket. one wallet can hold several spots.'],
+  ['feeding the clock', 'each ticket adds up to 4 minutes and 20 seconds, capped at the round’s full starting duration. a 0.05 mixETH buy takes all ten spots and adds up to 43 minutes and 20 seconds.'],
+  ['hitting zero', 'the countdown starts at launch. trading stops at zero. anyone can detonate the round to settle the ladder and open the staking locks.'],
+  ['ladder payouts', 'with ten tickets, the pot splits 25/18/14/10/8/7/6/5/4/3% from newest to oldest.'],
   ['smaller ladders', 'one ticket gets the whole pot. with two to nine tickets, each gets a larger share using the same relative weights.'],
   ['trading fees', '60% of each trading fee goes to stakers and 35% goes to the pot.'],
   ['referrals', 'with a recorded referral, the final 5% goes to the referral chain. for everyone else, 4% goes to the pot and 1% goes to the deployer.'],
+  ['cashing out', 'ladder winnings stay claimable after detonation. PSP redeems for its proportional share of that round’s remaining mixETH, with payouts rounded down.'],
 ]
 
-// stepped timeline: each beat steps further right (staircase, not a card wall)
-const STEP_PAD = ['', 'lg:pl-6', 'lg:pl-12', 'lg:pl-18', 'lg:pl-24', 'lg:pl-30']
-
 export default function Landing() {
-  // one greeter pepe per load — the same "the header IS the art" lane
   const greeter = useMemo(() => renderPepeSvg(randomDna()), [])
+  const [illustrationsPaused, setIllustrationsPaused] = useState(false)
 
   return (
-    <div className="xd-page font-body text-text-hi">
+    <div className="xd-page font-body text-text-hi" data-illustrations-paused={illustrationsPaused}>
       <DiagramStyles />
 
-      {/* ── 1. hero ── */}
-      <section className="pt-10 pb-4 sm:pt-14">
-        <div className="flex flex-wrap items-end gap-x-10 gap-y-6">
-          <div>
-            {/* the REAL clock, embedded live — prelaunch idle state per §8 */}
-            <Clock variant="mini" />
-            <p className="mt-2 text-xs text-text-lo">the countdown starts at launch.</p>
-          </div>
-          <span
-            className="block h-[138px] w-[138px] shrink-0 overflow-hidden rounded-lg border border-line sm:h-[207px] sm:w-[207px] [&>svg]:h-full [&>svg]:w-full"
-            style={{ imageRendering: 'pixelated' }}
-            aria-label="a greeter pepe"
-            dangerouslySetInnerHTML={{ __html: greeter }}
-          />
-        </div>
-
-        <h1 className="mt-10 font-display text-[clamp(4rem,8vw,6rem)] leading-[1.05] tracking-tight">
-          get in, loser. we’re taking the pot.
-        </h1>
-
-        <p className="mt-6 max-w-2xl text-base leading-relaxed text-text-lo">{SUBHEAD}</p>
-
-        <div className="mt-8">
+      <section className="grid items-center gap-10 pt-10 pb-4 sm:pt-14 lg:grid-cols-[minmax(0,1fr)_17.25rem] lg:gap-12">
+        <div className="min-w-0">
+          <h1 className="max-w-3xl font-display text-[clamp(3.25rem,7.5vw,6rem)] leading-[1.05] tracking-tight">
+            the anti meme,<br />
+            <span className="text-accent">memecoin.</span>
+          </h1>
+          <p className="mt-6 text-xl leading-snug sm:text-2xl">
+            new ticker. same insiders. same bullshit.
+          </p>
+          <p className="mt-5 max-w-xl leading-relaxed text-text-lo">
+            too much of crypto runs on disposable tokens. insiders get the head start.
+            everyone else gets the sales pitch. launch, dump, repeat.
+          </p>
+          <p className="mt-4 max-w-xl leading-relaxed text-text-lo">
+            PSP takes DeFi locking, bonding curves and NFTs and throws them into one game.
+          </p>
           <Link
             to="/play"
-            className="inline-flex items-center justify-center rounded-xl bg-accent px-7 py-3 text-base font-semibold text-bg-0 transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-[1px]"
+            className="mt-8 inline-flex items-center justify-center rounded-xl bg-accent px-7 py-3 text-base font-semibold text-bg-0 transition hover:brightness-110 active:translate-y-[1px]"
           >
             buy psp
           </Link>
         </div>
+
+        <div className="flex min-w-0 flex-wrap items-center gap-6 lg:flex-col lg:items-start">
+          <span
+            className="block h-[138px] w-[138px] shrink-0 overflow-hidden rounded-xl border border-line sm:h-[207px] sm:w-[207px] lg:h-[276px] lg:w-[276px] [&>svg]:h-full [&>svg]:w-full"
+            style={{ imageRendering: 'pixelated' }}
+            role="img"
+            aria-label="a greeter pepe"
+            dangerouslySetInnerHTML={{ __html: greeter }}
+          />
+          <div>
+            <Clock variant="mini" />
+            <p className="mt-2 text-xs text-text-lo">the countdown starts at launch.</p>
+          </div>
+        </div>
       </section>
 
-      {/* ── 2. one round, six beats ── */}
-      <section className="mt-20">
-        <h2 className="font-display text-2xl sm:text-3xl">how a round works</h2>
-        <ol className="mt-8">
-          {BEATS.map((b, i) => (
-            <li
-              key={b.n}
-              className={`flex flex-col items-start gap-6 border-t border-line py-8 sm:flex-row sm:items-center ${STEP_PAD[i]}`}
-            >
-              <BeatDiagram kind={b.kind} />
-              <div className="min-w-0 max-w-md">
-                <div className="tabular font-data text-sm text-text-lo">
-                  {b.n} · {b.name}
+      <div className="mt-14 flex flex-wrap items-center justify-between gap-3 sm:mt-20">
+        <p className="font-data text-sm text-text-lo">every piece has a job.</p>
+        <button
+          type="button"
+          onClick={() => setIllustrationsPaused(value => !value)}
+          className="xd-motion-toggle rounded-lg border border-line px-3 py-2 text-xs text-text-lo hover:border-accent hover:text-text-hi"
+        >
+          {illustrationsPaused ? 'play illustrations' : 'pause illustrations'}
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-x-10 lg:grid-cols-2">
+        {BEATS.map(b => (
+          <section key={b.kind} aria-labelledby={`story-${b.kind}`}
+            className="flex min-w-0 flex-col items-start gap-5 border-t border-line py-8 sm:flex-row">
+            <BeatDiagram kind={b.kind} pepeSvg={greeter} />
+            <div className="min-w-0">
+              <h2 id={`story-${b.kind}`} className="font-display text-2xl leading-tight">{b.name}</h2>
+              <p className="mt-3 leading-relaxed text-text-lo">{b.copy}</p>
+              {b.kind === 'reserve' && (
+                <div className="mt-4 border-l-2 border-line pl-3 text-xs leading-relaxed text-text-lo">
+                  <p>Alchemix’s mixETH is an ETH vault token (ERC-4626). trades and rewards are counted in mixETH.</p>
+                  {targetChain.testnet && <p className="mt-2">this testnet uses free practice mixETH with 0% yield.</p>}
+                  <a href="https://docs.alchemix.fi/" target="_blank" rel="noopener noreferrer"
+                    className="mt-2 inline-block underline underline-offset-4 hover:text-text-hi">
+                    more about mixETH ↗
+                  </a>
                 </div>
-                <p className="mt-2 leading-relaxed">{b.copy}</p>
-                {b.kind === 'reserve' && (
-                  <>
-                    {targetChain.testnet && (
-                      <p className="mt-3 text-xs leading-relaxed text-text-lo">
-                        this testnet uses free practice mixETH with 0% yield.
-                      </p>
-                    )}
-                    <a
-                      href="https://docs.alchemix.fi/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-block text-xs text-text-lo underline underline-offset-4 hover:text-text-hi"
-                    >
-                      read more about mixETH at Alchemix ↗
-                    </a>
-                  </>
-                )}
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
 
-      <CurveExplainer />
-
-      {/* ── 3. the math, straight ── */}
-      <section className="mt-20 rounded-2xl border border-line bg-bg-1 p-6 sm:p-10">
-        <h2 className="font-display text-2xl sm:text-3xl">where the money goes</h2>
+      <section className="mt-12 rounded-2xl border border-line bg-bg-1 p-6 sm:p-10" aria-labelledby="landing-rules">
+        <h2 id="landing-rules" className="font-display text-2xl sm:text-3xl">where the money goes</h2>
         <dl className="mt-8">
-          {MATH.map(([term, def]) => (
+          {RULES.map(([term, def]) => (
             <div key={term} className="grid gap-1 border-t border-line py-4 sm:grid-cols-[12rem_1fr] sm:gap-6">
               <dt className="font-data text-sm text-text-lo">{term}</dt>
-              <dd className="leading-relaxed">{def}</dd>
+              <dd className="max-w-2xl leading-relaxed">{def}</dd>
             </div>
           ))}
         </dl>
         <PayoutSlider />
+        <details className="xd-curve-detail mt-8 border-t border-line pt-5">
+          <summary className="cursor-pointer text-text-lo hover:text-text-hi">take a closer look at the curve</summary>
+          <CurveExplainer />
+        </details>
       </section>
 
-      {/* ── 4. settlement after detonation ── */}
-      <section className="mt-24 pb-20 text-left">
-        <p className="text-sm text-text-lo">after the round</p>
-        <h2 className="mt-4 max-w-4xl font-display text-[clamp(2.25rem,5vw,4rem)] leading-[1.1]">
-          redeem your PSP when you’re ready
-        </h2>
-        <p className="mt-6 max-w-xl leading-relaxed text-text-lo">
-          after detonation, you can redeem PSP at any time for its share of that round’s
-          remaining mixETH. payouts are rounded down and can be worth less than you paid.
-        </p>
+      <section className="py-16 sm:py-24">
+        <h2 className="max-w-4xl font-display text-[clamp(2.75rem,6vw,5rem)] leading-[1.1]">let the game respawn.</h2>
+        <Link to="/play" className="mt-6 inline-flex items-center gap-3 text-accent underline underline-offset-4">
+          get in, loser. we’re taking the pot. <span aria-hidden="true">↗</span>
+        </Link>
       </section>
     </div>
   )

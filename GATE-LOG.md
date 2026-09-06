@@ -915,3 +915,25 @@ Solidity source changed after the contract-source hash above.
   55.25-mixETH pot. No wallet transaction or contract deployment occurred. This
   frontend fix works with the current testnet. Review and bounded variant search:
   `docs/audit/2026-09-06-round-ui-state.md`.
+
+## 2026-09-06 — Landing manifesto and matching illustrations
+
+- Rebuilt the explainer around the user's approved anti-meme copy: public pooled
+  entry, the sine curve, staking fees, clock/ladder competition, NFT positions,
+  external mixETH yield, settlement and permissionless respawn. Removed the
+  rejected loss-value sentence. Kept the explicit practice-mixETH / 0% testnet
+  yield note, exact ticket/time/fee rules, payout slider and rounding description.
+- Eight CSS/SVG illustrations follow those sections in a responsive two-column
+  layout. The detailed curve opens below the rules and reuses the same normalized
+  sine geometry as the story thumbnail. A shared pause control and reduced-motion
+  static frames cover all illustrations. The real clock still uses PhaseEngine.
+- `bash scripts/check-audit.sh` passes: **502 Solidity tests / 67 suites**, **112
+  frontend tests**, **11 verifier tests**, **155 ABI declarations**, **36 production
+  size checks**, oracle/governance and TypeScript/Vite. A final copy/accessibility
+  cleanup also passes TypeScript/Vite. Existing bundle-size warnings remain.
+- Browser checked eight story sections at 1266px, 390px and 320px, with no story
+  or landing-content horizontal overflow. Verified animation pause and the
+  expandable curve. At 320px the landing client/scroll widths both equal 288px.
+  Restored the viewport override. No new tests for this presentation-only change.
+- Updated the local preview build only. Game contracts, transaction behavior,
+  deployment configuration, hosted here.now sites and broadcast files are untouched.
