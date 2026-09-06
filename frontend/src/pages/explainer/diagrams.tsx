@@ -1,5 +1,9 @@
+import { useMemo, useState } from 'react'
 import MixLogo from '../../components/MixLogo'
 import { CurveDiagram } from './CurveExplainer'
+import { randomDna, renderPepeSvg } from '../../lib/pepeRender'
+
+const randomPepe = () => renderPepeSvg(randomDna())
 
 // Illustrations only. CSS handles motion, with a readable static frame for each
 // diagram. The real countdown continues to use the shared PhaseEngine.
@@ -90,6 +94,10 @@ export function DiagramStyles() {
 .xd-grave { opacity: 0; animation: xd-grave-appear 8s ease-in-out infinite; }
 .xd-revive-ring { opacity: 0; transform-origin: 80px 66px; animation: xd-revive-flash 8s ease-out infinite; }
 .xd-respawn-still-arrow { display: none; }
+/* Fire at 55% of the death/revival cycle, after the ghost fades and before
+   the new pepe rises. CSS pause/reduced-motion also stop these rerolls. */
+.xd-respawn-roll { position: absolute; opacity: 0; pointer-events: none; animation: xd-respawn-roll 8s linear -3.6s infinite; }
+@keyframes xd-respawn-roll { from { opacity: 0; } to { opacity: 0; } }
 @keyframes xd-die-revive {
   0%, 14%, 84%, 100% { transform: translate(0, 0) rotate(0deg); filter: grayscale(0); opacity: 1; }
   25% { transform: translate(8px, 7px) rotate(80deg); filter: grayscale(1); opacity: 1; }
@@ -127,7 +135,8 @@ export function DiagramStyles() {
 
 export type BeatKind = 'predeposit' | 'curve' | 'stake' | 'jackpot' | 'nft' | 'reserve' | 'settle' | 'respawn'
 
-export function BeatDiagram({ kind, pepeSvg }: { kind: BeatKind; pepeSvg: string }) {
+export function BeatDiagram({ kind }: { kind: BeatKind }) {
+  const nftPepe = useMemo(() => kind === 'nft' ? randomPepe() : '', [kind])
   return (
     <div className="xd-stage" aria-hidden="true">
       {kind === 'curve' && <CurveDiagram />}
@@ -175,7 +184,7 @@ export function BeatDiagram({ kind, pepeSvg }: { kind: BeatKind; pepeSvg: string
 
       {kind === 'nft' && (
         <>
-          <span className="xd-nft-pepe" dangerouslySetInnerHTML={{ __html: pepeSvg }} />
+          <span className="xd-nft-pepe" dangerouslySetInnerHTML={{ __html: nftPepe }} />
           <svg viewBox="0 0 160 112">
             <text x="15" y="15">PSP → pepe → fees</text>
             <path d="M93 81 H147" stroke="var(--line)" />
@@ -215,23 +224,31 @@ export function BeatDiagram({ kind, pepeSvg }: { kind: BeatKind; pepeSvg: string
         </svg>
       )}
 
-      {kind === 'respawn' && (
-        <>
-          <span className="xd-respawn-ghost" dangerouslySetInnerHTML={{ __html: pepeSvg }} />
-          <span className="xd-respawn-pepe" dangerouslySetInnerHTML={{ __html: pepeSvg }} />
-          <svg viewBox="0 0 160 112" className="xd-respawn-scene">
-            <path d="M16 94 H144" stroke="var(--line)" />
-            <g className="xd-grave">
-              <path d="M62 93 V57 A18 18 0 0 1 98 57 V93 Z" fill="var(--bg-2)" stroke="var(--text-lo)" />
-              <text x="80" y="67" textAnchor="middle" className="xd-label">RIP</text>
-              <path d="M76 75 H84 M80 75 V85" stroke="var(--text-lo)" strokeWidth="2" />
-            </g>
-            <circle cx="80" cy="66" r="31" fill="none" stroke="var(--pepe)" strokeWidth="2" className="xd-revive-ring" />
-            <path d="M57 68 H70 L65 63 M70 68 L65 73" fill="none" stroke="var(--pepe)" strokeWidth="2" className="xd-respawn-still-arrow" />
-            <text x="80" y="15" textAnchor="middle" className="xd-label">die. respawn. repeat.</text>
-          </svg>
-        </>
-      )}
+      {kind === 'respawn' && <RespawnDiagram />}
     </div>
+  )
+}
+
+function RespawnDiagram() {
+  const [pepeSvg, setPepeSvg] = useState(randomPepe)
+  return (
+    <>
+      <span className="xd-respawn-roll" onAnimationIteration={(event) => {
+        if (event.animationName === 'xd-respawn-roll') setPepeSvg(randomPepe())
+      }} />
+      <span className="xd-respawn-ghost" dangerouslySetInnerHTML={{ __html: pepeSvg }} />
+      <span className="xd-respawn-pepe" dangerouslySetInnerHTML={{ __html: pepeSvg }} />
+      <svg viewBox="0 0 160 112" className="xd-respawn-scene">
+        <path d="M16 94 H144" stroke="var(--line)" />
+        <g className="xd-grave">
+          <path d="M62 93 V57 A18 18 0 0 1 98 57 V93 Z" fill="var(--bg-2)" stroke="var(--text-lo)" />
+          <text x="80" y="67" textAnchor="middle" className="xd-label">RIP</text>
+          <text x="80" y="82" textAnchor="middle" className="xd-label">PSP</text>
+        </g>
+        <circle cx="80" cy="66" r="31" fill="none" stroke="var(--pepe)" strokeWidth="2" className="xd-revive-ring" />
+        <path d="M57 68 H70 L65 63 M70 68 L65 73" fill="none" stroke="var(--pepe)" strokeWidth="2" className="xd-respawn-still-arrow" />
+        <text x="80" y="15" textAnchor="middle" className="xd-label">die. respawn. repeat.</text>
+      </svg>
+    </>
   )
 }

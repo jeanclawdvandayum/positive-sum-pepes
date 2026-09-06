@@ -979,3 +979,17 @@ Solidity source changed after the contract-source hash above.
   documents measure 1280px at the desktop breakpoint. Viewport override restored.
   Connected-account and wrong-network states were reviewed in code, not exercised
   with a signed-in wallet. No wallet transaction, deployment or hosted-site update.
+
+## 2026-09-06 — Random respawn pepes and PSP gravestone
+
+- Replaced the grave's cross with PSP beneath RIP. Respawn starts with independent
+  random artwork and rerolls between the ghost fading and the next pepe rising.
+  The NFT illustration also gets its own random pepe instead of sharing the hero.
+- Rerolls follow the existing CSS animation cycle, including its pause and reduced
+  motion rules. No extra timer or animation-frame loop was introduced.
+- Deterministic gate passes: **502 Solidity tests / 67 suites**, **112 frontend
+  tests**, **11 verifier tests**, **155 ABI declarations**, **36 production size
+  checks**, oracle/governance and TypeScript/Vite. Existing bundle warnings remain.
+- Browser verified RIP / PSP, changing respawn artwork across cycles, and stable
+  artwork while paused. Local preview rebuilt. No new tests for this presentation
+  change, contract changes or hosted-site update.

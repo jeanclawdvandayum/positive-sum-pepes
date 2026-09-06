@@ -128,7 +128,7 @@ export default function Landing() {
         {BEATS.map(b => (
           <section key={b.kind} aria-labelledby={`story-${b.kind}`}
             className="flex min-w-0 flex-col items-start gap-5 border-t border-line py-8 sm:flex-row">
-            <BeatDiagram kind={b.kind} pepeSvg={greeter} />
+            <BeatDiagram kind={b.kind} />
             <div className="min-w-0">
               <h2 id={`story-${b.kind}`} className="font-display text-2xl leading-tight">{b.name}</h2>
               <p className="mt-3 leading-relaxed text-text-lo">{b.copy}</p>
