@@ -1019,3 +1019,20 @@ Solidity source changed after the contract-source hash above.
   heading uses Geist Pixel, and page width equals viewport width on mobile.
   Active identity and phase branches were reviewed in source; no live round was
   spawned for this UI check. Local preview rebuilt and viewport restored.
+
+## 2026-09-06 — Combined ladder prize in the countdown headline
+
+- The active headline now reads "[name] is carpet bombing for [amount] mixETH in:"
+  with a larger gold-glowing prize. It sums the top buyer's holdings across every
+  occupied ladder spot using the existing tested groupRoundWinners calculation:
+  case-insensitive ownership, partial-ladder normalization and floor per seat.
+  Incomplete occupied-seat data leaves the estimate pending.
+- The amount beneath the clock is now labeled "total pot:". It shares the ladder
+  pot snapshot with the headline once available. Existing between-round copy stays.
+- Deterministic gate passes: **502 Solidity tests / 67 suites**, **112 frontend
+  tests**, **11 verifier tests**, **155 ABI declarations**, **36 production size
+  checks**, oracle/governance and TypeScript/Vite. Existing bundle warnings remain.
+- Browser checked the settled-round pot label at regular and 320px widths, with
+  document width equal to viewport width on mobile. Active rendering was reviewed
+  in source; payout aggregation is covered by the existing round-winners tests.
+  Local preview rebuilt and viewport restored. No contract or hosted-site changes.

@@ -5,6 +5,9 @@ import WalletPepeArt from '../../components/WalletPepeArt'
 import { useNow } from '../../phase/PhaseEngine'
 import type { RoundInfo } from '../../lib/useRound'
 import { useDisplayName } from '../../lib/useDisplayName'
+import { fmtAmount } from '../../lib/format'
+import { groupRoundWinners } from '../../lib/roundWinners'
+import type { BoardState } from './useLadderBoard'
 import type { LastTimeAdded } from './useTradeTape'
 import DetonateButton from './DetonateButton'
 
@@ -46,17 +49,27 @@ function ago(sec: number | undefined, now: number): string | undefined {
 
 export default function ClockPanel({
   round,
-  leadingBuyer,
+  board,
   lastTime,
   onDetonated,
 }: {
   round: RoundInfo
-  leadingBuyer: `0x${string}` | undefined
+  board: BoardState
   lastTime: LastTimeAdded | undefined
   onDetonated: () => void
 }) {
   const now = useNow()
   const when = lastTime ? ago(lastTime.atSec, now) : undefined
+  const leadingBuyer = board.seats[0]?.addr
+  const pot = board.pot ?? round.potBalance
+  const seatCount = board.ticketCount === undefined ? undefined : Number(board.ticketCount > 10n ? 10n : board.ticketCount)
+  const buyers = board.seats.slice(0, seatCount).map(seat => seat?.addr)
+  // Use the same per-seat floor and small-ladder normalization as claims. A
+  // missing occupied seat must leave the estimate pending, not inflate the rest.
+  const leadingPrize = board.pot !== undefined && seatCount !== undefined &&
+    buyers.length === seatCount && buyers.every((buyer): buyer is `0x${string}` => buyer !== undefined)
+      ? groupRoundWinners(board.pot, buyers)[0]?.payout ?? 0n
+      : undefined
 
   return (
     <section
@@ -68,16 +81,20 @@ export default function ClockPanel({
           {round.mode === 1 ? (
             <>
               {leadingBuyer ? <BombingBuyer address={leadingBuyer} /> : <span className="pl-bombing-buyer">anon pepe</span>}
-              {' '}is <em>carpet bombing</em> in:
+              {' '}is <em>carpet bombing</em> for{' '}
+              <span className="pl-bombing-prize" title="estimated payout across all their current ladder spots if the round detonated with this pot and ladder">
+                {fmtAmount(leadingPrize, 4)} mixETH
+              </span>{' '}in:
             </>
           ) : 'awaiting arming of carpet bomb'}
         </h1>
         <Clock />
-        <div className="mt-5 text-2xl sm:text-3xl" title="the pot gets the launch fee and at least 35% of each trading fee. the last ten tickets split it at detonation; an empty ladder sends it to redemption backing.">
-          {round.potBalance === undefined ? (
+        <div className="mt-5 flex max-w-full flex-wrap items-baseline justify-center gap-x-3 gap-y-1 text-2xl sm:text-3xl" title="the pot gets the launch fee and at least 35% of each trading fee. the last ten tickets split it at detonation; an empty ladder sends it to redemption backing.">
+          <span className="font-display text-xl text-[#c9d7e4] sm:text-2xl">total pot:</span>
+          {pot === undefined ? (
             <Skeleton className="h-8 w-44" aria-label="loading the pot" />
           ) : (
-            <PotOdometer value={round.potBalance} unit="mixETH" />
+            <PotOdometer value={pot} unit="mixETH" />
           )}
         </div>
         <div
