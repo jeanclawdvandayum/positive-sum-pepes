@@ -33,7 +33,7 @@ const OPTIONS: { key: ThemeMode; label: string; icon: ReactNode }[] = [
   },
 ]
 
-export default function ThemeSwitcher() {
+export default function ThemeSwitcher({ large = false }: { large?: boolean }) {
   const { mode, setMode } = useTheme()
 
   return (
@@ -50,7 +50,7 @@ export default function ThemeSwitcher() {
           aria-label={o.label}
           aria-pressed={mode === o.key}
           onClick={() => setMode(o.key)}
-          className={`grid h-7 w-7 place-items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+          className={`grid ${large ? 'h-11 w-11' : 'h-7 w-7'} place-items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
             mode === o.key
               ? 'bg-accent text-bg-0'
               : 'text-text-lo hover:bg-bg-2 hover:text-text-hi'

@@ -955,3 +955,27 @@ Solidity source changed after the contract-source hash above.
   826px and 320px. Narrow landing and headline client/scroll widths both equal
   288px. Viewport override restored and the local preview rebuilt. No new tests
   for this presentation change. No contract, transaction or hosted-site changes.
+
+## 2026-09-06 — Mobile header and navigation
+
+- Replaced the crowded header below 1280px with a burger disclosure. Wallet access
+  stays visible; navigation, the round clock, theme choices and testnet faucet
+  move into a height-bounded scrollable menu. Expanded state/controls, Escape
+  focus restoration, outside-pointer/focus dismissal, route closing and desktop
+  resize closing are implemented. Hidden navigation is removed from keyboard flow.
+- Mobile controls have 44px touch targets. Connected wallet names are bounded and
+  truncated within the pepe button. The desktop header has enough room for its
+  controls, and the predeposit link now preserves the graveyard link as well.
+- Browser found an additional 8px play-page overflow in the slippage presets and
+  custom input. That group now wraps; quote, slippage and transaction logic are
+  unchanged. No page-wide overflow clipping was added.
+- Deterministic gate passes: **502 Solidity tests / 67 suites**, **112 frontend
+  tests**, **11 verifier tests**, **155 ABI declarations**, **36 production size
+  checks**, oracle/governance and TypeScript/Vite. The final one-line swap layout
+  adjustment also passes TypeScript/Vite. Existing bundle warnings remain.
+- Browser checked the five routes at 320px with document width equal to viewport
+  width, plus menu open/closed, navigation dismissal, outside dismissal, wallet
+  chooser access and resize to the desktop header. Landing/play headers and
+  documents measure 1280px at the desktop breakpoint. Viewport override restored.
+  Connected-account and wrong-network states were reviewed in code, not exercised
+  with a signed-in wallet. No wallet transaction, deployment or hosted-site update.

@@ -512,7 +512,7 @@ export default function SwapCard() {
       {/* slippage */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="font-semibold text-text-lo">slippage</span>
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
           {[0.005, 0.01, 0.03, 0.05, 0.1].map((s) => (
             <button
               key={s}

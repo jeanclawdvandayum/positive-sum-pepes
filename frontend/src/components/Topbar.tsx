@@ -1,5 +1,5 @@
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
-import { useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { NavLink, useLocation, Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
@@ -30,6 +30,10 @@ const baseLinks = [
 export default function Topbar() {
   const round = useRound()
   const { pathname } = useLocation()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const headerRef = useRef<HTMLElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const menuId = useId()
   // a random pepe every load — the header IS the art
   const logo = useMemo(() => renderPepeSvg(randomDna()), [])
   /// predeposit page is live while the round is in (or before) its predeposit window;
@@ -37,16 +41,48 @@ export default function Topbar() {
   const showPredeposit = round.mode === 0 || round.predepositClosed === false
   const links = useMemo(() => {
     if (!showPredeposit) return baseLinks
-    return [...baseLinks.slice(0, 2), { to: '/predeposit', label: 'predeposit' }, baseLinks[2]]
+    return [...baseLinks.slice(0, 2), { to: '/predeposit', label: 'predeposit' }, ...baseLinks.slice(2)]
   }, [showPredeposit])
+
+  useEffect(() => { setMenuOpen(false) }, [pathname])
+
+  // This is a navigation disclosure, not a modal. Leave page scrolling and
+  // wallet dialogs alone, and remove the hidden links from the tab order.
+  useEffect(() => {
+    if (!menuOpen) return
+    function onPointerDown(event: PointerEvent) {
+      if (event.target instanceof Node && !headerRef.current?.contains(event.target)) setMenuOpen(false)
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setMenuOpen(false)
+      menuButtonRef.current?.focus()
+    }
+    const desktop = window.matchMedia('(min-width: 1280px)')
+    function onResize() { if (desktop.matches) setMenuOpen(false) }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    desktop.addEventListener('change', onResize)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+      desktop.removeEventListener('change', onResize)
+    }
+  }, [menuOpen])
 
   // the countdown chip lives everywhere EXCEPT play (the clock is the page there)
   const onPlay = pathname === '/play' || pathname === '/trade'
 
   return (
-    <header className="sticky top-0 z-20 border-b border-line bg-bg-0/80 font-body backdrop-blur-md">
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-3 sm:gap-4 sm:px-6">
-        <NavLink to="/" className="flex shrink-0 items-center gap-2">
+    <header ref={headerRef}
+      onBlur={(event) => {
+        if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false)
+      }}
+      className="sticky top-0 z-20 border-b border-line bg-bg-0/95 font-body backdrop-blur-md">
+      <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-4 py-2 sm:gap-4 sm:px-6 xl:py-3">
+        <NavLink to="/" aria-label="positive sum pepes home" onClick={() => setMenuOpen(false)}
+          className="flex min-h-11 shrink-0 items-center gap-2 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
           <span className="block h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-line [&>svg]:h-full [&>svg]:w-full"
             style={{ imageRendering: 'pixelated' }}
             dangerouslySetInnerHTML={{ __html: logo }}
@@ -56,14 +92,14 @@ export default function Topbar() {
           </span>
         </NavLink>
 
-        <nav className="flex flex-1 items-center justify-center gap-1" aria-label="main">
+        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 xl:flex" aria-label="main">
           {links.map((l) => (
             <NavLink
               key={l.to}
               to={l.to}
               className={({ isActive }) => {
                 const active = isActive || (l.to === '/play' && pathname === '/trade')
-                return `rounded-full px-3 py-1.5 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                return `whitespace-nowrap rounded-full px-3 py-1.5 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
                   active
                     ? 'bg-accent font-semibold text-bg-0'
                     : 'text-text-lo hover:bg-bg-2 hover:text-text-hi'
@@ -75,19 +111,60 @@ export default function Topbar() {
           ))}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className="ml-auto flex min-w-0 items-center gap-2 xl:ml-0 xl:gap-3">
+          <div className="hidden shrink-0 items-center gap-3 xl:flex">
+            {!onPlay && (
+              <Link to="/play" aria-label="countdown, go to play"
+                className="rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+                <Clock variant="mini" />
+              </Link>
+            )}
+            {FAUCET_ENABLED && <FaucetButton />}
+            <ThemeSwitcher />
+          </div>
+          <Connect onOpen={() => setMenuOpen(false)} />
+          <button ref={menuButtonRef} type="button" aria-label={menuOpen ? 'close menu' : 'open menu'}
+            aria-expanded={menuOpen} aria-controls={menuId}
+            onClick={() => setMenuOpen(open => !open)}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-line text-text-hi hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent xl:hidden">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d={menuOpen ? 'M6 6L18 18M6 18L18 6' : 'M4 6H20M4 12H20M4 18H20'} />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id={menuId} hidden={!menuOpen} className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-line bg-bg-0 xl:hidden">
+        <div className="mx-auto w-full max-w-7xl px-4 pt-3 pb-5 sm:px-6">
+          <nav aria-label="mobile main" className="grid grid-cols-2 gap-2">
+            {links.map(link => (
+              <NavLink key={link.to} to={link.to} onClick={() => setMenuOpen(false)}
+                className={({ isActive }) => `flex min-h-11 min-w-0 items-center rounded-lg px-3 py-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                  isActive || (link.to === '/play' && pathname === '/trade')
+                    ? 'bg-accent font-semibold text-bg-0'
+                    : 'bg-bg-1 text-text-hi hover:bg-bg-2'
+                }`}>
+                {link.label}
+              </NavLink>
+            ))}
+          </nav>
           {!onPlay && (
-            <Link
-              to="/play"
-              aria-label="countdown — go to play"
-              className="rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-            >
+            <Link to="/play" onClick={() => setMenuOpen(false)} aria-label="countdown, go to play"
+              className="mt-4 flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-lg border-t border-line pt-4 text-sm text-text-lo focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+              <span>round clock</span>
               <Clock variant="mini" />
             </Link>
           )}
-          {FAUCET_ENABLED && <FaucetButton />}
-          <ThemeSwitcher />
-          <Connect />
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+            <span className="text-sm text-text-lo">theme</span>
+            <ThemeSwitcher large />
+          </div>
+          {FAUCET_ENABLED && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+              <span className="text-sm text-text-lo">practice mixETH</span>
+              <FaucetButton menu />
+            </div>
+          )}
         </div>
       </div>
     </header>
@@ -96,7 +173,7 @@ export default function Topbar() {
 
 /// quiet outlined connect; connected = pepe identity chip (spec §7).
 /// Connected identity uses the current-round primary NFT, or stable address DNA.
-function Connect() {
+function Connect({ onOpen }: { onOpen: () => void }) {
   return (
     <ConnectButton.Custom>
       {({ account, chain, openAccountModal, openChainModal, openConnectModal, authenticationStatus, mounted }) => {
@@ -106,8 +183,8 @@ function Connect() {
           return (
             <button
               type="button"
-              onClick={openConnectModal}
-              className="rounded-full border border-line px-4 py-1.5 text-sm text-text-hi transition hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              onClick={() => { onOpen(); openConnectModal() }}
+              className="min-h-11 rounded-full border border-line px-4 py-1.5 text-sm text-text-hi transition hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent xl:min-h-0"
             >
               connect
             </button>
@@ -117,8 +194,8 @@ function Connect() {
           return (
             <button
               type="button"
-              onClick={openChainModal}
-              className="rounded-full border px-4 py-1.5 text-sm transition focus-visible:outline focus-visible:outline-2"
+              onClick={() => { onOpen(); openChainModal() }}
+              className="min-h-11 rounded-full border px-4 py-1.5 text-sm transition focus-visible:outline focus-visible:outline-2 xl:min-h-0"
               style={{ borderColor: 'var(--phase-critical)', color: 'var(--phase-critical)' }}
             >
               wrong network
@@ -126,7 +203,7 @@ function Connect() {
           )
         }
         return (
-          <ConnectedWallet address={account.address as `0x${string}`} onClick={openAccountModal} />
+          <ConnectedWallet address={account.address as `0x${string}`} onClick={() => { onOpen(); openAccountModal() }} />
         )
       }}
     </ConnectButton.Custom>
@@ -144,7 +221,7 @@ function ConnectedWallet({ address, onClick }: { address: `0x${string}`; onClick
 /// the Predeposit page (kept exactly as-is — that tree is not ours).
 const QUICK_MINT = 1000n * 10n ** 18n
 
-export function FaucetButton({ full = false }: { full?: boolean }) {
+export function FaucetButton({ full = false, menu = false }: { full?: boolean; menu?: boolean }) {
   const { isConnected } = useAccount()
   const [step, setStep] = useState<'idle' | 'tx' | 'done'>('idle')
   const [mintAmount, setMintAmount] = useState('1000')
@@ -210,12 +287,12 @@ export function FaucetButton({ full = false }: { full?: boolean }) {
       title="faucet · free mixETH"
       disabled={!isConnected}
       onClick={drip}
-      className={`inline-flex h-7 items-center gap-1 rounded-full border border-line bg-bg-1 px-2.5 font-body text-xs text-text-hi transition hover:border-accent active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+      className={`inline-flex ${menu ? 'h-11 px-4' : 'h-7 px-2.5'} items-center gap-1 rounded-full border border-line bg-bg-1 font-body text-xs text-text-hi transition hover:border-accent active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
         step === 'done' ? 'text-emerald-600' : ''
       }`}
     >
       {step === 'done' ? '✅' : step === 'tx' ? <><MixLogo px={14} />…</> : <MixLogo px={14} />}
-      <span className="hidden lg:inline">{step === 'done' ? 'minted' : step === 'tx' ? 'minting' : 'faucet'}</span>
+      <span className={menu ? '' : 'hidden lg:inline'}>{step === 'done' ? 'minted' : step === 'tx' ? 'minting' : 'faucet'}</span>
     </button>
   )
 }
