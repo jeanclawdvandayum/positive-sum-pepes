@@ -54,6 +54,22 @@ export default function NameRegistrationCard() {
   const reveal = !!state && matches && state.timestamp <= expires
   const wait = state && reveal ? Number(state.commitment[1] + state.minAge - state.timestamp) : 0
   const validLabel = isNameLabel(label)
+  const checkedLabel = reveal && plan ? plan.label : label
+  const [debouncedLabel, setDebouncedLabel] = useState('')
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedLabel(checkedLabel), 350)
+    return () => clearTimeout(timer)
+  }, [checkedLabel])
+  const availability = useQuery({
+    queryKey: ['name-availability', ns.chainId, ns.names, ns.parentId.toString(), debouncedLabel],
+    enabled: ready && isNameLabel(debouncedLabel),
+    queryFn: () => nameClient.readContract({ address: ns.names, abi: wnsAbi,
+      functionName: 'isAvailable', args: [debouncedLabel, ns.parentId] }),
+    staleTime: 0, refetchInterval: 10_000, retry: false,
+  })
+  const availabilityCurrent = debouncedLabel === checkedLabel && isNameLabel(checkedLabel)
+  const available = availabilityCurrent && !availability.isError && availability.data === true
+
 
   async function registerName() {
     if (!address || !ready || !ns.registrar || status?.busy) return
@@ -119,6 +135,7 @@ export default function NameRegistrationCard() {
         setPlanState({ key })
         setActivity({ key, done: `${next.label}.${ns.parentLabel}.wei` })
         await queries.invalidateQueries({ queryKey: nameQueryKey })
+        await queries.invalidateQueries({ queryKey: ['name-availability'] })
       } else setActivity({ key })
       await queries.invalidateQueries({ queryKey })
     } catch (error) {
@@ -149,6 +166,12 @@ export default function NameRegistrationCard() {
         <span className="shrink-0 font-data text-xs text-text-lo">.{ns.parentLabel}.wei</span>
       </div>
       <p className="mt-2 text-xs text-text-lo">1–32 letters, numbers or hyphens. Reserve, wait 60 seconds, then register.</p>
+      {isNameLabel(checkedLabel) && <p role="status" aria-live="polite" className={`mt-2 text-xs ${availabilityCurrent && availability.data === false ? 'text-phase-critical' : 'text-text-lo'}`}>
+        {!availabilityCurrent || availability.isPending ? 'checking name availability…'
+          : availability.isError ? 'availability check failed. retrying shortly.'
+          : availability.data ? 'available · checked on Ethereum. reserved names remain open until registration confirms.'
+          : 'that name is taken. choose another alias.'}
+      </p>}
       {state && <p className="mt-2 text-sm text-text-hi">
         {state.price === 0n ? 'your funded pepe covers the registration fee.' : 'registration: 0.0005 ETH.'} plus network gas.
         {reveal && wait > 0 ? ` ready in about ${wait}s.` : ''}
@@ -156,7 +179,7 @@ export default function NameRegistrationCard() {
       {query.isError && <p className="mt-2 break-words text-xs text-phase-critical">{errorMessage(query.error)}</p>}
       {address && chainId !== ns.chainId ? <button type="button" onClick={() => switchChainAsync({ chainId: ns.chainId }).catch(error => setActivity({ key, error: errorMessage(error) }))}
         className="mt-3 rounded-lg border border-line px-4 py-2 text-sm">switch to the registration network</button> :
-        <button type="button" onClick={registerName} disabled={!address || !state || status?.busy || (reveal ? wait > 0 : !validLabel)}
+        <button type="button" onClick={registerName} disabled={!address || !state || !available || status?.busy || (reveal ? wait > 0 : !validLabel)}
           className="mt-3 w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-black disabled:opacity-40">
           {!address ? 'connect your wallet to register' : status?.busy ? 'waiting for confirmation…' : reveal ? 'register your name' : 'reserve your name'}
         </button>}
