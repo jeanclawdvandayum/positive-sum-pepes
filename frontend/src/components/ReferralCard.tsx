@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { factoryAbi, registryAbi, stakerAbi } from '../lib/abi'
 import { rpcCall, rpcBatchCall } from '../lib/rpc'
-import { ADDRESSES, CHAIN_ID } from '../lib/config'
+import { ADDRESSES, CHAIN_ID, TESTNET_ETH_FAUCET } from '../lib/config'
 import { matchingReferral, parseReferral, referralKey, referralParams, savedReferral, type ReferralHint } from '../lib/referrals'
 import { useRound } from '../lib/useRound'
 import ReferralShare from './ReferralShare'
@@ -211,7 +211,7 @@ export default function ReferralCard() {
           <button className="btn-primary mt-3 w-full" disabled={!link || canRefer !== true} onClick={copyLink}>
             {copied ? 'copied ✓' : 'copy referral link'}
           </button>
-          <ReferralShare tokenId={active} link={link} enabled={canRefer === true} />
+          {!TESTNET_ETH_FAUCET && <ReferralShare tokenId={active} link={link} enabled={canRefer === true} />}
           {canRefer === false && (
             <div className="mt-2 text-xs font-bold text-amber-600">
               pepe #{active?.toString()} needs referral eligibility before purchases can record its referral.
