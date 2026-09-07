@@ -35,7 +35,7 @@ function short(addr: string): string {
 
 function BombingBuyer({ address }: { address: `0x${string}` }) {
   const name = useDisplayName(address, 'anon pepe')
-  return <span className="pl-bombing-buyer" title={address}>{name}</span>
+  return <span className="pl-bombing-buyer" title={`${name} · ${address}`}>{name.split('.')[0]}</span>
 }
 
 /// recency for the "last added" line — seconds → dry human time
