@@ -77,7 +77,7 @@ carried into a new round by local storage.
 
 ## Sharing on X
 
-Stake and predeposit referral cards offer a share preview with 20 rotating quips,
+The stake page's referral card offers a share preview with 20 rotating quips,
 the selected position's on-chain art and the full scoped referral URL. Testnet
 posts identify the playtest. Wallet, staker, NFT or link changes reset the preview.
 

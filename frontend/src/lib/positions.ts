@@ -10,7 +10,8 @@ export async function mapBatched<T, R>(items: T[], read: (item: T) => Promise<R>
   return results
 }
 
-export async function readPositions(staker: `0x${string}`, owner: `0x${string}`) {
+/** Graveyard collections include empty NFTs, which remain owned after withdrawal. */
+export async function readPositions(staker: `0x${string}`, owner: `0x${string}`, includeEmpty = false) {
   const count = await rpcCall(staker, stakerAbi, 'balanceOf', [owner]) as bigint
   if (count > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Position count exceeds supported enumeration.')
   const indices = Array.from({ length: Number(count) }, (_, i) => BigInt(i))
@@ -22,5 +23,5 @@ export async function readPositions(staker: `0x${string}`, owner: `0x${string}`)
     ])
     return { id, amount: result[0], pendingFees }
   })
-  return positions.filter(p => p.amount > 0n || p.pendingFees > 0n)
+  return includeEmpty ? positions : positions.filter(p => p.amount > 0n || p.pendingFees > 0n)
 }

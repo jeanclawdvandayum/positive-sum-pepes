@@ -11,7 +11,7 @@ import { CHAIN_ID, FAUCET_ENABLED, NATIVE_ETH_FAUCET_URL, TESTNET_ETH_FAUCET } f
 import { useRound, useBalances } from '../lib/useRound'
 import { useNow } from '../phase/PhaseEngine'
 import { fmtAmount, parseAmountToWad, wadToExact } from '../lib/format'
-import ReferralCard, { RefBanner } from '../components/ReferralCard'
+import { RefBanner } from '../components/ReferralCard'
 import { FaucetButton } from '../components/Topbar'
 import MixLogo from '../components/MixLogo'
 import Clock from '../components/Clock'
@@ -267,13 +267,12 @@ export default function Predeposit() {
           {pd?.capReached && <span className="chip bg-emerald-100 text-emerald-700">cap reached</span>}
           {pd?.windowOver && <span className="chip bg-amber-100 text-amber-700">window over</span>}
         </div>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 font-body text-sm leading-relaxed text-slate-500">
           get your frog in the door. deposit mixETH before launch to join the pooled first buy. after launch, claim your share as PSP staked in a pepe NFT.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="space-y-4">
+      <div className="space-y-4">
           {/* b. progress */}
           <div className="card p-5">
             <div className="mb-1 flex justify-between text-[11px] font-bold uppercase tracking-wide text-slate-400">
@@ -429,10 +428,6 @@ export default function Predeposit() {
           )}
 
           {error && <div className="break-words rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-500">{error}</div>}
-        </div>
-
-        {/* e. referral link generator */}
-        <ReferralCard />
       </div>
     </div>
   )

@@ -1222,3 +1222,9 @@ Solidity source changed after the contract-source hash above.
 - Confirmed pending fees survive detonation and remain on the NFT. Graveyard
   unlock settles fees; failed payout preserves credit on the surviving NFT.
   Explicit claims remain available after withdrawal; transfers carry entitlement.
+
+## 2026-09-07 — Predeposit layout and graveyard collections
+
+- Removed the predeposit referral sharing panel, expanded deposit cards to the available width, and matched introductory copy to the body font. Incoming referral capture remains supported.
+- Graveyard enumerates empty owned NFTs as well as funded positions. Unlocked NFTs appear in the dead pepe collection, with claim mixETH actions wherever pending fees remain. Art reads the selected round staker's on-chain DNA.
+- Validation: deterministic check-audit.sh passed (513 Solidity tests across 68 suites, 139 frontend tests, verifier/ABI/size gates and production build). Final typography-only adjustment also production-built. Predeposit browser checks passed at 1280px and 390px with full-width deposit cards and no horizontal overflow. Live fresh deployment has no dead-round NFTs yet, so wallet collection transactions were not exercised on testnet.

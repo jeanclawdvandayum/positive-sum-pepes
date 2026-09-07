@@ -96,7 +96,7 @@ export function useGraveyard(): {
             gr.claimablePot = await rpcCall(hook, hookAbi, 'claimablePot', [me]) as bigint
             const deposit = await rpcCall(controller, controllerAbi, 'predeposits', [me]) as [bigint, boolean]
             gr.unclaimedPredeposit = deposit[0] > 0n && !deposit[1]
-            if (staker) gr.positions = await readPositions(staker, me)
+            if (staker) gr.positions = await readPositions(staker, me, true)
           }
           found.push(gr)
         }

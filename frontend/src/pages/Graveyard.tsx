@@ -1,11 +1,21 @@
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { erc20Abi, hookAbi, stakerAbi, controllerAbi } from '../lib/abi'
 import { fmtAmount, fmtPrice, fmtPepeId } from '../lib/format'
 import { useGraveyard, type GraveyardRound } from './play/useGraveyard'
 import { PlayStyles } from './play/PlayStyles'
 import HallOfDetonations from './graveyard/HallOfDetonations'
+
+import { usePepeDna } from '../lib/usePepeDna'
+import { renderPepeSvg } from '../lib/pepeRender'
+
+function GraveyardArt({ staker, id }: { staker?: `0x${string}`; id: bigint }) {
+  const { data: dna, isError } = usePepeDna(staker, id)
+  const svg = useMemo(() => dna === undefined ? undefined : renderPepeSvg(dna), [dna])
+  return svg ? <div role="img" aria-label={`pepe ${id}`} className="aspect-square overflow-hidden rounded-lg [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
+    : <div className="flex aspect-square items-center justify-center text-xs text-text-lo">{isError ? 'pepe image unavailable' : 'loading pepe…'}</div>
+}
 
 type RedeemStep = 'idle' | 'approve' | 'redeem' | 'done'
 
@@ -71,7 +81,7 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
         address: round.staker, abi: stakerAbi, functionName: amount > 0n ? 'withdraw' : 'claimFees', args: [pepeId],
       })
     } catch {
-      setUnlockErr('unlock failed')
+      setUnlockErr(amount > 0n ? 'Unlock failed. Please try again.' : 'Fee claim failed. Your fees remain claimable.')
     } finally {
       setUnlocking((s) => { const n = new Set(s); n.delete(key); return n })
     }
@@ -150,42 +160,35 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
           </div>
         </Card>
 
-        <Card title="staked positions">
-          <p className="mt-1 text-xs text-text-lo">
-            detonation opened every lock — withdrawing skips the vest entirely. the psp lands in your
-            wallet; redeem it above.
-          </p>
-          {round.positions.length === 0 ? (
-            <p className="mt-auto pt-4 text-xs text-text-lo">
-              {!isConnected ? 'connect wallet to check.' : 'your wallet has 0 staked positions in this round.'}
-            </p>
-          ) : (
-            <ul className="mt-3 flex flex-col gap-2">
-              {round.positions.map((pos) => {
-                const key = pos.id.toString()
-                const busy = unlocking.has(key)
-                return (
-                  <li key={key} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-bg-2 px-3 py-2 text-sm">
-                    <span className="min-w-0 truncate text-text-lo">
-                      pepe <span title={pos.id.toString()} className="font-data text-text-hi">#{fmtPepeId(pos.id)}</span> ·{' '}
-                      <span className="tabular font-data text-text-hi">{fmtAmount(pos.amount)} psp</span> staked
-                    </span>
-                    <button
-                      onClick={() => unlock(pos.id, pos.amount)}
-                      disabled={busy}
-                      data-pending={busy || undefined}
-                      className="relative shrink-0 overflow-hidden rounded-lg border border-line bg-bg-1 px-3 py-1.5 text-xs font-semibold text-text-hi transition hover:border-accent disabled:cursor-wait"
-                    >
-                      <span className="pl-btn-fill" aria-hidden="true" />
-                      <span className="relative">{busy ? 'confirming…' : pos.amount > 0n ? 'unlock' : `claim ${fmtAmount(pos.pendingFees)} mixETH fees`}</span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-          {unlockErr && <p className="mt-2 text-xs text-phase-critical">{unlockErr}</p>}
-        </Card>
+        <div className="flex min-w-0 flex-col gap-4">
+          {[{ title: 'staked positions', positions: round.positions.filter(p => p.amount > 0n) },
+            { title: 'dead pepe collection', positions: round.positions.filter(p => p.amount === 0n) }].map(group => (
+            <Card key={group.title} title={group.title}>
+              <p className="mt-1 text-xs text-text-lo">{group.title === 'staked positions'
+                ? 'unlock your PSP and redeem it above. earned mixETH stays claimable after detonation.'
+                : 'unlocked, still yours. these pepes carry the scars of past rounds.'}</p>
+              {group.positions.length === 0 ? <p className="mt-4 text-xs text-text-lo">{!isConnected ? 'connect wallet to see your pepes.' : 'your collection is empty for this round.'}</p> : (
+                <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {group.positions.map(pos => {
+                    const busy = unlocking.has(pos.id.toString())
+                    return <li key={pos.id.toString()} className="min-w-0 rounded-lg border border-line bg-bg-2 p-3 text-sm">
+                      <GraveyardArt staker={round.staker} id={pos.id} />
+                      <p className="mt-2 truncate font-data" title={pos.id.toString()}>pepe #{fmtPepeId(pos.id)}</p>
+                      {pos.amount > 0n && <p className="mt-1 text-xs text-text-lo">{fmtAmount(pos.amount)} PSP staked</p>}
+                      {pos.pendingFees > 0n && <button disabled={busy} onClick={() => unlock(pos.id, 0n)} className="mt-3 w-full rounded-lg border border-line bg-bg-1 px-3 py-2 text-xs font-semibold hover:border-accent disabled:opacity-50">
+                        {busy ? 'confirming…' : `claim ${fmtAmount(pos.pendingFees)} mixETH`}
+                      </button>}
+                      {pos.amount > 0n && <button disabled={busy} onClick={() => unlock(pos.id, pos.amount)} className="mt-2 w-full rounded-lg border border-line bg-bg-1 px-3 py-2 text-xs font-semibold hover:border-accent disabled:opacity-50">
+                        {busy ? 'confirming…' : 'unlock PSP'}
+                      </button>}
+                    </li>
+                  })}
+                </ul>
+              )}
+            </Card>
+          ))}
+          {unlockErr && <p role="alert" className="text-xs text-phase-critical">{unlockErr}</p>}
+        </div>
       </div>
 
       <p className="border-t border-line px-5 py-3 text-center text-xs text-text-lo">
