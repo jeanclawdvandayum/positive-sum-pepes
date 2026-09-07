@@ -1268,3 +1268,10 @@ Solidity source changed after the contract-source hash above.
 - Rechecked mainnet parent custody, expiry and WNS runtime; signer address and private permissions verified. Updated verifier template for current Base Sepolia factory bbd703…dacf.
 - DeployRemoteNames simulation passed: 3,922,741 estimated gas, 0.000349831654626551 ETH sampled estimate excluding custody/activation. No broadcast or custody change. Verifier/server tests: 11 passed.
 - Added reviewable activation runbook and parent snapshot. Full gate rerun stopped during compilation; this preparation changes configuration/docs only, and the preceding full gate passed on unchanged contract/frontend source.
+
+## 2026-09-07 — Activate pepetesters registry
+
+- User explicitly authorized real deployment, domain custody transfer and admin recovery using the deployer in .env. Existing owner-only recoverParent already supplies the requested transfer-back function.
+- Deployed Ethereum gate 0xd09deaaa17528748a781024213249d5c89bb6b11 and registrar 0xde0f25e61767bc115bf67915469a1e16fd0087aa. Deployer is admin of both. Four confirmed transactions, total 0.000127937699004926 ETH. Parent safely transferred, recovery simulated successfully, then registration enabled.
+- Verified immutable configuration and runtime, plus Sourcify v2 creation/runtime matches for both contracts. Local permit service running with dedicated key and current Base Sepolia factory; UI env updated and production-built. Browser confirms enabled alias form; permit endpoint rejects absent commitment. No name minted on behalf of the user.
+- Updated operation/recovery instructions and saved public receipts. Public HTTPS verifier hosting and a public UI republish remain separate; local setup is active.

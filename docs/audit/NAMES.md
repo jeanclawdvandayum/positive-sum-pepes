@@ -1,9 +1,17 @@
 # PSP names — WNS integration
 
-Status: **source implementation and local-fork rehearsal; real-domain deployment pending**.
-Neither `pepe.wei` nor `pepetesters.wei` has been transferred, and no mainnet
-transaction has been signed or broadcast by this work. The existing PSP game
-contracts and balances are unchanged. Live name registration remains disabled.
+Status: **pepetesters.wei is live on Ethereum, with Base Sepolia eligibility** (September 7, 2026).
+
+Registrar: `0xde0f25e61767bc115bf67915469a1e16fd0087aa`. Gate:
+`0xd09deaaa17528748a781024213249d5c89bb6b11`. Both are administered by
+`0x1d52Ad18c074b8125fBCFDFcD01773c6BEdbd88A`. Parent custody was transferred
+and registration enabled with explicit user approval. `pepe.wei` is unchanged.
+The local UI and loopback verifier are configured for current factory
+`0xbbd703ebdab9f0dd4beaa9855d758028f115dacf`. See the
+[live receipts and checks](2026-09-07-names/live.json) and
+[admin instructions](2026-09-07-names/LIVE.md).
+
+Historical rehearsal details below describe the earlier preparation, not current activation status.
 
 ## Registration and display
 

@@ -1,0 +1,47 @@
+{
+  "chainId": 1,
+  "admin": "0x1d52Ad18c074b8125fBCFDFcD01773c6BEdbd88A",
+  "names": "0x0000000000696760E15f265e828DB644A0c242EB",
+  "parentId": "6361740363536127648378182158538670061512393038427336338828631921647240523046",
+  "sourceFactory": "0xbbd703ebdab9f0dd4beaa9855d758028f115dacf",
+  "sourceChainId": 84532,
+  "signer": "0x1016bA06d17774AD34085cdDe38Ec3540C7F34f8",
+  "transactions": {
+    "gate": {
+      "hash": "0x8b54cc74e42ebd4503c662f983499f9ac587882c658705f71df0f1100b81db97",
+      "blockNumber": "25923888",
+      "gasUsed": "994888",
+      "contractAddress": "0xd09deaaa17528748a781024213249d5c89bb6b11",
+      "costETH": "0.00004274695971524"
+    },
+    "registrar": {
+      "hash": "0xc8002062acc00e38ec28fa59fce775f37dc6f6c879519e311eaf90479608ea06",
+      "blockNumber": "25923891",
+      "gasUsed": "2022606",
+      "contractAddress": "0xde0f25e61767bc115bf67915469a1e16fd0087aa",
+      "costETH": "0.000078574741969014"
+    },
+    "transferParent": {
+      "hash": "0xb73fad635f3cde771ca407ef6382d7b77d995f61213139a9166a8bbdcf7b1c99",
+      "blockNumber": "25923898",
+      "gasUsed": "73704",
+      "contractAddress": null,
+      "costETH": "0.000003483299168712"
+    },
+    "enableRegistration": {
+      "hash": "0xe98b8bef09c190c0c14046e51ab419bea17f0d447c0d5dfb7c049a41a3edb860",
+      "blockNumber": "25923901",
+      "gasUsed": "71289",
+      "contractAddress": null,
+      "costETH": "0.00000313269815196"
+    }
+  },
+  "gate": "0xd09deaaa17528748a781024213249d5c89bb6b11",
+  "registrar": "0xde0f25e61767bc115bf67915469a1e16fd0087aa",
+  "runtimeVerified": true,
+  "recoverySimulationPassed": true,
+  "enabled": true,
+  "parentOwner": "0xdE0f25E61767bC115Bf67915469a1E16fD0087aA",
+  "totalTransactionCostETH": "0.000127937699004926",
+  "sourceVerification": "verification.json: both creation/runtime match"
+}

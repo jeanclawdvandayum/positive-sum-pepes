@@ -1,0 +1,75 @@
+{
+  "chainId": 1,
+  "contracts": {
+    "gate": {
+      "address": "0xd09dEAaa17528748A781024213249D5c89bb6B11",
+      "identifier": "src/names/PSPRemoteNameGate.sol:PSPRemoteNameGate",
+      "verificationId": "1e406e35-cf27-4716-933d-6f89c11b4ae2",
+      "matchId": "47228171",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-07T07:13:18Z",
+      "match": "match",
+      "chainId": "1",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "1e406e35-cf27-4716-933d-6f89c11b4ae2",
+        "jobStartTime": "2026-09-07T07:13:16Z",
+        "jobFinishTime": "2026-09-07T07:13:18Z",
+        "compilationTime": "961",
+        "externalVerifications": {
+          "blockscout": {
+            "verificationId": "d09deaaa17528748a781024213249d5c89bb6b116a9e640e",
+            "statusUrl": "https://eth.blockscout.com/api?module=contract&action=checkverifystatus&chainid=1&guid=d09deaaa17528748a781024213249d5c89bb6b116a9e640e",
+            "explorerUrl": "https://eth.blockscout.com//address/0xd09dEAaa17528748A781024213249D5c89bb6B11",
+            "contractApiUrl": "https://eth.blockscout.com/api?module=contract&action=getabi&chainid=1&address=0xd09dEAaa17528748A781024213249D5c89bb6B11"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "1",
+          "address": "0xd09dEAaa17528748A781024213249D5c89bb6B11",
+          "verifiedAt": "2026-09-07T07:13:18Z",
+          "matchId": "47228171"
+        }
+      }
+    },
+    "registrar": {
+      "address": "0xdE0f25E61767bC115Bf67915469a1E16fD0087aA",
+      "identifier": "src/names/PSPNameRegistrar.sol:PSPNameRegistrar",
+      "verificationId": "c3a998e9-925f-445d-85fa-8ef5a36c6d4b",
+      "matchId": "47228172",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-07T07:13:19Z",
+      "match": "match",
+      "chainId": "1",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "c3a998e9-925f-445d-85fa-8ef5a36c6d4b",
+        "jobStartTime": "2026-09-07T07:13:17Z",
+        "jobFinishTime": "2026-09-07T07:13:19Z",
+        "compilationTime": "1354",
+        "externalVerifications": {
+          "blockscout": {
+            "verificationId": "de0f25e61767bc115bf67915469a1e16fd0087aa6a9e6410",
+            "statusUrl": "https://eth.blockscout.com/api?module=contract&action=checkverifystatus&chainid=1&guid=de0f25e61767bc115bf67915469a1e16fd0087aa6a9e6410",
+            "explorerUrl": "https://eth.blockscout.com//address/0xdE0f25E61767bC115Bf67915469a1E16fD0087aA",
+            "contractApiUrl": "https://eth.blockscout.com/api?module=contract&action=getabi&chainid=1&address=0xdE0f25E61767bC115Bf67915469a1E16fD0087aA"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "1",
+          "address": "0xdE0f25E61767bC115Bf67915469a1E16fD0087aA",
+          "verifiedAt": "2026-09-07T07:13:19Z",
+          "matchId": "47228172"
+        }
+      }
+    }
+  }
+}

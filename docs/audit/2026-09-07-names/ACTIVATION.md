@@ -1,6 +1,6 @@
 # pepetesters.wei activation preparation — September 7, 2026
 
-Status: simulated successfully; no Ethereum transactions broadcast and parent custody unchanged.
+Historical preparation record. Activation completed with user approval later September 7, 2026. See LIVE.md and live.json for confirmed addresses, custody and transactions.
 
 ## Confirmed configuration
 
