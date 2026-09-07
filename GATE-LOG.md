@@ -1262,3 +1262,9 @@ Solidity source changed after the contract-source hash above.
 - Verified connected playtest wallet on Base Sepolia: three owned positions, one withdrawing with 181.1689 mixETH pending; other two have 101.5757 mixETH combined. The different claim/reinvest amounts reflect contract eligibility.
 - Added an adjacent explanation with withdrawing position count, excluded fees and the existing cancel-withdrawal path. No automatic cancellation or contract changes.
 - check-audit.sh passed (513 Solidity, 143 frontend tests and remaining gates/build).
+
+## 2026-09-07 — Refresh pepetesters activation preparation
+
+- Rechecked mainnet parent custody, expiry and WNS runtime; signer address and private permissions verified. Updated verifier template for current Base Sepolia factory bbd703…dacf.
+- DeployRemoteNames simulation passed: 3,922,741 estimated gas, 0.000349831654626551 ETH sampled estimate excluding custody/activation. No broadcast or custody change. Verifier/server tests: 11 passed.
+- Added reviewable activation runbook and parent snapshot. Full gate rerun stopped during compilation; this preparation changes configuration/docs only, and the preceding full gate passed on unchanged contract/frontend source.
