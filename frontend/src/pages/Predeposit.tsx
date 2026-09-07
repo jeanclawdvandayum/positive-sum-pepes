@@ -262,10 +262,10 @@ export default function Predeposit() {
       <div className="card p-5">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-2xl font-black text-slate-900">predeposit</h2>
-          {round.id > 0n && <span className="chip bg-sky-100 text-sky-700">round #{round.id.toString()}</span>}
-          {badge && <span className={`chip ${badge.cls}`}>{badge.label}</span>}
-          {pd?.capReached && <span className="chip bg-emerald-100 text-emerald-700">cap reached</span>}
-          {pd?.windowOver && <span className="chip bg-amber-100 text-amber-700">window over</span>}
+          {round.id > 0n && <span className="pd-stamp pd-stamp--round">round #{round.id.toString()}</span>}
+          {badge && <span className="pd-stamp">{badge.label}</span>}
+          {pd?.capReached && <span className="pd-stamp pd-stamp--full">cap reached</span>}
+          {pd?.windowOver && <span className="pd-stamp pd-stamp--ended">window over</span>}
         </div>
         <p className="mt-1 font-body text-sm leading-relaxed text-slate-500">
           get your frog in the door. deposit mixETH before launch to join the pooled first buy. after launch, claim your share as PSP staked in a pepe NFT.
