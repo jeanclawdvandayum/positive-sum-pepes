@@ -1,4 +1,5 @@
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
+import { ensureWalletChain } from './ensureWalletChain'
 import { CHAIN_ID, ADDRESSES } from './config'
 import { factoryAbi, hookAbi, controllerAbi, reinvestorAbi, registryAbi, stakerAbi } from './abi'
 import { assertNftManagement } from './nftPermissions'
@@ -11,12 +12,12 @@ import { assertReinvestor } from './reinvestRules'
 
 /** AUD-4: every UI write simulates, waits for mining, and checks receipt status. */
 export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } | { nftRoundId: bigint | undefined } | { referralPurchase: { roundId: bigint; registry?: `0x${string}` } }) {
-  const { address, chainId } = useAccount()
+  const { address } = useAccount()
   const client = usePublicClient({ chainId: CHAIN_ID })
   const { writeContractAsync } = useWriteContract()
   const confirmed = async (parameters: Parameters<typeof writeContractAsync>[0]) => {
     if (!client || !address) throw new Error('Connect a wallet first.')
-    if (chainId !== CHAIN_ID) throw new Error('Switch your wallet to the configured network.')
+    await ensureWalletChain(address, CHAIN_ID)
     // Immutable legacy deployments do not acquire the new purchase rules.
     const factory = ADDRESSES.factory as `0x${string}`
     const blockNumber = await client.getBlockNumber().catch(error => { throw userFacingRpcError(error) })
@@ -77,7 +78,10 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
     return confirmTransaction({
       simulate: p => client.simulateContract({ ...p, account: address } as never)
         .catch(error => { throw userFacingRpcError(error) }),
-      submit: p => writeContractAsync(p),
+      submit: async p => {
+        await ensureWalletChain(address, CHAIN_ID)
+        return writeContractAsync(p)
+      },
       wait: async hash => {
         let replacementReason: string | undefined
         const receipt = await client.waitForTransactionReceipt({

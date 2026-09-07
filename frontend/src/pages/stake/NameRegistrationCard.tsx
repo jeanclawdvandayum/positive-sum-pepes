@@ -1,3 +1,4 @@
+import { ensureWalletChain } from '../../lib/ensureWalletChain'
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAccount, useSwitchChain, useWriteContract } from 'wagmi'
@@ -75,6 +76,7 @@ export default function NameRegistrationCard() {
     if (!address || !ready || !ns.registrar || status?.busy) return
     setActivity({ key, busy: true })
     try {
+      await ensureWalletChain(address, ns.chainId)
       const expectedAccount = address
       const assertWallet = () => {
         const wallet = getAccount(wagmiConfig)
@@ -177,12 +179,10 @@ export default function NameRegistrationCard() {
         {reveal && wait > 0 ? ` ready in about ${wait}s.` : ''}
       </p>}
       {query.isError && <p className="mt-2 break-words text-xs text-phase-critical">{errorMessage(query.error)}</p>}
-      {address && chainId !== ns.chainId ? <button type="button" onClick={() => switchChainAsync({ chainId: ns.chainId }).catch(error => setActivity({ key, error: errorMessage(error) }))}
-        className="mt-3 rounded-lg border border-line px-4 py-2 text-sm">switch to the registration network</button> :
         <button type="button" onClick={registerName} disabled={!address || !state || !available || status?.busy || (reveal ? wait > 0 : !validLabel)}
           className="mt-3 w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-black disabled:opacity-40">
           {!address ? 'connect your wallet to register' : status?.busy ? 'waiting for confirmation…' : reveal ? 'register your name' : 'reserve your name'}
-        </button>}
+        </button>
       {reveal && !status?.busy && <button type="button" className="mt-2 text-xs text-text-lo underline" onClick={() => {
         try { localStorage.removeItem(key) } catch { /* a new commit replaces the old one */ }
         setPlanState({ key }); setLabel('')

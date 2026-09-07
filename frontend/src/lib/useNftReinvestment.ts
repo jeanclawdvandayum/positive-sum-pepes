@@ -1,3 +1,4 @@
+import { ensureWalletChain } from './ensureWalletChain'
 import { useEffect, useRef } from 'react'
 import { useAccount } from 'wagmi'
 import { getAccount } from 'wagmi/actions'
@@ -23,6 +24,7 @@ export function useNftReinvestment(staker: `0x${string}` | undefined, version: N
   }
   const prepare = async (ids: readonly bigint[], collectionApproval = false) => {
     if (!address || !staker) throw new Error('Connect your wallet and wait for the position to load.')
+    await ensureWalletChain(address, CHAIN_ID)
     await prepareNftReinvestment(address, ADDRESSES.reinvestor, ids, version, {
       assertSession,
       ownerOf: id => rpcCall(staker, stakerAbi, 'ownerOf', [id]) as Promise<`0x${string}`>,

@@ -1,3 +1,4 @@
+import { ensureWalletChain } from '../lib/ensureWalletChain'
 import { rpcCall } from '../lib/rpc'
 import { minimumOutput, MIN_BUY_INPUT } from '../lib/gameRules'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
@@ -135,6 +136,7 @@ export function PepeCard({
     setError(null)
     setTopUpSuccess(null)
     try {
+      await ensureWalletChain(owner, CHAIN_ID)
       await topUpPosition({ owner, staker, id, amount: addition }, {
         assertSession: () => {
           const account = getAccount(wagmiConfig)
