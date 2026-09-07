@@ -5,8 +5,10 @@ Python 3.11+, and the installed root/frontend dependencies. Chain ID is **84532*
 The runner pins the canonical PoolManager to
 `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408`.
 
-This is the procedure for the next release. Actual validation and deployment
-results belong in `GATE-LOG.md` and the run's output files.
+The September 7 live release completed from `c724d124`. See
+[the current playtest](TESTNET-PLAYTEST.md) for its addresses and verification.
+Use this procedure for future releases. Actual results belong in `GATE-LOG.md`
+and the run's output files.
 
 ## Profile and rehearsal
 

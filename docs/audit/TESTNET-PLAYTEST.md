@@ -1,89 +1,66 @@
 # Base Sepolia playtest
 
-Use chain **84532**. Test mixETH is freely minted and has no monetary value;
-Base Sepolia ETH is needed only for gas. The deployment manifest is the source
-of addresses and code hashes. Existing earlier deployments retain their old code.
+The current local release is **[http://127.0.0.1:4173/#/predeposit](http://127.0.0.1:4173/#/predeposit)**.
+Use Base Sepolia, chain **84532**, and a browser wallet. Test mixETH is freely
+minted and has no monetary value. Base Sepolia ETH pays gas.
 
-Open **[the hosted testnet](https://devoted-truffle-ydjx.here.now/#/play)** in a
-browser with your wallet extension. This here.now preview was published from
-frontend revision `f208da28` and initially expires **2026-09-06 at 12:08 UTC**
-unless claimed into a here.now account. Its private claim link was supplied in
-the publishing conversation; it is not committed here. See the
-[frontend hosting record](deployments/herenow-2026-09-05.json).
+## September 7 fresh release
 
-The **[local app](http://127.0.0.1:4173/#/play)** remains available on this Mac.
-Both use the same Base Sepolia contracts. Without `VITE_WC_PROJECT_ID`, connection
-uses browser wallets only. A real WalletConnect project can be configured later
-for remote/mobile connections.
+- Source: **`c724d124e924973d2888c0ed185902c581dbb36b`**.
+- Factory: **`0xbbd703ebdab9f0dd4beaa9855d758028f115dacf`**.
+- [Manifest](deployments/base-sepolia-2026-09-07.json): addresses, bytecode,
+  immutable wiring, timings, rules and feature versions, inspected at block
+  **46,490,893**. History starts at factory creation block **46,490,865**.
+- [Receipts](deployments/base-sepolia-2026-09-07-receipts.json): **17 successful
+  transactions**, including the reinvestor deployed against actual round addresses.
+- [Source verification](deployments/base-sepolia-2026-09-07-verification.json):
+  **17/17 creation/runtime matches** on Sourcify. With `bytecodeHash=none`, these
+  are executable-code matches rather than metadata-backed exact-source matches.
+- Both deployed-release tests passed on a local fork, covering fresh features,
+  two rounds and old-round exits. They made no public-chain gameplay transactions.
 
-- Factory: `0xc79b74dacf99a82f1b1e847948338f9263913a59`.
-- [Release manifest](deployments/base-sepolia-2026-09-05.json): factory-derived
-  original addresses, bytecode hashes, constructor wiring and approved rules.
-- [Verification record](deployments/base-sepolia-2026-09-05-verification.json):
-  17/17 creation/runtime matches on Sourcify. This build uses `bytecodeHash=none`,
-  so these are executable-code matches, not metadata-backed exact-source matches.
-  See [Sourcify's match definitions](https://docs.sourcify.dev/docs/exact-match-vs-match/)
-  and [the verified factory](https://sourcify.dev/server/v2/contract/84532/0xc79b74dacf99a82f1b1e847948338f9263913a59?fields=all).
-- [Deployment receipts](deployments/base-sepolia-2026-09-05-receipts.json): 16
-  deployment transactions plus the second-pass reinvestor, all successful.
+The release starts at round 1 in predeposit with zero deposits. Its initial
+window ends **September 7, 2026 at 05:00:28 UTC**, or the round can launch sooner
+once deposits fill the **500 mixETH** cap. Any positive predeposit is accepted
+within that cap, down to one wei, with no per-wallet cap. Use the free mixETH
+faucet before depositing.
 
-**Reinvestment repair (AUD-14):** use the
-[current manifest](deployments/base-sepolia-2026-09-05-reinvest-repair.json).
-Only ZapIn and Reinvestor were replaced; all retained contract code hashes match
-the original release. New ZapIn: `0xfbaedab9e2e3ad26827c3cec712520cd56e5d842`.
-New Reinvestor: `0x7e5a814b4c7c7d788b20eb90fd7340fa4929f9ae`.
-Both [creation receipts](deployments/base-sepolia-2026-09-05-reinvest-repair-receipts.json)
-succeeded and the [verification record](deployments/base-sepolia-2026-09-05-reinvest-repair-verification.json)
-confirms creation/runtime matches. Refresh old browser tabs. The new addresses
-need fresh token/router approvals and NFT operator approval before use.
+The active round clock lasts two hours and the withdrawal vest lasts one hour
+(six ten-minute epochs). Active purchases require **0.005 mixETH**, including
+fees. Every full 0.005 mixETH earns a ladder ticket and adds up to **260 seconds**,
+subject to the clock cap. Current source features are active in this release:
+atomic referrals, owner-attributed reinvestment, NFT safe transfers and individual
+approvals, block-hash-seeded predeposit art and per-round art uniqueness.
 
-The old reinvestor incorrectly owned ladder seats and Buy/TimeAdded identity;
-PSP principal was still restaked into the correct NFT. Historical events and
-seats cannot be rewritten. Ordinary later buys evict old seats; pot entitlement
-left on the old wrapper at detonation has no forwarding claim path. The new UI
-rejects wrappers without the corrected attribution version. Do not use the old
-`0x7328d580df5d234f5d904f1b0fb1d631f26213f6` wrapper for new reinvestments.
+Both local frontend overrides point to this deployment. The export supplies a
+primary and fallback public RPC and the confirmed history start block. Without
+`VITE_WC_PROJECT_ID`, connections use browser wallets. Naming remains disabled
+pending its separate Ethereum registrar, matching gate/verifier and custody setup.
 
-To restart the built app from `frontend/`, run:
+To restart the built app from `frontend/`:
 
 ```sh
 node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 4173
 ```
 
-Deployment addresses are in the ignored `.env.local`; the production RPC default
-is in `.env.production` (use `.env.production.local` to override it locally).
-Rebuilding uses those settings. The original round uses source revision `a35228a3`;
-the replacement router manifest pins `796222cd`. Round assets and the active
-clock remain on the original contracts.
-The frontend uses [Base's public Sepolia endpoint](https://docs.base.org/base-chain/api-reference/rpc-overview)
-with Multicall3 view batching, concurrent-request deduplication, a second public
-provider as fallback, and 12-second timeouts per provider. Immutable round
-metadata is cached. The curve preview samples locally from materialized on-chain
-coefficients; executable quotes and minOut protection still come from the contract.
-Activity history starts at `VITE_DEPLOYMENT_BLOCK` and advances in bounded pages
-with a 12-block reorg overlap. Set this block from the factory's creation receipt
-when deploying another instance.
-Public RPC service remains subject to rate limits; the playtest should include
-an interruption/recovery check.
+Rebuild after changing frontend settings with `npm --prefix frontend run build`.
+Deployment-specific values belong in `.env.local` and `.env.production.local`.
+The prior local settings are backed up in ignored
+`out/releases/ui-before-c724d124/`. Full current release logs, build inputs and
+receipts are in ignored `out/releases/base-sepolia-live-2026-09-07-c724d124/`.
 
-The configured playtest has a two-hour predeposit window, one-hour withdrawal
-vest (six ten-minute epochs), two-hour clock cap, and no per-wallet predeposit
-cap. Minimum buy/predeposit is 0.005 mixETH; each whole purchase unit earns a
-ticket and 260 seconds, subject to the clock cap. The total predeposit cap is
-500 mixETH. To start immediately, fill that cap with free test mixETH and launch;
-a smaller raise becomes publicly launchable when its window ends.
-
-September 6 source amendment: freshly deployed controllers accept any positive
-predeposit amount, down to one wei; active buys still require 0.005 mixETH.
-The existing deployment described above retains its old predeposit minimum.
-The UI checks the controller's capability and displays exact cap headroom on
-both predeposit forms. See [predeposit review](2026-09-06-predeposit.md).
+Earlier factories retain their balances and NFTs. The prior factory was
+`0xc79b74dacf99a82f1b1e847948338f9263913a59`; its
+[manifest](deployments/base-sepolia-2026-09-05.json) and
+[reinvestor repair](deployments/base-sepolia-2026-09-05-reinvest-repair.json)
+remain historical records. Previous here.now previews point to their original
+builds and were not updated by this local release.
 
 ## Wallet test sequence
 
 1. Open the app and connect a test wallet on Base Sepolia. Use its faucet to get
    free mixETH. Try rejecting a wallet confirmation; the app should show no success.
-2. Predeposit at least 0.005 mixETH. Launch when the cap or window permits, then
+2. Predeposit any positive amount within the cap, including a dust amount. Launch when the cap or window permits, then
    claim your genesis position. A second wallet helps test distribution.
 3. Buy 0.005, 0.01 and 0.05 mixETH. Expect 1, 2 and 10 new ticket units. Fractional
    purchase remainders give neither an extra seat nor extra time. At the clock cap,
@@ -122,16 +99,16 @@ observed behavior. Browser wallet scenarios remain part of the user playtest;
 automated receipt and exit-target tests do not substitute for those interactions.
 
 The automated deployed-code test is `BaseSepoliaReleaseTest`, with
-`PSP_RELEASE_TESTNET=true`, `PSP_FACTORY`, `PSP_ZAPIN`, `PSP_ZAPOUT`, and
+`PSP_RELEASE_TESTNET=true`, `PSP_RELEASE_FRESH=true`, `PSP_FACTORY`, `PSP_ZAPIN`, `PSP_ZAPOUT`, and
 `PSP_REINVESTOR` set from the manifest. Run it with `forge test --match-contract
-BaseSepoliaReleaseTest --fork-url BASE_SEPOLIA_RPC --fork-block-number 46412314`.
+BaseSepoliaReleaseTest --fork-url BASE_SEPOLIA_RPC --fork-block-number 46490893`.
 This is local fork execution only. The two-wallet complete exit can leave one
 wei of unallocated genesis PSP; see [FEE-ACCOUNTING.md](FEE-ACCOUNTING.md).
 
-The router repair also passed `ReinvestRepairTest` against the actual replacement
+The historical September 5 router repair also passed `ReinvestRepairTest` against its replacement
 contracts at block **46416991**, with `PSP_REINVEST_REPAIR_TEST=true` and
 `PSP_USE_DEPLOYED_REPAIR=true`, plus factory/zap/reinvestor addresses from the
-current manifest. It tests operator single/batch reinvestment and owner pot claims
+September 5 repair manifest. It tests operator single/batch reinvestment and owner pot claims
 against the live round's deployed contracts on a local fork. It sends no transactions.
 
 ## Measured economic scenarios

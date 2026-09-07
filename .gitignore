@@ -15,6 +15,7 @@ cache/
 node_modules/
 frontend/dist/
 frontend/.env.local
+frontend/.env.*.local
 frontend/tsconfig.tsbuildinfo
 .herenow/
 .DS_Store

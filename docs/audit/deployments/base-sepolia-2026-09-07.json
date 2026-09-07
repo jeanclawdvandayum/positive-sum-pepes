@@ -1,0 +1,230 @@
+{
+  "schema": 3,
+  "chainId": 84532,
+  "block": "46490893",
+  "blockHash": "0x535fe21c6185348190c66837fc73d74a478ef949ec3e766f25dfcbdfa4957928",
+  "revision": "c724d124e924973d2888c0ed185902c581dbb36b",
+  "sourceDirty": false,
+  "rehearsal": false,
+  "owner": "0x1d52Ad18c074b8125fBCFDFcD01773c6BEdbd88A",
+  "deployerCutTo": "0x1d52Ad18c074b8125fBCFDFcD01773c6BEdbd88A",
+  "addresses": {
+    "factory": "0xbbd703ebdab9f0dd4beaa9855d758028f115dacf",
+    "token": "0xee0b6d34880a6295aD1584a5e09E277159330f52",
+    "controller": "0x708d01f0a5B46D874c1839EbB1EE7627279BB24a",
+    "hook": "0x7154A68B7Ddf1a9896DE200E96f1aB06665FaA88",
+    "staker": "0xa99A991B4F504104552b4c0cdAFd493C04ab77eb",
+    "mix": "0x0FdD49dD4eB08d44789AcC610D9Bd3117e1043d9",
+    "registry": "0xfB1fB57C7f5b835AeD17166Fe3a1eb6351429277",
+    "zapIn": "0xc9a3904cfabd0932f1a8b7bd428d98e74060e7f3",
+    "zapOut": "0xe7b7e3ce1221c3a321e051a42f5a4d9149a42e4f",
+    "faucet": "0xe63b129834e1c48dc2db232b35c35a63f2c291d7",
+    "reinvestor": "0x44b378a75d8ba56c50e229198382e45bec382b47",
+    "descriptor": "0xeC59427803580A000791A2855c90927F40fCE72D",
+    "poolManager": "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408",
+    "hookDeployer": "0x3383cBc518f997D8aDF9a28c2c7D425646C875fa",
+    "controllerDeployer": "0x16D49b05779392Ea3832333d3bDAce7319fF506B",
+    "stakerDeployer": "0x8d503e9cE8de79604BC3CCA9068DE2ddd382C814",
+    "tokenDeployer": "0xa021226b50D6f84c79f8110BDf3b736318ecFce9",
+    "hookInitCode": "0x15206161394Ef39400f6153271036Ea008517eEa",
+    "hookCodeFirst": "0x897466134af019E3Ce95FDCD62cbbc3311EEcE5B",
+    "hookCodeSecond": "0xFF71984523E5BA7E28F8b44a5a0D1ce97CC9aF38"
+  },
+  "codeHashes": {
+    "factory": "0x8a22e87b55d89a6089b20cc182476563dcb33478546406f7872bd7afd19f456a",
+    "token": "0x8721430a98f5829116e8b9ce4f1ea7803f74b29dced9bf42d752b0d3ff8fcc35",
+    "controller": "0xa62690b77ab6c18df591b3d9ceb9b8db070fb9ce5deb1dddce72f0b8a7161b96",
+    "hook": "0xa3781f9684efde3ddeec899a432468a5232c93c7d3fefbe302ca85a557221fe2",
+    "staker": "0x9553801e7c9083161100e75d2af546d54df47135b9df7dc5e2b5332f7f5069ee",
+    "mix": "0x41b9f1d4c4b0c12adcc03eefb445499ba7882621f6589ff276a67b17668826a4",
+    "registry": "0x0214838116436ac452b9221ec1e845706b7dc886eaad63d2d5665cfc9e2dd476",
+    "zapIn": "0x6c12e1de731ffeec67de135f150349ebba4055e6998e9ac58350c4aadd610020",
+    "zapOut": "0x032532d2bed88be6e330cb4d08d3d335191eff23552afc417920d15c2450ef01",
+    "faucet": "0x62d851ff1c2d7aff050f403face4f370608c54fae6444e6ea986d99fe4e83c1c",
+    "reinvestor": "0xb1634f06836419ae4fa55f672009ea6b0e4fa7281fea10c2b7d233cdff9a659a",
+    "descriptor": "0x52daae97725991c0fdaf77f4db931f986ad0b3e48df37855f29ab0b04e09348a",
+    "poolManager": "0x03c45db6d09b14da7c1f7239a5a49697f976d395277e6d2acb6fbed3f9e0249f",
+    "hookDeployer": "0x15ba8d81b9b696baaee3acf5d21e738498de38fefd69cde6918d28afed44b8bb",
+    "controllerDeployer": "0x91fffd76e6dbd0dd45b10d8a5e5b7acd3801fa394771dc5cb74a330715d12b08",
+    "stakerDeployer": "0x2402de8661d68b979501783a6f638d7076d97aa8dda9d4601fd94d7592a3c3dc",
+    "tokenDeployer": "0xab720b835ad9b09610dbe90086b180fb49a9af5124ae15cca812705bfc38f6e6",
+    "hookInitCode": "0x710cc7db5b63825aa2c4b0c15a43d14aff78dd4145b4401e6d0bd1ab225fc549",
+    "hookCodeFirst": "0x1100ae201b059a249113c130b4bce16df766546b84dcfc91d08ba5f6b0c08564",
+    "hookCodeSecond": "0x51b0dbdb0d63393215352a7d5b1955344c20c082e9c9bfdc08430e125eb7eb08"
+  },
+  "artifacts": {
+    "factory": {
+      "contract": "PSPFactory",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0xd6df982110ec4920e1779c91bf1ca645c8bd9d047cfcd9b83ff966adee8b684c"
+    },
+    "token": {
+      "contract": "PSPToken",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0x27c2510dbc83e072c204eb15979ccb08011198cf9155872054f2d414adbeb9d3"
+    },
+    "controller": {
+      "contract": "RoundController",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0xa76686312151b3f2e61b1694be45eeabc772bf90228aff4d1a16b6a2b9395f30"
+    },
+    "hook": {
+      "contract": "CurveHook",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0x7704d72d7fec682fa4f1ca70024cbfcfbf8e3c5665b56902d8062812692fa2fd"
+    },
+    "staker": {
+      "contract": "PSPStaker",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0x4fcf079db99d3df37c35e7e2f14ae3e149caed917c563b126100c297254af86a"
+    },
+    "registry": {
+      "contract": "PSPReferralRegistry",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0x6ac0252824edbfa75be3cafe804fec2cfaf64678909d0ffbb4833beec5fa9ea3"
+    },
+    "mix": {
+      "contract": "SepoliaMixETH",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0x41b9f1d4c4b0c12adcc03eefb445499ba7882621f6589ff276a67b17668826a4"
+    },
+    "descriptor": {
+      "contract": "PepeDescriptor",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0x52daae97725991c0fdaf77f4db931f986ad0b3e48df37855f29ab0b04e09348a"
+    },
+    "hookDeployer": {
+      "contract": "HookDeployer",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0xa066b06602755b965d566975e3624bd0d59c772baaba59e88ceef2c057e6ba7e"
+    },
+    "controllerDeployer": {
+      "contract": "ControllerDeployer",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0x91fffd76e6dbd0dd45b10d8a5e5b7acd3801fa394771dc5cb74a330715d12b08"
+    },
+    "stakerDeployer": {
+      "contract": "StakerDeployer",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0x2402de8661d68b979501783a6f638d7076d97aa8dda9d4601fd94d7592a3c3dc"
+    },
+    "tokenDeployer": {
+      "contract": "TokenDeployer",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0xab720b835ad9b09610dbe90086b180fb49a9af5124ae15cca812705bfc38f6e6"
+    },
+    "hookInitCode": {
+      "contract": "HookInitCode",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0x644898f5b9f3e621d2b77d366ec662599c93c516a548f304cca2f95ce89487c5"
+    },
+    "zapIn": {
+      "contract": "PSPZapIn",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0xfdbf1d86fc57aa8ec06913334a89df59b314a71de15896f45d3d05a4fdbdbff6"
+    },
+    "zapOut": {
+      "contract": "PSPZapOut",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0x80f853cb632614607ad86d585b8a22adab8c83ce0717488d2897eab2ea08a736"
+    },
+    "faucet": {
+      "contract": "MixETHFaucet",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0x5b88477b329b59593acde59a53137176de2a54415f5410cbd425226428080c27"
+    },
+    "reinvestor": {
+      "contract": "PSPReinvestor",
+      "runtimeMatchesIgnoringImmutables": true,
+      "artifactRuntimeHash": "0x8f8da4f80b9f047240d45249fe598eff45910462dfe1dd7aac081a442e2cb37b"
+    }
+  },
+  "hookCreationCodeMatchesArtifact": true,
+  "deployment": {
+    "transactionHash": "0xbc99d3df6f9c79e0c186e9f24fdc596b115c8b6245f937107f33fcb06caf6bd0",
+    "block": "46490865",
+    "blockHash": "0x574e6d8690a84f0236eb9169ae13575990b87e9afe34342f3b3975a3d531937f"
+  },
+  "round": {
+    "roundId": "1",
+    "name": "Positive Sum Pepes",
+    "symbol": "PSP",
+    "destroyed": false,
+    "mode": 0
+  },
+  "params": [
+    "10000000000000",
+    "4605170185988092",
+    "60000000000000000",
+    "10000000000000000000000",
+    10000
+  ],
+  "timings": {
+    "PREDEPOSIT_DURATION": "7200",
+    "VEST_DURATION": "3600",
+    "PREDEPOSIT_CAP_PER_WALLET": "0",
+    "PREDEPOSIT_CAP": "500000000000000000000",
+    "predepositStartTime": "1788750028",
+    "detWindow": "7200",
+    "packed": "2450033041830756937002705452174085508308000",
+    "epochSize": "600"
+  },
+  "rules": {
+    "minimumBuy": "5000000000000000",
+    "minimumPredeposit": "1",
+    "timePerUnit": "260",
+    "feeBps": {
+      "FEE_BPS_PRE_WAVE": "1000",
+      "FEE_BPS_ABOVE_WAVE": "250",
+      "STAKER_BPS": "6000",
+      "POT_BPS": "3500",
+      "REFERRAL_LEG_BPS": "500",
+      "DEPLOYER_BPS": "100"
+    }
+  },
+  "features": {
+    "PREDEPOSIT_RULES_VERSION": "1",
+    "PURCHASE_REFERRAL_VERSION": "1",
+    "NFT_INTERFACE_VERSION": "1",
+    "PEPE_DNA_VERSION": "1",
+    "ATTRIBUTION_VERSION": "1",
+    "nftInterfaces": {
+      "erc165": true,
+      "erc721": true,
+      "metadata": true,
+      "invalid": false
+    },
+    "genesisPreview": {
+      "wallet": "0x0000000000000000000000000000000000000001",
+      "dna": "33870060297525567018932934212414651478981969193259861987268878329615842606803"
+    },
+    "genesisArt": "round-block-hash-seed-with-wallet-and-collision-resolution"
+  },
+  "wiring": {
+    "controller.factory": "0xbbd703ebdab9f0dd4beaa9855d758028f115dacf",
+    "controller.owner": "0xbbd703ebdab9f0dd4beaa9855d758028f115dacf",
+    "controller.pspToken": "0xee0b6d34880a6295aD1584a5e09E277159330f52",
+    "controller.mixETH": "0x0FdD49dD4eB08d44789AcC610D9Bd3117e1043d9",
+    "controller.hook": "0x7154A68B7Ddf1a9896DE200E96f1aB06665FaA88",
+    "token.factory": "0xbbd703ebdab9f0dd4beaa9855d758028f115dacf",
+    "token.controller": "0x708d01f0a5B46D874c1839EbB1EE7627279BB24a",
+    "staker.controller": "0x708d01f0a5B46D874c1839EbB1EE7627279BB24a",
+    "staker.psp": "0xee0b6d34880a6295aD1584a5e09E277159330f52",
+    "staker.descriptor": "0xeC59427803580A000791A2855c90927F40fCE72D",
+    "hook.controller": "0x708d01f0a5B46D874c1839EbB1EE7627279BB24a",
+    "hook.referralRegistry": "0xfB1fB57C7f5b835AeD17166Fe3a1eb6351429277",
+    "hook.poolManager": "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408",
+    "registry.staker": "0xa99A991B4F504104552b4c0cdAFd493C04ab77eb",
+    "hook.deployerCutTo": "0x1d52Ad18c074b8125fBCFDFcD01773c6BEdbd88A",
+    "zapIn.mixETH": "0x0FdD49dD4eB08d44789AcC610D9Bd3117e1043d9",
+    "zapIn.poolManager": "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408",
+    "zapOut.mixETH": "0x0FdD49dD4eB08d44789AcC610D9Bd3117e1043d9",
+    "zapOut.poolManager": "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408",
+    "faucet.mixETH": "0x0FdD49dD4eB08d44789AcC610D9Bd3117e1043d9",
+    "reinvestor.staker": "0xa99A991B4F504104552b4c0cdAFd493C04ab77eb",
+    "reinvestor.psp": "0xee0b6d34880a6295aD1584a5e09E277159330f52",
+    "reinvestor.mix": "0x0FdD49dD4eB08d44789AcC610D9Bd3117e1043d9",
+    "reinvestor.zapIn": "0xc9a3904cfabd0932f1a8b7bd428d98e74060e7f3"
+  },
+  "sourceVerification": "Runtime matches local artifacts except immutable slots; see companion explorer verification record"
+}

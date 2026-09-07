@@ -6,26 +6,25 @@ and 2,048 calls per real-V4 handler with zero reverts; the previous hardening
 revision also passed a 256-run / 32,768-call three-wallet campaign and complete exits; **139 frontend tests**, **11 verifier tests**; TypeScript/Vite;
 155 ABI declarations; 36 production size checks; independent oracle and governance
 gates. Static-analysis flags remain triaged separately. See GATE-LOG.md.
-The existing Base Sepolia release remains configured in the local frontend.
-See [TESTNET-PLAYTEST.md](TESTNET-PLAYTEST.md) for the running app, release manifest,
-source verification and wallet test sequence. Earlier deployments remain unchanged.
-Fresh deployment scripts now cover the changes below, with a default local-fork
-rehearsal, confirmed-address exports and an explicit live broadcast command. See
-[BASE-SEPOLIA-DEPLOY.md](BASE-SEPOLIA-DEPLOY.md). Preparing these scripts does not
-replace the existing deployment or frontend configuration.
-The current testnet frontend uses the AUD-14 replacement ZapIn/Reinvestor; see
-the [repair manifest](deployments/base-sepolia-2026-09-05-reinvest-repair.json).
-Original round contracts, balances and NFTs remain in place. The AUD-15 atomic
-referral purchase implementation is prepared in source and requires a fresh
-factory/round deployment; the current live registry is unchanged. See
-[REFERRALS.md](REFERRALS.md). Old misattributed
-events/seats are immutable and are not silently relabeled as repaired history.
-The AUD-16 through AUD-21 hardening is also prepared in source only and requires
-fresh contracts. See the [September 6 review](2026-09-06-hardening/REVIEW.md)
-for the six confirmed fixes, reproductions, static triage and review limits.
-The user subsequently approved the full ERC-721 interface. Safe transfers, individual
-transfer/fee approvals and frontend controls are implemented in source; see the
-[NFT interface review](2026-09-06-nft-interface/REVIEW.md). These also require fresh contracts.
+The fresh Base Sepolia release is deployed from **`c724d124`**. The local UI uses
+factory **`0xbbd703ebdab9f0dd4beaa9855d758028f115dacf`**, with matching new routers,
+faucet, mixETH and reinvestor. All **17 deployment receipts** succeeded; the
+manifest verified deployed bytecode, immutable wiring and current feature
+versions. Both release lifecycle tests passed on a local fork, and Sourcify
+reported **17/17 creation/runtime matches**. See [TESTNET-PLAYTEST.md](TESTNET-PLAYTEST.md),
+the [manifest](deployments/base-sepolia-2026-09-07.json) and
+[verification record](deployments/base-sepolia-2026-09-07-verification.json).
+
+This release includes atomic purchase referrals, owner-attributed reinvestment,
+AUD-16 through AUD-21 hardening, ERC-721 safe transfers and individual approvals,
+any-positive predeposits, and round-seeded collision-safe genesis art. The local
+UI's history starts at the confirmed factory creation block **46,490,865**.
+Earlier deployments and their assets remain at their original addresses. Their
+old misattributed events/seats are immutable and remain historical records.
+See [REFERRALS.md](REFERRALS.md), the
+[hardening review](2026-09-06-hardening/REVIEW.md) and
+[NFT interface review](2026-09-06-nft-interface/REVIEW.md) for implementation details.
+The [deployment runbook](BASE-SEPOLIA-DEPLOY.md) covers future releases/recovery.
 
 WNS naming now has a registrar, same-chain PSP eligibility gate, parent custody
 and recovery controls, plus verified name display and a registration UI. This is
@@ -46,7 +45,7 @@ and fee balance; this work does not add admin powers to the PSP game contracts.
 - Public predeposits accept **any positive amount**, including one wei, within the
   global and per-wallet caps. Overshoots revert without partial acceptance. Both
   frontend forms show exact cap amounts and use integer MAX calculations. This
-  amendment requires fresh contracts; legacy rounds retain their deployed minimum.
+  rule is active in the fresh release; legacy rounds retain their deployed minimum.
   See [predeposit review](2026-09-06-predeposit.md) for deployment detection and the
   distinction between a tiny individual deposit and a representable pooled launch.
 - Predeposit claims use cosmetic pseudorandom DNA from a block hash captured at
@@ -55,8 +54,8 @@ and fee balance; this work does not add admin powers to the PSP game contracts.
   reserves a unique canonical v2 trait combination in that round.
   Chosen duplicate art reverts; automatic/genesis mints resolve collisions to the
   first available combination without scanning. Transfers and withdrawals retain
-  the reservation. See [block-hash art review](2026-09-06-blockhash-pepes.md). Requires fresh
-  contracts; existing art stays unchanged.
+  the reservation. See [block-hash art review](2026-09-06-blockhash-pepes.md). Active in the fresh
+  release; earlier deployments retain their existing art.
 - Every `floor(gross mixETH / 0.005 mixETH)` purchase unit earns one ladder ticket.
   Only the latest ten remain in storage; absolute ticket numbers include evicted
   units. Fractional remainders do not earn tickets or time. No per-wallet dedup.
@@ -211,13 +210,13 @@ all stakes and redeems all supply at each campaign’s end.
 
 ## Release checklist
 
-- Preserve the existing uncommitted work; review the complete diff and record a clean
-  source revision before release. The user approved release preparation and a fresh testnet deployment. Historical
-  broadcast files are preserved separately from the reviewed source revision.
-- Run deterministic gates, static analysis and a Base Sepolia dry-run, then a fresh
-  staged Base Sepolia deploy with `--slow`, second-pass reinvestor, and source verification.
-- Capture factory-derived addresses, bytecode hashes, parameters and source revision.
-- Build the frontend against those addresses; browser-test wallet rejection, receipt
+- Completed September 7: deploy clean revision `c724d124` from an isolated checkout,
+  preserving unrelated working files. Deterministic gates passed, followed by a
+  staged live deployment with `--slow`, second-pass reinvestor, source verification
+  and deployed-code lifecycle tests. Earlier static-analysis triage remains linked above.
+- Completed: capture factory-derived addresses, bytecode hashes and parameters,
+  wire the frontend, and check all five routes plus the mobile predeposit view.
+- User playtest: browser-test wallet rejection, receipt
   revert, account/chain switch, partial spawn resume, two rounds, claims and redemption.
 - Commission human review and resolve findings before any mainnet funds are accepted.
 

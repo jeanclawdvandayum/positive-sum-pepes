@@ -1169,3 +1169,39 @@ Solidity source changed after the contract-source hash above.
   layouts, denial/download fallback, reroll, selection and wallet resets, and
   eligibility guards. Inspected both the mobile panel and downloaded art.
   No X post or public-chain transaction was submitted. No contracts/env changed.
+
+
+## 2026-09-07 — Fresh Base Sepolia release and local UI switch
+
+- User authorized live deployment and UI rewiring. Deployed clean source
+  **`c724d124e924973d2888c0ed185902c581dbb36b`** from an isolated checkout, preserving
+  unrelated whitepaper/GATE-LOG work and old broadcast records. Used the existing
+  testnet signer through a temporary encrypted keystore, removed after completion.
+- Factory **`0xbbd703ebdab9f0dd4beaa9855d758028f115dacf`**, created in block
+  **46,490,865**. **17/17 live receipts succeeded**, total gas **52,032,034**,
+  largest transaction **9,049,335**. Genesis and the second-pass reinvestor are
+  fully wired. The manifest pins block **46,490,893** and all feature versions.
+- Deterministic gate: **513 Solidity tests / 68 suites**, **139 frontend tests**,
+  **11 verifier tests**, **155 ABI declarations**, **36 production size checks**,
+  independent oracle/governance and TypeScript/Vite passed. The clean Solidity
+  compilation took 1,695 seconds. Existing compiler/bundle warnings remain.
+- Both deployed-release tests passed on a local fork: fresh feature/round-reset
+  canary and two-round lifecycle/old exits. Source verification returned **17/17
+  creation/runtime matches** on Sourcify. These are executable-code matches
+  (`bytecodeHash=none`), not metadata-backed exact-source matches.
+- Public manifest, receipts and verification are under
+  `docs/audit/deployments/base-sepolia-2026-09-07*.json`. Full run output was
+  preserved in ignored `out/releases/base-sepolia-live-2026-09-07-c724d124/`.
+- Backed up prior UI settings and applied the verified export to local dev and
+  production overrides. Removed the historical hardcoded start block from the
+  production defaults. The generated overrides supply the correct history start,
+  factory, routers, mixETH, faucet and reinvestor plus primary/fallback public RPCs.
+- Rebuilt and served at **http://127.0.0.1:4173/#/predeposit**. Chromium checked all
+  five routes against the fresh factory/round 1, a live countdown and 500 mixETH
+  headroom. A 390px mobile check showed no horizontal overflow; no page errors.
+  Desktop and mobile screenshots were inspected. Browser-wallet gameplay remains
+  the user's playtest; automated lifecycle writes were confined to the local fork.
+- Live round 1 starts empty in predeposit. Public launch is available at the
+  500 mixETH cap or after **2026-09-07 05:00:28 UTC**. Naming is disabled pending
+  its separate Ethereum registrar/gate/verifier/custody release. Earlier contracts
+  retain their balances/NFTs; hosted here.now previews were not changed.
