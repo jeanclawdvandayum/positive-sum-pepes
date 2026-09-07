@@ -41,16 +41,23 @@ function fmtDelta(ms: number): string {
 export default function Clock({
   variant = 'full',
   className = '',
+  deadlineMs,
+  label,
 }: {
   variant?: 'full' | 'mini'
   className?: string
+  /** Independent countdown, without changing the round's detonation deadline. */
+  deadlineMs?: number
+  label?: string
 }) {
-  const { hasDeadline } = usePhase()
+  const { hasDeadline: roundHasDeadline } = usePhase()
+  const hasDeadline = deadlineMs !== undefined || roundHasDeadline
+  const remainingMs = () => deadlineMs !== undefined ? Math.max(0, deadlineMs - Date.now()) : getRemainingMs()
   const round = useRound()
   const idle = round.mode === 0 && round.detWindow !== undefined
     ? fmtClock(Number(round.detWindow) * 1000) : '--:--:--'
   const digitRefs = useRef<(HTMLSpanElement | null)[]>([])
-  const prevStr = useRef<string>(hasDeadline ? fmtClock(getRemainingMs()) : idle)
+  const prevStr = useRef<string>(hasDeadline ? fmtClock(remainingMs()) : idle)
   const flashPending = useRef(false)
   const chipSeq = useRef(0)
   const chipTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -59,7 +66,7 @@ export default function Clock({
   // live value: subscribe to the engine's ONE rAF loop, write digits in place
   useLayoutEffect(() => {
     const write = () => {
-      const str = hasDeadline ? fmtClock(getRemainingMs()) : idle
+      const str = hasDeadline ? fmtClock(remainingMs()) : idle
       const prev = prevStr.current
       for (let i = 0; i < LAYOUT_LEN; i++) {
         const el = digitRefs.current[i]
@@ -77,10 +84,11 @@ export default function Clock({
     }
     write()
     return subscribeFrames(write)
-  }, [hasDeadline, idle])
+  }, [hasDeadline, idle, deadlineMs])
 
-  // +5:00 injection → flash changed digits on the next frame + float a chip
+  // Purchase time additions flash changed digits and float a chip.
   useEffect(() => {
+    if (deadlineMs !== undefined) return
     const onInject = (addedMs: number) => {
       flashPending.current = true
       chipSeq.current += 1
@@ -93,13 +101,13 @@ export default function Clock({
       unsub()
       if (chipTimer.current) clearTimeout(chipTimer.current)
     }
-  }, [])
+  }, [deadlineMs])
 
   return (
     <div
       className={`clock clock--${variant} ${hasDeadline ? '' : 'clock--idle'} ${className}`}
       role="timer"
-      aria-label={hasDeadline ? 'time until detonation' : 'clock armed at round launch'}
+      aria-label={label ?? (hasDeadline ? 'time until detonation' : 'clock armed at round launch')}
     >
       <div className="clock-glow" aria-hidden="true" />
       <span className="clock-numerals-wrap">

@@ -1,4 +1,5 @@
 import Clock from '../../components/Clock'
+import ClockBand from '../../components/ClockBand'
 import PotOdometer from '../../components/PotOdometer'
 import Skeleton from '../../components/Skeleton'
 import WalletPepeArt from '../../components/WalletPepeArt'
@@ -72,11 +73,7 @@ export default function ClockPanel({
       : undefined
 
   return (
-    <section
-      aria-label="round clock"
-      className="pl-clockband relative left-1/2 w-screen -translate-x-1/2"
-    >
-      <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 pb-7 pt-6 sm:pb-9 sm:pt-8">
+    <ClockBand label="round clock" className="pl-clockband">
         <h1 className="mb-5 w-full max-w-4xl text-center font-display text-2xl leading-tight text-[#e8f0f7] [overflow-wrap:anywhere] sm:mb-6 sm:text-3xl">
           {round.mode === 1 ? (
             <>
@@ -126,7 +123,6 @@ export default function ClockPanel({
           </p>
         )}
         <DetonateButton key={round.controller} round={round} onDetonated={onDetonated} />
-      </div>
-    </section>
+    </ClockBand>
   )
 }

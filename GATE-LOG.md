@@ -1205,3 +1205,20 @@ Solidity source changed after the contract-source hash above.
   500 mixETH cap or after **2026-09-07 05:00:28 UTC**. Naming is disabled pending
   its separate Ethereum registrar/gate/verifier/custody release. Earlier contracts
   retain their balances/NFTs; hosted here.now previews were not changed.
+
+
+## 2026-09-07 — Shared predeposit/play countdown presentation
+
+- Predeposit now uses the same Clock instrument and shared full-width ClockBand
+  as play, with a centered pixel-font title and dark timer stage above the forms.
+  Its explicit deadline uses the existing PhaseEngine frame subscription without
+  changing the global detonation deadline or subscribing to purchase injections.
+- Deterministic gate passed: **513 Solidity tests / 68 suites**, **139 frontend
+  tests**, **11 verifier tests**, **155 ABI declarations**, **36 production size
+  checks**, independent oracle/governance and TypeScript/Vite. Contracts unchanged.
+- Browser checks matched timer font, size, padding and borders between the pages,
+  checked full-width layout, ticking and zero-clamped expiry, and found no mobile
+  overflow at 390px. Desktop/mobile screenshots inspected. Built preview updated.
+- Confirmed pending fees survive detonation and remain on the NFT. Graveyard
+  unlock settles fees; failed payout preserves credit on the surviving NFT.
+  Explicit claims remain available after withdrawal; transfers carry entitlement.

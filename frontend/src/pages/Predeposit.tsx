@@ -10,10 +10,12 @@ import { rpcCall } from '../lib/rpc'
 import { CHAIN_ID, FAUCET_ENABLED, NATIVE_ETH_FAUCET_URL, TESTNET_ETH_FAUCET } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
 import { useNow } from '../phase/PhaseEngine'
-import { fmtAmount, fmtCountdown, parseAmountToWad, wadToExact } from '../lib/format'
+import { fmtAmount, parseAmountToWad, wadToExact } from '../lib/format'
 import ReferralCard, { RefBanner } from '../components/ReferralCard'
 import { FaucetButton } from '../components/Topbar'
 import MixLogo from '../components/MixLogo'
+import Clock from '../components/Clock'
+import ClockBand from '../components/ClockBand'
 
 type Step = 'idle' | 'approve' | 'tx' | 'done'
 
@@ -157,12 +159,6 @@ export default function Predeposit() {
 
   const endTime = pd && duration !== undefined ? pd.startTime + duration : undefined
   const remaining = endTime !== undefined ? Math.max(0, Number(endTime - BigInt(nowSec))) : undefined
-  const countdownParts = remaining === undefined ? [] : [
-    ...(remaining >= 86400 ? [{ label: 'days', value: Math.floor(remaining / 86400) }] : []),
-    { label: 'hours', value: Math.floor(remaining / 3600) % 24 },
-    { label: 'minutes', value: Math.floor(remaining / 60) % 60 },
-    { label: 'seconds', value: remaining % 60 },
-  ]
   const mode = round.mode
   const badge = mode !== undefined ? MODE_BADGES[mode] : undefined
   const launched = pd?.closed === true && (mode ?? 0) >= 1
@@ -254,10 +250,18 @@ export default function Predeposit() {
     <div className="space-y-4">
       <RefBanner />
 
+      {pd && !pd.closed && endTime !== undefined && (
+        <ClockBand label="predeposit clock">
+          <h1 className="mb-5 w-full max-w-4xl text-center font-display text-2xl leading-tight text-[#e8f0f7] sm:mb-6 sm:text-3xl">
+            {remaining !== undefined && remaining > 0 ? 'predeposit window ends in:' : 'predeposit window elapsed'}
+          </h1>
+          <Clock key={round.controller} deadlineMs={Number(endTime) * 1000} label="time until predeposit window ends" />
+        </ClockBand>
+      )}
       {/* a. header */}
       <div className="card p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-black text-slate-900">predeposit</h1>
+          <h2 className="text-2xl font-black text-slate-900">predeposit</h2>
           {round.id > 0n && <span className="chip bg-sky-100 text-sky-700">round #{round.id.toString()}</span>}
           {badge && <span className={`chip ${badge.cls}`}>{badge.label}</span>}
           {pd?.capReached && <span className="chip bg-emerald-100 text-emerald-700">cap reached</span>}
@@ -266,27 +270,6 @@ export default function Predeposit() {
         <p className="mt-1 text-sm text-slate-500">
           get your frog in the door. deposit mixETH before launch to join the pooled first buy. after launch, claim your share as PSP staked in a pepe NFT.
         </p>
-        {pd && !pd.closed && remaining !== undefined && (
-          <div className="mt-6 rounded-2xl border border-line bg-bg-2 px-3 py-6 sm:px-8 sm:py-8">
-            <p className="text-center font-data text-xs uppercase tracking-widest text-text-lo sm:text-sm">
-              {remaining > 0 ? 'predeposit window ends in' : 'predeposit window elapsed'}
-            </p>
-            <div
-              role="timer"
-              aria-label={`predeposit window: ${fmtCountdown(remaining)} remaining`}
-              className={`mx-auto mt-5 grid max-w-3xl gap-2 sm:gap-6 ${countdownParts.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}
-            >
-              {countdownParts.map(({ label, value }) => (
-                <div key={label} aria-hidden="true" className="min-w-0 text-center">
-                  <div className={`font-clock leading-none tabular-nums text-phase-calm ${countdownParts.length === 4 ? 'text-[clamp(1.5rem,9vw,5.5rem)]' : 'text-[clamp(2rem,12vw,6.5rem)]'}`}>
-                    {String(value).padStart(2, '0')}
-                  </div>
-                  <div className="mt-4 font-data text-[10px] uppercase tracking-widest text-text-lo sm:text-xs">{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
