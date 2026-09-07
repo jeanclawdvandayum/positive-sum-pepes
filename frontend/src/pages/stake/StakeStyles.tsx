@@ -13,6 +13,14 @@ export default function StakeStyles() {
   outline-offset: 2px;
 }
 
+.st-pepe-deck { position: relative; width: calc(100% - 48px); aspect-ratio: 1; margin: 8px 40px 40px 4px; }
+.st-pepe-card { position: absolute; inset: 0; display: grid; place-items: center; padding: 4px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 5px 14px #0005; cursor: pointer; transition: transform 450ms ease; }
+.st-pepe-card > span { overflow: hidden; border-radius: 8px; }
+.st-pepe-card--top { border-color: var(--accent); }
+.st-pepe-shuffle { animation: st-deck-shuffle 450ms ease; }
+@keyframes st-deck-shuffle { 0% { transform: translateY(-16px) rotate(-7deg); opacity: .6; } 100% { transform: translateY(0) rotate(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .st-pepe-card { transition: none; } .st-pepe-shuffle { animation: none; } }
+
 /* amount input — the old .input-amount lives in shared css; this is ours */
 .st-input {
   width: 100%;

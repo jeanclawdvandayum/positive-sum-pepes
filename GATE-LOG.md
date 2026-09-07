@@ -1238,3 +1238,10 @@ Solidity source changed after the contract-source hash above.
 
 - Standardized predeposit stamps to 30px with vertically centered text. Removed the duplicate predeposit-mode stamp while retaining round and relevant status stamps.
 - Height change passed check-audit.sh and browser measurements at 1280px and 390px. Final conditional label removal production-built.
+
+## 2026-09-07 — Stake identity layout, fees and Pepe deck
+
+- Moved fee summary and claim/reinvest actions below the art/stat columns, with responsive full-width controls. Identity title is staked position(s).
+- Added an accessible clickable Pepe deck using owned IDs and their on-chain DNA. Exposed cards promote to the top with a shuffle animation; large collections have cycling controls and reduced-motion preferences are respected.
+- Earned fees use current positions.feesPaid plus pendingFeesOf; claims and reinvestments preserve the total. This is current-position accounting, not wallet lifetime history: contract withdrawal clears position feesPaid. Missing reads show a loading value.
+- check-audit.sh passed: 513 Solidity tests, 141 frontend tests, verifier/ABI/size gates and production build. Added fee claim-invariance/missing-read tests. Temporary browser fixture checked two-Pepe edge clicks, action containment and no overflow at 1280px/390px; screenshots inspected. Fixture removed.

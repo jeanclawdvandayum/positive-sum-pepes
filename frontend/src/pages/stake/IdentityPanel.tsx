@@ -1,30 +1,14 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// IdentityPanel — the den's lead panel (REDESIGN-B3 item 1): the user's pepe
-// rendered BIG (pixelated, integer multiples of the 69px source: 207 / 276px),
-// or the random preview when disconnected; name (pepe # until the .wei registry
-// opens); beneath: staked amount, share of the 60% stream, and the live fee
-// accumulator — plus the multiclaim/reinvest row and the parked-fees note.
-//
-// Art lane is PepePanel's, unchanged: primaryOf → dnaOf → descriptor.renderSVG
-// every 6s, local mirror fallback, teaser while disconnected. No new reads.
-// ─────────────────────────────────────────────────────────────────────────────
-
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useAccount } from 'wagmi'
-import { stakerAbi, descriptorAbi } from '../../lib/abi'
-import { rpcCall } from '../../lib/rpc'
 import { renderPepeSvg, randomDna } from '../../lib/pepeRender'
-import { fmtAmount, fmtPepeId } from '../../lib/format'
+import { fmtAmount } from '../../lib/format'
 import type { RoundInfo } from '../../lib/useRound'
-import Skeleton from '../../components/Skeleton'
+import PepeStack from './PepeStack'
 import FeeAccumulator from './FeeAccumulator'
 
-const isZero = (a: string | undefined) => !a || /^0x0+$/.test(a)
-
 interface Props {
+  ids: bigint[]
   round: RoundInfo
-  /** bump to force a refetch (e.g. right after a lock tx lands) */
-  refreshKey: number
   staked: bigint
   valueMix: bigint | undefined
   valueUsd: number | undefined
@@ -40,7 +24,7 @@ interface Props {
 
 export default function IdentityPanel({
   round,
-  refreshKey,
+  ids,
   staked,
   valueMix,
   valueUsd,
@@ -52,99 +36,22 @@ export default function IdentityPanel({
   claimRow,
 }: Props) {
   const { address } = useAccount()
-  const [tokenId, setTokenId] = useState<bigint | undefined>()
-  const [dna, setDna] = useState<bigint | undefined>()
-  const [svg, setSvg] = useState<string | null>(null)
-  const [artOnline, setArtOnline] = useState(false)
-  // random preview for disconnected / loading / un-hatched states — per mount
   const [teaser] = useState(() => renderPepeSvg(randomDna()))
-
   const staker = round.staker
-
-  useEffect(() => {
-    if (!address || isZero(staker)) return
-    let dead = false
-    async function tick() {
-      try {
-        const id = (await rpcCall(staker!, stakerAbi, 'primaryOf', [address])) as bigint
-        if (dead) return
-        setTokenId(id)
-        if (id === 0n) {
-          setDna(undefined)
-          setSvg(null)
-          return
-        }
-        const d = (await rpcCall(staker!, stakerAbi, 'dnaOf', [id])) as bigint
-        if (dead) return
-        setDna(d)
-        const desc = (await rpcCall(staker!, stakerAbi, 'descriptor')) as `0x${string}`
-        if (dead) return
-        if (!isZero(desc)) {
-          const art = (await rpcCall(desc, descriptorAbi, 'renderSVG', [d])) as string
-          if (dead) return
-          setSvg(art)
-          setArtOnline(true)
-        } else {
-          setArtOnline(false)
-        }
-      } catch {
-        /* staker not resolvable — keep last */
-      }
-    }
-    tick()
-    const iv = setInterval(tick, 6000)
-    return () => {
-      dead = true
-      clearInterval(iv)
-    }
-  }, [address, staker, refreshKey])
-
-  // ── art + name states ──
-  let art: string | null
-  let nameLine: ReactNode
-  let subLine: ReactNode
-
-  if (!address) {
-    art = teaser
-    nameLine = 'meet your accomplice'
-    subLine = "connect your wallet to find your pepe. this one’s keeping you company."
-  } else if (tokenId === undefined) {
-    art = teaser
-    nameLine = <Skeleton className="h-6 w-40" />
-    subLine = 'looking up your pepe. a slow connection can take a moment.'
-  } else if (tokenId === 0n) {
-    art = teaser
-    nameLine = 'time to hatch a pepe'
-    subLine = 'pick your accomplice below. add PSP to stake, or enter zero to mint the NFT.'
-  } else {
-    art = svg ?? (dna !== undefined ? renderPepeSvg(dna) : null)
-    nameLine = (
-      <>
-        <span title={tokenId.toString()}>pepe #{fmtPepeId(tokenId)}</span> <span className="text-text-lo">· pspp</span>
-      </>
-    )
-    subLine = artOnline
-      ? 'rendered on-chain · yours forever'
-      : 'local render — same art data the contract draws from'
-  }
-
-  const dimmed = !!address && tokenId === 0n // un-hatched: the preview sleeps
+  const nameLine = 'staked position(s)'
+  const subLine = !address ? 'connect your wallet to find your pepe.'
+    : ids.length > 0 ? 'your pepes. your share of the trading fees.'
+    : 'pick your accomplice below. add PSP to stake, or enter zero to mint the NFT.'
 
   return (
     <section className="rounded-2xl border border-line bg-bg-1 p-5 sm:p-6" aria-label="your pepe">
-      <div className="flex flex-col gap-6 sm:flex-row sm:gap-8">
+      <div className="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2">
         {/* the pepe, big — integer multiples of the 69px source (2× / 4×) */}
-        <div className="relative shrink-0 self-center sm:self-start">
-          <div
-            className="h-[138px] w-[138px] overflow-hidden rounded-xl border border-line sm:h-[276px] sm:w-[276px] [&>svg]:h-full [&>svg]:w-full"
-            style={{
-              imageRendering: 'pixelated',
-              filter: dimmed ? 'grayscale(0.7) opacity(0.55)' : undefined,
-            }}
-            aria-label={address ? 'your pepe' : 'a random pepe'}
-            dangerouslySetInnerHTML={{ __html: art ?? '' }}
-          />
-        </div>
+        {ids.length > 0 ? <PepeStack key={`${address}:${staker}`} ids={ids} staker={staker} /> : (
+          <div className="aspect-square w-full max-w-[276px] overflow-hidden rounded-xl border border-line [&>svg]:h-full [&>svg]:w-full"
+            style={{ imageRendering: 'pixelated', filter: address ? 'grayscale(0.7) opacity(0.55)' : undefined }}
+            aria-label="a random pepe" dangerouslySetInnerHTML={{ __html: teaser }} />
+        )}
 
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-2xl leading-tight">{nameLine}</h1>
@@ -183,18 +90,14 @@ export default function IdentityPanel({
             </div>
           </dl>
 
-          {/* the emotional core */}
-          <div className="mt-5 border-t border-line pt-4">
-            <FeeAccumulator value={feesValue} connected={connected} hasStake={hasStake} />
-            {claimRow}
-            {parked > 0n && (
-              <p className="mt-3 text-xs leading-relaxed text-text-lo">
-                {fmtAmount(parked)} mixETH in trading fees carried forward. later trades can distribute
-                them once enough fees and eligible staking weight are available.
-              </p>
-            )}
-          </div>
         </div>
+      </div>
+      <div className="mt-5 min-w-0 border-t border-line pt-4">
+        <FeeAccumulator value={feesValue} connected={connected} hasStake={hasStake} />
+        {claimRow}
+        {parked > 0n && <p className="mt-3 text-xs leading-relaxed text-text-lo">
+          {fmtAmount(parked)} mixETH in trading fees carried forward. later trades can distribute them once enough fees and eligible staking weight are available.
+        </p>}
       </div>
     </section>
   )

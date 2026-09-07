@@ -1,31 +1,4 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// FeeAccumulator — FEES EARNED THIS ROUND, live-ticking (REDESIGN-B3 item 1:
-// "this counter is the page's emotional core and the strongest revisit reason").
-//
-// NO new chain reads: it consumes the existing pendingFeesOf lane (6s batched
-// updates) and smooth-interpolates between readings — DECIDED (2026-08-31):
-//   · each fresh reading re-anchors the counter and re-derives the accrual
-//     rate from a ~12-reading window (~72s), so trade-fee lumps become a
-//     steady drip
-//   · extrapolation is capped just past one poll interval — if the RPC stalls
-//     or backs off, the counter HOLDS instead of faking growth (no fake
-//     liveness, red-line)
-//   · a drop between readings = a claim landed → history resets, counter
-//     restarts from truth (claims reset the counter; nothing is lost)
-//   · disconnected → the designed empty state, never a frozen number
-// Display rides PhaseEngine's shared whole-second heartbeat (useNow) — no
-// private interval, no per-frame work. Tabular mono: numbers never reflow.
-// ─────────────────────────────────────────────────────────────────────────────
-
-import { useEffect, useRef } from 'react'
 import Skeleton from '../../components/Skeleton'
-
-interface Reading {
-  v: bigint
-  t: number
-}
-
-const WINDOW = 12 // readings kept (~72s at the 6s cadence)
 
 function fmtAccum(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return '0.00000000'
@@ -38,27 +11,16 @@ export default function FeeAccumulator({
   connected,
   hasStake,
 }: {
-  /** Σ pendingFeesOf across the wallet's pepes (existing 6s lane) */
+  /** Σ feesPaid + pendingFeesOf across the wallet's pepes (existing 6s lane) */
   value: bigint | undefined
   connected: boolean
   hasStake: boolean
 }) {
-  const hist = useRef<Reading[]>([])
-
-  useEffect(() => {
-    if (value === undefined) return // rpc hiccup → keep the last anchor
-    const t = Date.now()
-    const h = hist.current
-    if (h.length > 0 && value < h[h.length - 1].v) h.length = 0 // claim landed
-    h.push({ v: value, t })
-    if (h.length > WINDOW) h.splice(0, h.length - WINDOW)
-  }, [value])
-
   // designed empty states (spec §8 voice)
   if (!connected) {
     return (
       <div>
-        <div className="text-xs text-text-lo">unclaimed trading fees</div>
+        <div className="text-xs text-text-lo">total fees earned</div>
         <p className="mt-2 max-w-[26rem] text-sm leading-relaxed text-text-lo">
           connect your wallet to check what your pepe has earned.
         </p>
@@ -68,7 +30,7 @@ export default function FeeAccumulator({
   if (!hasStake) {
     return (
       <div>
-        <div className="text-xs text-text-lo">unclaimed trading fees</div>
+        <div className="text-xs text-text-lo">total fees earned</div>
         <p className="mt-2 max-w-[26rem] text-sm leading-relaxed text-text-lo">
           put PSP in a pepe. let the trading fees come to you.
         </p>
@@ -76,22 +38,16 @@ export default function FeeAccumulator({
     )
   }
 
-  const h = hist.current
-  const anchor = h.length > 0 ? h[h.length - 1] : undefined
 
-  // HONEST COUNTER (2026-09-03 playtest fix): the old extrapolated drip
-  // (windowed rate × capped elapsed) ticked ABOVE the chain's real pending —
-  // a claim then paid less than the number on screen. The counter now shows
-  // the LAST REAL READING and moves only when the chain moves (6s lane);
-  // claims reset it. No invented liveness.
-  const display = anchor !== undefined ? Number(anchor.v) / 1e18 : 0
-  const idle = anchor === undefined ? false : anchor.v === 0n
+  // Chain readings only: paid fees plus the current claimable balance.
+  const display = value !== undefined ? Number(value) / 1e18 : 0
+  const idle = value === 0n
   const formatted = fmtAccum(display)
 
   return (
     <div className="min-w-0" style={{ containerType: 'inline-size' }}>
-      <div className="text-xs text-text-lo">unclaimed trading fees</div>
-      {anchor === undefined ? (
+      <div className="text-xs text-text-lo">total fees earned</div>
+      {value === undefined ? (
         <Skeleton className="mt-2 h-10 w-60 max-w-full" />
       ) : (
         <>
@@ -99,13 +55,13 @@ export default function FeeAccumulator({
             className="st-accum mt-2 pr-2"
             // Size against this column, keeping every digit plus right padding.
             style={{ fontSize: `min(2.25rem, calc((100cqi - 0.5rem) / ${formatted.length * 0.62}))` }}
-            role="timer"
-            aria-label="unclaimed trading fees"
+            role="status"
+            aria-label="total fees earned"
           >
             {formatted}
           </div>
           <div className="mt-1.5 text-xs text-text-lo">
-            {idle ? 'mixETH · accrued fees appear here' : 'mixETH · your cut, ready to claim'}
+            {idle ? 'mixETH · accrued fees appear here' : 'mixETH · claimed + pending across these positions'}
           </div>
         </>
       )}

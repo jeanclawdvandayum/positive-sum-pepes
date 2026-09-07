@@ -1,3 +1,4 @@
+import { positionFeesEarned } from '../lib/positionFees'
 import { minimumOutput, MIN_BUY_INPUT } from '../lib/gameRules'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { predepositResult } from '../lib/chainResults'
@@ -137,6 +138,9 @@ export default function Stake() {
   const totalValueMix = round.marginalPrice ? (totalStaked * round.marginalPrice) / 10n ** 18n : undefined
   const totalValueUsd = totalValueMix !== undefined && ethUsd ? (Number(totalValueMix) / 1e18) * ethUsd : undefined
   const totalPending = [...pendings.values()].reduce<bigint>((a, p) => a + (p ?? 0n), 0n)
+  const totalEarned = count !== undefined && ids.length === n && ids.every((_, i) => detailResults[i * 3] !== undefined && detailResults[i * 3 + 1] !== undefined)
+    ? ids.reduce((sum, _, i) => sum + positionFeesEarned((detailResults[i * 3] as bigint[])[4], detailResults[i * 3 + 1] as bigint)!, 0n)
+    : undefined
   const stakeableIds = entries.filter((e) => e.withdrawing === false && e.amount > 0n).map((e) => e.id)
 
   /// share of the 60% staker stream = your locked PSP / all locked PSP
@@ -364,19 +368,18 @@ export default function Stake() {
         ]
       : []),
     { label: 'your pepes', value: String(entries.length) },
-    { label: 'fees earned', value: `${fmtAmount(totalPending, 4)} mix` },
+    { label: 'fees earned', value: totalEarned === undefined ? '…' : `${fmtAmount(totalEarned, 4)} mix` },
     ...(round.totalLocked !== undefined
       ? [{ label: 'all psp locked', value: `${fmtAmount(round.totalLocked)} psp` }]
       : []),
   ]
 
-  // multiclaim / reinvest — mounted inside the identity panel under the
-  // accumulator (the fees it counts are the fees it claims)
+  // Claims use pending fees; the separate earned stat includes prior payouts.
   const claimRow = hasPepes ? (
-    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+    <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
       <button
         type="button"
-        className="st-btn st-btn-primary flex-1"
+        className="st-btn st-btn-primary min-w-0 flex-col"
         disabled={!isConnected || totalPending === 0n || multiBusy}
         onClick={multiclaim}
       >
@@ -385,7 +388,7 @@ export default function Stake() {
       {round.reinvestorReady && (
         <button
           type="button"
-          className="st-btn flex-1"
+          className="st-btn min-w-0 flex-col"
           disabled={!isConnected || totalPending === 0n || stakeableIds.length === 0 || multiBusy || nftVersion === undefined}
           onClick={reinvestAll}
         >
@@ -425,12 +428,12 @@ export default function Stake() {
 
           <IdentityPanel
             round={round}
-            refreshKey={pepeKey}
             staked={totalStaked}
             valueMix={totalValueMix}
             valueUsd={totalValueUsd}
             sharePct={sharePct}
-            feesValue={totalPending}
+            ids={ids}
+            feesValue={totalEarned}
             connected={isConnected}
             hasStake={hasPepes}
             parked={parked}
