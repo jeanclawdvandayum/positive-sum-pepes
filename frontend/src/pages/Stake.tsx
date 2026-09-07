@@ -143,6 +143,8 @@ export default function Stake() {
     : undefined
   const stakeableIds = entries.filter((e) => e.withdrawing === false && e.amount > 0n).map((e) => e.id)
   const reinvestPending = stakeableIds.reduce((sum, id) => sum + (pendings.get(id) ?? 0n), 0n)
+  const withdrawingEntries = entries.filter(e => e.withdrawing === true)
+  const withdrawingFees = withdrawingEntries.reduce((sum, e) => sum + (pendings.get(e.id) ?? 0n), 0n)
 
   /// share of the 60% staker stream = your locked PSP / all locked PSP
   const sharePct =
@@ -403,6 +405,10 @@ export default function Stake() {
           </span>}
         </button>
       )}
+      {withdrawingEntries.length > 0 && <p className="text-xs leading-relaxed text-text-lo sm:col-span-2">
+        multiclaim covers all {entries.length} pepes. {withdrawingEntries.length} {withdrawingEntries.length === 1 ? 'pepe is' : 'pepes are'} withdrawing with {fmtAmount(withdrawingFees, 4)} mixETH in claimable fees.
+        {' '}reinvest covers the other {stakeableIds.length}. cancel withdrawal on the position below to include it again.
+      </p>}
     </div>
   ) : null
 

@@ -1256,3 +1256,9 @@ Solidity source changed after the contract-source hash above.
 
 - Display #1–#10 from seat order instead of cumulative ticket serials. Large purchases no longer overflow the rank label. Payout and ordering logic unchanged.
 - check-audit.sh passed (513 Solidity, 143 frontend tests and remaining gates/build). Browser assertion confirmed all ten rank labels on the rebuilt local play page.
+
+## 2026-09-07 — Explain withdrawing Pepe exclusion
+
+- Verified connected playtest wallet on Base Sepolia: three owned positions, one withdrawing with 181.1689 mixETH pending; other two have 101.5757 mixETH combined. The different claim/reinvest amounts reflect contract eligibility.
+- Added an adjacent explanation with withdrawing position count, excluded fees and the existing cancel-withdrawal path. No automatic cancellation or contract changes.
+- check-audit.sh passed (513 Solidity, 143 frontend tests and remaining gates/build).
