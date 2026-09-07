@@ -225,6 +225,7 @@ export function FaucetButton({ full = false, menu = false }: { full?: boolean; m
   const { isConnected } = useAccount()
   const [step, setStep] = useState<'idle' | 'tx' | 'done'>('idle')
   const [mintAmount, setMintAmount] = useState('1000')
+  const [error, setError] = useState<string | null>(null)
   const { writeContractAsync } = useConfirmedWrite()
 
   function amountWad(): bigint | null {
@@ -240,6 +241,7 @@ export function FaucetButton({ full = false, menu = false }: { full?: boolean; m
   async function drip() {
     const amt = full ? amountWad() : QUICK_MINT
     if (!amt) return
+    setError(null)
     try {
       setStep('tx')
       await writeContractAsync({
@@ -250,14 +252,15 @@ export function FaucetButton({ full = false, menu = false }: { full?: boolean; m
       })
       setStep('done')
       setTimeout(() => setStep('idle'), 2500)
-    } catch {
+    } catch (e) {
+      setError(e instanceof Error ? e.message.slice(0, 180) : 'Mint failed. Please try again.')
       setStep('idle')
     }
   }
 
   if (full) {
     return (
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <input
           className="input-amount w-32 text-right"
           placeholder="1000"
@@ -267,7 +270,7 @@ export function FaucetButton({ full = false, menu = false }: { full?: boolean; m
         />
         <button
           type="button"
-          disabled={!isConnected || !amountWad()}
+          disabled={!isConnected || !amountWad() || step === 'tx'}
           onClick={drip}
           className={`btn-ghost flex-1 ${step === 'done' ? 'border-emerald-200 text-emerald-600' : ''}`}
         >
@@ -277,6 +280,7 @@ export function FaucetButton({ full = false, menu = false }: { full?: boolean; m
               ? 'confirm in wallet…'
               : 'faucet: mint mixETH (free)'}
         </button>
+        {error && <p role="alert" className="w-full text-sm text-red-400">{error}</p>}
       </div>
     )
   }
@@ -284,8 +288,8 @@ export function FaucetButton({ full = false, menu = false }: { full?: boolean; m
   return (
     <button
       type="button"
-      title="faucet · free mixETH"
-      disabled={!isConnected}
+      title={error || "faucet · free mixETH"}
+      disabled={!isConnected || step === 'tx'}
       onClick={drip}
       className={`inline-flex ${menu ? 'h-11 px-4' : 'h-7 px-2.5'} items-center gap-1 rounded-full border border-line bg-bg-1 font-body text-xs text-text-hi transition hover:border-accent active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
         step === 'done' ? 'text-emerald-600' : ''
@@ -293,6 +297,7 @@ export function FaucetButton({ full = false, menu = false }: { full?: boolean; m
     >
       {step === 'done' ? '✅' : step === 'tx' ? <><MixLogo px={14} />…</> : <MixLogo px={14} />}
       <span className={menu ? '' : 'hidden lg:inline'}>{step === 'done' ? 'minted' : step === 'tx' ? 'minting' : 'faucet'}</span>
+      {error && <span role="alert" className="max-w-64 whitespace-normal text-red-400">{error}</span>}
     </button>
   )
 }
