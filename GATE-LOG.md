@@ -1233,3 +1233,8 @@ Solidity source changed after the contract-source hash above.
 
 - Replaced round, mode, cap and window pill tags with pixel-cut perforated stamps using PSP theme colors and type.
 - check-audit.sh passed: 513 Solidity tests, 139 frontend tests, remaining verifier/ABI/size gates and production build. Browser checks at 1280px and 390px passed with no horizontal overflow; mobile screenshot inspected.
+
+## 2026-09-07 — Ticket alignment and redundant status
+
+- Standardized predeposit stamps to 30px with vertically centered text. Removed the duplicate predeposit-mode stamp while retaining round and relevant status stamps.
+- Height change passed check-audit.sh and browser measurements at 1280px and 390px. Final conditional label removal production-built.

@@ -146,7 +146,9 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.35rem 0.65rem;
+  box-sizing: border-box;
+  height: 1.875rem;
+  padding: 0 0.65rem;
   color: var(--stamp-ink);
   background: color-mix(in srgb, var(--stamp-ink) 9%, var(--color-bg-1, #0b1424));
   border-block: 1px solid color-mix(in srgb, var(--stamp-ink) 55%, transparent);

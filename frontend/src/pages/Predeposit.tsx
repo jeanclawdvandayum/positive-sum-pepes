@@ -263,7 +263,7 @@ export default function Predeposit() {
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-2xl font-black text-slate-900">predeposit</h2>
           {round.id > 0n && <span className="pd-stamp pd-stamp--round">round #{round.id.toString()}</span>}
-          {badge && <span className="pd-stamp">{badge.label}</span>}
+          {badge && mode !== 0 && <span className="pd-stamp">{badge.label}</span>}
           {pd?.capReached && <span className="pd-stamp pd-stamp--full">cap reached</span>}
           {pd?.windowOver && <span className="pd-stamp pd-stamp--ended">window over</span>}
         </div>
