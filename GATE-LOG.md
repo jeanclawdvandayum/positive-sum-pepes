@@ -1251,3 +1251,8 @@ Solidity source changed after the contract-source hash above.
 - Bulk reinvest requests one explicitly labeled collection approval instead of per-NFT approval transactions. Subsequent calls use the existing atomic reinvestAll contract entry point. Individual-position approval scope remains unchanged.
 - Minimum fee check runs before approval and is refreshed afterward. UI shows combined eligible fees and position count; withdrawing positions remain claim-only. First use requires approval and reinvest transactions; approved use requires one reinvest transaction.
 - check-audit.sh passed, including 513 Solidity tests and 143 frontend tests. New tests cover single collection approval, reuse, ownership changes and wallet-session changes. Production UI rebuilt locally.
+
+## 2026-09-07 — Ladder rank labels
+
+- Display #1–#10 from seat order instead of cumulative ticket serials. Large purchases no longer overflow the rank label. Payout and ordering logic unchanged.
+- check-audit.sh passed (513 Solidity, 143 frontend tests and remaining gates/build). Browser assertion confirmed all ten rank labels on the rebuilt local play page.

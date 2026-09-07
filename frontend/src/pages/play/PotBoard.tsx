@@ -58,7 +58,6 @@ export default function PotBoard({
   roundLabel,
   claimable,
   claimHook,
-  ticketCount,
   staker,
   roundId,
 }: {
@@ -165,10 +164,6 @@ export default function PotBoard({
       <ol className="mt-4 flex flex-1 flex-col gap-1.5">
         {seats.map((s, i) => {
           const rank = i + 1
-          // absolute ticket number: seat 0 (newest) = count−1, walking back.
-          // Per-whole-PSP seats mean one buy can take several seats — the
-          // absolute number is what makes them distinct.
-          const ticketNo = ticketCount !== undefined ? ticketCount - BigInt(i) : undefined
           const isTop = rank === 1
           const payout = payoutWad(i)
           const nominal = s ? sharePct(i, seated) : (LADDER[i] ?? 0)
@@ -181,7 +176,7 @@ export default function PotBoard({
               <div className="pl-seat-bar" style={{ width: `${barW}%` }} aria-hidden="true" />
               <div className={`pl-seat-inner ${isTop ? 'text-base' : 'text-sm'}`}>
                 <span className="tabular w-7 shrink-0 font-data text-text-lo" aria-hidden="true">
-                  {s !== undefined && ticketNo !== undefined ? ticketNo.toString() : `#${rank}`}
+                  {`#${rank}`}
                 </span>
                 <span className="relative flex shrink-0">
                   {s ? <WalletPepeArt address={s.addr} staker={staker}
