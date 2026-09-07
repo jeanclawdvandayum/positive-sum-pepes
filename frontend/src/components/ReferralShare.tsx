@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAccount } from 'wagmi'
-import { CHAIN_ID } from '../lib/config'
+import { CHAIN_ID, TESTNET_ETH_FAUCET } from '../lib/config'
 import { fmtPepeId } from '../lib/format'
 import { rpcCall } from '../lib/rpc'
 import { useRound } from '../lib/useRound'
@@ -19,6 +19,7 @@ export default function ReferralShare({ tokenId, link, enabled }: {
 }) {
   const { address } = useAccount()
   const { staker } = useRound()
+  if (TESTNET_ETH_FAUCET) return null
   if (!enabled || !link || tokenId === null || !staker || !address) {
     return <button type="button" disabled className={`${button} mt-3 w-full`}>post to X</button>
   }
