@@ -1245,3 +1245,9 @@ Solidity source changed after the contract-source hash above.
 - Added an accessible clickable Pepe deck using owned IDs and their on-chain DNA. Exposed cards promote to the top with a shuffle animation; large collections have cycling controls and reduced-motion preferences are respected.
 - Earned fees use current positions.feesPaid plus pendingFeesOf; claims and reinvestments preserve the total. This is current-position accounting, not wallet lifetime history: contract withdrawal clears position feesPaid. Missing reads show a loading value.
 - check-audit.sh passed: 513 Solidity tests, 141 frontend tests, verifier/ABI/size gates and production build. Added fee claim-invariance/missing-read tests. Temporary browser fixture checked two-Pepe edge clicks, action containment and no overflow at 1280px/390px; screenshots inspected. Fixture removed.
+
+## 2026-09-07 — Bulk reinvest approval flow
+
+- Bulk reinvest requests one explicitly labeled collection approval instead of per-NFT approval transactions. Subsequent calls use the existing atomic reinvestAll contract entry point. Individual-position approval scope remains unchanged.
+- Minimum fee check runs before approval and is refreshed afterward. UI shows combined eligible fees and position count; withdrawing positions remain claim-only. First use requires approval and reinvest transactions; approved use requires one reinvest transaction.
+- check-audit.sh passed, including 513 Solidity tests and 143 frontend tests. New tests cover single collection approval, reuse, ownership changes and wallet-session changes. Production UI rebuilt locally.

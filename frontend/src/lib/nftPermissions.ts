@@ -14,8 +14,8 @@ export function nftRecipient(value: string, owner: Address, staker: Address): Ad
   return to
 }
 
-/** Only selected, still-owned NFTs are approved. Every mined approval and session
- * change is checked before continuing to the next wallet transaction. */
+/** Single-position flows use individual approval. The explicitly labeled bulk
+ * action can request collection approval once. Ownership/session checks remain. */
 export async function prepareNftReinvestment(
   owner: Address, operator: Address, ids: readonly bigint[], version: NftVersion,
   operations: {
@@ -26,6 +26,7 @@ export async function prepareNftReinvestment(
     approve: (id: bigint) => Promise<unknown>
     approveAll: () => Promise<unknown>
   },
+  collectionApproval = false,
 ) {
   if (version === undefined) throw new Error('Waiting for NFT approval support to load.')
   if (ids.length === 0 || ids.length > 64 || new Set(ids).size !== ids.length) throw new Error('Choose 1–64 different Pepes.')
@@ -38,7 +39,7 @@ export async function prepareNftReinvestment(
   await assertOwners()
   const all = await operations.isApprovedForAll()
   operations.assertSession()
-  if (!all && version === 0) {
+  if (!all && (version === 0 || collectionApproval)) {
     await operations.approveAll() // legacy UI labels the collection-wide permission
     await assertOwners()
   } else if (!all) {

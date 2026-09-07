@@ -21,7 +21,7 @@ export function useNftReinvestment(staker: `0x${string}` | undefined, version: N
       throw new Error('Wallet, network or round changed. Refresh and try again.')
     }
   }
-  const prepare = async (ids: readonly bigint[]) => {
+  const prepare = async (ids: readonly bigint[], collectionApproval = false) => {
     if (!address || !staker) throw new Error('Connect your wallet and wait for the position to load.')
     await prepareNftReinvestment(address, ADDRESSES.reinvestor, ids, version, {
       assertSession,
@@ -30,7 +30,7 @@ export function useNftReinvestment(staker: `0x${string}` | undefined, version: N
       getApproved: id => rpcCall(staker, stakerAbi, 'getApproved', [id]) as Promise<`0x${string}`>,
       approve: id => writeContractAsync({ address: staker, abi: stakerAbi, functionName: 'approve', args: [ADDRESSES.reinvestor, id] }),
       approveAll: () => writeContractAsync({ address: staker, abi: stakerAbi, functionName: 'setApprovalForAll', args: [ADDRESSES.reinvestor, true] }),
-    })
+    }, collectionApproval)
   }
   return { prepare, assertSession }
 }

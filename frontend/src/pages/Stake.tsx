@@ -142,6 +142,7 @@ export default function Stake() {
     ? ids.reduce((sum, _, i) => sum + positionFeesEarned((detailResults[i * 3] as bigint[])[4], detailResults[i * 3 + 1] as bigint)!, 0n)
     : undefined
   const stakeableIds = entries.filter((e) => e.withdrawing === false && e.amount > 0n).map((e) => e.id)
+  const reinvestPending = stakeableIds.reduce((sum, id) => sum + (pendings.get(id) ?? 0n), 0n)
 
   /// share of the 60% staker stream = your locked PSP / all locked PSP
   const sharePct =
@@ -265,10 +266,12 @@ export default function Stake() {
     setError(null)
     try {
       setMultiStep('tx')
-      await nftReinvestment.prepare(stakeableIds)
       const key = buildPoolKey(round.mix!, round.token!, round.hook!)
-      const fees = (await Promise.all(stakeableIds.map(id => rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as Promise<bigint>))).reduce((sum, fee) => sum + fee, 0n)
-      if (fees < MIN_BUY_INPUT) throw new Error('Reinvest requires at least 0.005 mixETH in accrued fees.')
+      let fees = (await Promise.all(stakeableIds.map(id => rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as Promise<bigint>))).reduce((sum, fee) => sum + fee, 0n)
+      if (fees < MIN_BUY_INPUT) throw new Error('Eligible positions need a combined 0.005 mixETH in fees. Withdrawing positions can be claimed separately.')
+      await nftReinvestment.prepare(stakeableIds, true)
+      fees = (await Promise.all(stakeableIds.map(id => rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as Promise<bigint>))).reduce((sum, fee) => sum + fee, 0n)
+      if (fees < MIN_BUY_INPUT) throw new Error('Eligible fees changed during approval. At least 0.005 mixETH combined is needed.')
       const quote = await rpcCall(round.hook!, hookAbi, 'getBuyOutput', [fees]) as bigint
       nftReinvestment.assertSession()
       await writeContractAsync({
@@ -389,12 +392,14 @@ export default function Stake() {
         <button
           type="button"
           className="st-btn min-w-0 flex-col"
-          disabled={!isConnected || totalPending === 0n || stakeableIds.length === 0 || multiBusy || nftVersion === undefined}
+          disabled={!isConnected || reinvestPending < MIN_BUY_INPUT || stakeableIds.length === 0 || multiBusy || nftVersion === undefined}
           onClick={reinvestAll}
         >
           {multiStep === 'done' ? '✓' : reinvestApproved ? '↻ reinvest all' : 'approve & reinvest all'}
+          <span className="text-xs">{fmtAmount(reinvestPending, 4)} mixETH combined · {stakeableIds.length} positions</span>
+          {reinvestPending < MIN_BUY_INPUT && <span className="text-[10px] font-normal">0.005 mixETH combined minimum · withdrawing positions are claim-only</span>}
           {!reinvestApproved && <span className="mt-1 block text-[10px] font-normal">
-            {nftVersion === 1 ? 'approve each included Pepe · transfer and fee-claim permission' : nftVersion === 0 ? 'collection approval · transfers and fee claims for all Pepes' : 'checking approvals…'}
+            one collection approval, then one batch reinvest · permits transfers and fee claims for all Pepes in this round
           </span>}
         </button>
       )}

@@ -92,3 +92,19 @@ test('round-specific NFT management admits only safe transfers and revocations',
     { functionName: 'stakeFor', args: [owner, 1n, 100n] },
   ]) assert.throws(() => check(action))
 })
+
+test('bulk reinvestment requests one collection approval, then none on repeat', async () => {
+  const f = fixture()
+  await prepareNftReinvestment(owner, operator, [1n, 2n], 1, f.ops, true)
+  assert.deepEqual(f.writes, ['all'])
+  await prepareNftReinvestment(owner, operator, [1n, 2n], 1, f.ops, true)
+  assert.deepEqual(f.writes, ['all'])
+})
+test('bulk approval still aborts after ownership or session changes', async () => {
+  for (const change of [f => f.disconnect(), f => f.owners.set(2n, receiver)]) {
+    const f = fixture(); const original = f.ops.approveAll
+    f.ops.approveAll = async () => { await original(); change(f) }
+    await assert.rejects(prepareNftReinvestment(owner, operator, [1n, 2n], 1, f.ops, true))
+    assert.deepEqual(f.writes, ['all'])
+  }
+})
