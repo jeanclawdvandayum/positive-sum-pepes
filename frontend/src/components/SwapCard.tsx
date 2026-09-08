@@ -44,7 +44,7 @@ export default function SwapCard() {
   const buyTarget = atomicPurchase ? referral.registry! : ADDRESSES.zapIn
   const referralLoading = referral.registry === undefined || referral.version === undefined
   const referralBlocked = referralLoading || (hint > 0n && referral.attributed !== true && !atomicPurchase)
-  const { writeContractAsync } = useConfirmedWrite({ referralPurchase: { roundId: round.id, registry: referral.registry } })
+  const { writeWithApprovals } = useConfirmedWrite({ referralPurchase: { roundId: round.id, registry: referral.registry } })
   const burstRef = useRef<BurstHandle>(null)
 
   /// Flat mode = one-way exit (scoopy 2026-08-29, fix #3): buying is
@@ -178,11 +178,12 @@ export default function SwapCard() {
     if (predepositPhase && !pdAllowed) { setError('Check the exact remaining cap and this round’s deposit rules.'); return }
     if (side === 'buy' && !predepositPhase && mixIn < MIN_BUY_INPUT) { setError('Minimum purchase is 0.005 mixETH.'); return }
     setStep('waiting') // lock the action before the fresh allowance RPC
+    const approvals: Parameters<typeof writeWithApprovals>[1] = []
     try {
       if (predepositPhase) {
         if (!hasAllowance) {
           setStep('approve')
-          await writeContractAsync({
+          approvals.push({
             address: round.mix!,
             abi: erc20Abi,
             functionName: 'approve',
@@ -190,12 +191,12 @@ export default function SwapCard() {
           })
         }
         setStep('waiting')
-        await writeContractAsync({
+        await writeWithApprovals({
           address: round.controller!,
           abi: controllerAbi,
           functionName: 'predeposit',
           args: [mixIn],
-        })
+        }, approvals)
         setStep('done')
         return
       }
@@ -207,7 +208,7 @@ export default function SwapCard() {
         const currentAllowance = await rpcCall(round.mix!, erc20Abi, 'allowance', [address, buyTarget]) as bigint
         if (currentAllowance < mixIn) {
           setStep('approve')
-          await writeContractAsync({
+          approvals.push({
             address: round.mix!,
             abi: erc20Abi,
             functionName: 'approve',
@@ -218,15 +219,15 @@ export default function SwapCard() {
         const output = await freshMinOut()
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 600)
         if (atomicPurchase) {
-          await writeContractAsync({
+          await writeWithApprovals({
             address: buyTarget, abi: registryAbi, functionName: 'buyWithMix',
             args: [poolKey, mixIn, output, deadline, referrerNftId],
-          })
+          }, approvals)
         } else {
-          await writeContractAsync({
+          await writeWithApprovals({
             address: buyTarget, abi: zapInAbi, functionName: 'buyWithMix',
             args: [poolKey, mixIn, output, deadline],
-          })
+          }, approvals)
         }
         setStep('done')
         // The chain receipt is confirmed. Only animate the actual capped extension.
@@ -243,7 +244,7 @@ export default function SwapCard() {
       // sell
       if (!hasAllowance) {
         setStep('approve')
-        await writeContractAsync({
+        approvals.push({
           address: round.token!,
           abi: erc20Abi,
           functionName: 'approve',
@@ -251,12 +252,12 @@ export default function SwapCard() {
         })
       }
       setStep('swap')
-      await writeContractAsync({
+      await writeWithApprovals({
         address: ADDRESSES.zapOut,
         abi: zapOutAbi,
         functionName: 'sellToMix',
         args: [poolKey, pspIn, await freshMinOut(), BigInt(Math.floor(Date.now() / 1000) + 600)],
-      })
+      }, approvals)
       setStep('done')
     } catch (e) {
       setError(e instanceof Error ? e.message.slice(0, 140) : 'transaction failed')

@@ -54,7 +54,7 @@ export default function Stake() {
   const [pickedId, setPickedId] = useState<bigint | null>(null)
   const [pickerSeed, setPickerSeed] = useState(1)
   const [multiStep, setMultiStep] = useState<'idle' | 'tx' | 'done'>('idle')
-  const { writeContractAsync } = useConfirmedWrite()
+  const { writeContractAsync, writeWithApprovals } = useConfirmedWrite()
   const ethUsd = useEthUsd()
 
   const ZERO = '0x0000000000000000000000000000000000000000' as const
@@ -186,6 +186,7 @@ export default function Stake() {
     if (busy) return
     setStep('tx')
     setError(null)
+    const approvals: Parameters<typeof writeWithApprovals>[1] = []
     try {
       if (fn === 'lockWithPepe' && dnaVersion === 1n && round.staker && pickedId !== null) {
         const available = await rpcCall(round.staker, stakerAbi, 'isPepeAvailable', [pickedId])
@@ -196,7 +197,7 @@ export default function Stake() {
       }
       if (needsApproval && round.token && round.staker && amountWad > 0n) {
         setStep('approve')
-        await writeContractAsync({
+        approvals.push({
           address: round.token,
           abi: erc20Abi,
           functionName: 'approve',
@@ -204,12 +205,12 @@ export default function Stake() {
         })
       }
       setStep('tx')
-      await writeContractAsync({
+      await writeWithApprovals({
         address: round.staker!,
         abi: stakerAbi,
         functionName: fn,
         ...(fn === 'lock' ? { args: [amountWad] } : { args: [amountWad, pickedId!] }),
-      })
+      }, approvals)
       setStep('done')
       setAmount('')
       setPickedId(null)
@@ -271,17 +272,17 @@ export default function Stake() {
       const key = buildPoolKey(round.mix!, round.token!, round.hook!)
       let fees = (await Promise.all(stakeableIds.map(id => rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as Promise<bigint>))).reduce((sum, fee) => sum + fee, 0n)
       if (fees < MIN_BUY_INPUT) throw new Error('Eligible positions need a combined 0.005 mixETH in fees. Withdrawing positions can be claimed separately.')
-      await nftReinvestment.prepare(stakeableIds, true)
+      const approvals = await nftReinvestment.prepare(stakeableIds, true)
       fees = (await Promise.all(stakeableIds.map(id => rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as Promise<bigint>))).reduce((sum, fee) => sum + fee, 0n)
       if (fees < MIN_BUY_INPUT) throw new Error('Eligible fees changed during approval. At least 0.005 mixETH combined is needed.')
       const quote = await rpcCall(round.hook!, hookAbi, 'getBuyOutput', [fees]) as bigint
       nftReinvestment.assertSession()
-      await writeContractAsync({
+      await writeWithApprovals({
         address: ADDRESSES.reinvestor,
         abi: reinvestorAbi,
         functionName: 'reinvestAll',
         args: [stakeableIds, key, minimumOutput(quote, 100), BigInt(Math.floor(Date.now() / 1000) + 600)],
-      })
+      }, approvals)
       setMultiStep('done')
       refresh()
       setTimeout(() => setMultiStep('idle'), 2500)
@@ -401,7 +402,7 @@ export default function Stake() {
           <span className="text-xs">{fmtAmount(reinvestPending, 4)} mixETH combined · {stakeableIds.length} positions</span>
           {reinvestPending < MIN_BUY_INPUT && <span className="text-[10px] font-normal">0.005 mixETH combined minimum · withdrawing positions are claim-only</span>}
           {!reinvestApproved && <span className="mt-1 block text-[10px] font-normal">
-            one collection approval, then one batch reinvest · permits transfers and fee claims for all Pepes in this round
+            collection approval + batch reinvest · combined when your wallet supports it · permits transfers and fee claims for all Pepes in this round
           </span>}
         </button>
       )}

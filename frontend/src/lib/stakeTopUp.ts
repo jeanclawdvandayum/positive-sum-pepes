@@ -28,6 +28,7 @@ export async function topUpPosition(
     approve: (spender: Address, amount: bigint) => Promise<unknown>
     stake: (owner: Address, id: bigint, amount: bigint) => Promise<unknown>
     onStep: (step: TopUpStep) => void
+    atomicStake?: () => Promise<boolean>
   },
 ) {
   const { owner, staker, id, amount } = target
@@ -45,6 +46,7 @@ export async function topUpPosition(
   operations.onStep('checking')
   let state = await validate()
   if (state.allowance < amount) {
+    if (operations.atomicStake && await operations.atomicStake()) return
     operations.onStep('approve')
     await operations.approve(staker, amount)
     // Ownership, withdrawal status, wallet and balance can change during approval.

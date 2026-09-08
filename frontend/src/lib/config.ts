@@ -1,7 +1,8 @@
 import { cookieStorage, createStorage } from 'wagmi'
 import { base, baseSepolia, mainnet, sepolia } from 'wagmi/chains'
 import { defineChain, type Transport } from 'viem'
-import { getDefaultConfig } from '@rainbow-me/rainbowkit'
+import { getDefaultConfig, getDefaultWallets } from '@rainbow-me/rainbowkit'
+import { walletchanWallet } from './walletchan'
 import { injectedWallet } from '@rainbow-me/rainbowkit/wallets'
 import { rpcTransport } from './rpcTransport'
 
@@ -65,7 +66,8 @@ export const wagmiConfig = getDefaultConfig({
   projectId: env.VITE_WC_PROJECT_ID || '',
   // Browser extensions use EIP-6963/injection without a relay project.
   // Offer remote wallets only when their real project is configured.
-  wallets: env.VITE_WC_PROJECT_ID ? undefined : [{ groupName: 'Browser wallets', wallets: [injectedWallet] }],
+  wallets: [{ groupName: 'Browser wallets', wallets: [walletchanWallet, injectedWallet] },
+    ...(env.VITE_WC_PROJECT_ID ? getDefaultWallets().wallets : [])],
   chains: separateNameChain ? [targetChain, mainnet] : [targetChain],
   batch: { multicall: { batchSize: 4096, wait: 20 } },
   storage: createStorage({ storage: cookieStorage }),

@@ -10,7 +10,7 @@ import { useConfirmedWrite } from './useConfirmedWrite'
 
 export function useNftReinvestment(staker: `0x${string}` | undefined, version: NftVersion) {
   const { address } = useAccount()
-  const { writeContractAsync } = useConfirmedWrite()
+  const { writeContractAsync, atomicWallet } = useConfirmedWrite()
   const session = `${address}:${staker}`
   const latest = useRef(session)
   latest.current = session
@@ -25,14 +25,21 @@ export function useNftReinvestment(staker: `0x${string}` | undefined, version: N
   const prepare = async (ids: readonly bigint[], collectionApproval = false) => {
     if (!address || !staker) throw new Error('Connect your wallet and wait for the position to load.')
     await ensureWalletChain(address, CHAIN_ID)
+    const deferred = Boolean(await atomicWallet())
+    const approvals: Parameters<typeof writeContractAsync>[0][] = []
+    const approve = async (call: Parameters<typeof writeContractAsync>[0]) => {
+      if (deferred) approvals.push(call)
+      else await writeContractAsync(call)
+    }
     await prepareNftReinvestment(address, ADDRESSES.reinvestor, ids, version, {
       assertSession,
       ownerOf: id => rpcCall(staker, stakerAbi, 'ownerOf', [id]) as Promise<`0x${string}`>,
       isApprovedForAll: () => rpcCall(staker, stakerAbi, 'isApprovedForAll', [address, ADDRESSES.reinvestor]) as Promise<boolean>,
       getApproved: id => rpcCall(staker, stakerAbi, 'getApproved', [id]) as Promise<`0x${string}`>,
-      approve: id => writeContractAsync({ address: staker, abi: stakerAbi, functionName: 'approve', args: [ADDRESSES.reinvestor, id] }),
-      approveAll: () => writeContractAsync({ address: staker, abi: stakerAbi, functionName: 'setApprovalForAll', args: [ADDRESSES.reinvestor, true] }),
-    }, collectionApproval)
+      approve: id => approve({ address: staker, abi: stakerAbi, functionName: 'approve', args: [ADDRESSES.reinvestor, id] }),
+      approveAll: () => approve({ address: staker, abi: stakerAbi, functionName: 'setApprovalForAll', args: [ADDRESSES.reinvestor, true] }),
+    }, collectionApproval, deferred)
+    return approvals
   }
   return { prepare, assertSession }
 }

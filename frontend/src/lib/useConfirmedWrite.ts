@@ -1,7 +1,11 @@
+import { encodeFunctionData } from 'viem'
+import { getWalletClient } from 'wagmi/actions'
+import { getCapabilities, sendCalls, waitForCallsStatus } from 'viem/actions'
+import { supportsAtomicBatch, confirmAtomicTransaction } from './walletBatch'
 import { startTransactionToast, transactionLabel } from './transactionToasts'
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi'
 import { ensureWalletChain } from './ensureWalletChain'
-import { CHAIN_ID, ADDRESSES } from './config'
+import { CHAIN_ID, ADDRESSES, wagmiConfig } from './config'
 import { factoryAbi, hookAbi, controllerAbi, reinvestorAbi, registryAbi, stakerAbi } from './abi'
 import { assertNftManagement } from './nftPermissions'
 import { assertGameRules } from './gameRules'
@@ -16,9 +20,10 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
   const { address } = useAccount()
   const client = usePublicClient({ chainId: CHAIN_ID })
   const { writeContractAsync } = useWriteContract()
-  const confirmed = async (parameters: Parameters<typeof writeContractAsync>[0]) => {
+  type Write = Parameters<typeof writeContractAsync>[0]
+  const confirmed = async (parameters: Write, validateOnly = false) => {
     if (!client || !address) throw new Error('Connect a wallet first.')
-    const toast = startTransactionToast(transactionLabel(parameters.functionName), CHAIN_ID, address)
+    const toast = validateOnly ? undefined : startTransactionToast(transactionLabel(parameters.functionName), CHAIN_ID, address)
     try {
       await ensureWalletChain(address, CHAIN_ID)
       // Immutable legacy deployments do not acquire the new purchase rules.
@@ -78,6 +83,7 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
       } catch (error) {
         throw userFacingRpcError(error)
       }
+      if (validateOnly) return undefined
       return await confirmTransaction({
         simulate: p => client.simulateContract({ ...p, account: address } as never)
           .catch(error => { throw userFacingRpcError(error) }),
@@ -93,8 +99,47 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
           })
           return { ...receipt, replacementReason }
         },
-      }, { ...parameters, account: address, chainId: CHAIN_ID } as typeof parameters, toast.update)
+      }, { ...parameters, account: address, chainId: CHAIN_ID } as typeof parameters, toast?.update)
+    } catch (error) { toast?.fail(error); throw error }
+  }
+  // Capabilities belong to the selected account AND chain. Never cache by brand.
+  const atomicWallet = async () => {
+    if (!address) throw new Error('Connect a wallet first.')
+    await ensureWalletChain(address, CHAIN_ID)
+    const wallet = await getWalletClient(wagmiConfig, { chainId: CHAIN_ID })
+    if (wallet.account.address.toLowerCase() !== address.toLowerCase()) throw new Error('Wallet account changed.')
+    const capabilities = await getCapabilities(wallet, { account: address, chainId: CHAIN_ID }).catch(() => undefined)
+    return supportsAtomicBatch(capabilities) ? wallet : undefined
+  }
+  const writeWithApprovals = async (action: Write, approvals: Write[] = []) => {
+    if (!approvals.length) return confirmed(action)
+    const wallet = await atomicWallet()
+    if (!wallet) {
+      for (const approval of approvals) await confirmed(approval)
+      return confirmed(action)
+    }
+    const toast = startTransactionToast(`approve & ${transactionLabel(action.functionName)}`, CHAIN_ID, address!)
+    try {
+      const calls = [...approvals, action]
+      // Apply the same round, target, referral and reinvestor guards to EVERY call.
+      for (const call of calls) await confirmed(call, true)
+      return await confirmAtomicTransaction({
+        send: async () => {
+          await ensureWalletChain(address!, CHAIN_ID)
+          // The wallet simulates dependent calls together. An isolated action
+          // eth_call would fail before its approval exists.
+          return sendCalls(wallet, {
+            account: address!, chain: wallet.chain, forceAtomic: true,
+            calls: calls.map(call => ({ to: call.address, value: call.value,
+              data: encodeFunctionData(call as never) })),
+          })
+        },
+        wait: id => waitForCallsStatus(wallet, { id, timeout: 180_000, retryCount: 0 }),
+        confirm: hash => client!.waitForTransactionReceipt({ hash, timeout: 180_000 }),
+        notify: toast.update,
+      })
     } catch (error) { toast.fail(error); throw error }
   }
-  return { writeContractAsync: confirmed as typeof writeContractAsync }
+
+  return { writeContractAsync: confirmed as typeof writeContractAsync, writeWithApprovals, atomicWallet }
 }

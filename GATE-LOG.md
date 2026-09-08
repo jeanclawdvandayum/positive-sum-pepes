@@ -1337,3 +1337,19 @@ Both BaseSepoliaRelease fork lifecycle tests passed; Sourcify matched 17/17
 creation/runtime pairs. Ethereum eligibility gate rotated to the fresh factory,
 verified 1/1, registrar re-enabled, and local verifier restarted. UI build passed
 with new addresses, retaining the existing registrar and namespace.
+
+## 2026-09-08 — wallet atomic approval batches
+
+- Frontend detects EIP-5792 atomic capability per account and target chain
+  (`supported` or `ready`), including EIP-7702 upgrade-capable wallets.
+- Swaps, predeposits, staking, position top-ups, and reinvestment combine
+  required approvals and execution with `forceAtomic: true`. Unsupported
+  wallets retain confirmed sequential writes. Submitted batches are never
+  replayed as a fallback. Existing round/target checks apply to every call.
+- Success requires one successful atomic receipt plus independent target-chain
+  receipt confirmation. Toasts retain actual transaction explorer links.
+- WalletChan connection entry uses its official `com.walletchan` EIP-6963
+  announcement and icon from https://github.com/apoorvlathey/walletchan.
+- `npm --prefix frontend test`: 160 passing; production build passed.
+  Local browser smoke: WalletChan entry and icon visible. Real-wallet signing
+  was not performed. Contracts and deployment addresses unchanged.

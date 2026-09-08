@@ -70,7 +70,7 @@ export function PepeCard({
   onDone: () => void
 }) {
   const { address, isConnected } = useAccount()
-  const { writeContractAsync } = useConfirmedWrite()
+  const { writeContractAsync, writeWithApprovals, atomicWallet } = useConfirmedWrite()
   const ethUsd = useEthUsd()
   const [step, setStep] = useState<CardStep>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -156,6 +156,12 @@ export function PepeCard({
           return { owner: nftOwner as `0x${string}`, withdrawing: withdrawing as boolean, balance: balance as bigint,
             allowance: allowance as bigint, mode: Number(mode), flatTime: flatTime as bigint }
         },
+        atomicStake: async () => {
+          if (!await atomicWallet()) return false
+          await writeWithApprovals({ address: staker, abi: stakerAbi, functionName: 'stakeFor', args: [owner, id, addition] },
+            [{ address: token, abi: erc20Abi, functionName: 'approve', args: [staker, addition] }])
+          return true
+        },
         approve: (spender, value) => writeContractAsync({ address: token, abi: erc20Abi, functionName: 'approve', args: [spender, value] }),
         stake: (user, pepeId, value) => writeContractAsync({ address: staker, abi: stakerAbi, functionName: 'stakeFor', args: [user, pepeId, value] }),
         onStep: next => { if (mounted.current) setTopUpStep(next) },
@@ -193,19 +199,19 @@ export function PepeCard({
     setError(null)
     try {
       setStep('tx')
-      await nftReinvestment.prepare([id])
+      const approvals = await nftReinvestment.prepare([id])
       setNftRefresh(key => key + 1)
       const key = buildPoolKey(round.mix!, round.token!, round.hook!)
       const fees = await rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as bigint
       if (fees < MIN_BUY_INPUT) throw new Error('Reinvest requires at least 0.005 mixETH in accrued fees.')
       const quote = await rpcCall(round.hook!, hookAbi, 'getBuyOutput', [fees]) as bigint
       nftReinvestment.assertSession()
-      await writeContractAsync({
+      await writeWithApprovals({
         address: ADDRESSES.reinvestor,
         abi: reinvestorAbi,
         functionName: 'reinvest',
         args: [id, key, minimumOutput(quote, 100), BigInt(Math.floor(Date.now() / 1000) + 600)],
-      })
+      }, approvals)
       setStep('done')
       onDone()
       setTimeout(() => setStep('idle'), 2500)

@@ -27,6 +27,7 @@ export async function prepareNftReinvestment(
     approveAll: () => Promise<unknown>
   },
   collectionApproval = false,
+  deferredApprovals = false,
 ) {
   if (version === undefined) throw new Error('Waiting for NFT approval support to load.')
   if (ids.length === 0 || ids.length > 64 || new Set(ids).size !== ids.length) throw new Error('Choose 1–64 different Pepes.')
@@ -54,6 +55,7 @@ export async function prepareNftReinvestment(
     }
   }
   // Recheck earlier approvals too: a wallet can revoke while another prompt is open.
+  if (deferredApprovals) { await assertOwners(); return }
   const stillAll = await operations.isApprovedForAll()
   if (!stillAll) {
     if (version === 0) throw new Error('Collection approval was revoked. Try again.')

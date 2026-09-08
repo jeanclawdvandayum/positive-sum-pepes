@@ -121,7 +121,7 @@ export default function Predeposit() {
   const [step, setStep] = useState<Step>('idle')
   const [launchStep, setLaunchStep] = useState<'idle' | 'tx' | 'done'>('idle')
   const [error, setError] = useState<string | null>(null)
-  const { writeContractAsync } = useConfirmedWrite()
+  const { writeContractAsync, writeWithApprovals } = useConfirmedWrite()
 
   const amountWad = parseAmountToWad(amount)
   const hasAllowance = allowance !== undefined && amountWad > 0n && allowance >= amountWad
@@ -166,11 +166,12 @@ export default function Predeposit() {
   async function runDeposit() {
     if (!round.controller || !canSubmit) return
     setError(null)
+    const approvals: Parameters<typeof writeWithApprovals>[1] = []
     try {
       if (!round.mix) return
       if (!hasAllowance) {
         setStep('approve')
-        await writeContractAsync({
+        approvals.push({
           address: round.mix,
           abi: erc20Abi,
           functionName: 'approve',
@@ -178,12 +179,12 @@ export default function Predeposit() {
         })
       }
       setStep('tx')
-      await writeContractAsync({
+      await writeWithApprovals({
         address: round.controller,
         abi: controllerAbi,
         functionName: 'predeposit',
         args: [amountWad],
-      })
+      }, approvals)
       setStep('done')
       setNonce((n) => n + 1)
     } catch (e) {
