@@ -1327,3 +1327,13 @@ Delayed genesis and successor regressions cover 24-hour staged-birth pauses.
 `bash scripts/check-audit.sh` passed: 514 Solidity tests / 68 suites, production
 size limits, governance gate, independent sine oracle, ABI checks, frontend and
 name-verifier tests, and TypeScript/Vite build. Deployment follows separately.
+
+## 2026-09-08 — fresh Base Sepolia window-fix release
+
+Source `2edcd348`; dry-run passed, 17/17 live deployment receipts succeeded.
+Factory `0xa3958145ab9a87e01a10ca3f3c404f5898f41a2f` verified wiring and timing:
+predepositStartTime equals final RoundDeployed timestamp 1788843992.
+Both BaseSepoliaRelease fork lifecycle tests passed; Sourcify matched 17/17
+creation/runtime pairs. Ethereum eligibility gate rotated to the fresh factory,
+verified 1/1, registrar re-enabled, and local verifier restarted. UI build passed
+with new addresses, retaining the existing registrar and namespace.

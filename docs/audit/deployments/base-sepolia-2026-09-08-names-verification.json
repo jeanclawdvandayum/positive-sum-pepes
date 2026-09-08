@@ -1,0 +1,52 @@
+{
+  "chainId": 1,
+  "contracts": {
+    "gate": {
+      "address": "0xCb349DCed4f6D4f4950A2b51D907e307Be9F9fA4",
+      "identifier": "src/names/PSPRemoteNameGate.sol:PSPRemoteNameGate",
+      "verificationId": "6f5ce38e-3cd5-4cb9-a6aa-842e67f156b0",
+      "matchId": "47270562",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-08T05:10:37Z",
+      "match": "match",
+      "chainId": "1",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "6f5ce38e-3cd5-4cb9-a6aa-842e67f156b0",
+        "jobStartTime": "2026-09-08T05:10:35Z",
+        "jobFinishTime": "2026-09-08T05:10:37Z",
+        "compilationTime": "1277",
+        "externalVerifications": {
+          "etherscan": {
+            "verificationId": "mgsxqacjheviwh62ejpp3tdjmaitvdclgpjg8utefzkkylk1yk",
+            "statusUrl": "https://api.etherscan.io/v2/api?chainid=1&module=contract&action=checkverifystatus&guid=mgsxqacjheviwh62ejpp3tdjmaitvdclgpjg8utefzkkylk1yk",
+            "explorerUrl": "https://etherscan.io//address/0xCb349DCed4f6D4f4950A2b51D907e307Be9F9fA4",
+            "contractApiUrl": "https://api.etherscan.io/v2/api?chainid=1&module=contract&action=getabi&address=0xCb349DCed4f6D4f4950A2b51D907e307Be9F9fA4"
+          },
+          "routescan": {
+            "verificationId": "373c7bbc-9590-525c-ac94-18a50e9e68b7",
+            "statusUrl": "https://api.routescan.io/v2/network/mainnet/evm/1/etherscan/api?module=contract&action=checkverifystatus&chainid=1&guid=373c7bbc-9590-525c-ac94-18a50e9e68b7",
+            "explorerUrl": "https://routescan.io/address/0xCb349DCed4f6D4f4950A2b51D907e307Be9F9fA4?chainid=1",
+            "contractApiUrl": "https://api.routescan.io/v2/network/mainnet/evm/1/etherscan/api?module=contract&action=getabi&chainid=1&address=0xCb349DCed4f6D4f4950A2b51D907e307Be9F9fA4"
+          },
+          "blockscout": {
+            "verificationId": "cb349dced4f6d4f4950a2b51d907e307be9f9fa46a9f98ce",
+            "statusUrl": "https://eth.blockscout.com/api?module=contract&action=checkverifystatus&chainid=1&guid=cb349dced4f6d4f4950a2b51d907e307be9f9fa46a9f98ce",
+            "explorerUrl": "https://eth.blockscout.com//address/0xCb349DCed4f6D4f4950A2b51D907e307Be9F9fA4",
+            "contractApiUrl": "https://eth.blockscout.com/api?module=contract&action=getabi&chainid=1&address=0xCb349DCed4f6D4f4950A2b51D907e307Be9F9fA4"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "1",
+          "address": "0xCb349DCed4f6D4f4950A2b51D907e307Be9F9fA4",
+          "verifiedAt": "2026-09-08T05:10:37Z",
+          "matchId": "47270562"
+        }
+      }
+    }
+  }
+}

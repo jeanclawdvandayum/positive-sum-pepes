@@ -1,5 +1,22 @@
 # Audit preparation — September 2026
 
+## September 8 deployment update
+
+The active local UI uses factory `0xa3958145ab9a87e01a10ca3f3c404f5898f41a2f` on Base Sepolia.
+Predeposit starts at final wiring, verified against the RoundDeployed block.
+The deterministic gate passed 514 Solidity tests / 68 suites, 154 frontend
+tests and 11 name-verifier tests. Both deployed release lifecycle tests passed
+on a local fork; all 17 deployment transactions succeeded and 17/17 sources
+matched on Sourcify. See [manifest](deployments/base-sepolia-2026-09-08.json)
+and [window correction](2026-09-08-predeposit-window.md).
+
+The existing Ethereum registrar retains pepetesters.wei custody and existing
+names. Its new eligibility gate is `0xcb349dced4f6d4f4950a2b51d907e307be9f9fa4`,
+configured for the fresh factory. The local verifier was updated and restarted.
+Pending name commitments from the previous gate must be reserved again.
+Earlier release details below are historical.
+
+
 This is a review packet for the current source tree, not a security certification.
 Final local gates: **513 Solidity tests / 68 suites**, including 64 invariant runs
 and 2,048 calls per real-V4 handler with zero reverts; the previous hardening
