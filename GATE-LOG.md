@@ -1102,6 +1102,49 @@ Solidity source changed after the contract-source hash above.
   collision behavior and compatibility details.
 
 
+## 2026-09-07 — The Rolling Paper
+
+- Added `frontend/public/whitepaper.html`, a self-contained mainnet-design paper
+  with embedded PSP art and fonts, a chapter rail, responsive mathematical
+  figures, and print styling. Uses the site’s Geist Pixel accent. Includes the
+  requested continued-mixETH-yield assumption and subtle rolling-paper humor.
+- The six interactive figures cover the curve, capped clock, normalized ladder,
+  fee allocation, earning-time withdrawal fees, and proportional redemption.
+  Source review corrected the default uncapped wallet configuration and the
+  referral qualification check at binding rather than each payout.
+- `bash scripts/check-audit.sh` passes: **505 Solidity tests / 67 suites**,
+  **122 frontend tests**, **11 verifier tests**, **155 ABI declarations**,
+  **36 production size checks**, independent oracle/governance and TypeScript/
+  Vite. Existing compiler/frontend bundle warnings remain. Final TypeScript/Vite
+  build after editorial amendments also passes; the exported HTML matches source.
+- A temporary Node check validated script initialization and input handlers,
+  embedded assets, anchor targets, curve calibration and monotonicity over 20,005
+  samples, fee bounds, clock minimum/expiry/cap, ladder normalization, earned-fee
+  survival, and complete redemption boundaries. No new permanent test suite or
+  browser-automation QA was added for this document. Local preview refreshed.
+- No game-contract, live configuration, deployment, or wallet changes.
+
+
+## 2026-09-07 — Rolling Paper: anti-memecoin thesis and reincarnation
+
+- Replaced the sidebar sigma mark with a decorative random Pepe on each document
+  load, using the embedded existing PSP renderer and trait data. A static Pepe
+  remains available without JavaScript; no wallet reads or NFT ID assumptions.
+- Made “the anti-memecoin, memecoin” explicit on the cover and in the opening
+  argument and fee discussion. Expanded death/reincarnation around retained
+  community and history, separate round backing, preserved old claims, and
+  voluntary re-entry instead of disposable copycat launches.
+- `bash scripts/check-audit.sh` passes: **505 Solidity tests / 67 suites**,
+  **122 frontend tests**, **11 verifier tests**, **155 ABI declarations**,
+  **36 production size checks**, oracle/governance and TypeScript/Vite.
+  Existing bundle warnings remain. Exported paper matches the standalone source.
+- Temporary document checks pass; two controlled load seeds yield different
+  sidebar Pepes, with exactly one randomization per load. Five DNA samples
+  match the canonical project renderer byte-for-byte. Existing mathematical
+  figure checks also pass. Local preview refreshed; no browser-automation QA
+  or new permanent test suite was added for the editorial changes.
+
+
 ## 2026-09-07 — Fresh Base Sepolia deployment preparation
 
 - Added `scripts/deployment/base-sepolia.mjs`. Its default is a disposable local
