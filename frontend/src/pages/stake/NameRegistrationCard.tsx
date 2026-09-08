@@ -1,3 +1,4 @@
+import { startTransactionToast } from '../../lib/transactionToasts'
 import { ensureWalletChain } from '../../lib/ensureWalletChain'
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -74,6 +75,7 @@ export default function NameRegistrationCard() {
 
   async function registerName() {
     if (!address || !ready || !ns.registrar || status?.busy) return
+    const toast = startTransactionToast(reveal ? 'register name' : 'reserve name', ns.chainId, address)
     setActivity({ key, busy: true })
     try {
       await ensureWalletChain(address, ns.chainId)
@@ -131,7 +133,7 @@ export default function NameRegistrationCard() {
             onReplaced: r => { if (r.reason !== 'repriced') replacementReason = r.reason } })
           return { ...receipt, replacementReason }
         },
-      }, params)
+      }, params, toast.update)
       if (canReveal) {
         try { localStorage.removeItem(key) } catch { /* the confirmed registration remains successful */ }
         setPlanState({ key })
@@ -141,6 +143,7 @@ export default function NameRegistrationCard() {
       } else setActivity({ key })
       await queries.invalidateQueries({ queryKey })
     } catch (error) {
+      toast.fail(error)
       setActivity({ key, error: errorMessage(error) })
       await queries.invalidateQueries({ queryKey })
     }

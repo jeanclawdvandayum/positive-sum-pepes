@@ -28,3 +28,24 @@ test('successful cancellation or replacement is not a successful game action', a
     }, {}), /cancelled or replaced/)
   }
 })
+
+test('toast lifecycle follows confirmation and replacement hash', async () => {
+ const events=[]
+ await confirmTransaction({simulate:async()=>{},submit:async()=>'0x01',wait:async()=>({status:'success',transactionHash:'0x02',replacementReason:'repriced'})},{},(...event)=>events.push(event))
+ assert.deepEqual(events.map(e=>e[0]),['simulating','wallet','pending','success'])
+ assert.equal(events.at(-1)[1],'0x02')
+})
+test('toast distinguishes unknown confirmation from reverted receipt', async () => {
+ for (const timeout of [true,false]) {
+  const events=[]
+  await assert.rejects(confirmTransaction({simulate:async()=>{},submit:async()=>'0x01',wait:async()=>{if(timeout)throw Error('timeout');return {status:'reverted',transactionHash:'0x02'}}},{},(...event)=>events.push(event)))
+  assert.equal(events.at(-1)[0],timeout?'unknown':'failed')
+  assert.equal(events.at(-1)[1],timeout?'0x01':'0x02')
+ }
+})
+test('wallet rejection has no invented explorer hash', async () => {
+ const events=[]
+ await assert.rejects(confirmTransaction({simulate:async()=>{},submit:async()=>{throw Error('rejected')},wait:async()=>assert.fail('no submission')},{},(...event)=>events.push(event)))
+ assert.equal(events.at(-1)[0],'failed')
+ assert.equal(events.at(-1)[1],undefined)
+})

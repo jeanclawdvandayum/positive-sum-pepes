@@ -1,3 +1,4 @@
+import TransactionToasts from './components/TransactionToasts'
 import { useEffect } from 'react'
 import { WagmiProvider } from 'wagmi'
 import { RainbowKitProvider, lightTheme, darkTheme } from '@rainbow-me/rainbowkit'
@@ -116,6 +117,7 @@ function Shell() {
             <div className="min-h-dvh bg-bg-0">
               <DeadlineWire />
               <Topbar />
+              <TransactionToasts />
               <ScanlineOverlay />
               <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-4 sm:px-6">
                 <Routes>
