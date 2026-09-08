@@ -92,9 +92,9 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
   return (
     <div className="rounded-xl border border-line bg-bg-1">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line p-5">
-        <div className="flex items-baseline gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <h2 className="font-display text-xl text-text-hi">{round.name}</h2>
-          <span className="rounded-full border border-line px-2.5 py-0.5 text-xs text-text-lo">
+          <span className="pd-stamp pd-stamp--round shrink-0">
             round {round.roundId.toString()} — {modeWord}
           </span>
         </div>
