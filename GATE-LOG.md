@@ -1318,3 +1318,12 @@ Solidity source changed after the contract-source hash above.
 - Deployed Ethereum gate 0xd09deaaa17528748a781024213249d5c89bb6b11 and registrar 0xde0f25e61767bc115bf67915469a1e16fd0087aa. Deployer is admin of both. Four confirmed transactions, total 0.000127937699004926 ETH. Parent safely transferred, recovery simulated successfully, then registration enabled.
 - Verified immutable configuration and runtime, plus Sourcify v2 creation/runtime matches for both contracts. Local permit service running with dedicated key and current Base Sepolia factory; UI env updated and production-built. Browser confirms enabled alias form; permit endpoint rejects absent commitment. No name minted on behalf of the user.
 - Updated operation/recovery instructions and saved public receipts. Public HTTPS verifier hosting and a public UI republish remain separate; local setup is active.
+
+## 2026-09-08 — predeposit starts at final staged wiring
+
+Moved predeposit start from constructor time to first hook wiring. Deposits and
+launch reject before wiring, and expiry remains false until initialized.
+Delayed genesis and successor regressions cover 24-hour staged-birth pauses.
+`bash scripts/check-audit.sh` passed: 514 Solidity tests / 68 suites, production
+size limits, governance gate, independent sine oracle, ABI checks, frontend and
+name-verifier tests, and TypeScript/Vite build. Deployment follows separately.

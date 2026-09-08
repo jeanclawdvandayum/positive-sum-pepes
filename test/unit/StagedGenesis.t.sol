@@ -69,6 +69,28 @@ contract StagedGenesisTest is Test {
         return address(uint160(uint256(keccak256("descriptor-2"))));
     }
 
+    function test_DelayedBirthStartsFullPredepositWindowAtWiring() public {
+        factory.reserveGenesis(_params());
+        factory.birthStep();
+        skip(12 hours);
+        factory.birthStep();
+        skip(12 hours);
+        uint256 wiredAt = block.timestamp;
+        factory.birthStep();
+        RoundController c = factory.getRound(1).controller;
+        assertEq(c.predepositStartTime(), wiredAt);
+        (,,,,, bool windowOver, bool launchable) = c.predepositState();
+        assertFalse(windowOver);
+        assertFalse(launchable);
+        skip(c.PREDEPOSIT_DURATION() - 1);
+        (,,,,, windowOver,) = c.predepositState();
+        assertFalse(windowOver);
+        skip(1);
+        (,,,,, windowOver, launchable) = c.predepositState();
+        assertTrue(windowOver);
+        assertTrue(launchable);
+    }
+
     /// Happy path: reserve (owner) → 3 birthSteps (a stranger pays the gas —
     /// the factory must not care who finishes the birth).
     function test_StagedGenesis_FullFlow() public {
@@ -209,8 +231,11 @@ contract StagedGenesisTest is Test {
 
         vm.prank(alice);
         factory.birthStep();
+        skip(12 hours);
         vm.prank(alice);
         factory.birthStep();
+        skip(12 hours);
+        uint256 wiredAt = block.timestamp;
         vm.expectEmit(true, true, true, true, address(factory));
         emit PSPFactory.ETHCarried(1, 2, 40e18);
         vm.prank(alice);
@@ -218,6 +243,9 @@ contract StagedGenesisTest is Test {
 
         assertEq(factory.currentRoundId(), 2, "round 2 born");
         PSPFactory.Round memory r2 = factory.getRound(2);
+        assertEq(r2.controller.predepositStartTime(), wiredAt, "full window after delayed rebirth");
+        (,,,,, bool expired,) = r2.controller.predepositState();
+        assertFalse(expired);
         assertEq(r2.name, "Positive Sum Pepes 2", "round 2 name");
         assertEq(r2.symbol, "PSP2", "round 2 symbol");
         assertTrue(r2.controller != r1.controller, "fresh controller");

@@ -180,3 +180,10 @@ The fresh-feature canary requires untouched round-one predeposits. Its state
 changes happen in Forge's local fork. If factory setup failed before
 the descriptor or sine configuration landed, inspect that earlier step first.
 The completion scripts require that configuration and preserve reserved births.
+
+## September 8 window correction
+
+Fresh source starts the predeposit window in the final wiring transaction,
+rather than controller creation. Inspect `predepositStartTime` against the
+confirmed `RoundDeployed` block timestamp after deployment. See
+[the regression note](2026-09-08-predeposit-window.md).

@@ -90,7 +90,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     uint256 public totalInitialPSP; // snapshot of PSP minted at launch
     bool public predepositClosed;
 
-    /// @dev Predeposit window: opens at deployment, closes at cap or expiry.
+    /// @dev Predeposit window opens at final factory wiring, not controller creation.
     ///      Anyone may launch once the cap is reached or the week elapses;
     ///      the owner (factory) may also launch early. Carry seeding from a
     ///      previous round's destruction is exempt from the cap — it IS the
@@ -121,7 +121,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     ///      predepositFor, guarding the BENEFICIARY); the factory carry
     ///      (seedCarry) is exempt — it IS the bootstrap.
     uint256 public immutable PREDEPOSIT_CAP_PER_WALLET; // 0 = off
-    uint256 public immutable predepositStartTime;
+    uint256 public predepositStartTime;
 
     // ─────────────── Locking (vlCVX-style) ───────────────
     // (2026-08-19) the lock ledger, accumulator, and fee claims moved to
@@ -206,7 +206,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         CurveMath.validate(_config);
         curveConfig = _config;
         factory = _factory;
-        predepositStartTime = block.timestamp;
+        // The final factory wiring step starts the public window.
         // Birth the staker: ERC-721 position ledger + fee accumulator. Born
         // here (not factory) so `staker` is immutable and the hook can cache
         // it as stakerClaimant at its own construction. Deployed through the
@@ -232,6 +232,9 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
 
     // ─────────────── Hook Setup ───────────────
     function setHook(CurveHook _hook) external onlyOwner {
+        if (address(_hook) == address(0)) revert ZeroAddress();
+        // Start once, in the final birth transaction. Retries cannot reset it.
+        if (address(hook) == address(0)) predepositStartTime = block.timestamp;
         hook = _hook;
     }
 
@@ -308,6 +311,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     }
 
     function _predepositFor(address beneficiary, uint256 mixETHAmount) internal {
+        if (address(hook) == address(0)) revert NotPredeposit();
         if (predepositClosed) revert PredepositClosed();
         if (mixETHAmount == 0) revert ZeroAmount();
         // Public deposits are capped: hitting the cap exactly ends the window
@@ -395,7 +399,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     }
 
     function _windowOver() internal view returns (bool) {
-        return block.timestamp >= predepositStartTime + PREDEPOSIT_DURATION;
+        return address(hook) != address(0) && block.timestamp >= predepositStartTime + PREDEPOSIT_DURATION;
     }
 
     /// @notice Everything a front-end needs about the predeposit phase.
@@ -431,6 +435,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     ///      early — the window is a floor for public participation, not a
     ///      constraint on the protocol itself.
     function launchPooledBuy() external nonReentrant {
+        if (address(hook) == address(0)) revert NotPredeposit();
         if (predepositClosed) revert PredepositClosed();
         if (msg.sender != owner() && !_capReached() && !_windowOver()) revert PredepositOpen();
         predepositClosed = true;
