@@ -324,11 +324,6 @@ export default function SwapCard() {
         <h2 className="font-display text-lg text-text-hi">
           {predepositPhase ? 'predeposit' : 'swap'}
         </h2>
-        {round.mode === 2 && (
-          <span className="pd-stamp shrink-0">
-            flat — pro-rata, fee-free
-          </span>
-        )}
         <div className="flex rounded-full bg-bg-2 p-1">
           <button
             type="button"

@@ -29,12 +29,6 @@ interface PdState {
   launchable: boolean
 }
 
-const MODE_BADGES: Record<number, { label: string; cls: string }> = {
-  0: { label: 'predeposit', cls: 'bg-sky-100 text-sky-700' },
-  1: { label: 'active', cls: 'bg-emerald-100 text-emerald-700' },
-  2: { label: 'flat', cls: 'bg-slate-100 text-slate-500' },
-  3: { label: 'destroyed', cls: 'bg-amber-100 text-amber-700' },
-}
 
 export default function Predeposit() {
   const round = useRound()
@@ -160,7 +154,6 @@ export default function Predeposit() {
   const endTime = pd && duration !== undefined ? pd.startTime + duration : undefined
   const remaining = endTime !== undefined ? Math.max(0, Number(endTime - BigInt(nowSec))) : undefined
   const mode = round.mode
-  const badge = mode !== undefined ? MODE_BADGES[mode] : undefined
   const launched = pd?.closed === true && (mode ?? 0) >= 1
   const canSubmit =
     isConnected && !!round.controller && predepositAmountAllowed(amountWad, minimum, maxDeposit) && balanceOk && !walletCapExceeded && !busy && !pd?.closed
@@ -262,10 +255,6 @@ export default function Predeposit() {
       <div className="card p-5">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-2xl font-black text-slate-900">predeposit</h2>
-          {round.id > 0n && <span className="pd-stamp pd-stamp--round">round #{round.id.toString()}</span>}
-          {badge && mode !== 0 && <span className="pd-stamp">{badge.label}</span>}
-          {pd?.capReached && <span className="pd-stamp pd-stamp--full">cap reached</span>}
-          {pd?.windowOver && <span className="pd-stamp pd-stamp--ended">window over</span>}
         </div>
         <p className="mt-1 font-body text-sm leading-relaxed text-slate-500">
           get your frog in the door. deposit mixETH before launch to join the pooled first buy. after launch, claim your share as PSP staked in a pepe NFT.

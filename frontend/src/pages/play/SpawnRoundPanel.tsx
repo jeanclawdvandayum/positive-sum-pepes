@@ -64,9 +64,6 @@ export default function SpawnRoundPanel({
       <div className="rounded-xl border border-line bg-bg-1 p-5">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="font-display text-xl text-text-hi">another round of frog business · {(destroyedRoundId + 1n).toString()}</h2>
-          <span className="pd-stamp shrink-0">
-            permissionless
-          </span>
         </div>
         <p className="mt-2 max-w-lg text-sm leading-relaxed text-text-lo">
           the detonation flattened round {destroyedRoundId?.toString()} and opened every lock. the successor

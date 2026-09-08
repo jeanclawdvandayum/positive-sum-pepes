@@ -122,7 +122,6 @@ export default function PostRound({
     }
   }
 
-  const modeWord = dead.mode === 3 ? 'destroyed' : 'flat'
 
   return (
     <section aria-label="redemption portal" className="mt-4">
@@ -130,9 +129,6 @@ export default function PostRound({
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line p-5">
           <div className="flex items-baseline gap-3">
             <h2 className="font-display text-xl text-text-hi">the round went boom. check your pockets.</h2>
-            <span className="rounded-full border border-line px-2.5 py-0.5 text-xs text-text-lo">
-              round {dead.roundId?.toString() ?? '…'} {dead.name ? `· ${dead.name} ` : ''}— {modeWord}
-            </span>
           </div>
           <p className="text-xs text-text-lo">current backing per PSP: <span className="tabular font-data text-text-hi">{fmtPrice(perPsp)}</span> mix / psp</p>
         </div>
