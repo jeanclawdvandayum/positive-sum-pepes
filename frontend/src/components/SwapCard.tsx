@@ -320,12 +320,12 @@ export default function SwapCard() {
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-line bg-bg-1 p-5 font-body">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display text-lg text-text-hi">
           {predepositPhase ? 'predeposit' : 'swap'}
         </h2>
         {round.mode === 2 && (
-          <span className="rounded-full border border-line px-2.5 py-0.5 text-xs text-text-lo">
+          <span className="pd-stamp shrink-0">
             flat — pro-rata, fee-free
           </span>
         )}
