@@ -2,7 +2,7 @@ import { positionFeesEarned } from '../lib/positionFees'
 import { minimumOutput, MIN_BUY_INPUT } from '../lib/gameRules'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { predepositResult } from '../lib/chainResults'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { ADDRESSES, FAUCET_ENABLED, REINVEST_ENABLED } from '../lib/config'
 import { controllerAbi, erc20Abi, faucetAbi, hookAbi, stakerAbi, reinvestorAbi, buildPoolKey } from '../lib/abi'
@@ -340,13 +340,20 @@ export default function Stake() {
     return () => { dead = true; clearInterval(iv) }
   }, [round.controller, round.mode, address])
 
+  const claimSession = `${address}:${round.controller}`
+  const latestClaimSession = useRef(claimSession)
+  latestClaimSession.current = claimSession
+  useEffect(() => { setClaimStep('idle') }, [claimSession])
+
   async function claimGenesis() {
     setError(null)
     if (!round.controller) return
     try {
       setClaimStep('tx')
       if (genesisPepe !== null && canChooseGenesis) {
-        if (!round.staker || await rpcCall(round.staker, stakerAbi, 'isPepeAvailable', [genesisPepe]) !== true) {
+        const available = round.staker && await rpcCall(round.staker, stakerAbi, 'isPepeAvailable', [genesisPepe])
+        if (latestClaimSession.current !== claimSession) return
+        if (available !== true) {
           setGenesisPepe(null)
           throw new Error('That Pepe was just minted. Pick another face. Your predeposit is still yours.')
         }
@@ -355,11 +362,13 @@ export default function Stake() {
       } else {
         await writeContractAsync({ address: round.controller, abi: controllerAbi, functionName: 'claimPredepositPSP' })
       }
+      if (latestClaimSession.current !== claimSession) return
       setMyDep(deposit => deposit ? { ...deposit, claimed: true } : deposit)
       setClaimStep('done')
       refresh()
-      setTimeout(() => setClaimStep('idle'), 2500)
+      setTimeout(() => { if (latestClaimSession.current === claimSession) setClaimStep('idle') }, 2500)
     } catch (e) {
+      if (latestClaimSession.current !== claimSession) return
       setError(e instanceof Error ? e.message.slice(0, 140) : 'claim failed')
       setClaimStep('idle')
     }
@@ -509,12 +518,6 @@ export default function Stake() {
                   max
                 </button>
               </div>
-              {canChooseGenesis && <div className="mt-4">
-                <p className="mb-3 text-xs text-text-lo">pick your first frog. the art is yours when the claim lands.</p>
-                <PepePicker round={round} selected={genesisPepe} onSelect={setGenesisPepe} disabled={claimStep === 'tx'} actionLabel="claim"
-                  seed={genesisSeed} onReroll={() => { setGenesisPepe(null); setGenesisSeed(s => s + 1) }} />
-                {genesisPepe !== null && <button type="button" className="st-btn mt-2 w-full text-xs" disabled={claimStep === 'tx'} onClick={() => setGenesisPepe(null)}>surprise me instead</button>}
-              </div>}
               <button
                 type="button"
                 className="st-btn st-btn-primary mt-3 w-full"

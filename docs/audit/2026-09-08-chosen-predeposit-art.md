@@ -27,3 +27,7 @@ Validation: the final deterministic gate passed 523 Solidity tests in 69 suites,
 160 frontend tests, 11 verifier tests, ABI/size/oracle/governance checks and the
 production build. A 390px browser fixture verified selection and pending-state
 controls. No live deployment was performed in this change.
+
+Follow-up differential review fixed two UI issues and added four contract
+regressions. Final gate: 527 contract tests / 69 suites, 160 frontend tests and
+11 verifier tests passed. See [review](PSP_DIFFERENTIAL_REVIEW_2026-09-08.md).

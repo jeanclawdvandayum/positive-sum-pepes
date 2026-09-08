@@ -1370,3 +1370,17 @@ with new addresses, retaining the existing registrar and namespace.
 - Mobile browser fixture: six candidates, selected-art state, pending controls
   disabled, claim-specific wording, and no overflow at 390px.
 - Fresh deployment required. Existing deployed addresses were not changed.
+
+## 2026-09-08 — chosen-art differential security review
+
+- Independent authorization/collision, accounting, and frontend reviews of
+  `8d10592a` found no new fund-loss or authorization flaw.
+- Fixed two UI correctness issues: duplicate genesis picker in ordinary staking,
+  and stale account/round responses mutating current claim display/selection.
+- Added max-ID/double-claim, pre-launch retry, deferred payout/exact recovery,
+  and full touched-storage rollback regressions through the chosen entry point.
+- Final `bash scripts/check-audit.sh`: **527 Solidity tests / 69 suites**,
+  **160 frontend tests**, **11 verifier tests**, **157 ABI declarations**,
+  **36 production size checks**, oracle/governance and production build passed.
+- Report: `docs/audit/PSP_DIFFERENTIAL_REVIEW_2026-09-08.md`.
+  Contracts unchanged by this review; source feature remains undeployed.
