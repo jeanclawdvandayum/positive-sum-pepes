@@ -767,6 +767,16 @@ contract PSPStaker is ReentrancyGuard {
     ///      into a fresh pseudorandom pepe minted to `user`, paying the
     ///      share's accrued fees alongside (deferred if payout is unavailable).
     function claimGenesisShare(address user, uint256 share) external nonReentrant {
+        _claimGenesisShare(user, share, 0, false);
+    }
+
+    /// @notice Controller-only genesis claim with exact selected ID and art.
+    /// @dev Uses the same permanent trait reservation as every other mint.
+    function claimGenesisShareWithPepe(address user, uint256 share, uint256 pepeId) external nonReentrant {
+        _claimGenesisShare(user, share, pepeId, true);
+    }
+
+    function _claimGenesisShare(address user, uint256 share, uint256 pepeId, bool chosen) private {
         if (msg.sender != address(controller)) revert NotController();
 
         if (user == address(0)) revert ZeroAddress();
@@ -783,9 +793,17 @@ contract PSPStaker is ReentrancyGuard {
         // PD-3: the round's frozen block-hash seed chooses art for this wallet.
         // PD-2: keep the preferred address ID and resolve ID/art collisions
         // independently, preserving existing NFTs and round art uniqueness.
-        uint256 id = uint256(uint160(user));
-        uint256 dna = _availableDna(_genesisDna(user));
-        if (_ownerOf[id] != address(0)) id = nextTokenId;
+        uint256 id;
+        uint256 dna;
+        if (chosen) {
+            if (pepeId == 0 || _ownerOf[pepeId] != address(0)) revert BadPepeId();
+            id = pepeId;
+            dna = _hashDna(id);
+        } else {
+            id = uint256(uint160(user));
+            dna = _availableDna(_genesisDna(user));
+            if (_ownerOf[id] != address(0)) id = nextTokenId;
+        }
         _mint(user, id, dna);
         Position storage pos = positions[id];
         pos.amount = share;

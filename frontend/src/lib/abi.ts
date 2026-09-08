@@ -26,6 +26,8 @@ export const controllerAbi = parseAbi([
   'function staker() view returns (address)',
   'function predepositState() view returns (uint256 total, uint256 cap, uint256 startTime, bool closed, bool capReached, bool windowOver, bool launchable)',
   'function claimPredepositPSP()',
+  'function claimPredepositPSPWithPepe(uint256 pepeId)',
+  'function PREDEPOSIT_ART_VERSION() view returns (uint256)',
   'function predeposit(uint256 mixETHAmount)',
   'function launchPooledBuy()',
   'function PREDEPOSIT_RULES_VERSION() view returns (uint256)',

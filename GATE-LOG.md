@@ -1353,3 +1353,20 @@ with new addresses, retaining the existing registrar and namespace.
 - `npm --prefix frontend test`: 160 passing; production build passed.
   Local browser smoke: WalletChan entry and icon visible. Real-wallet signing
   was not performed. Contracts and deployment addresses unchanged.
+
+## 2026-09-08 — chosen predeposit claim art (source, not deployed)
+
+- Added controller `claimPredepositPSPWithPepe(id)` and controller-only staker
+  `claimGenesisShareWithPepe`. Selected and random claims share accounting.
+  Exact selected art uses the existing permanent trait reservation registry.
+- Tests cover exact preview DNA, duplicate claims, taken IDs, rendered-trait
+  aliases, zero IDs, unauthorized callers, retryability, fee/principal parity,
+  and claims/withdrawals after detonation.
+- `bash scripts/check-audit.sh`: **523 Solidity tests / 69 suites**, **160
+  frontend tests**, **11 name-verifier tests**, **157 ABI declarations**, **36
+  production size checks**, oracle, no-governance and frontend build passed.
+- Runtime bytes: PSPStaker 14,728; RoundController 11,970; StakerDeployer 16,066;
+  ControllerDeployer 22,896. All within EIP-170.
+- Mobile browser fixture: six candidates, selected-art state, pending controls
+  disabled, claim-specific wording, and no overflow at 390px.
+- Fresh deployment required. Existing deployed addresses were not changed.

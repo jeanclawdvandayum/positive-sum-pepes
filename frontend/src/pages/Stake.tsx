@@ -53,6 +53,11 @@ export default function Stake() {
   const [error, setError] = useState<string | null>(null)
   const [pickedId, setPickedId] = useState<bigint | null>(null)
   const [pickerSeed, setPickerSeed] = useState(1)
+  const [genesisPepe, setGenesisPepe] = useState<bigint | null>(null)
+  const [genesisSeed, setGenesisSeed] = useState(1)
+  const genesisArt = useRpcReads([{ to: round.controller, abi: controllerAbi, functionName: 'PREDEPOSIT_ART_VERSION' }], !!round.controller, 15000)
+  const canChooseGenesis = genesisArt[0] === 1n
+  useEffect(() => { setGenesisPepe(null) }, [address, round.controller])
   const [multiStep, setMultiStep] = useState<'idle' | 'tx' | 'done'>('idle')
   const { writeContractAsync, writeWithApprovals } = useConfirmedWrite()
   const ethUsd = useEthUsd()
@@ -340,11 +345,17 @@ export default function Stake() {
     if (!round.controller) return
     try {
       setClaimStep('tx')
-      await writeContractAsync({
-        address: round.controller,
-        abi: controllerAbi,
-        functionName: 'claimPredepositPSP',
-      })
+      if (genesisPepe !== null && canChooseGenesis) {
+        if (!round.staker || await rpcCall(round.staker, stakerAbi, 'isPepeAvailable', [genesisPepe]) !== true) {
+          setGenesisPepe(null)
+          throw new Error('That Pepe was just minted. Pick another face. Your predeposit is still yours.')
+        }
+        await writeContractAsync({ address: round.controller, abi: controllerAbi,
+          functionName: 'claimPredepositPSPWithPepe', args: [genesisPepe] })
+      } else {
+        await writeContractAsync({ address: round.controller, abi: controllerAbi, functionName: 'claimPredepositPSP' })
+      }
+      setMyDep(deposit => deposit ? { ...deposit, claimed: true } : deposit)
       setClaimStep('done')
       refresh()
       setTimeout(() => setClaimStep('idle'), 2500)
@@ -427,13 +438,19 @@ export default function Stake() {
                 your {fmtAmount(myDep!.mixETHAmount)} mixETH predeposit bought a share of the launch PSP.
                 claim it into a fresh pepe NFT. your PSP stays staked, and you keep your share of the fees earned before claiming.
               </p>
+              {canChooseGenesis && <div className="mt-4">
+                <p className="mb-3 text-xs text-text-lo">pick your first frog. the art is yours when the claim lands.</p>
+                <PepePicker round={round} selected={genesisPepe} onSelect={setGenesisPepe} disabled={claimStep === 'tx'} actionLabel="claim"
+                  seed={genesisSeed} onReroll={() => { setGenesisPepe(null); setGenesisSeed(s => s + 1) }} />
+                {genesisPepe !== null && <button type="button" className="st-btn mt-2 w-full text-xs" disabled={claimStep === 'tx'} onClick={() => setGenesisPepe(null)}>surprise me instead</button>}
+              </div>}
               <button
                 type="button"
                 className="st-btn st-btn-primary mt-3 w-full"
                 disabled={claimStep === 'tx' || busy}
                 onClick={claimGenesis}
               >
-                {claimStep === 'done' ? '✓ claimed' : claimStep === 'tx' ? 'confirm in wallet…' : 'claim your genesis PSP'}
+                {claimStep === 'done' ? '✓ claimed' : claimStep === 'tx' ? 'confirm in wallet…' : canChooseGenesis ? (genesisPepe === null ? 'claim with a surprise pepe' : 'claim with this pepe') : 'claim your genesis PSP'}
               </button>
             </section>
           )}
@@ -492,6 +509,12 @@ export default function Stake() {
                   max
                 </button>
               </div>
+              {canChooseGenesis && <div className="mt-4">
+                <p className="mb-3 text-xs text-text-lo">pick your first frog. the art is yours when the claim lands.</p>
+                <PepePicker round={round} selected={genesisPepe} onSelect={setGenesisPepe} disabled={claimStep === 'tx'} actionLabel="claim"
+                  seed={genesisSeed} onReroll={() => { setGenesisPepe(null); setGenesisSeed(s => s + 1) }} />
+                {genesisPepe !== null && <button type="button" className="st-btn mt-2 w-full text-xs" disabled={claimStep === 'tx'} onClick={() => setGenesisPepe(null)}>surprise me instead</button>}
+              </div>}
               <button
                 type="button"
                 className="st-btn st-btn-primary mt-3 w-full"

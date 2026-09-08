@@ -505,6 +505,20 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     ///      position into a fresh NFT. PSP stays in the staker; the normal
     ///      withdrawal-request rules apply, and detonation opens the lock.
     function claimPredepositPSP() external nonReentrant {
+        _claimPredepositPSP(0, false);
+    }
+
+    /// @notice Art selection is supported when claiming the pooled allocation.
+    uint256 public constant PREDEPOSIT_ART_VERSION = 1;
+
+    /// @notice Claim into the exact unminted Pepe selected from the art picker.
+    /// @dev A taken ID or trait combination reverts the entire claim, preserving
+    ///      the depositor's allocation and accrued fees for another selection.
+    function claimPredepositPSPWithPepe(uint256 pepeId) external nonReentrant {
+        _claimPredepositPSP(pepeId, true);
+    }
+
+    function _claimPredepositPSP(uint256 pepeId, bool chosen) private {
         DepositInfo storage dep = predeposits[msg.sender];
         if (dep.claimed) revert PredepositClosed();
         if (dep.mixETHAmount == 0) revert ZeroAmount();
@@ -524,7 +538,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // Move the share (and its accrued fees) from the staker's genesis
         // lock into a fresh NFT. Accrued-fee accounting and
         // deferred-payout handling live in the staker.
-        staker.claimGenesisShare(msg.sender, share);
+        if (chosen) staker.claimGenesisShareWithPepe(msg.sender, share, pepeId);
+        else staker.claimGenesisShare(msg.sender, share);
     }
 
     // ─────────────── Locking (moved to PSPStaker, 2026-08-19) ───────────────

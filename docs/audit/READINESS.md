@@ -1,5 +1,15 @@
 # Audit preparation — September 2026
 
+## September 8 source update — chosen predeposit art (not deployed)
+
+Predepositors may choose their NFT art when claiming via
+`claimPredepositPSPWithPepe`. The original random-art claim remains available.
+Both routes share principal and fee accounting. Exact selected IDs and rendered
+trait combinations must be unused; a failed choice leaves the claim intact.
+The UI offers selection only on controllers with `PREDEPOSIT_ART_VERSION == 1`.
+This requires a fresh deployment. The addresses below still refer to the
+previous deployed code. See [design and checks](2026-09-08-chosen-predeposit-art.md).
+
 ## September 8 deployment update
 
 The active local UI uses factory `0xa3958145ab9a87e01a10ca3f3c404f5898f41a2f` on Base Sepolia.

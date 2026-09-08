@@ -25,13 +25,15 @@ interface Props {
   /** re-roll the candidate set */
   seed: number
   onReroll: () => void
+  disabled?: boolean
+  actionLabel?: string
 }
 
 /// The art randomizer — 6 candidate pepes rendered by the ON-CHAIN descriptor
 /// (eth_call renderSVG(keccak(id))). What you see is exactly what you'll mint:
 /// lockWithPepe(amount, id) commits that id, and its dna is the previewed dna.
 /// Refresh rolls 6 fresh ids. This is the "choose your accomplice" step of staking.
-export default function PepePicker({ round, selected, onSelect, seed, onReroll }: Props) {
+export default function PepePicker({ round, selected, onSelect, seed, onReroll, disabled = false, actionLabel = 'stake' }: Props) {
   const staker = round.staker
   const dnaVersion = usePepeDnaVersion(staker)
   const [descriptor, setDescriptor] = useState<string | undefined>()
@@ -59,8 +61,8 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
     refetchInterval: 6000,
   })
   useEffect(() => {
-    if (selected !== null && available?.[candidates.indexOf(selected)] === false) onSelect(null)
-  }, [selected, available, candidates, onSelect])
+    if (!disabled && selected !== null && available?.[candidates.indexOf(selected)] === false) onSelect(null)
+  }, [selected, available, candidates, onSelect, disabled])
 
   useEffect(() => {
     if (!staker || isZero(staker)) return
@@ -118,6 +120,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
         </div>
         <button
           className="st-btn shrink-0 text-xs"
+          disabled={disabled}
           onClick={() => {
             onSelect(null)
             onReroll()
@@ -138,7 +141,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
               type="button"
               aria-label={`select pepe #${id}`}
               aria-pressed={isSel}
-              disabled={taken}
+              disabled={disabled || taken}
               onClick={() => onSelect(isSel ? null : id)}
               className={`relative aspect-square w-full min-w-0 rounded-xl border p-1 transition disabled:cursor-not-allowed disabled:opacity-40 ${
                 isSel
@@ -166,7 +169,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll }
 
       <p className="mt-2 text-xs text-text-lo">
         {selected
-          ? `pepe #${fmtPepeId(selected)} selected — pick another or stake below`
+          ? `pepe #${fmtPepeId(selected)} selected · pick another or ${actionLabel} below`
           : 'tap a pepe to select it'}
       </p>
     </div>

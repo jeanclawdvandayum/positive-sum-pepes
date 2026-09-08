@@ -39,6 +39,7 @@ export function transactionLabel(name: string) {
     reinvest: 'reinvest fees', reinvestAll: 'reinvest all', claimMany: 'claim all fees',
     requestWithdraw: 'start withdrawal', cancelWithdraw: 'keep staking', withdraw: 'unlock PSP',
     stakeFor: 'add PSP', lockWithPepe: 'stake PSP', detonate: 'detonate round',
+    claimPredepositPSP: 'claim predeposit PSP', claimPredepositPSPWithPepe: 'claim chosen Pepe',
     commit: 'reserve name', register: 'register name',
   } as Record<string, string>)[name] ?? name.replace(/([A-Z])/g, ' $1').toLowerCase()
 }
