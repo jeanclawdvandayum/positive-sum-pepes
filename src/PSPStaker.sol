@@ -188,6 +188,7 @@ contract PSPStaker is ReentrancyGuard {
     // constant storage work, so collisions cannot force a claim to scan mints.
     mapping(uint256 => uint256) private _mintedDna;
     mapping(uint256 => uint256) private _artToken;
+    mapping(uint256 => address) public reservedPepeOwner;
     mapping(uint256 => uint256) private _artRunBoundary;
     uint256 private _nextArtKey = 1;
     uint256 public constant PEPE_DNA_VERSION = 1;
@@ -262,7 +263,18 @@ contract PSPStaker is ReentrancyGuard {
         return PepeDna.fromKey(_nextArtKey);
     }
 
-    function _mint(address to, uint256 id, uint256 dna) internal {
+    /// @notice Reserve a depositor's exact ID and rendered art until their claim.
+    /// @dev Only the controller can reserve, atomically with a funded deposit.
+    function reserveGenesisPepe(address user, uint256 id) external {
+        if (msg.sender != address(controller)) revert NotController();
+        if (user == address(0)) revert ZeroAddress();
+        if (id == 0 || _ownerOf[id] != address(0) || reservedPepeOwner[id] != address(0)) revert BadPepeId();
+        _reserveArt(id, _hashDna(id));
+        _reserveId(id);
+        reservedPepeOwner[id] = user;
+    }
+
+    function _reserveArt(uint256 id, uint256 dna) private {
         uint256 artKey = PepeDna.key(dna);
         if (_artToken[artKey] != 0) revert PepeDnaTaken();
         uint256 artStart = artKey;
@@ -273,15 +285,28 @@ contract PSPStaker is ReentrancyGuard {
         _artRunBoundary[artEnd] = artStart;
         if (artKey == _nextArtKey) _nextArtKey = artEnd + 1;
         _artToken[artKey] = id;
-        _mintedDna[id] = dna;
 
+    }
+
+    function _reserveId(uint256 id) private {
         uint256 start = id;
         uint256 end = id;
-        if (id > 1 && _ownerOf[id - 1] != address(0)) start = _mintedRunBoundary[id - 1];
-        if (id < type(uint256).max && _ownerOf[id + 1] != address(0)) end = _mintedRunBoundary[id + 1];
+        if (id > 1 && (_ownerOf[id - 1] != address(0) || reservedPepeOwner[id - 1] != address(0))) start = _mintedRunBoundary[id - 1];
+        if (id < type(uint256).max && (_ownerOf[id + 1] != address(0) || reservedPepeOwner[id + 1] != address(0))) end = _mintedRunBoundary[id + 1];
         _mintedRunBoundary[start] = end;
         _mintedRunBoundary[end] = start;
         if (id == nextTokenId) nextTokenId = end + 1;
+    }
+
+    function _mint(address to, uint256 id, uint256 dna) internal {
+        if (reservedPepeOwner[id] != address(0)) revert BadPepeId();
+        _reserveArt(id, dna);
+        _reserveId(id);
+        _finishMint(to, id, dna);
+    }
+
+    function _finishMint(address to, uint256 id, uint256 dna) private {
+        _mintedDna[id] = dna;
         _ownerOf[id] = to;
         _ownedIndex[id] = _owned[to].length;
         _owned[to].push(id);
@@ -802,9 +827,14 @@ contract PSPStaker is ReentrancyGuard {
         } else {
             id = uint256(uint160(user));
             dna = _availableDna(_genesisDna(user));
-            if (_ownerOf[id] != address(0)) id = nextTokenId;
+            if (_ownerOf[id] != address(0) || reservedPepeOwner[id] != address(0)) id = nextTokenId;
         }
-        _mint(user, id, dna);
+        if (chosen && reservedPepeOwner[id] == user) {
+            delete reservedPepeOwner[id];
+            _finishMint(user, id, dna);
+        } else {
+            _mint(user, id, dna);
+        }
         Position storage pos = positions[id];
         pos.amount = share;
         _stakedByOwner[user] += share;

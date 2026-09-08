@@ -1,14 +1,13 @@
 # Audit preparation — September 2026
 
-## September 8 source update — chosen predeposit art (not deployed)
+## September 8 source update — reserved predeposit art (not deployed)
 
-Predepositors may choose their NFT art when claiming via
-`claimPredepositPSPWithPepe`. The original random-art claim remains available.
-Both routes share principal and fee accounting. Exact selected IDs and rendered
-trait combinations must be unused; a failed choice leaves the claim intact.
-The UI offers selection only on controllers with `PREDEPOSIT_ART_VERSION == 1`.
-This requires a fresh deployment. The addresses below still refer to the
-previous deployed code. See [design and checks](2026-09-08-chosen-predeposit-art.md).
+Version 2 adds `predepositWithPepe`: select and reserve the exact art in the
+funded deposit transaction. Top-ups keep the choice. Both claim routes honor
+it automatically, including after detonation in the Graveyard. Reservations
+block both duplicate IDs and canonical rendered trait combinations in other
+mints. Version 1 claim-time selection remains a legacy UI path. Existing
+deployed addresses are unchanged. See [design and checks](2026-09-08-reserved-predeposit-art.md).
 
 ## September 8 deployment update
 

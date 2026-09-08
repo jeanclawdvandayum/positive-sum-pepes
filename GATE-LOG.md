@@ -1384,3 +1384,18 @@ with new addresses, retaining the existing registrar and namespace.
   **36 production size checks**, oracle/governance and production build passed.
 - Report: `docs/audit/PSP_DIFFERENTIAL_REVIEW_2026-09-08.md`.
   Contracts unchanged by this review; source feature remains undeployed.
+
+## 2026-09-08 — reserve chosen art during predeposit
+
+- `predepositWithPepe` reserves a funded depositor's ID and canonical art atomically.
+  Top-ups keep the choice; both claim selectors honor it after launch/detonation.
+- Shared occupied-ID/art indexes include reservations. Ordinary and automatic
+  mints cannot consume them. Failed collisions roll back transfers and accounting.
+- Predeposit UI includes the picker and reserved-face preview. Play's predeposit
+  shortcut links to that page. Existing deployed controllers remain unchanged.
+- `bash scripts/check-audit.sh` passed: **531 Solidity tests / 69 suites**,
+  **160 frontend tests**, **11 verifier tests**, **159 ABI declarations**, **36
+  production size checks**, independent oracle, no-governance and TS/Vite build.
+- 390px browser picker fixture passed: six faces, selection, deposit wording,
+  pending-state lock, and no horizontal overflow. No live transactions/deployment.
+- See `docs/audit/2026-09-08-reserved-predeposit-art.md`.

@@ -296,6 +296,20 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
 
     // ─────────────── Predeposit ───────────────
 
+    /// @notice The depositor's fixed art choice, shared by all their deposits.
+    mapping(address => uint256) public predepositPepe;
+
+    /// @notice Deposit and reserve the exact Pepe that the later claim will mint.
+    function predepositWithPepe(uint256 mixETHAmount, uint256 pepeId) external nonReentrant {
+        uint256 selected = predepositPepe[msg.sender];
+        if (selected != 0 && selected != pepeId) revert PredepositClosed();
+        _predepositFor(msg.sender, mixETHAmount);
+        if (selected == 0) {
+            staker.reserveGenesisPepe(msg.sender, pepeId);
+            predepositPepe[msg.sender] = pepeId;
+        }
+    }
+
     function predeposit(uint256 mixETHAmount) external nonReentrant {
         _predepositFor(msg.sender, mixETHAmount);
     }
@@ -500,7 +514,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // For now, depositors call claimPredepositPSP()
     }
 
-    /// @notice Claim predeposit PSP into a staked NFT with the round's pseudorandom art.
+    /// @notice Claim predeposit PSP with reserved art, or automatic art if none was selected.
     /// @dev The share and its accrued fees move out of the virtual genesis
     ///      position into a fresh NFT. PSP stays in the staker; the normal
     ///      withdrawal-request rules apply, and detonation opens the lock.
@@ -508,8 +522,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         _claimPredepositPSP(0, false);
     }
 
-    /// @notice Art selection is supported when claiming the pooled allocation.
-    uint256 public constant PREDEPOSIT_ART_VERSION = 1;
+    /// @notice Version 2 reserves art during deposit and honors it on every claim route.
+    uint256 public constant PREDEPOSIT_ART_VERSION = 2;
 
     /// @notice Claim into the exact unminted Pepe selected from the art picker.
     /// @dev A taken ID or trait combination reverts the entire claim, preserving
@@ -519,6 +533,12 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     }
 
     function _claimPredepositPSP(uint256 pepeId, bool chosen) private {
+        uint256 reserved = predepositPepe[msg.sender];
+        if (reserved != 0) {
+            if (chosen && pepeId != reserved) revert PredepositClosed();
+            pepeId = reserved;
+            chosen = true;
+        }
         DepositInfo storage dep = predeposits[msg.sender];
         if (dep.claimed) revert PredepositClosed();
         if (dep.mixETHAmount == 0) revert ZeroAmount();

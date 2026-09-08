@@ -29,6 +29,8 @@ export const controllerAbi = parseAbi([
   'function claimPredepositPSPWithPepe(uint256 pepeId)',
   'function PREDEPOSIT_ART_VERSION() view returns (uint256)',
   'function predeposit(uint256 mixETHAmount)',
+  'function predepositWithPepe(uint256 mixETHAmount, uint256 pepeId)',
+  'function predepositPepe(address user) view returns (uint256)',
   'function launchPooledBuy()',
   'function PREDEPOSIT_RULES_VERSION() view returns (uint256)',
   'function PREDEPOSIT_DURATION() view returns (uint256)',

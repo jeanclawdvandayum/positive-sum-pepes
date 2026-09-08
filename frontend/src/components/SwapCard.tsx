@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { usePurchaseReferral, useReferral } from './ReferralCard'
 import { purchaseReferral } from '../lib/referrals'
 import { MIN_BUY_INPUT, purchaseUnits, TIME_PER_UNIT, minimumOutput } from '../lib/gameRules'
@@ -21,7 +22,7 @@ import { quoteWithFee, type TradeQuote } from '../lib/tradeQuote'
 
 /// mixETH-only swap card (testnet): the mock mixETH has no ETH backing, so
 /// every ETH leg (zapInBuy / zapOut / zapInPredeposit) is off the table —
-/// buys go buyWithMix, sells go sellToMix, predeposit goes approve+predeposit.
+/// buys go buyWithMix, sells go sellToMix; predeposits use their dedicated picker page.
 type Side = 'buy' | 'sell'
 type Step = 'idle' | 'approve' | 'swap' | 'waiting' | 'done'
 
@@ -173,34 +174,13 @@ export default function SwapCard() {
 
   async function run() {
     setError(null)
-    if (!address || !poolKey || busy) return
+    if (!address || !poolKey || busy || predepositPhase) return
     if (side === 'buy' && !predepositPhase && referralBlocked) { setError('Referral purchases require the updated round contracts.'); return }
     if (predepositPhase && !pdAllowed) { setError('Check the exact remaining cap and this round’s deposit rules.'); return }
     if (side === 'buy' && !predepositPhase && mixIn < MIN_BUY_INPUT) { setError('Minimum purchase is 0.005 mixETH.'); return }
     setStep('waiting') // lock the action before the fresh allowance RPC
     const approvals: Parameters<typeof writeWithApprovals>[1] = []
     try {
-      if (predepositPhase) {
-        if (!hasAllowance) {
-          setStep('approve')
-          approvals.push({
-            address: round.mix!,
-            abi: erc20Abi,
-            functionName: 'approve',
-            args: [round.controller!, mixIn],
-          })
-        }
-        setStep('waiting')
-        await writeWithApprovals({
-          address: round.controller!,
-          abi: controllerAbi,
-          functionName: 'predeposit',
-          args: [mixIn],
-        }, approvals)
-        setStep('done')
-        return
-      }
-
       // active trading
       if (side === 'buy') {
         const referrerNftId = purchaseReferral(hint, referral.attributed)
@@ -318,6 +298,14 @@ export default function SwapCard() {
               : side === 'buy'
                 ? 'buy PSP'
                 : 'sell for mixETH'
+
+  if (predepositPhase) return (
+    <div className="rounded-xl border border-line bg-bg-1 p-5 font-body">
+      <h2 className="font-display text-lg">predeposit</h2>
+      <p className="mt-2 text-sm text-text-lo">pick your pepe and join the pooled first buy.</p>
+      <Link className="mt-4 block rounded-lg bg-pepe p-3 text-center font-bold text-bg-0" to="/predeposit">choose your pepe &amp; deposit</Link>
+    </div>
+  )
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-line bg-bg-1 p-5 font-body">

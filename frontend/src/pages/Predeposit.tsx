@@ -2,7 +2,7 @@ import { capHeadroom, predepositLimit, predepositAmountAllowed, predepositProgre
 import { usePredepositMinimum } from '../lib/usePredepositMinimum'
 import { predepositResult } from '../lib/chainResults'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { controllerAbi, erc20Abi } from '../lib/abi'
@@ -16,6 +16,10 @@ import { FaucetButton } from '../components/Topbar'
 import MixLogo from '../components/MixLogo'
 import Clock from '../components/Clock'
 import ClockBand from '../components/ClockBand'
+import PepePicker from '../components/PepePicker'
+import { useQuery } from '@tanstack/react-query'
+import { renderPepeSvg } from '../lib/pepeRender'
+import { dnaOfId } from '../components/PepePicker'
 
 type Step = 'idle' | 'approve' | 'tx' | 'done'
 
@@ -33,8 +37,27 @@ interface PdState {
 export default function Predeposit() {
   const round = useRound()
   const minimum = usePredepositMinimum(round.controller)
+  const [selectedPepe, setSelectedPepe] = useState<bigint | null>(null)
+  const [pickerSeed, setPickerSeed] = useState(1)
   const { address, isConnected } = useAccount()
   const { mix: mixBal } = useBalances(round.token, round.mix)
+
+  const { data: artVersion, isPending: artLoading } = useQuery({
+    queryKey: ['predeposit-art-version', CHAIN_ID, round.controller],
+    enabled: !!round.controller,
+    queryFn: () => rpcCall(round.controller!, controllerAbi, 'PREDEPOSIT_ART_VERSION') as Promise<bigint>,
+  })
+  const { data: reservedPepe, refetch: refreshPepe } = useQuery({
+    queryKey: ['predeposit-pepe', CHAIN_ID, round.controller, address],
+    enabled: artVersion === 2n && !!address,
+    queryFn: () => rpcCall(round.controller!, controllerAbi, 'predepositPepe', [address!]) as Promise<bigint>,
+    refetchInterval: 6000,
+  })
+  const depositSession = `${address}:${round.controller}`
+  const latestDepositSession = useRef(depositSession)
+  latestDepositSession.current = depositSession
+  useEffect(() => { setSelectedPepe(null); setStep('idle'); setError(null) }, [address, round.controller])
+  const depositPepe = reservedPepe && reservedPepe > 0n ? reservedPepe : selectedPepe
 
   /// predepositState + duration + depositor count + own deposit, polled like
   /// every other read in this app (useReadContracts sits idle on custom chains)
@@ -156,7 +179,7 @@ export default function Predeposit() {
   const mode = round.mode
   const launched = pd?.closed === true && (mode ?? 0) >= 1
   const canSubmit =
-    isConnected && !!round.controller && predepositAmountAllowed(amountWad, minimum, maxDeposit) && balanceOk && !walletCapExceeded && !busy && !pd?.closed
+    isConnected && !artLoading && !!round.controller && predepositAmountAllowed(amountWad, minimum, maxDeposit) && balanceOk && !walletCapExceeded && !busy && !pd?.closed && (artVersion !== 2n || (reservedPepe !== undefined && depositPepe !== null))
 
   async function fail(e: unknown) {
     setError(e instanceof Error ? e.message.slice(0, 140) : 'transaction failed')
@@ -182,12 +205,16 @@ export default function Predeposit() {
       await writeWithApprovals({
         address: round.controller,
         abi: controllerAbi,
-        functionName: 'predeposit',
-        args: [amountWad],
+        functionName: artVersion === 2n ? 'predepositWithPepe' : 'predeposit',
+        args: artVersion === 2n ? [amountWad, depositPepe!] : [amountWad],
       }, approvals)
+      if (latestDepositSession.current !== depositSession) return
+      if (artVersion === 2n) await refreshPepe()
+      if (latestDepositSession.current !== depositSession) return
       setStep('done')
       setNonce((n) => n + 1)
     } catch (e) {
+      if (latestDepositSession.current !== depositSession) return
       fail(e)
     }
   }
@@ -292,6 +319,21 @@ export default function Predeposit() {
               </div>
             </div>
           </div>
+
+          {artVersion === 2n && !pd?.closed && (
+            reservedPepe && reservedPepe > 0n ? (
+              <div className="card p-5 flex flex-wrap items-center gap-4">
+                <img className="w-28 rounded-lg" alt="Your reserved Pepe" src={`data:image/svg+xml,${encodeURIComponent(renderPepeSvg(dnaOfId(reservedPepe)))}`} />
+                <p className="font-body text-sm">your pepe is reserved. every top-up goes into this position.</p>
+              </div>
+            ) : <PepePicker round={round} selected={selectedPepe} onSelect={setSelectedPepe}
+                  seed={pickerSeed} onReroll={() => { setSelectedPepe(null); setPickerSeed(s => s + 1) }}
+                  disabled={busy} actionLabel="deposit" />
+          )}
+
+          {artVersion === 2n && !pd?.closed && !reservedPepe && (
+            <p className="px-1 font-body text-sm text-text-lo">choose your pepe above. your deposit reserves that face for the round.</p>
+          )}
 
           {/* c. deposit */}
           <div className="card p-5">

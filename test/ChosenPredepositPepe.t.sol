@@ -8,6 +8,83 @@ import {RoundController} from "../src/RoundController.sol";
 /// @title ChosenPredepositPepeTest
 /// @notice Selected art must preserve pooled principal, fees and retryable claims.
 contract ChosenPredepositPepeTest is PredepositPrecisionTest {
+    function _reserveDeposit(uint256 id) private {
+        vm.startPrank(bob);
+        mixETH.approve(address(controller), 100e18);
+        controller.predepositWithPepe(10e18, id);
+        vm.stopPrank();
+    }
+
+    function test_DepositReservesExactArtAndOldClaimMintsItAfterDetonation() public {
+        _reserveDeposit(4046);
+        assertEq(controller.predepositPepe(bob), 4046);
+        assertEq(stakerV.reservedPepeOwner(4046), bob);
+        assertFalse(stakerV.isPepeAvailable(4046));
+        assertFalse(stakerV.isPepeAvailable(5249));
+        vm.startPrank(alice);
+        vm.expectRevert(PSPStaker.BadPepeId.selector);
+        stakerV.lockWithPepe(0, 4046);
+        vm.expectRevert(PSPStaker.PepeDnaTaken.selector);
+        stakerV.lockWithPepe(0, 5249);
+        vm.stopPrank();
+        _launch(100e18);
+        skip(73 hours);
+        controller.detonate();
+        vm.prank(bob);
+        controller.claimPredepositPSP();
+        assertEq(stakerV.ownerOf(4046), bob);
+        assertEq(stakerV.dnaOf(4046), uint256(keccak256(abi.encode(uint256(4046)))));
+        assertEq(stakerV.reservedPepeOwner(4046), address(0));
+        assertFalse(stakerV.isPepeAvailable(5249));
+    }
+
+    function test_ReservedChoiceSurvivesTopupsAndRejectsReplacement() public {
+        _reserveDeposit(6000);
+        vm.startPrank(bob);
+        controller.predepositWithPepe(1e18, 6000);
+        controller.predeposit(1e18);
+        vm.expectRevert(RoundController.PredepositClosed.selector);
+        controller.predepositWithPepe(1e18, 6001);
+        vm.stopPrank();
+        (uint256 amount,) = controller.predeposits(bob);
+        assertEq(amount, 12e18);
+        _launch(100e18);
+        vm.prank(bob);
+        vm.expectRevert(RoundController.PredepositClosed.selector);
+        controller.claimPredepositPSPWithPepe(6001);
+        vm.prank(bob);
+        controller.claimPredepositPSP();
+        assertEq(stakerV.ownerOf(6000), bob);
+    }
+
+    function test_ReservationCollisionRollsBackFundsAndDeposit() public {
+        _reserveDeposit(4046);
+        uint256 balance = mixETH.balanceOf(alice);
+        uint256 total = controller.totalPredepositMixETH();
+        vm.startPrank(alice);
+        mixETH.approve(address(controller), 10e18);
+        vm.expectRevert(PSPStaker.PepeDnaTaken.selector);
+        controller.predepositWithPepe(10e18, 5249);
+        vm.stopPrank();
+        assertEq(mixETH.balanceOf(alice), balance);
+        assertEq(controller.totalPredepositMixETH(), total);
+        assertEq(controller.predepositPepe(alice), 0);
+        (uint256 amount,) = controller.predeposits(alice);
+        assertEq(amount, 0);
+    }
+
+    function test_ReservationRequiresControllerAndSkipsSequentialId() public {
+        vm.expectRevert(PSPStaker.NotController.selector);
+        stakerV.reserveGenesisPepe(bob, 1);
+        _reserveDeposit(1);
+        assertEq(stakerV.nextTokenId(), 2);
+        _launch(100e18);
+        vm.prank(bob);
+        controller.claimPredepositPSP();
+        assertEq(stakerV.nextTokenId(), 2);
+        assertEq(stakerV.ownerOf(1), bob);
+    }
+
     function _prepareChosenClaim() private {
         vm.startPrank(bob);
         mixETH.approve(address(controller), 10e18);
