@@ -69,7 +69,7 @@ export default function Trade() {
         <Tape entries={tape.entries} loading={!tape.complete} error={tape.error} />
       </div>
       {settled && (
-        <div className="flex items-center gap-3 rounded-xl border border-line bg-bg-1 p-5 text-sm text-text-lo">
+        <div className="mt-4 flex items-center gap-3 rounded-xl border border-line bg-bg-1 p-5 text-sm text-text-lo">
           <span>
             round {round.id.toString()} is flat — redeem your psp from the{' '}
             <Link to="/graveyard" className="text-accent underline">graveyard</Link>.
