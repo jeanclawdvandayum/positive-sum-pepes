@@ -224,7 +224,7 @@ export function PepeCard({
   const dateStr = (ts: number) => new Date(ts * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-line bg-bg-1 p-4">
+    <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-line bg-bg-1 p-4">
       <div className="flex items-center justify-between">
         <span title={id.toString()} className="font-data text-xs text-text-lo">pepe #{fmtPepeId(id)}</span>
         {amount === 0n && <span className="text-[10px] text-text-lo">unstaked pepe</span>}
@@ -258,7 +258,7 @@ export function PepeCard({
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg bg-bg-2 px-3 py-2 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg bg-bg-2 px-3 py-2 text-xs">
         <span className="text-text-lo">
           {isFlat ? 'bomb opened all locks' : decaying ? (decayed ? 'unlocked' : 'unlocks (vesting)') : 'indefinite lock'}
         </span>
@@ -345,7 +345,7 @@ export default function PepeCards({
   const isFlat = round.flatTime !== undefined && round.flatTime > 0n
   const { address } = useAccount()
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
       {entries.map((e) => (
         <PepeCard
           key={`${address}:${round.staker}:${e.id}`}

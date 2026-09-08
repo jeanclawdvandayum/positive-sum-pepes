@@ -177,7 +177,7 @@ body {
 .tx-toast--success .tx-toast-art { animation: tx-stamp .55s ease-out; }
 .tx-toast--success .tx-toast-scan, .tx-toast--failed .tx-toast-scan { animation-iteration-count: 1; }
 .tx-toast--failed .tx-toast-art { filter: grayscale(.8); }
-.tx-toast-copy { min-width: 0; }
+.tx-toast-copy { min-width: 0; overflow-wrap: anywhere; }
 .tx-toast-label { display: block; color: var(--text-lo); font-size: 10px; letter-spacing: .04em; overflow-wrap: anywhere; }
 .tx-toast-copy strong { display: block; margin: 5px 0; color: var(--tx-ink); font-size: 22px; line-height: 1.15; font-weight: 400; }
 .tx-toast-copy p { margin: 0; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
@@ -191,3 +191,11 @@ body {
 @keyframes tx-stamp { 40% { transform: rotate(7deg) scale(1.08); } }
 @keyframes tx-fuse { to { transform: scaleX(0); } }
 @media (prefers-reduced-motion: reduce) { .tx-toast, .tx-toast-art, .tx-toast-scan, .tx-toast-life { animation: none !important; } }
+
+/* Keep notifications within narrow wallet webviews, including safe-area padding. */
+@media (max-width: 480px) {
+  .tx-toast-stack { left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); width: auto; min-width: 0; max-width: calc(100dvw - 16px); box-sizing: border-box; }
+  .tx-toast { min-width: 0; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; padding: 14px 30px 16px 10px; }
+  .tx-toast-art { width: 56px; height: 64px; }
+  .tx-toast-copy strong { font-size: 20px; }
+}

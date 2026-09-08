@@ -1,4 +1,4 @@
-import { fmtAmount, wadToExact } from '../lib/format'
+import { fmtAmount, fmtPepeId, wadToExact } from '../lib/format'
 import { parseTopUpAmount, type TopUpStep } from '../lib/stakeTopUp'
 
 export default function PositionTopUp({ id, balance, value, open, busy, step, blockedReason, onValue, onToggle, onSubmit }: {
@@ -24,23 +24,23 @@ export default function PositionTopUp({ id, balance, value, open, busy, step, bl
     : step === 'approve' ? 'approving PSP…'
       : step === 'stake' ? 'adding PSP…' : 'confirm add PSP'
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-w-0 flex-col gap-2">
       <button className="st-btn text-xs" disabled={busy || !!blockedReason} onClick={onToggle}
         aria-expanded={open} aria-controls={`${inputId}-form`}>
         {open ? 'cancel top-up' : '+ add PSP'}
       </button>
       {blockedReason && <p className="text-[10px] text-text-lo">{blockedReason}</p>}
       {open && (
-        <form id={`${inputId}-form`} className="flex flex-col gap-2 rounded-xl bg-bg-2 p-3"
+        <form id={`${inputId}-form`} className="flex min-w-0 flex-col gap-2 rounded-xl bg-bg-2 p-3"
           onSubmit={event => { event.preventDefault(); if (!busy && !blockedReason && amount && balance !== undefined && amount <= balance) onSubmit() }}>
-          <label htmlFor={inputId} className="text-xs text-text-hi">add PSP to pepe #{id.toString()}</label>
+          <label htmlFor={inputId} className="min-w-0 text-xs text-text-hi" title={`pepe #${id}`}>add PSP to pepe #{fmtPepeId(id)}</label>
           <p className="text-[10px] text-text-lo">Keeps this NFT and adds to its existing stake.</p>
-          <div className="flex items-center justify-between text-[10px] text-text-lo">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-[10px] text-text-lo">
             <span title={balance === undefined ? undefined : `${wadToExact(balance)} PSP`}>wallet: {fmtAmount(balance, 4)} PSP</span>
             <button type="button" className="font-semibold text-accent disabled:opacity-40" disabled={busy || !!blockedReason || balance === undefined || balance === 0n}
               onClick={() => onValue(wadToExact(balance))}>Max</button>
           </div>
-          <input id={inputId} className="st-input !py-2 !text-sm" inputMode="decimal" autoComplete="off" placeholder="0.0 PSP"
+          <input id={inputId} className="st-input min-w-0 w-full !py-2 !text-sm" inputMode="decimal" autoComplete="off" placeholder="0.0 PSP"
             value={value} onChange={event => onValue(event.target.value)} disabled={busy || !!blockedReason}
             aria-invalid={!!inputError} aria-describedby={inputError ? `${inputId}-error` : undefined} />
           {inputError && <p id={`${inputId}-error`} className="text-[10px] text-phase-critical">{inputError}</p>}
