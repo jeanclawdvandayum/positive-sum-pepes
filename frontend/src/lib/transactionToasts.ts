@@ -1,5 +1,5 @@
 export type TxStage = 'preparing' | 'simulating' | 'wallet' | 'pending' | 'success' | 'failed' | 'unknown'
-export type TxToast = { id: number; label: string; chainId: number; account: `0x${string}`; stage: TxStage; hash?: `0x${string}`; detail?: string; updated: number }
+export type TxToast = { id: number; dna: bigint; label: string; chainId: number; account: `0x${string}`; stage: TxStage; hash?: `0x${string}`; detail?: string; updated: number }
 let entries: TxToast[] = []
 let nextId = 0
 const listeners = new Set<() => void>()
@@ -15,7 +15,7 @@ export const transactionToasts = {
 }
 
 export function startTransactionToast(label: string, chainId: number, account: `0x${string}`) {
-  let entry: TxToast = { id: ++nextId, label, chainId, account, stage: 'preparing', updated: Date.now() }
+  let entry: TxToast = { id: ++nextId, dna: BigInt(crypto.getRandomValues(new Uint32Array(1))[0]), label, chainId, account, stage: 'preparing', updated: Date.now() }
   const update = (stage: TxStage, hash?: `0x${string}`, detail?: string) => {
     entry = { ...entry, stage, hash: hash ?? entry.hash, detail, updated: Date.now() }
     if (dismissed.has(entry.id)) return

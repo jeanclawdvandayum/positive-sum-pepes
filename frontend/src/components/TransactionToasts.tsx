@@ -1,7 +1,6 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import { transactionToasts, type TxToast } from '../lib/transactionToasts'
-import { useWalletPepe } from '../lib/useWalletPepe'
-import { useRound } from '../lib/useRound'
+import { renderPepeSvg } from '../lib/pepeRender'
 import { wagmiConfig } from '../lib/config'
 
 const status = {
@@ -15,8 +14,7 @@ const status = {
 } as const
 
 function TransactionToast({ item }: { item: TxToast }) {
-  const round = useRound()
-  const svg = useWalletPepe(item.account, round.staker)
+  const svg = useMemo(() => renderPepeSvg(item.dna), [item.dna])
   const chain = wagmiConfig.chains.find(chain => chain.id === item.chainId)
   const explorer = chain?.blockExplorers?.default
   useEffect(() => {
