@@ -5,7 +5,10 @@
 Fresh testnet profile: 24-hour predeposit (86,400 seconds), 1,000 mixETH global
 cap, uncapped wallets, and 69:04:20 maximum active clock (248,660 seconds).
 Withdrawal vest remains one hour. Deposit-time art reservation version 2 is
-included. Deployment and hosted links will be recorded after confirmation.
+included. Factory `0x182307cfd9d1fac0b2e69cb862e993314332d2cb` is deployed on Base Sepolia.
+All 17 PSP deployment transactions succeeded, both deployed lifecycle tests
+passed, and Sourcify matched all 17 creation/runtime sources. See
+[manifest](deployments/base-sepolia-2026-09-09.json).
 
 
 ## September 8 source update — reserved predeposit art (not deployed)

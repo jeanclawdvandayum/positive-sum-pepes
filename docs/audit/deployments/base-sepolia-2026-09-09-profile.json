@@ -1,0 +1,8 @@
+{
+  "factory": "0x182307cfd9d1fac0b2e69cb862e993314332d2cb",
+  "version": "2",
+  "cap": "1000000000000000000000",
+  "predepositSeconds": "86400",
+  "start": "1788948262",
+  "clockSeconds": "248660"
+}

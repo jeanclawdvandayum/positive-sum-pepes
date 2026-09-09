@@ -1,0 +1,27 @@
+{
+  "registrar": "0xde0f25e61767bc115bf67915469a1e16fd0087aa",
+  "factory": "0x182307cfd9d1fac0b2e69cb862e993314332d2cb",
+  "signer": "0x1016bA06d17774AD34085cdDe38Ec3540C7F34f8",
+  "transactions": {
+    "deployGate": {
+      "hash": "0xcfc6133db9f6e43c6f4e6f174609439ecdae3fc7bc820896a5f8dca39bf51370",
+      "block": "25939120",
+      "address": "0x8e65b2eedaebc97abc7444ffcdae6dd7f8278ce2",
+      "costETH": "0.000093780646018208"
+    },
+    "rotateGate": {
+      "hash": "0xe7c070f8463fb9e83383847825b41fc8c81edaa45e81a9d163f23e33fd617b14",
+      "block": "25939124",
+      "address": null,
+      "costETH": "0.000004721014172664"
+    },
+    "enable": {
+      "hash": "0x8bd47ba076d01e658c2ac27ed2316bb20aafde1f62ec28d887fbf58aaa016123",
+      "block": "25939135",
+      "address": null,
+      "costETH": "0.000006540466043889"
+    }
+  },
+  "gate": "0x8e65b2eedaebc97abc7444ffcdae6dd7f8278ce2",
+  "enabled": true
+}

@@ -1413,3 +1413,13 @@ with new addresses, retaining the existing registrar and namespace.
   governance and frontend build. Deployment simulation succeeded without broadcast.
 - Paper browser checks passed at 390/1280px: clock clamp 248,660 seconds,
   900 mixETH boot backing, zero-time rejection, no overflow or script errors.
+
+## 2026-09-09 — deployed and published
+
+Release `302e233c`: factory `0x182307cfd9d1fac0b2e69cb862e993314332d2cb`.
+All 17 PSP receipts succeeded, 17/17 Sourcify matches, both deployed lifecycle
+fork tests passed. Live profile and mobile UI checks passed. Existing WNS
+registrar retained; its fresh gate targets this factory and registration is enabled.
+Local name verifier updated. See `docs/audit/2026-09-09-release.md` and manifests.
+UI: https://stormy-quill-wawf.here.now/ . Paper: https://deep-pepper-sy7v.here.now/ .
+Footer links to the paper. Both are anonymous 24-hour publications.
