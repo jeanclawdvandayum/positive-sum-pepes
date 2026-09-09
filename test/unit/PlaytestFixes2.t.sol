@@ -146,9 +146,9 @@ contract PlaytestFixes2 is Test {
         assertEq(controller.PREDEPOSIT_CAP_PER_WALLET(), 0);
         vm.startPrank(alice);
         mixETH.approve(address(controller), type(uint256).max);
-        controller.predeposit(500e18);
+        controller.predeposit(1000e18);
         vm.stopPrank();
-        assertEq(controller.totalPredepositMixETH(), 500e18);
+        assertEq(controller.totalPredepositMixETH(), 1000e18);
     }
 
     // ─────────────── #6: factory UI views + rebirth ───────────────

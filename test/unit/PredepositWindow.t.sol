@@ -19,7 +19,7 @@ import {MockPoolManager} from "../mocks/MockPoolManager.sol";
 import {StakerDeployer} from "src/StakerDeployer.sol";
 
 
-/// @title PredepositWindowTest — 1-week window, 500 mixETH cap, permissionless launch
+/// @title PredepositWindowTest — 1-week window, 1,000 mixETH cap, permissionless launch
 /// @notice Covers the rebirth flow added to RoundController/PSPFactory:
 ///         - public predeposit is hard-capped at PREDEPOSIT_CAP (overshoot reverts)
 ///         - hitting the cap exactly makes the round launchable by ANYONE
@@ -72,26 +72,26 @@ contract PredepositWindowTest is Test {
 
     function test_constants() public view {
         assertEq(controller.PREDEPOSIT_DURATION(), 7 days, "one week");
-        assertEq(controller.PREDEPOSIT_CAP(), 500e18, "500 mixETH");
+        assertEq(controller.PREDEPOSIT_CAP(), 1000e18, "1,000 mixETH");
     }
 
     // ─────────────── cap enforcement ───────────────
 
     function test_cap_OvershootReverts() public {
-        _deposit(alice, 400e18);
+        _deposit(alice, 900e18);
         vm.prank(bob);
         mixETH.approve(address(controller), 101e18);
         mixETH.transfer(bob, 101e18);
         vm.prank(bob);
         vm.expectRevert(RoundController.CapExceeded.selector);
         controller.predeposit(101e18);
-        assertEq(controller.totalPredepositMixETH(), 400e18, "nothing recorded on revert");
+        assertEq(controller.totalPredepositMixETH(), 900e18, "nothing recorded on revert");
     }
 
     function test_cap_ExactFillLaunchableByAnyone() public {
-        _deposit(alice, 400e18);
-        _deposit(bob, 100e18); // exactly 500 — allowed
-        assertEq(controller.totalPredepositMixETH(), 500e18);
+        _deposit(alice, 900e18);
+        _deposit(bob, 100e18); // exactly 1,000 — allowed
+        assertEq(controller.totalPredepositMixETH(), 1000e18);
 
         (,,,,,, bool launchable) = controller.predepositState();
         assertTrue(launchable, "cap fill => permissionless launch");
@@ -102,7 +102,7 @@ contract PredepositWindowTest is Test {
     }
 
     function test_cap_SecondDepositAfterCapReverts() public {
-        _deposit(alice, 500e18);
+        _deposit(alice, 1000e18);
         vm.prank(bob);
         vm.expectRevert(RoundController.CapExceeded.selector);
         controller.predeposit(1);
@@ -138,12 +138,12 @@ contract PredepositWindowTest is Test {
 
     function testFuzzDustCompletesGlobalCapAndLaunches(uint64 raw) public {
         uint256 dust = bound(raw, 1, 0.005e18 - 1);
-        _deposit(alice, 500e18 - dust);
+        _deposit(alice, 1000e18 - dust);
         (,,,, bool reached,, bool launchable) = controller.predepositState();
         assertFalse(reached);
         assertFalse(launchable);
         _deposit(bob, dust);
-        assertEq(controller.totalPredepositMixETH(), 500e18);
+        assertEq(controller.totalPredepositMixETH(), 1000e18);
         (,,,, reached,, launchable) = controller.predepositState();
         assertTrue(reached);
         assertTrue(launchable);
@@ -188,7 +188,7 @@ contract PredepositWindowTest is Test {
     }
 
     function test_state_ViewFields() public {
-        _deposit(alice, 250e18);
+        _deposit(alice, 500e18);
         (
             uint256 total,
             uint256 cap,
@@ -198,8 +198,8 @@ contract PredepositWindowTest is Test {
             bool windowOver,
             bool launchable
         ) = controller.predepositState();
-        assertEq(total, 500e18 / 2);
-        assertEq(cap, 500e18);
+        assertEq(total, 1000e18 / 2);
+        assertEq(cap, 1000e18);
         assertEq(start, controller.predepositStartTime());
         assertFalse(closed);
         assertFalse(capReached);
@@ -217,17 +217,17 @@ contract PredepositWindowTest is Test {
     function test_seedCarry_FactoryOnlyAndCapExempt() public {
         vm.prank(rando);
         vm.expectRevert(RoundController.NotFactory.selector);
-        controller.seedCarry(600e18);
+        controller.seedCarry(1100e18);
 
         // factory seeds a carry LARGER than the public cap
-        mixETH.transfer(address(factory), 600e18);
+        mixETH.transfer(address(factory), 1100e18);
         vm.prank(address(factory));
-        mixETH.approve(address(controller), 600e18);
+        mixETH.approve(address(controller), 1100e18);
         vm.startPrank(address(factory));
-        controller.seedCarry(600e18);
+        controller.seedCarry(1100e18);
         vm.stopPrank();
 
-        assertEq(controller.totalPredepositMixETH(), 600e18, "carry exceeds public cap");
+        assertEq(controller.totalPredepositMixETH(), 1100e18, "carry exceeds public cap");
         (,,,, bool capReached, bool windowOver, bool launchable) = controller.predepositState();
         assertTrue(capReached, "carry >= cap counts as reached");
         assertFalse(windowOver);
@@ -247,7 +247,7 @@ contract PredepositWindowTest is Test {
         // public headroom counts from the carry, not from zero
         vm.prank(alice);
         vm.expectRevert(RoundController.CapExceeded.selector);
-        controller.predeposit(500e18);
+        controller.predeposit(1000e18);
     }
 
     // ─────────────── html (walk-away UI) ───────────────

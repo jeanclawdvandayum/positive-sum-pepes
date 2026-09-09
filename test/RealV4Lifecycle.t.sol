@@ -377,10 +377,10 @@ contract RealV4LifecycleTest is RealV4Base {
         factory.reserveSpawn(1);
         for(uint256 i;i<3;++i)factory.birthStep{gas:12_000_000}();
         RoundController next=factory.getRound(2).controller;
-        assertEq(next.totalPredepositMixETH(),500e18);
+        assertEq(next.totalPredepositMixETH(),1000e18);
         next.launchPooledBuy();
         assertEq(uint256(factory.getRound(2).hook.mode()),1);
-        assertEq(mixETH.balanceOf(address(factory)),49_500e18);
+        assertEq(mixETH.balanceOf(address(factory)),49_000e18);
     }
 }
 

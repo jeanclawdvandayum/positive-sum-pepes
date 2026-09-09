@@ -37,9 +37,9 @@ abstract contract DeploymentSupport is Script {
 
     function _testnetTimings() internal view returns (uint256) {
         return CurveMath.packTimingsCapped(
-            vm.envOr("PSP_PREDEPOSIT_SEC", uint256(2 hours)),
+            vm.envOr("PSP_PREDEPOSIT_SEC", uint256(24 hours)),
             vm.envOr("PSP_VEST_SEC", uint256(1 hours)),
-            vm.envOr("PSP_DET_SEC", uint256(2 hours)),
+            vm.envOr("PSP_DET_SEC", uint256(69 hours + 4 minutes + 20 seconds)),
             vm.envOr("PSP_WALLET_CAP_MIX", uint256(0))
         );
     }
@@ -113,7 +113,7 @@ abstract contract DeploymentSupport is Script {
             && r.token.controller() == address(r.controller), "round wiring mismatch");
         require(address(r.hook.poolManager()) == address(factory.poolManager()), "hook PoolManager mismatch");
         require(r.hook.MIN_BUY_INPUT() == 0.005e18 && r.hook.TIME_PER_UNIT() == 260, "game rules mismatch");
-        require(r.controller.PREDEPOSIT_RULES_VERSION() == 1 && r.controller.PREDEPOSIT_CAP() == 500e18,
+        require(r.controller.PREDEPOSIT_RULES_VERSION() == 1 && r.controller.PREDEPOSIT_CAP() == 1000e18,
             "predeposit rules mismatch");
         PSPStaker staker = r.controller.staker();
         require(address(staker).code.length != 0 && address(staker.controller()) == address(r.controller)

@@ -42,7 +42,7 @@ test('timing inspection pins detonation and wallet cap to their separate 64-bit 
   const custom = {
     packed: 900n | (3600n << 64n) | (7200n << 128n) | (500n << 192n),
     PREDEPOSIT_DURATION: 900n, VEST_DURATION: 3600n, detWindow: 7200n,
-    PREDEPOSIT_CAP_PER_WALLET: 500n * 10n ** 18n, PREDEPOSIT_CAP: 500n * 10n ** 18n, epochSize: 600n,
+    PREDEPOSIT_CAP_PER_WALLET: 500n * 10n ** 18n, PREDEPOSIT_CAP: 1000n * 10n ** 18n, epochSize: 600n,
   }
   assert.doesNotThrow(() => assertTimingProfile(custom))
   assert.throws(() => assertTimingProfile({ ...custom, detWindow: 500n }), /four-field/)

@@ -26,11 +26,11 @@ node scripts/deployment/base-sepolia.mjs --dry-run
 
 | Setting | Default |
 |---|---|
-| Predeposit window | 7,200 seconds, two hours |
+| Predeposit window | 86,400 seconds, 24 hours |
 | Withdrawal vest | 3,600 seconds, six ten-minute epochs |
-| Clock window/cap | 7,200 seconds, two hours |
+| Clock window/cap | 248,660 seconds, 69:04:20 |
 | Per-wallet predeposit cap | `0`, uncapped |
-| Global predeposit cap | 500 mixETH |
+| Global predeposit cap | 1,000 mixETH |
 | Minimum public predeposit | One wei, within the caps |
 | Minimum active gross buy / ladder ticket | 0.005 mixETH |
 | Time per complete purchase unit | Up to 260 seconds |

@@ -134,11 +134,11 @@ contract BaseSepoliaReleaseTest is Test {
         assertEq(c.registry.PURCHASE_REFERRAL_VERSION(), 1);
         assertEq(c.reinvestor.ATTRIBUTION_VERSION(), 1);
         assertTrue(c.staker.supportsInterface(0x80ac58cd));
-        assertEq(c.r.controller.PREDEPOSIT_CAP(), 500e18);
+        assertEq(c.r.controller.PREDEPOSIT_CAP(), 1000e18);
         assertEq(c.r.controller.PREDEPOSIT_CAP_PER_WALLET(), vm.envOr("PSP_WALLET_CAP_MIX", uint256(0)) * 1e18);
-        assertEq(c.r.controller.PREDEPOSIT_DURATION(), vm.envOr("PSP_PREDEPOSIT_SEC", uint256(7200)));
+        assertEq(c.r.controller.PREDEPOSIT_DURATION(), vm.envOr("PSP_PREDEPOSIT_SEC", uint256(86400)));
         assertEq(c.r.controller.VEST_DURATION(), vm.envOr("PSP_VEST_SEC", uint256(3600)));
-        assertEq(c.r.hook.detWindow(), vm.envOr("PSP_DET_SEC", uint256(7200)));
+        assertEq(c.r.hook.detWindow(), vm.envOr("PSP_DET_SEC", uint256(248660)));
     }
 
     function _freshGenesis(ReleaseContext memory c) internal returns (uint256 idA, uint256 idB) {
@@ -162,7 +162,9 @@ contract BaseSepoliaReleaseTest is Test {
         vm.stopPrank();
         vm.startPrank(c.b);
         c.mix.approve(address(c.r.controller), deposit);
-        c.r.controller.predeposit(deposit);
+        c.r.controller.predepositWithPepe(deposit, 6000);
+        assertEq(c.r.controller.predepositPepe(c.b), 6000);
+        assertFalse(c.staker.isPepeAvailable(6000));
         vm.stopPrank();
         skip(c.r.controller.PREDEPOSIT_DURATION());
         assertEq(c.staker.genesisPepeDna(c.a), preview, "claim delay keeps available preview stable");
@@ -171,9 +173,10 @@ contract BaseSepoliaReleaseTest is Test {
         idA = c.staker.primaryOf(c.a);
         assertEq(idA, uint256(uint160(c.a)));
         assertEq(c.staker.dnaOf(idA), preview);
-        uint256 previewB = c.staker.genesisPepeDna(c.b);
+        uint256 previewB = uint256(keccak256(abi.encode(uint256(6000))));
         vm.prank(c.b); c.r.controller.claimPredepositPSP();
         idB = c.staker.primaryOf(c.b);
+        assertEq(idB, 6000);
         assertEq(c.staker.dnaOf(idB), previewB);
         assertTrue(PepeDna.key(preview) != PepeDna.key(previewB), "genesis art stays unique");
         assertTrue(PepeDna.key(preview) != PepeDna.key(c.staker.dnaOf(4046)), "all mint paths share reservations");

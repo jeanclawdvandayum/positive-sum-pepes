@@ -54,6 +54,9 @@ function Footer() {
         <span aria-hidden="true">·</span>
         <span className="tabular font-data">round {round.id.toString()}</span>
         <span aria-hidden="true">·</span>
+        <a href={import.meta.env.VITE_ROLLING_PAPER_URL || '/whitepaper.html'} target="_blank" rel="noopener noreferrer"
+          className="underline decoration-pepe/50 underline-offset-4 transition-colors hover:text-pepe">rolling paper ↗</a>
+        <span aria-hidden="true">·</span>
         <span>made of pixels and math</span>
       </div>
     </footer>

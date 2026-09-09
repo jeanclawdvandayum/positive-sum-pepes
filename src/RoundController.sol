@@ -106,7 +106,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // bits, widths DERIVED from the field count in CurveMath (LESSONS
     // 2026-08-24/2026-08-18: hand-set widths drift from data reality).
     uint256 public immutable PREDEPOSIT_DURATION; // default 7 days
-    uint256 public constant PREDEPOSIT_CAP = 500e18; // 500 mixETH
+    uint256 public constant PREDEPOSIT_CAP = 1000e18; // 1,000 mixETH
     /// @notice Version 1 accepts any positive predeposit, subject to the caps.
     uint256 public constant PREDEPOSIT_RULES_VERSION = 1;
     /// @dev Genesis pooled buy routes this share of the boot into the hook's

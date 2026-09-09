@@ -1399,3 +1399,17 @@ with new addresses, retaining the existing registrar and namespace.
 - 390px browser picker fixture passed: six faces, selection, deposit wording,
   pending-state lock, and no horizontal overflow. No live transactions/deployment.
 - See `docs/audit/2026-09-08-reserved-predeposit-art.md`.
+
+## 2026-09-09 — 24-hour / 1,000 mixETH / 69:04:20 release inputs
+
+- Global predeposit cap is 1,000 mixETH. Testnet profile uses 86,400 seconds
+  before launch and a 248,660-second active clock cap. Wallets remain uncapped;
+  one-hour withdrawal vest is preserved. Deposit art reservation v2 included.
+- Updated cap fixtures, deployment checks, rolling paper examples, landing copy
+  and footer paper link. The initial run exposed two stale 500-cap test fixtures;
+  corrected fixture amounts and reran the complete gate.
+- Full gate passed: 531 Solidity tests / 69 suites, 160 frontend tests,
+  11 verifier tests, 159 ABI declarations, 36 production size checks, oracle,
+  governance and frontend build. Deployment simulation succeeded without broadcast.
+- Paper browser checks passed at 390/1280px: clock clamp 248,660 seconds,
+  900 mixETH boot backing, zero-time rejection, no overflow or script errors.

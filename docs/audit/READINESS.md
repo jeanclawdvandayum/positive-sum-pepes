@@ -1,5 +1,13 @@
 # Audit preparation — September 2026
 
+## September 9 release preparation
+
+Fresh testnet profile: 24-hour predeposit (86,400 seconds), 1,000 mixETH global
+cap, uncapped wallets, and 69:04:20 maximum active clock (248,660 seconds).
+Withdrawal vest remains one hour. Deposit-time art reservation version 2 is
+included. Deployment and hosted links will be recorded after confirmation.
+
+
 ## September 8 source update — reserved predeposit art (not deployed)
 
 Version 2 adds `predepositWithPepe`: select and reserve the exact art in the
