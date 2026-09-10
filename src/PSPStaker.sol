@@ -60,6 +60,7 @@ contract PSPStaker is ReentrancyGuard {
     error BadPepeId();       // chosen-id path: zero or already owned
     error PepeDnaTaken();    // another NFT already has this v2 trait combination
     error PepeArtExhausted();
+    error UnsupportedArtVersion();
     error RequestActive();   // stake/top-up while decaying — cancel first
     error NotDecaying();     // cancel/withdraw without an active request
     error VestNotComplete(); // withdraw before the decay ran out
@@ -191,7 +192,8 @@ contract PSPStaker is ReentrancyGuard {
     mapping(uint256 => address) public reservedPepeOwner;
     mapping(uint256 => uint256) private _artRunBoundary;
     uint256 private _nextArtKey = 1;
-    uint256 public constant PEPE_DNA_VERSION = 1;
+    uint256 public immutable PEPE_DNA_VERSION;
+    uint256 private immutable _artCombinations;
     /// @dev Cosmetic pseudorandomness, frozen per round so waiting to claim
     /// cannot reroll art. Block producers/deployers can influence this seed;
     /// it never controls principal, fee weights or rewards.
@@ -203,6 +205,13 @@ contract PSPStaker is ReentrancyGuard {
         psp = _psp;
         controller = _controller;
         descriptor = descriptor_;
+        // A round freezes its renderer and matching collision codec together.
+        // Legacy descriptors have no version getter. Unknown versions fail closed.
+        (bool ok, bytes memory data) = descriptor_.staticcall(abi.encodeWithSignature("ART_VERSION()"));
+        uint256 version = ok && data.length == 32 ? abi.decode(data, (uint256)) : 1;
+        if (version != 1 && version != 2) revert UnsupportedArtVersion();
+        PEPE_DNA_VERSION = version;
+        _artCombinations = PepeDna.combinations(version);
         _genesisArtSeed = keccak256(abi.encode(
             blockhash(block.number == 0 ? 0 : block.number - 1), block.chainid, address(this)
         ));
@@ -242,7 +251,7 @@ contract PSPStaker is ReentrancyGuard {
 
     /// @notice Whether this exact chosen ID and its previewed art can be minted.
     function isPepeAvailable(uint256 id) external view returns (bool) {
-        return id != 0 && _ownerOf[id] == address(0) && _artToken[PepeDna.key(_hashDna(id))] == 0;
+        return id != 0 && _ownerOf[id] == address(0) && _artToken[PepeDna.key(_hashDna(id), PEPE_DNA_VERSION)] == 0;
     }
 
     /// @notice Pseudorandom art used by a genesis claim at the current state.
@@ -258,9 +267,9 @@ contract PSPStaker is ReentrancyGuard {
     }
 
     function _availableDna(uint256 preferred) private view returns (uint256) {
-        if (_artToken[PepeDna.key(preferred)] == 0) return preferred;
-        if (_nextArtKey > PepeDna.COMBINATIONS) revert PepeArtExhausted();
-        return PepeDna.fromKey(_nextArtKey);
+        if (_artToken[PepeDna.key(preferred, PEPE_DNA_VERSION)] == 0) return preferred;
+        if (_nextArtKey > _artCombinations) revert PepeArtExhausted();
+        return PepeDna.fromKey(_nextArtKey, PEPE_DNA_VERSION);
     }
 
     /// @notice Reserve a depositor's exact ID and rendered art until their claim.
@@ -275,12 +284,12 @@ contract PSPStaker is ReentrancyGuard {
     }
 
     function _reserveArt(uint256 id, uint256 dna) private {
-        uint256 artKey = PepeDna.key(dna);
+        uint256 artKey = PepeDna.key(dna, PEPE_DNA_VERSION);
         if (_artToken[artKey] != 0) revert PepeDnaTaken();
         uint256 artStart = artKey;
         uint256 artEnd = artKey;
         if (artKey > 1 && _artToken[artKey - 1] != 0) artStart = _artRunBoundary[artKey - 1];
-        if (artKey < PepeDna.COMBINATIONS && _artToken[artKey + 1] != 0) artEnd = _artRunBoundary[artKey + 1];
+        if (artKey < _artCombinations && _artToken[artKey + 1] != 0) artEnd = _artRunBoundary[artKey + 1];
         _artRunBoundary[artStart] = artEnd;
         _artRunBoundary[artEnd] = artStart;
         if (artKey == _nextArtKey) _nextArtKey = artEnd + 1;

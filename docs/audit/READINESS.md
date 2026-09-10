@@ -1,5 +1,18 @@
 # Audit preparation — September 2026
 
+## September 10 source preparation — expanded art
+
+Fresh testnet profile: 24-hour predeposit, 1,000 mixETH global cap and
+04:20:00 maximum active clock (15,600 seconds). Wallets remain uncapped.
+
+The seven-trait Studio expansion is integrated as art version 2 with separate
+immutable bytecode storage. There are 191,664,000 canonical combinations.
+Existing deployed art and its renderer are preserved. New deployment scripts
+select `PepeExpandedDescriptor`; a fresh factory is required so the staker’s
+collision codec matches. This art release is **not deployed**. See
+[expanded art integration](../art/EXPANDED.md).
+
+
 ## September 9 release preparation
 
 Fresh testnet profile: 24-hour predeposit (86,400 seconds), 1,000 mixETH global

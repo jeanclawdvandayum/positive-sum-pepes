@@ -39,7 +39,7 @@ abstract contract DeploymentSupport is Script {
         return CurveMath.packTimingsCapped(
             vm.envOr("PSP_PREDEPOSIT_SEC", uint256(24 hours)),
             vm.envOr("PSP_VEST_SEC", uint256(1 hours)),
-            vm.envOr("PSP_DET_SEC", uint256(69 hours + 4 minutes + 20 seconds)),
+            vm.envOr("PSP_DET_SEC", uint256(4 hours + 20 minutes)),
             vm.envOr("PSP_WALLET_CAP_MIX", uint256(0))
         );
     }
@@ -118,7 +118,7 @@ abstract contract DeploymentSupport is Script {
         PSPStaker staker = r.controller.staker();
         require(address(staker).code.length != 0 && address(staker.controller()) == address(r.controller)
             && address(staker.psp()) == address(r.token), "staker wiring mismatch");
-        require(staker.NFT_INTERFACE_VERSION() == 1 && staker.PEPE_DNA_VERSION() == 1
+        require(staker.NFT_INTERFACE_VERSION() == 1 && (staker.PEPE_DNA_VERSION() == 1 || staker.PEPE_DNA_VERSION() == 2)
             && staker.supportsInterface(0x80ac58cd), "NFT capabilities missing");
         require(staker.descriptor() == factory.descriptor(), "staker descriptor mismatch");
         PSPReferralRegistry registry = PSPReferralRegistry(factory.referralRegistryOf(roundId));

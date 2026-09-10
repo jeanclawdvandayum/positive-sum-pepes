@@ -12,7 +12,7 @@ test('deployment runner defaults to a local rehearsal with the current uncapped 
   assert.equal(opt.settings.PSP_WALLET_CAP_MIX, '0')
   assert.equal(opt.settings.PSP_PREDEPOSIT_SEC, '86400')
   assert.equal(opt.settings.PSP_VEST_SEC, '3600')
-  assert.equal(opt.settings.PSP_DET_SEC, '248660')
+  assert.equal(opt.settings.PSP_DET_SEC, '15600')
 })
 
 test('live deployment needs an explicit keystore and sender and refuses private-key CLI input', () => {

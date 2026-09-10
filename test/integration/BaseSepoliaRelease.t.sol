@@ -130,7 +130,7 @@ contract BaseSepoliaReleaseTest is Test {
         assertEq(c.r.hook.STAKER_BPS(), 6000);
         assertEq(c.r.hook.POT_BPS(), 3500);
         assertEq(c.r.controller.PREDEPOSIT_RULES_VERSION(), 1);
-        assertEq(c.staker.PEPE_DNA_VERSION(), 1);
+        assertEq(c.staker.PEPE_DNA_VERSION(), 2);
         assertEq(c.registry.PURCHASE_REFERRAL_VERSION(), 1);
         assertEq(c.reinvestor.ATTRIBUTION_VERSION(), 1);
         assertTrue(c.staker.supportsInterface(0x80ac58cd));
@@ -138,7 +138,7 @@ contract BaseSepoliaReleaseTest is Test {
         assertEq(c.r.controller.PREDEPOSIT_CAP_PER_WALLET(), vm.envOr("PSP_WALLET_CAP_MIX", uint256(0)) * 1e18);
         assertEq(c.r.controller.PREDEPOSIT_DURATION(), vm.envOr("PSP_PREDEPOSIT_SEC", uint256(86400)));
         assertEq(c.r.controller.VEST_DURATION(), vm.envOr("PSP_VEST_SEC", uint256(3600)));
-        assertEq(c.r.hook.detWindow(), vm.envOr("PSP_DET_SEC", uint256(248660)));
+        assertEq(c.r.hook.detWindow(), vm.envOr("PSP_DET_SEC", uint256(15600)));
     }
 
     function _freshGenesis(ReleaseContext memory c) internal returns (uint256 idA, uint256 idB) {

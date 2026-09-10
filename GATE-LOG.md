@@ -1423,3 +1423,27 @@ registrar retained; its fresh gate targets this factory and registration is enab
 Local name verifier updated. See `docs/audit/2026-09-09-release.md` and manifests.
 UI: https://stormy-quill-wawf.here.now/ . Paper: https://deep-pepper-sy7v.here.now/ .
 Footer links to the paper. Both are anonymous 24-hour publications.
+
+## 2026-09-10 — expanded Studio art integration (source only)
+
+- Added art release 2: 12/11/11/12/11/10/10/10 traits, 191,664,000 canonical
+  combinations. Studio text recompiles byte-identically to its exported Solidity.
+  Original art, descriptor, browser JSON, compiler and golden files are unchanged.
+- New immutable SSTORE2 descriptor: runtime 9,470 bytes, initcode 23,781 bytes;
+  art store 11,731 bytes including STOP. Versioned staker collision keys and
+  round-aware UI previews; fresh deployment and source-verification scripts wired.
+- `bash scripts/check-audit.sh` passed: **536 tests / 70 suites**, **160 frontend
+  tests**, **11 verifier tests**, **161 ABI declarations**, **38 production size
+  checks**, independent sine oracle, no-governance gate, TypeScript/Vite build.
+  Log: `/tmp/expanded-gate.log`.
+- Final focused `ExpandedPepeArtTest`: **6/6 passed**, including 256 fuzz cases,
+  client/Solidity SVG parity for both versions, exact stored bytes and new metadata,
+  version pinning, unknown-version rejection, expanded reservation/claim after
+  detonation/transfer, and old aliases becoming distinct new-version art. This
+  adds one test beyond the full run above (537 distinct tests covered). The
+  focused pass also follows moving the new error declaration into the existing
+  error block. Log: `/tmp/expanded-final-test.log`.
+- Frozen Studio compiler tests passed. A 390px browser fixture verified six
+  expanded previews, exact version-2 SVG, selection, pending lock and no overflow.
+  Contact sheet inspected at `/tmp/expanded-preview.png`.
+- No contracts deployed, no live addresses changed. See `docs/art/EXPANDED.md`.

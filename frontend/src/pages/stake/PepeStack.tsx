@@ -1,12 +1,14 @@
+import { usePepeDnaVersion } from '../../lib/usePepeDnaVersion'
 import { useState } from 'react'
 import { usePepeDna } from '../../lib/usePepeDna'
 import { renderPepeSvg } from '../../lib/pepeRender'
 
 function Face({ id, staker }: { id: bigint; staker?: `0x${string}` }) {
+  const version = usePepeDnaVersion(staker)
   const { data, isError } = usePepeDna(staker, id)
-  return data === undefined
+  return data === undefined || version === undefined
     ? <span className="text-xs text-text-lo">{isError ? 'art unavailable' : 'loading pepe…'}</span>
-    : <span className="block h-full w-full [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: renderPepeSvg(data) }} />
+    : <span className="block h-full w-full [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: renderPepeSvg(data, version) }} />
 }
 
 export default function PepeStack({ ids, staker }: { ids: bigint[]; staker?: `0x${string}` }) {

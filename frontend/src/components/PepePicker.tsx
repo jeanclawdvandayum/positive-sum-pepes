@@ -36,7 +36,8 @@ interface Props {
 export default function PepePicker({ round, selected, onSelect, seed, onReroll, disabled = false, actionLabel = 'stake' }: Props) {
   const staker = round.staker
   const dnaVersion = usePepeDnaVersion(staker)
-  const [descriptor, setDescriptor] = useState<string | undefined>()
+  const [descriptorResult, setDescriptor] = useState<{ staker: string; value: string }>()
+  const descriptor = descriptorResult?.staker === staker ? descriptorResult?.value : undefined
   const [svgs, setSvgs] = useState<Record<string, string>>({})
   const [localMode, setLocalMode] = useState(false)
 
@@ -52,23 +53,25 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll, 
     }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seed])
+  }, [seed, staker])
 
   const { data: available } = useQuery({
     queryKey: ['pepe-candidates', CHAIN_ID, staker, candidates.map(String)],
-    enabled: !!staker && dnaVersion === 1n,
+    enabled: !!staker && (dnaVersion === 1n || dnaVersion === 2n),
     queryFn: () => Promise.all(candidates.map(id => rpcCall(staker!, stakerAbi, 'isPepeAvailable', [id]) as Promise<boolean>)),
     refetchInterval: 6000,
   })
   useEffect(() => {
-    if (!disabled && selected !== null && available?.[candidates.indexOf(selected)] === false) onSelect(null)
+    if (!disabled && selected !== null && (!candidates.includes(selected) || available?.[candidates.indexOf(selected)] === false)) onSelect(null)
   }, [selected, available, candidates, onSelect, disabled])
 
   useEffect(() => {
     if (!staker || isZero(staker)) return
+    let active = true
     rpcCall(staker, stakerAbi, 'descriptor')
-      .then((d) => setDescriptor(d as string))
-      .catch(() => setDescriptor(undefined))
+      .then((d) => { if (active) setDescriptor({ staker, value: d as string }) })
+      .catch(() => { if (active) setDescriptor(undefined) })
+    return () => { active = false }
   }, [staker])
 
   // no descriptor / chain down? render locally from the same art data the
@@ -78,11 +81,12 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll, 
       setLocalMode(false)
       return
     }
+    if (dnaVersion === undefined) { setSvgs({}); return }
     const next: Record<string, string> = {}
-    for (const id of candidates) next[id.toString()] = renderPepeSvg(dnaOfId(id))
+    for (const id of candidates) next[id.toString()] = renderPepeSvg(dnaOfId(id), dnaVersion)
     setSvgs(next)
     setLocalMode(true)
-  }, [descriptor, candidates])
+  }, [descriptor, candidates, dnaVersion])
 
   useEffect(() => {
     if (!descriptor || isZero(descriptor)) return
@@ -105,7 +109,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll, 
     return () => {
       dead = true
     }
-  }, [descriptor, candidates])
+  }, [descriptor, candidates, dnaVersion])
 
   return (
     <div className="rounded-2xl border border-line bg-bg-1 p-4">
@@ -141,7 +145,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll, 
               type="button"
               aria-label={`select pepe #${id}`}
               aria-pressed={isSel}
-              disabled={disabled || taken}
+              disabled={disabled || taken || !svg || dnaVersion === undefined}
               onClick={() => onSelect(isSel ? null : id)}
               className={`relative aspect-square w-full min-w-0 rounded-xl border p-1 transition disabled:cursor-not-allowed disabled:opacity-40 ${
                 isSel

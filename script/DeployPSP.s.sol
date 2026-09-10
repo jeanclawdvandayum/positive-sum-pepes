@@ -10,7 +10,7 @@ import {PSPFactory} from "../src/PSPFactory.sol";
 import {HookDeployer} from "../src/HookDeployer.sol";
 import {ControllerDeployer} from "../src/ControllerDeployer.sol";
 import {SineMath} from "../src/libraries/SineMath.sol";
-import {PepeDescriptor} from "../src/PepeDescriptor.sol";
+import {PepeExpandedDescriptor} from "../src/PepeExpandedDescriptor.sol";
 import {PSPZapIn} from "../src/PSPZapIn.sol";
 import {PSPZapOut} from "../src/PSPZapOut.sol";
 import {IMixETH} from "../src/interfaces/IMixETH.sol";
@@ -25,8 +25,8 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 /// @title DeployPSP
 /// @notice Fresh staged deployment. PSP_TESTNET selects Base Sepolia 84532,
 /// a new free-mint practice mixETH/faucet and a read-only embedded status page.
-/// Testnet defaults: 2h predeposit, 1h vest, 2h clock, uncapped per-wallet
-/// predeposit (global cap 500 mixETH). PSP_* timing and sine overrides apply.
+/// Testnet defaults: 24h predeposit, 1h vest, 4h20m clock, uncapped per-wallet
+/// predeposit (global cap 1000 mixETH). PSP_* timing and sine overrides apply.
 /// Run a local fork rehearsal first. Broadcast with --slow, then read the
 /// actual round from the factory in the separate DeployReinvestor pass.
 contract DeployPSP is DeploymentSupport {
@@ -106,7 +106,7 @@ contract DeployPSP is DeploymentSupport {
         // wire the on-chain pepe art FIRST — it's global on the factory and
         // every round's staker is born with it (rides deployController's
         // raw-calldata passthrough). Factory owner == this broadcaster.
-        PepeDescriptor descriptor = new PepeDescriptor();
+        PepeExpandedDescriptor descriptor = new PepeExpandedDescriptor();
         factory.setDescriptor(address(descriptor));
         vm.stopBroadcast();
 

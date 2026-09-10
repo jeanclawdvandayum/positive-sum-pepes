@@ -1,3 +1,4 @@
+import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 import { capHeadroom, predepositLimit, predepositAmountAllowed, predepositProgress, predepositRemainder } from '../lib/predeposit'
 import { usePredepositMinimum } from '../lib/usePredepositMinimum'
 import { predepositResult } from '../lib/chainResults'
@@ -36,6 +37,7 @@ interface PdState {
 
 export default function Predeposit() {
   const round = useRound()
+  const dnaVersion = usePepeDnaVersion(round.staker)
   const minimum = usePredepositMinimum(round.controller)
   const [selectedPepe, setSelectedPepe] = useState<bigint | null>(null)
   const [pickerSeed, setPickerSeed] = useState(1)
@@ -268,19 +270,36 @@ export default function Predeposit() {
               : `approve ${wadToExact(amountWad)} mixETH`
 
   return (
-    <div className="space-y-4">
+    <div className="pd-page space-y-4">
       <RefBanner />
+      <style>{`
+        .pd-picker > div { height: 100%; }
+        .pd-picker .grid { gap: 10px; }
+        .pd-progress .mt-4 { margin-top: 10px; }
+        .pd-progress .px-3 { padding: 8px 0; }
+        .pd-clock > div { padding-top: 16px; padding-bottom: 20px; }
+        @media (min-width: 1024px) {
+          .pd-grid { align-items: stretch; }
+          .pd-picker .grid { max-width: 370px; margin-inline: auto; }
+          .pd-picker > p { margin-top: 8px; }
+          .pd-clock > div { padding-block: 8px; }
+          .pd-clock h1 { font-size: 24px; margin-bottom: 6px; }
+          .pd-clock .clock { transform: scale(.76); margin-block: -18px; }
+          .pd-deposit .input-amount { padding: 8px 12px; font-size: 24px; }
+          .pd-deposit .btn-primary { padding-block: 10px; }
+        }
+      `}</style>
 
       {pd && !pd.closed && endTime !== undefined && (
-        <ClockBand label="predeposit clock">
-          <h1 className="mb-5 w-full max-w-4xl text-center font-display text-2xl leading-tight text-[#e8f0f7] sm:mb-6 sm:text-3xl">
+        <ClockBand label="predeposit clock" className="pd-clock">
+          <h1 className="mb-3 w-full max-w-4xl text-center font-display text-2xl leading-tight text-[#e8f0f7] sm:mb-3 sm:text-3xl">
             {remaining !== undefined && remaining > 0 ? 'predeposit window ends in:' : 'predeposit window elapsed'}
           </h1>
           <Clock key={round.controller} deadlineMs={Number(endTime) * 1000} label="time until predeposit window ends" />
         </ClockBand>
       )}
       {/* a. header */}
-      <div className="card p-5">
+      <div className="px-1">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-2xl font-black text-slate-900">predeposit</h2>
         </div>
@@ -289,9 +308,9 @@ export default function Predeposit() {
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="pd-grid grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
           {/* b. progress */}
-          <div className="card p-5">
+          <div className="pd-progress card p-4 lg:col-start-2 lg:row-start-1">
             <div className="mb-1 flex justify-between text-[11px] font-bold uppercase tracking-wide text-slate-400">
               <span>window fill</span>
               <span className="min-w-0 break-all text-right">{pd ? predepositProgress(pd.total, pd.cap) : '…'}</span>
@@ -320,10 +339,11 @@ export default function Predeposit() {
             </div>
           </div>
 
+          <div className="pd-picker min-w-0 lg:col-start-1 lg:row-start-1 lg:row-span-2">
           {artVersion === 2n && !pd?.closed && (
             reservedPepe && reservedPepe > 0n ? (
               <div className="card p-5 flex flex-wrap items-center gap-4">
-                <img className="w-28 rounded-lg" alt="Your reserved Pepe" src={`data:image/svg+xml,${encodeURIComponent(renderPepeSvg(dnaOfId(reservedPepe)))}`} />
+                {dnaVersion !== undefined && <img className="w-28 rounded-lg" alt="Your reserved Pepe" src={`data:image/svg+xml,${encodeURIComponent(renderPepeSvg(dnaOfId(reservedPepe), dnaVersion))}`} />}
                 <p className="font-body text-sm">your pepe is reserved. every top-up goes into this position.</p>
               </div>
             ) : <PepePicker round={round} selected={selectedPepe} onSelect={setSelectedPepe}
@@ -331,12 +351,9 @@ export default function Predeposit() {
                   disabled={busy} actionLabel="deposit" />
           )}
 
-          {artVersion === 2n && !pd?.closed && !reservedPepe && (
-            <p className="px-1 font-body text-sm text-text-lo">choose your pepe above. your deposit reserves that face for the round.</p>
-          )}
-
+          </div>
           {/* c. deposit */}
-          <div className="card p-5">
+          <div className="pd-deposit card p-4 lg:col-start-2 lg:row-start-2">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-black text-slate-900">deposit</h2>
               <div className="flex shrink-0 items-center gap-1 rounded-2xl bg-white px-4 py-2 shadow-sm">
@@ -344,7 +361,7 @@ export default function Predeposit() {
               </div>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
+            <div className="mt-3 rounded-2xl border border-sky-100 bg-sky-50/60 p-3">
               <div className="flex items-center justify-between text-xs font-bold text-slate-400">
                 <span>commit</span>
                 <button
@@ -391,14 +408,14 @@ export default function Predeposit() {
             </div>
 
             {(FAUCET_ENABLED || TESTNET_ETH_FAUCET) && (
-              <div className="mt-3 space-y-2">
-                {FAUCET_ENABLED && <FaucetButton full />}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 font-body">
+                {FAUCET_ENABLED && <FaucetButton />}
                 {TESTNET_ETH_FAUCET && (
                   <a
                     href={NATIVE_ETH_FAUCET_URL}
                     target="_blank"
                     rel="noreferrer"
-                    className="btn-ghost w-full"
+                    className="text-xs text-text-lo underline underline-offset-4"
                   >
                     get {CHAIN_ID === 84532 ? 'base ' : ''}sepolia ETH ↗
                   </a>
@@ -416,7 +433,7 @@ export default function Predeposit() {
 
           {/* d. launch / claim */}
           {(pd?.launchable || launched) && (
-            <div className="card p-5">
+            <div className="card p-4 lg:col-span-2">
               <h2 className="text-lg font-black text-slate-900">{launched ? 'round launched' : 'launch'}</h2>
               {launched ? (
                 <>

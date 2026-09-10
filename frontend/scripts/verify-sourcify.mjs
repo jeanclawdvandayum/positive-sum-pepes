@@ -13,7 +13,7 @@ const contracts = {
   registry:'src/PSPReferralRegistry.sol:PSPReferralRegistry',
   zapIn:'src/PSPZapIn.sol:PSPZapIn', zapOut:'src/PSPZapOut.sol:PSPZapOut',
   faucet:'src/testnet/MixETHFaucet.sol:MixETHFaucet', reinvestor:'src/PSPReinvestor.sol:PSPReinvestor',
-  descriptor:'src/PepeDescriptor.sol:PepeDescriptor', hookDeployer:'src/HookDeployer.sol:HookDeployer',
+  descriptor:manifest.features?.PEPE_DNA_VERSION === '2' || manifest.artifacts?.descriptor?.contract === 'PepeExpandedDescriptor' ? 'src/PepeExpandedDescriptor.sol:PepeExpandedDescriptor' : 'src/PepeDescriptor.sol:PepeDescriptor', hookDeployer:'src/HookDeployer.sol:HookDeployer',
   controllerDeployer:'src/ControllerDeployer.sol:ControllerDeployer', stakerDeployer:'src/StakerDeployer.sol:StakerDeployer',
   tokenDeployer:'src/ControllerDeployer.sol:TokenDeployer',
   hookInitCode:'src/HookInitCode.sol:HookInitCode',

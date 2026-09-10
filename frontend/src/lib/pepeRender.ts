@@ -1,4 +1,5 @@
-import art from './pepeArt.json'
+import legacyArt from './pepeArt.json'
+import expandedArt from './pepeArtExpanded.json'
 
 /// Client-side pepe renderer — a faithful mirror of PepeDescriptor.renderSVG.
 /// Same RLE stamps, same palette assembly, same layer order (base → expr →
@@ -9,17 +10,6 @@ import art from './pepeArt.json'
 
 const hexToBytes = (h: string): Uint8Array =>
   Uint8Array.from(h.match(/.{2}/g)!, (b) => parseInt(b, 16))
-
-const BASE = hexToBytes(art.base)
-const EXPR = art.expr.map(hexToBytes)
-const EYE = art.eye.map(hexToBytes)
-const HAT = art.hat.map((s) => (s ? hexToBytes(s) : null))
-const WEAR = art.wear.map((s) => (s ? hexToBytes(s) : null))
-const ITEM = art.item.map((s) => (s ? hexToBytes(s) : null))
-const SKINS = hexToBytes(art.skins)
-const FIXED = hexToBytes(art.fixed)
-const IRISES = hexToBytes(art.irises)
-const BGS = hexToBytes(art.bgs)
 
 export interface Traits {
   expr: number
@@ -33,7 +23,8 @@ export interface Traits {
 }
 
 /// codec v2 — 4 bits per axis, modulo the axis count (any uint256 is valid)
-export function decodeDna(dna: bigint): Traits {
+export function decodeDna(dna: bigint, version = 1n): Traits {
+  const art = artFor(version)
   const f = (shift: number) => Number((dna >> BigInt(shift)) & 15n)
   const c = art.counts
   return {
@@ -53,7 +44,8 @@ const rgb = (b: Uint8Array, o: number): string =>
 
 /// mirrors PepeArtData.palette — 24 slots assembled from skin ramp + fixed
 /// shading slots + iris + bg overrides
-function palette(skin: number, iris: number, bg: number): string[] {
+function palette(art: typeof legacyArt, skin: number, iris: number, bg: number): string[] {
+  const SKINS = hexToBytes(art.skins), FIXED = hexToBytes(art.fixed), IRISES = hexToBytes(art.irises), BGS = hexToBytes(art.bgs)
   const m: string[] = new Array(24).fill('#000000')
   art.skinSlots.forEach((slot, i) => {
     m[slot] = rgb(SKINS, skin * 24 + i * 3)
@@ -92,9 +84,11 @@ const stamp = (data: Uint8Array, pal: string[]): string =>
   data.length === 0 ? '' : runs(data, data[0], data[1], data[2], pal, 4)
 
 /// dna -> complete SVG, layer order identical to the contract
-export function renderPepeSvg(dna: bigint): string {
-  const t = decodeDna(dna)
-  const pal = palette(t.skin, t.iris, t.bg)
+export function renderPepeSvg(dna: bigint, version = 1n): string {
+  const art = artFor(version)
+  const { BASE, EXPR, EYE, HAT, WEAR, ITEM } = buffers(version)
+  const t = decodeDna(dna, version)
+  const pal = palette(art, t.skin, t.iris, t.bg)
   const layers = [
     runs(BASE, 0, 0, 69, pal),
     stamp(EXPR[t.expr], pal),
@@ -116,4 +110,26 @@ export function randomDna(): bigint {
   const u = new Uint32Array(1)
   crypto.getRandomValues(u)
   return BigInt(u[0]) & 0xffffffffn
+}
+
+function artFor(version: bigint): typeof legacyArt {
+  if (version === 1n) return legacyArt
+  if (version === 2n) return expandedArt
+  throw new Error('Unsupported Pepe art version')
+}
+
+function decodeBuffers(art: typeof legacyArt) {
+  const BASE = hexToBytes(art.base)
+  const EXPR = art.expr.map(hexToBytes)
+  const EYE = art.eye.map(hexToBytes)
+  const HAT = art.hat.map((s) => (s ? hexToBytes(s) : null))
+  const WEAR = art.wear.map((s) => (s ? hexToBytes(s) : null))
+  const ITEM = art.item.map((s) => (s ? hexToBytes(s) : null))
+  return { BASE, EXPR, EYE, HAT, WEAR, ITEM }
+}
+const cachedBuffers = new Map<bigint, ReturnType<typeof decodeBuffers>>()
+function buffers(version: bigint) {
+  let value = cachedBuffers.get(version)
+  if (!value) { value = decodeBuffers(artFor(version)); cachedBuffers.set(version, value) }
+  return value
 }

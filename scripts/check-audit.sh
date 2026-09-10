@@ -3,6 +3,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 forge test --no-match-path 'test/integration/*'
+node script/gen_expanded_art.mjs --check
+node script/expanded-art-fixtures.mjs --check
 bash scripts/check-no-governance.sh
 python3 scripts/check-sizes.py
 python3 scripts/sine_oracle.py --check

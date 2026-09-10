@@ -1,3 +1,4 @@
+import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 import { useEffect, useState } from 'react'
 import { fmtPepeId } from '../lib/format'
 import { useAccount } from 'wagmi'
@@ -28,6 +29,7 @@ export default function PepePanel({ round, refreshKey = 0 }: Props) {
   const [teaser] = useState(() => renderPepeSvg(randomDna()))
 
   const staker = round.staker
+  const version = usePepeDnaVersion(staker)
 
   useEffect(() => {
     if (!address || isZero(staker)) return
@@ -111,7 +113,7 @@ export default function PepePanel({ round, refreshKey = 0 }: Props) {
       >
         {svg || dna !== undefined ? (
           <div
-            dangerouslySetInnerHTML={{ __html: svg ?? renderPepeSvg(dna!) }}
+            dangerouslySetInnerHTML={{ __html: svg ?? renderPepeSvg(dna!, version ?? 1n) }}
             className="h-full w-full"
           />
         ) : (

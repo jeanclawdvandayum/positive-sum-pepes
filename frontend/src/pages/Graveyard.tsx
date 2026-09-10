@@ -1,3 +1,4 @@
+import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
@@ -11,8 +12,9 @@ import { usePepeDna } from '../lib/usePepeDna'
 import { renderPepeSvg } from '../lib/pepeRender'
 
 function GraveyardArt({ staker, id }: { staker?: `0x${string}`; id: bigint }) {
+  const version = usePepeDnaVersion(staker)
   const { data: dna, isError } = usePepeDna(staker, id)
-  const svg = useMemo(() => dna === undefined ? undefined : renderPepeSvg(dna), [dna])
+  const svg = useMemo(() => dna === undefined || version === undefined ? undefined : renderPepeSvg(dna, version), [dna, version])
   return svg ? <div role="img" aria-label={`pepe ${id}`} className="aspect-square overflow-hidden rounded-lg [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
     : <div className="flex aspect-square items-center justify-center text-xs text-text-lo">{isError ? 'pepe image unavailable' : 'loading pepe…'}</div>
 }

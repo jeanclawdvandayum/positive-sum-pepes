@@ -69,6 +69,7 @@ async function main() {
   addresses.hookInitCode = await read(addresses.hookDeployer, addressGetter('initOracle'), 'initOracle')
   addresses.hookCodeFirst = await read(addresses.hookInitCode, addressGetter('first'), 'first')
   addresses.hookCodeSecond = await read(addresses.hookInitCode, addressGetter('second'), 'second')
+  addresses.artData = await read(addresses.descriptor, addressGetter('artData'), 'artData')
   const codeHashes = {}, codes = {}
   for (const [key, address] of Object.entries(addresses)) {
     const code = await checked(`deployed code for ${key}`, () => client.getCode({ address, blockNumber: block.number }))
@@ -80,13 +81,16 @@ async function main() {
   // executable bytes and metadata distinguish fresh source from legacy APIs
   // with unchanged version numbers (including block-hash genesis art).
   const artifacts = {}
-  const runtimeContracts = { factory: 'PSPFactory', token: 'PSPToken', controller: 'RoundController', hook: 'CurveHook', staker: 'PSPStaker', registry: 'PSPReferralRegistry', mix: 'SepoliaMixETH', descriptor: 'PepeDescriptor', hookDeployer: 'HookDeployer', controllerDeployer: 'ControllerDeployer', stakerDeployer: 'StakerDeployer', tokenDeployer: 'TokenDeployer', hookInitCode: 'HookInitCode', zapIn: 'PSPZapIn', zapOut: 'PSPZapOut', faucet: 'MixETHFaucet', reinvestor: 'PSPReinvestor' }
+  const runtimeContracts = { factory: 'PSPFactory', token: 'PSPToken', controller: 'RoundController', hook: 'CurveHook', staker: 'PSPStaker', registry: 'PSPReferralRegistry', mix: 'SepoliaMixETH', descriptor: 'PepeExpandedDescriptor', hookDeployer: 'HookDeployer', controllerDeployer: 'ControllerDeployer', stakerDeployer: 'StakerDeployer', tokenDeployer: 'TokenDeployer', hookInitCode: 'HookInitCode', zapIn: 'PSPZapIn', zapOut: 'PSPZapOut', faucet: 'MixETHFaucet', reinvestor: 'PSPReinvestor' }
   for (const [key, contract] of Object.entries(runtimeContracts)) {
     if (!addresses[key]) continue
     const artifact = loadArtifact(contract, contract === 'TokenDeployer' ? 'ControllerDeployer' : contract)
     assertRuntimeMatches(codes[key], artifact, key)
     artifacts[key] = { contract, runtimeMatchesIgnoringImmutables: true, artifactRuntimeHash: keccak256(artifact.deployedBytecode.object) }
   }
+  const artHex = fs.readFileSync(path.join(root, 'src/art/ExpandedPepeArt.sol'), 'utf8').match(/DATA = hex"([0-9a-fA-F]+)"/)[1]
+  if (codes.artData.toLowerCase() !== ('0x00' + artHex).toLowerCase()) throw Error('Expanded art storage differs from release source')
+  if (await read(addresses.descriptor, uintGetter('ART_VERSION'), 'ART_VERSION') !== 2n) throw Error('Expanded descriptor version mismatch')
   const shards = [codes.hookCodeFirst, codes.hookCodeSecond]
   if (shards.some(code => !code.startsWith('0x00'))) throw Error('Hook code shard is not STOP-prefixed')
   const storedCreationCode = '0x' + shards.map(code => code.slice(4)).join('')
@@ -123,7 +127,7 @@ async function main() {
   const features = {}
   for (const [role, getter] of [['controller', 'PREDEPOSIT_RULES_VERSION'], ['registry', 'PURCHASE_REFERRAL_VERSION'], ['staker', 'NFT_INTERFACE_VERSION'], ['staker', 'PEPE_DNA_VERSION'], ...(addresses.reinvestor ? [['reinvestor', 'ATTRIBUTION_VERSION']] : [])]) {
     const version = await read(addresses[role], uintGetter(getter), getter)
-    if (version !== 1n) throw Error(`Unsupported ${getter}`)
+    if (version !== (getter === 'PEPE_DNA_VERSION' ? 2n : 1n)) throw Error(`Unsupported ${getter}`)
     features[getter] = version
   }
   const supportsAbi = parseAbi(['function supportsInterface(bytes4) view returns(bool)'])

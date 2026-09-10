@@ -1,3 +1,4 @@
+import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 import { ensureWalletChain } from '../lib/ensureWalletChain'
 import { rpcCall } from '../lib/rpc'
 import { minimumOutput, MIN_BUY_INPUT } from '../lib/gameRules'
@@ -35,8 +36,9 @@ export interface PepeEntry {
 type CardStep = 'idle' | 'tx' | 'done'
 
 function Art({ id, staker }: { id: bigint; staker?: `0x${string}` }) {
+  const version = usePepeDnaVersion(staker)
   const { data: dna, isError } = usePepeDna(staker, id)
-  const svg = useMemo(() => dna === undefined ? undefined : renderPepeSvg(dna), [dna])
+  const svg = useMemo(() => dna === undefined || version === undefined ? undefined : renderPepeSvg(dna, version), [dna, version])
   if (!svg) return <div className="flex h-32 items-center justify-center rounded-xl bg-bg-2 text-xs text-text-lo">
     {isError ? 'pepe image unavailable' : 'loading pepe…'}
   </div>

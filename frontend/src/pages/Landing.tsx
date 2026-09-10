@@ -54,7 +54,7 @@ const BEATS: { name: string; copy: string; kind: BeatKind }[] = [
 
 const RULES: [string, string][] = [
   ['buying in', 'the minimum buy is 0.005 mixETH, including fees. every full 0.005 mixETH buys one ladder ticket. one wallet can hold several spots.'],
-  ['feeding the clock', 'each ticket adds up to 4 minutes and 20 seconds, capped at 69 hours, 4 minutes and 20 seconds in this testnet. a 0.05 mixETH buy takes all ten spots and adds up to 43 minutes and 20 seconds.'],
+  ['feeding the clock', 'each ticket adds up to 4 minutes and 20 seconds, capped at 4 hours and 20 minutes in this testnet. a 0.05 mixETH buy takes all ten spots and adds up to 43 minutes and 20 seconds.'],
   ['hitting zero', 'the countdown starts at launch. trading stops at zero. anyone can detonate the round to settle the ladder and open the staking locks.'],
   ['ladder payouts', 'with ten tickets, the pot splits 25/18/14/10/8/7/6/5/4/3% from newest to oldest.'],
   ['smaller ladders', 'one ticket gets the whole pot. with two to nine tickets, each gets a larger share using the same relative weights.'],
