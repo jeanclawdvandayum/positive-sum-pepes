@@ -1,9 +1,13 @@
 import { cookieStorage, createStorage } from 'wagmi'
 import { base, baseSepolia, mainnet, sepolia } from 'wagmi/chains'
 import { defineChain, type Transport } from 'viem'
-import { getDefaultConfig, getDefaultWallets } from '@rainbow-me/rainbowkit'
+import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { walletchanWallet } from './walletchan'
-import { injectedWallet } from '@rainbow-me/rainbowkit/wallets'
+import {
+  injectedWallet, metaMaskWallet, coinbaseWallet, trustWallet,
+  phantomWallet, rabbyWallet, rainbowWallet, okxWallet,
+  uniswapWallet, zerionWallet, ledgerWallet, walletConnectWallet,
+} from '@rainbow-me/rainbowkit/wallets'
 import { rpcTransport } from './rpcTransport'
 
 const env = import.meta.env
@@ -64,10 +68,14 @@ const separateNameChain = Boolean(env.VITE_NAME_REGISTRAR) && Number(env.VITE_NA
 export const wagmiConfig = getDefaultConfig({
   appName: 'Positive Sum Pepes',
   projectId: env.VITE_WC_PROJECT_ID || '',
-  // Browser extensions use EIP-6963/injection without a relay project.
-  // Offer remote wallets only when their real project is configured.
-  wallets: [{ groupName: 'Browser wallets', wallets: [walletchanWallet, injectedWallet] },
-    ...(env.VITE_WC_PROJECT_ID ? getDefaultWallets().wallets : [])],
+  // WalletConnect-backed entries require this app's own relay project ID.
+  // Preserve extension access while deployment credentials are being configured.
+  wallets: env.VITE_WC_PROJECT_ID ? [{
+    groupName: 'Wallets',
+    wallets: [metaMaskWallet, coinbaseWallet, trustWallet, phantomWallet,
+      rabbyWallet, rainbowWallet, okxWallet, uniswapWallet, zerionWallet,
+      ledgerWallet, walletchanWallet, walletConnectWallet, injectedWallet],
+  }] : [{ groupName: 'Browser wallets', wallets: [walletchanWallet, injectedWallet] }],
   chains: separateNameChain ? [targetChain, mainnet] : [targetChain],
   batch: { multicall: { batchSize: 4096, wait: 20 } },
   storage: createStorage({ storage: cookieStorage }),
