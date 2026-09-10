@@ -1,7 +1,8 @@
 # Expanded Pepe art, release 2
 
-Source preparation, September 10, 2026. This release has **not been deployed**.
-The current September 9 testnet remains on art version 1.
+Deployed September 10, 2026 on Base Sepolia. Factory
+`0xe4bf7a7450b580fef3a5965e4f3896e736e06dd2` uses art version 2.
+The September 9 deployment retains art version 1.
 
 The Studio export in `studio/expanded` adds Amazing and Rage expressions, Sus
 eyes, Fuck My Shit Up hair, Reading Glasses, Unibrow, and Knife. Counts in DNA

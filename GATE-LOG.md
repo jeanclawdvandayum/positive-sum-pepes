@@ -1447,3 +1447,19 @@ Footer links to the paper. Both are anonymous 24-hour publications.
   expanded previews, exact version-2 SVG, selection, pending lock and no overflow.
   Contact sheet inspected at `/tmp/expanded-preview.png`.
 - No contracts deployed, no live addresses changed. See `docs/art/EXPANDED.md`.
+
+## 2026-09-10 — fresh expanded-art deployment and compact predeposit UI
+
+- Release `57f112a5`, factory `0xe4bf7a7450b580fef3a5965e4f3896e736e06dd2`.
+- Deterministic gate: 537 Solidity tests / 70 suites, 160 frontend tests,
+  11 verifier tests, 161 ABI declarations and 38 size checks passed; oracle,
+  governance, TypeScript/Vite and expanded-art parity gates passed.
+- Rehearsal and live-deployment lifecycle tests each passed 2/2.
+- All 17 deployment receipts succeeded. Manifest checks bytecode, exact art
+  storage and wiring. Profile: 24h predeposit, 1000 mixETH cap, 04:20:00 clock.
+- Sourcify matched 16/17. Its Linux compiler segfaults on the new descriptor,
+  including isolated-source retry. Local runtime and art bytes match.
+- Desktop 1366×768 contains the predeposit controls; mobile390px has no
+  horizontal overflow. UI rebuilt against confirmed contracts.
+- Existing Ethereum registrar retained, gate rotated and local verifier
+  rewired. See `docs/audit/2026-09-10-release.md` and deployment records.

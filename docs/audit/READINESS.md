@@ -1,6 +1,6 @@
 # Audit preparation — September 2026
 
-## September 10 source preparation — expanded art
+## September 10 deployment — expanded art
 
 Fresh testnet profile: 24-hour predeposit, 1,000 mixETH global cap and
 04:20:00 maximum active clock (15,600 seconds). Wallets remain uncapped.
@@ -9,7 +9,10 @@ The seven-trait Studio expansion is integrated as art version 2 with separate
 immutable bytecode storage. There are 191,664,000 canonical combinations.
 Existing deployed art and its renderer are preserved. New deployment scripts
 select `PepeExpandedDescriptor`; a fresh factory is required so the staker’s
-collision codec matches. This art release is **not deployed**. See
+collision codec matches. Deployed factory:
+`0xe4bf7a7450b580fef3a5965e4f3896e736e06dd2`. All 17 deployment
+receipts succeeded and both deployed lifecycle fork tests passed. See
+[manifest](deployments/base-sepolia-2026-09-10.json) and
 [expanded art integration](../art/EXPANDED.md).
 
 
