@@ -280,6 +280,9 @@ export default function Predeposit() {
         .pd-clock > div { padding-top: 16px; padding-bottom: 20px; }
         @media (min-width: 1024px) {
           .pd-grid { align-items: stretch; }
+          .pd-page > .px-1 { display: flex; align-items: center; gap: 24px; }
+          .pd-page > .px-1 h2 { white-space: nowrap; }
+          .pd-page > .px-1 p { margin: 0; max-width: 52rem; }
           .pd-picker .grid { max-width: 370px; margin-inline: auto; }
           .pd-picker > p { margin-top: 8px; }
           .pd-clock > div { padding-block: 8px; }
