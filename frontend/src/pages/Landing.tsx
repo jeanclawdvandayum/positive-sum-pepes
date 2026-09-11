@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import Clock from '../components/Clock'
-import { randomDna, renderPepeSvg } from '../lib/pepeRender'
+import { renderDecorativePepeSvg } from '../lib/pepeRender'
 import { BeatDiagram, DiagramStyles, type BeatKind } from './explainer/diagrams'
 import { targetChain } from '../lib/config'
 import PayoutSlider from './explainer/PayoutSlider'
@@ -65,7 +65,7 @@ const RULES: [string, string][] = [
 ]
 
 export default function Landing() {
-  const greeter = useMemo(() => renderPepeSvg(randomDna()), [])
+  const greeter = useMemo(() => renderDecorativePepeSvg(), [])
 
   return (
     <div className="xd-page font-body text-text-hi">

@@ -3,7 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { NavLink, useLocation, Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
-import { renderPepeSvg, randomDna } from '../lib/pepeRender'
+import { renderDecorativePepeSvg } from '../lib/pepeRender'
 import { ADDRESSES, FAUCET_ENABLED } from '../lib/config'
 import { faucetAbi } from '../lib/abi'
 import { useRound } from '../lib/useRound'
@@ -35,7 +35,7 @@ export default function Topbar() {
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const menuId = useId()
   // a random pepe every load — the header IS the art
-  const logo = useMemo(() => renderPepeSvg(randomDna()), [])
+  const logo = useMemo(() => renderDecorativePepeSvg(), [])
   /// predeposit page is live while the round is in (or before) its predeposit window;
   /// after launch the page stays reachable by URL for claims.
   const showPredeposit = round.mode === 0 || round.predepositClosed === false

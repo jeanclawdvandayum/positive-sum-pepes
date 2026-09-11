@@ -6,7 +6,7 @@ import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
-import { controllerAbi, erc20Abi } from '../lib/abi'
+import { controllerAbi, erc20Abi, stakerAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
 import { CHAIN_ID, FAUCET_ENABLED, NATIVE_ETH_FAUCET_URL, TESTNET_ETH_FAUCET } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
@@ -194,7 +194,15 @@ export default function Predeposit() {
     const approvals: Parameters<typeof writeWithApprovals>[1] = []
     try {
       if (!round.mix) return
-      if (!hasAllowance) {
+      // Read at submission time: a previous deposit may have consumed the polled allowance.
+      const freshAllowance = await rpcCall(round.mix, erc20Abi, 'allowance', [address!, round.controller]) as bigint
+      if (latestDepositSession.current !== depositSession) return
+      setAllowance(freshAllowance)
+      if (artVersion === 2n && !reservedPepe && round.staker && depositPepe !== null) {
+        const available = await rpcCall(round.staker, stakerAbi, 'isPepeAvailable', [depositPepe])
+        if (!available) { setSelectedPepe(null); throw new Error('That Pepe was just reserved. Choose another Pepe before depositing.') }
+      }
+      if (freshAllowance < amountWad) {
         setStep('approve')
         approvals.push({
           address: round.mix,
@@ -213,6 +221,7 @@ export default function Predeposit() {
       if (latestDepositSession.current !== depositSession) return
       if (artVersion === 2n) await refreshPepe()
       if (latestDepositSession.current !== depositSession) return
+      setAllowance(undefined)
       setStep('done')
       setNonce((n) => n + 1)
     } catch (e) {
@@ -274,9 +283,14 @@ export default function Predeposit() {
       <RefBanner />
       <style>{`
         .pd-picker > div { height: 100%; }
+        .pd-reserved-card {
+          display: grid; place-items: center; width: min(100%, 300px); aspect-ratio: 1;
+          padding: 4px; background: var(--bg-2); border: 1px solid var(--accent);
+          border-radius: 12px; box-shadow: 0 5px 14px #0005;
+          transform: rotate(-2deg); image-rendering: pixelated;
+        }
         .pd-picker .grid { gap: 10px; }
         .pd-progress .mt-4 { margin-top: 10px; }
-        .pd-progress .px-3 { padding: 8px 0; }
         .pd-clock > div { padding-top: 16px; padding-bottom: 20px; }
         @media (min-width: 1024px) {
           .pd-grid { align-items: stretch; }
@@ -326,13 +340,13 @@ export default function Predeposit() {
             </div>
             {pd && <p className="mt-2 break-all text-xs text-slate-500">{predepositRemainder(pd.total, pd.cap)}</p>}
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-white/80 px-3 py-3 shadow-sm">
+              <div className="pd-stat rounded-2xl bg-white/80 shadow-sm">
                 <div className="text-lg font-black text-slate-900">
                   {depositors !== undefined ? depositors.toString() : '…'}
                 </div>
                 <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">depositors</div>
               </div>
-              <div className="rounded-2xl bg-white/80 px-3 py-3 shadow-sm">
+              <div className="pd-stat rounded-2xl bg-white/80 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2 break-all text-lg font-black text-slate-900">
                   {!isConnected ? '—' : myDep === undefined ? '…' : wadToExact(myDep.mixETHAmount)}
                   {myDep?.claimed && <span className="text-xs font-bold text-emerald-600">claimed ✓</span>}
@@ -345,9 +359,17 @@ export default function Predeposit() {
           <div className="pd-picker min-w-0 lg:col-start-1 lg:row-start-1 lg:row-span-2">
           {artVersion === 2n && !pd?.closed && (
             reservedPepe && reservedPepe > 0n ? (
-              <div className="card p-5 flex flex-wrap items-center gap-4">
-                {dnaVersion !== undefined && <img className="w-28 rounded-lg" alt="Your reserved Pepe" src={`data:image/svg+xml,${encodeURIComponent(renderPepeSvg(dnaOfId(reservedPepe), dnaVersion))}`} />}
-                <p className="font-body text-sm">your pepe is reserved. every top-up goes into this position.</p>
+              <div className="card flex flex-col items-center gap-5 p-5 text-center" aria-label="your reserved pepe">
+                <div>
+                  <h2 className="font-display text-2xl leading-tight">reserved position</h2>
+                  <p className="mt-1 font-body text-xs text-text-lo">your pepe is reserved. every top-up goes into this position.</p>
+                </div>
+                <div className="flex w-full flex-1 items-center justify-center px-2 py-2">
+                  <div className="pd-reserved-card">
+                    {dnaVersion !== undefined ? <img className="block aspect-square h-full w-full rounded-lg" alt="Your reserved Pepe" src={`data:image/svg+xml,${encodeURIComponent(renderPepeSvg(dnaOfId(reservedPepe), dnaVersion))}`} />
+                      : <span className="text-xs text-text-lo">loading pepe…</span>}
+                  </div>
+                </div>
               </div>
             ) : <PepePicker round={round} selected={selectedPepe} onSelect={setSelectedPepe}
                   seed={pickerSeed} onReroll={() => { setSelectedPepe(null); setPickerSeed(s => s + 1) }}
@@ -479,6 +501,9 @@ export default function Predeposit() {
             </div>
           )}
 
+          {isConnected && artVersion === 2n && reservedPepe === 0n && selectedPepe === null && !pd?.closed && (
+            <p role="alert" className="mt-3 font-body text-sm text-phase-critical">Choose your Pepe above before depositing.</p>
+          )}
           {error && <div className="break-words rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-500">{error}</div>}
       </div>
     </div>

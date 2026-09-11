@@ -68,3 +68,16 @@ test('expanded logarithmic axes use bounded, ordered ticks inside the visible ra
     ticks.forEach((v, i) => assert.ok(v >= min && v <= max && (!i || v > ticks[i - 1])))
   }
 })
+
+test('ten-million reserve extrapolation is bounded without inventing capped prices', () => {
+  for (const reserve of [1e6, 1e7, 1e12, 1e59]) {
+    const c = sampleSineChart(raw, reserve)
+    assert.equal(c.truncated, true)
+    assert.ok(c.points.length <= 8260)
+    assert.ok(c.points.every(p => [p.reserve, p.price, p.supply, p.price * 1e18].every(Number.isFinite)))
+    assert.ok(c.markers.every(m => Number.isFinite(m.price * 1e18)))
+    const last = c.points.at(-1)
+    assert.ok(last.reserve < reserve)
+    assert.ok(last.price > c.points.at(-2).price)
+  }
+})

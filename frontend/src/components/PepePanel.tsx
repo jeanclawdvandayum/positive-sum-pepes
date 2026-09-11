@@ -4,7 +4,7 @@ import { fmtPepeId } from '../lib/format'
 import { useAccount } from 'wagmi'
 import { stakerAbi, descriptorAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
-import { renderPepeSvg, randomDna } from '../lib/pepeRender'
+import { renderPepeSvg, renderDecorativePepeSvg } from '../lib/pepeRender'
 import type { RoundInfo } from '../lib/useRound'
 
 interface Props {
@@ -26,7 +26,7 @@ export default function PepePanel({ round, refreshKey = 0 }: Props) {
   const [svg, setSvg] = useState<string | null>(null)
   const [artOnline, setArtOnline] = useState(false)
   // teaser pepe for wallet-disconnected / chain-down states — rerolled per mount
-  const [teaser] = useState(() => renderPepeSvg(randomDna()))
+  const [teaser] = useState(() => renderDecorativePepeSvg())
 
   const staker = round.staker
   const version = usePepeDnaVersion(staker)

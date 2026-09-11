@@ -1,6 +1,13 @@
 import legacyArt from './pepeArt.json'
 import expandedArt from './pepeArtExpanded.json'
 
+// Decorative art follows the newest release; owned NFTs always pass their round version.
+export const DECORATIVE_ART_VERSION = 2n
+
+export function renderDecorativePepeSvg(dna = randomDna()): string {
+  return renderPepeSvg(dna, DECORATIVE_ART_VERSION)
+}
+
 /// Client-side pepe renderer — a faithful mirror of PepeDescriptor.renderSVG.
 /// Same RLE stamps, same palette assembly, same layer order (base → expr →
 /// eyes → eyewear → hat → item), same 4-bit DNA codec. Used when the on-chain

@@ -1,3 +1,4 @@
+import { chartWad } from './chartNumbers'
 import { rpcCall } from './rpc'
 import { hookAbi } from './abi'
 import { sampleSineChart, sineChartHeadroom, type SineCurveData, type SineMarker } from './sineChart'
@@ -25,15 +26,15 @@ export async function loadSineCurve(hook: `0x${string}`, liveReserve = 0): Promi
   }
   const cached = await promise
   const { data, raw } = cached
-  if (data.active && data.points.at(-1)!.reserve < sineChartHeadroom(liveReserve, Number(raw[4]) / 1e18)) {
+  if (data.active && !data.truncated && data.points.at(-1)!.reserve < sineChartHeadroom(liveReserve, Number(raw[4]) / 1e18)) {
     cached.data = sampleSineChart(raw, liveReserve)
   }
   return cached.data
 }
 
 /// human-readable tag for a marker (chart labels)
-export function markerLabel(m: SineMarker, fmtPrice: (v: bigint) => string): string {
-  const p = fmtPrice(BigInt(Math.round(m.price * 1e18)))
+export function markerLabel(m: SineMarker, fmtPrice: (v: bigint | undefined) => string): string {
+  const p = fmtPrice(chartWad(m.price))
   if (m.kind === 'boot') return `launch ${p}`
   if (m.k === 4) return `wave 1 top ${p}`
   if (m.k === 8) return `wave 2 top ${p}`

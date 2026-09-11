@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import MixLogo from '../../components/MixLogo'
 import { CurveDiagram } from './CurveExplainer'
-import { randomDna, renderPepeSvg } from '../../lib/pepeRender'
+import { renderDecorativePepeSvg } from '../../lib/pepeRender'
 
-const randomPepe = () => renderPepeSvg(randomDna())
+const randomPepe = () => renderDecorativePepeSvg()
 
 // Illustrations only. CSS handles motion, with a readable static frame for each
 // diagram. The real countdown continues to use the shared PhaseEngine.

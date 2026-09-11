@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import { transactionToasts, type TxToast } from '../lib/transactionToasts'
-import { renderPepeSvg } from '../lib/pepeRender'
+import { renderDecorativePepeSvg } from '../lib/pepeRender'
 import { wagmiConfig } from '../lib/config'
 
 const status = {
@@ -14,7 +14,7 @@ const status = {
 } as const
 
 function TransactionToast({ item }: { item: TxToast }) {
-  const svg = useMemo(() => renderPepeSvg(item.dna), [item.dna])
+  const svg = useMemo(() => renderDecorativePepeSvg(item.dna), [item.dna])
   const chain = wagmiConfig.chains.find(chain => chain.id === item.chainId)
   const explorer = chain?.blockExplorers?.default
   useEffect(() => {

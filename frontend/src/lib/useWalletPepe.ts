@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CHAIN_ID } from './config'
 import { rpcCall } from './rpc'
-import { renderPepeSvg } from './pepeRender'
+import { DECORATIVE_ART_VERSION, renderPepeSvg } from './pepeRender'
 import { addressPepeDna, createWalletPepeReader, walletPepeKey } from './walletPepe'
 
 export function useWalletPepe(address: `0x${string}`, staker?: `0x${string}`) {
@@ -19,5 +19,5 @@ export function useWalletPepe(address: `0x${string}`, staker?: `0x${string}`) {
   })
   const pepe = query.isError ? undefined : query.data
   const dna = pepe?.dna ?? addressPepeDna(address)
-  return useMemo(() => pepe?.svg ?? (staker && version === undefined ? '<svg viewBox="0 0 69 69" />' : renderPepeSvg(dna, version ?? 1n)), [pepe?.svg, dna, version, staker])
+  return useMemo(() => pepe?.svg ?? (staker && version === undefined ? '<svg viewBox="0 0 69 69" />' : renderPepeSvg(dna, version ?? DECORATIVE_ART_VERSION)), [pepe?.svg, dna, version, staker])
 }

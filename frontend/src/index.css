@@ -199,3 +199,5 @@ body {
   .tx-toast-art { width: 56px; height: 64px; }
   .tx-toast-copy strong { font-size: 20px; }
 }
+
+.pd-stat { min-width: 0; padding: 12px 16px; }

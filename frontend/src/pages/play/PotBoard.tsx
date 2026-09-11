@@ -1,7 +1,7 @@
 import { useConfirmedWrite } from '../../lib/useConfirmedWrite'
 import { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
-import { renderPepeSvg } from '../../lib/pepeRender'
+import { renderDecorativePepeSvg } from '../../lib/pepeRender'
 import { dnaOfId } from '../../components/PepePicker'
 import { fmtAmount } from '../../lib/format'
 import { hookAbi } from '../../lib/abi'
@@ -39,7 +39,7 @@ const sleepers = new Map<number, string>()
 function sleeperFor(seat: number): string {
   let svg = sleepers.get(seat)
   if (svg === undefined) {
-    svg = renderPepeSvg(dnaOfId(2_000_000_000_000n + BigInt(seat)))
+    svg = renderDecorativePepeSvg(dnaOfId(2_000_000_000_000n + BigInt(seat)))
     sleepers.set(seat, svg)
   }
   return svg

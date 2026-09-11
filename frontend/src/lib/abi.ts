@@ -23,6 +23,12 @@ export const factoryAbi = parseAbi([
 ])
 
 export const controllerAbi = parseAbi([
+  'error ERC20InsufficientAllowance(address spender, uint256 allowance, uint256 needed)',
+  'error PepeDnaTaken()',
+  'error BadPepeId()',
+  'error PredepositClosed()',
+  'error CapExceeded()',
+  'error WalletCapExceeded()', 
   'function staker() view returns (address)',
   'function predepositState() view returns (uint256 total, uint256 cap, uint256 startTime, bool closed, bool capReached, bool windowOver, bool launchable)',
   'function claimPredepositPSP()',

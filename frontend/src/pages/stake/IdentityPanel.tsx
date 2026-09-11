@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useAccount } from 'wagmi'
-import { renderPepeSvg, randomDna } from '../../lib/pepeRender'
+import { renderDecorativePepeSvg } from '../../lib/pepeRender'
 import { fmtAmount } from '../../lib/format'
 import type { RoundInfo } from '../../lib/useRound'
 import PepeStack from './PepeStack'
@@ -36,7 +36,7 @@ export default function IdentityPanel({
   claimRow,
 }: Props) {
   const { address } = useAccount()
-  const [teaser] = useState(() => renderPepeSvg(randomDna()))
+  const [teaser] = useState(() => renderDecorativePepeSvg())
   const staker = round.staker
   const nameLine = 'staked position(s)'
   const subLine = !address ? 'connect your wallet to find your pepe.'

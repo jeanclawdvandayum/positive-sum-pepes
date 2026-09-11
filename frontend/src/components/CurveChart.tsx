@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { sampleCurve } from '../lib/curve'
 import { useRound, type RoundInfo } from '../lib/useRound'
 import { fmtAmount, fmtPrice } from '../lib/format'
+import { chartWad } from '../lib/chartNumbers'
 import { logTicks } from '../lib/chartTicks'
 
 type YMode = 'price' | 'supply'
@@ -36,7 +37,7 @@ export function CurveChartView({ round, hasTrades = true, entryPrice }: ChartPro
   const [hover, setHover] = useState<number | null>(null)
 
   const pts = useMemo(() => {
-    if (round.sine?.active && round.sine.points.length) return round.sine.points
+    if (round.sine?.active && round.sine.points.length) return round.sine.points.filter(p => [p.reserve, p.price, p.supply].every(Number.isFinite))
     if (!round.sine || round.sine.configured) return []
     return round.curve ? sampleCurve(round.curve, round.supply ?? 0n) : []
   }, [round.sine, round.curve, round.supply])
@@ -178,6 +179,7 @@ export function CurveChartView({ round, hasTrades = true, entryPrice }: ChartPro
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-display text-lg text-text-hi">the curve</h2>
+          {round.sine?.truncated && <p role="status" className="text-xs text-phase-heat">The theoretical curve exceeds the chart range. Live balances below come from the contract.</p>}
           <p className="text-xs text-text-lo">
             x: mixETH reserve ({lin ? 'linear' : 'log'}) · y:{' '}
             {yMode === 'price' ? ` price (${lin ? 'linear' : 'log'})` : ' supply (linear)'}
@@ -243,8 +245,8 @@ export function CurveChartView({ round, hasTrades = true, entryPrice }: ChartPro
                   fontSize="11"
                 >
                   {yMode === 'price'
-                    ? chartPrice(BigInt(Math.round(t * 1e18)))
-                    : fmtAmount(BigInt(Math.round(t * 1e18)))}
+                    ? chartPrice(chartWad(t))
+                    : fmtAmount(chartWad(t))}
                 </text>
               </g>
             )
@@ -263,7 +265,7 @@ export function CurveChartView({ round, hasTrades = true, entryPrice }: ChartPro
                   className="fill-text-lo"
                   fontSize="11"
                 >
-                  {fmtAmount(BigInt(Math.round(t * 1e18)))}
+                  {fmtAmount(chartWad(t))}
                 </text>
               </g>
             )
@@ -349,12 +351,12 @@ export function CurveChartView({ round, hasTrades = true, entryPrice }: ChartPro
               >
                 <rect width="158" height="40" rx="8" fill="var(--chart-panel)" stroke="var(--chart-panel-border)" />
                 <text x="10" y="17" fontSize="11" className="fill-text-lo">
-                  reserve {fmtAmount(BigInt(Math.round(pts[hover].reserve * 1e18)))}
+                  reserve {fmtAmount(chartWad(pts[hover].reserve))}
                 </text>
                 <text x="10" y="31" fontSize="11" fontWeight="bold" className="fill-text-hi">
                   {yMode === 'price'
-                    ? `price ${chartPrice(BigInt(Math.round(pts[hover].price * 1e18)))}`
-                    : `supply ${fmtAmount(BigInt(Math.round(pts[hover].supply * 1e18)))}`}
+                    ? `price ${chartPrice(chartWad(pts[hover].price))}`
+                    : `supply ${fmtAmount(chartWad(pts[hover].supply))}`}
                 </text>
               </g>
             </g>
@@ -409,7 +411,7 @@ function EntryMark({ price, sy }: { price: number; sy: (v: number) => number }) 
         fontSize="10"
         className="fill-pepe font-semibold"
       >
-        your entry · {chartPrice(BigInt(Math.round(price * 1e18)))}
+        your entry · {chartPrice(chartWad(price))}
       </text>
     </g>
   )

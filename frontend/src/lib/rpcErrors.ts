@@ -13,6 +13,15 @@ export function isRpcUnavailable(error: unknown): boolean {
 }
 
 export function userFacingRpcError(error: unknown): unknown {
+  let current = error
+  const seen = new Set<unknown>()
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current)
+    if (/0xfb8f41b2|ERC20InsufficientAllowance/.test(current.message)) {
+      return new Error('The mixETH approval is too small or was already used. Try again to approve the current deposit amount.', { cause: error })
+    }
+    current = current.cause
+  }
   return isRpcUnavailable(error)
     ? new Error('The RPC connection is busy or unavailable. No new transaction was submitted. Wait a moment and try again.', { cause: error })
     : error

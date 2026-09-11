@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react'
-import { renderPepeSvg, randomDna } from '../../lib/pepeRender'
+import { renderDecorativePepeSvg } from '../../lib/pepeRender'
 import { fmtAmount } from '../../lib/format'
 import type { GraveyardRound } from '../play/useGraveyard'
 import RoundWinners from './RoundWinners'
@@ -46,7 +46,7 @@ export default function HallOfDetonations({ rounds, checked, connected }: {
   checked: boolean
   connected: boolean
 }) {
-  const sleeper = useMemo(() => renderPepeSvg(randomDna()), [])
+  const sleeper = useMemo(() => renderDecorativePepeSvg(), [])
 
   return (
     <section className="rounded-2xl border border-line bg-bg-1 p-5" aria-label="round history">
