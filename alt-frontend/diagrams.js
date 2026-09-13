@@ -1,0 +1,32 @@
+// Adapted from frontend/src/pages/explainer/diagrams.tsx.
+const randomFace = () => Math.floor(Math.random() * 12);
+const pepe = (n, cls) => `<img class="${cls}" src="./assets/pepe-${n}.svg" alt=""/>`;
+export function supportDiagram(kind) {
+  let drawing = '';
+  if (kind === 'predeposit') drawing = `<svg viewBox="0 0 160 112"><text x="80" y="16" text-anchor="middle">public predeposit</text>${[28,72,116].map((x,i)=>`<g><rect x="${x}" y="27" width="16" height="12" rx="2" fill="var(--raised)" stroke="var(--muted)"/><path d="M${x+8} 42 V71 H80" fill="none" stroke="var(--line)"/><rect x="${x+5}" y="36" width="6" height="6" rx="1" fill="var(--green)" class="xd-deposit xd-deposit-${i}"/></g>`).join('')}<rect x="34" y="75" width="92" height="23" rx="4" fill="var(--raised)" stroke="var(--green)"/><text x="80" y="90" text-anchor="middle" class="xd-label">one pooled buy</text></svg>`;
+  if (kind === 'nft') drawing = `${pepe(randomFace(),'xd-nft-pepe')}<svg viewBox="0 0 160 112"><text x="15" y="15">PSP → pepe → fees</text><path d="M93 81 H147" stroke="var(--line)"/><g class="xd-nft-rewards" fill="var(--green)"><rect x="99" y="63" width="9" height="18" rx="2"/><rect x="116" y="49" width="9" height="32" rx="2"/><rect x="133" y="35" width="9" height="46" rx="2"/></g><text x="98" y="97">earned</text></svg>`;
+  if (kind === 'curve') {
+    const point=t=>({x:28+182*t,y:210-90*(t-Math.sin(2*Math.PI*t)/(2*Math.PI))});
+    const path=(from,to)=>Array.from({length:65},(_,i)=>{const p=point(from+(to-from)*i/64);return `${i?'L':'M'}${p.x.toFixed(2)},${p.y.toFixed(2)}`}).join(' ');
+    const zones=[[0,.25,true],[.25,.75,false],[.75,1.25,true],[1.25,1.75,false],[1.75,2,true]];
+    drawing=`<svg viewBox="0 0 420 240"><path d="M28 15V225H400" fill="none" stroke="var(--line)"/>${zones.map(([a,b,calm])=>`<path d="${path(a,b)}" fill="none" stroke="${calm?'var(--green)':'var(--diagram-steep)'}" stroke-width="7"/>`).join('')}<g class="xd-curve-dot"><circle r="20" fill="var(--ink)" opacity=".12"/><circle r="9" fill="var(--ink)"/></g></svg>`;
+  }
+  if (kind === 'stake') drawing=`<svg viewBox="0 0 160 112"><text x="16" y="19">trading fees</text><path d="M18 35H140" stroke="var(--line)"/><rect x="40" y="31" width="8" height="8" rx="2" fill="var(--green)" class="xd-fee"/><rect x="16" y="49" width="72" height="22" rx="3" fill="var(--green)"/><rect x="91" y="49" width="42" height="22" rx="2" fill="var(--diagram-pot)"/><rect x="136" y="49" width="6" height="22" rx="1" fill="var(--muted)"/><text x="16" y="94" class="xd-label">60% to stakers</text></svg>`;
+  if (kind === 'jackpot') drawing=`<svg viewBox="0 0 160 112"><text x="80" y="21" text-anchor="middle" class="xd-clock-add" style="font-family:Segment; font-size:16px;fill:var(--time-text)">+1:09</text><text x="80" y="36" text-anchor="middle">per ladder ticket</text>${[48,62,76].map(y=>`<rect x="19" y="${y}" width="122" height="9" rx="2" fill="var(--raised)" stroke="var(--line)"/>`).join('')}<rect x="20" y="48" width="40" height="9" rx="2" fill="var(--diagram-pot)" class="xd-ticket"/><text x="80" y="102" text-anchor="middle">last 10 tickets</text></svg>`;
+  if (kind === 'reserve') drawing=`<svg viewBox="0 0 160 112"><text x="16" y="19">external yield</text><circle cx="34" cy="63" r="16" fill="var(--raised)" stroke="var(--ink)"/><path d="M34 49L26 63L34 68L42 63Z M26 66L34 77L42 66L34 71Z" fill="var(--ink)"/><path d="M57 63H99" stroke="var(--green)" stroke-dasharray="2 3"/><rect x="72" y="60" width="6" height="6" rx="1" fill="var(--green)" class="xd-fee"/><rect x="107" y="33" width="30" height="51" rx="4" fill="var(--raised)" stroke="var(--green)"/><rect x="110" y="39" width="24" height="42" rx="2" fill="var(--green)" class="xd-yield-fill"/><text x="80" y="102" text-anchor="middle">ETH per mixETH</text></svg>`;
+  if (kind === 'settle') drawing=`<svg viewBox="0 0 160 112"><text x="80" y="17" text-anchor="middle">after detonation</text><path d="M18 29V85H143" fill="none" stroke="var(--line)"/><path d="M20 72H142" stroke="var(--green)" stroke-width="2"/><path d="M20 72C58 72 54 52 79 52S104 31 142 31" fill="none" stroke="var(--green)" stroke-width="3" class="xd-flatten"/>${[38,80,122].map(x=>`<circle cx="${x}" cy="72" r="4" fill="var(--ink)"/>`).join('')}<text x="80" y="102" text-anchor="middle">backing / PSP</text></svg>`;
+  if (kind === 'respawn') {
+    const n=randomFace();
+    drawing = `<span class="xd-respawn-roll"></span>${pepe(n,'xd-respawn-ghost')}${pepe(n,'xd-respawn-pepe')}<svg viewBox="0 0 160 112" class="xd-respawn-scene"><path d="M16 94 H144" stroke="var(--line)"/><g class="xd-grave"><path d="M62 93 V57 A18 18 0 0 1 98 57 V93 Z" fill="var(--raised)" stroke="var(--muted)"/><text x="80" y="67" text-anchor="middle" class="xd-label">RIP</text><text x="80" y="82" text-anchor="middle" class="xd-label">PSP</text></g><circle cx="80" cy="66" r="31" fill="none" stroke="var(--green)" stroke-width="2" class="xd-revive-ring"/><path d="M57 68 H70 L65 63 M70 68 L65 73" fill="none" stroke="var(--green)" stroke-width="2" class="xd-respawn-still-arrow"/><text x="80" y="15" text-anchor="middle" class="xd-label">die. respawn. repeat.</text></svg>`;
+  }
+  return `<div class="support-diagram"><div class="xd-stage" aria-hidden="true">${drawing}</div></div>`;
+}
+// Change the art while the card is hidden between death and resurrection.
+document.addEventListener('animationiteration', event => {
+  if (event.animationName !== 'xd-respawn-roll') return;
+  const stage=event.target.closest('.xd-stage');
+  if (!stage) return;
+  const current=Number(stage.querySelector('.xd-respawn-pepe').src.match(/pepe-(\d+)/)?.[1]??0);
+  const next=(current+1+Math.floor(Math.random()*11))%12;
+  stage.querySelectorAll('.xd-respawn-pepe,.xd-respawn-ghost').forEach(img=>{img.src=`./assets/pepe-${next}.svg`});
+});

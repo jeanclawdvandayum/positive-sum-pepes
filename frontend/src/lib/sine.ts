@@ -1,10 +1,11 @@
+import { readSineRulesVersion } from './sineVersion'
 import { chartWad } from './chartNumbers'
 import { rpcCall } from './rpc'
 import { hookAbi } from './abi'
 import { sampleSineChart, sineChartHeadroom, type SineCurveData, type SineMarker } from './sineChart'
 export type { SineCurveData, SineMarker } from './sineChart'
 
-const cache = new Map<string, Promise<{ raw: bigint[]; data: SineCurveData }>>()
+const cache = new Map<string, Promise<{ raw: bigint[]; version: 1 | 2; data: SineCurveData }>>()
 
 /** Cache immutable coefficients; extend geometry locally as reserves grow. */
 export async function loadSineCurve(hook: `0x${string}`, liveReserve = 0): Promise<SineCurveData> {
@@ -15,19 +16,20 @@ export async function loadSineCurve(hook: `0x${string}`, liveReserve = 0): Promi
       rpcCall(hook, hookAbi, 'sineConfigured') as Promise<boolean>,
       rpcCall(hook, hookAbi, 'sineActive') as Promise<boolean>,
       rpcCall(hook, hookAbi, 'sineCurve') as Promise<bigint[]>,
-    ]).then(([configured, active, raw]) => {
-      if (configured && active) return { raw, data: sampleSineChart(raw, liveReserve) }
+      readSineRulesVersion(() => rpcCall(hook, hookAbi, 'SINE_RULES_VERSION')),
+    ]).then(([configured, active, raw, version]) => {
+      if (configured && active) return { raw, version, data: sampleSineChart(raw, liveReserve, version) }
       cache.delete(key) // The same predeposit hook can materialize later.
-      return { raw, data: { active: false, configured, boot: 0, span: 0, top: 0, q0: 0n,
+      return { raw, version, data: { active: false, configured, boot: 0, span: 0, top: 0, q0: 0n,
         checkpoints: [], points: [], markers: [] } }
     })
     cache.set(key, promise)
     promise.catch(() => cache.delete(key))
   }
   const cached = await promise
-  const { data, raw } = cached
-  if (data.active && !data.truncated && data.points.at(-1)!.reserve < sineChartHeadroom(liveReserve, Number(raw[4]) / 1e18)) {
-    cached.data = sampleSineChart(raw, liveReserve)
+  const { data, raw, version } = cached
+  if (data.active && !data.truncated && data.points.at(-1)!.reserve < sineChartHeadroom(liveReserve, Number(raw[4]) / 1e18, version)) {
+    cached.data = sampleSineChart(raw, liveReserve, version)
   }
   return cached.data
 }

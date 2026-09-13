@@ -24,6 +24,7 @@ export interface RoundInfo {
   marginalPrice: bigint | undefined
   /// CLOCK-REDESIGN §2: the ladder pot — 35% of every fee + genesis launch
   /// fee + dust. Paid to the last-10-buyers board at detonation.
+  ticketPrice?: bigint
   potBalance: bigint | undefined
   totalLocked: bigint | undefined
   flatTime: bigint | undefined // bomb timestamp — nonzero = flat, locks open
@@ -98,7 +99,7 @@ function startRoundLoop() {
       const reinvestorReady = wrapperStaker?.toLowerCase() === rStaker.toLowerCase()
       // Immutable sine coefficients are cached per hook. Geometry extends
       // locally when the live reserve approaches the sampled window's edge.
-      const [mode, reserve, supply, totalLocked, pd, flatTime, potBalance, sineActive, swapFeeBps] = await Promise.all([
+      const [mode, reserve, supply, totalLocked, pd, flatTime, potBalance, sineActive, swapFeeBps, ticketPrice] = await Promise.all([
         rpcCall(rHook, hookAbi, 'mode') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'reserveMixETH') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'totalSupplyPSP') as Promise<bigint>,
@@ -110,6 +111,7 @@ function startRoundLoop() {
         rpcCall(rHook, hookAbi, 'potBalance') as Promise<bigint>,
         (rpcCall(rHook, hookAbi, 'sineActive') as Promise<boolean>).catch(() => false),
         rpcCall(rHook, hookAbi, 'swapFeeBps').then(value => BigInt(value as number)).catch(() => undefined),
+        rpcCall(rHook, hookAbi, 'ticketPrice').then(value => value as bigint).catch(() => undefined),
       ])
       if (!rHook || !rController) return
       // sine flavor: the zone getMarginalPrice is legacy — price comes from
@@ -138,7 +140,7 @@ function startRoundLoop() {
         rulesCompatible,
         id, token: rToken, controller: rController, staker: rStaker, hook: rHook, mix,
         mode: Number(mode), reserve, supply, marginalPrice: livePrice,
-        potBalance,
+        potBalance, ticketPrice,
         swapFeeBps,
         totalLocked,
         predepositClosed: pd[3], predepositStartTime: pd[2], totalPredeposit: pd[0], predepositCap: pd[1],

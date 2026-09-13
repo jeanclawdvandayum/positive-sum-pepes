@@ -20,7 +20,7 @@ contract MockFactory {
 
 /// @title VestingTest — InfiniFi epoch-point decay: pins, exact fee splits,
 ///         staggered decayers, gating, votes, dust, sparse replays.
-/// @notice Epoch = VEST/6 = 7d. Weight changes go live at the NEXT epoch
+/// @notice Epoch = VEST/6, with a four-week decay horizon. Weight changes go live at the NEXT epoch
 ///         boundary; a request at epoch E holds full weight through E and
 ///         steps down 5/6, 4/6, … 0 at each boundary after (k = e - E).
 ///         Fees are credited live via the creditPerWeight accumulator and
@@ -39,8 +39,8 @@ contract VestingTest is Test {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
 
-    uint256 constant VEST = 42 days;
-    uint256 constant EPOCH = 7 days; // VEST / 6
+    uint256 constant VEST = 28 days;
+    uint256 constant EPOCH = VEST / 6;
     uint256 t0; // setUp ends exactly on the epoch-2 boundary
 
     /// @dev decay math mirror: (base, slope) for an amount
@@ -107,13 +107,13 @@ contract VestingTest is Test {
         stakerV.requestWithdraw(101); // requestEpoch = 2, full through it
         assertEq(stakerV.biasOf(101, block.timestamp), 1000e18, "full through request epoch");
 
-        vm.warp(t0 + 1 * EPOCH); // +1 week → 5/6
+        vm.warp(t0 + 1 * EPOCH); // +1 epoch → 5/6
         assertEq(stakerV.biasOf(101, block.timestamp), _wAt(1000e18, 1), "1wk = 5/6");
 
-        vm.warp(t0 + 3 * EPOCH); // +3 weeks → 1/2
+        vm.warp(t0 + 3 * EPOCH); // +3 epochs → 1/2
         assertEq(stakerV.biasOf(101, block.timestamp), _wAt(1000e18, 3), "3wk = 1/2");
 
-        vm.warp(t0 + 6 * EPOCH); // +6 weeks → 0
+        vm.warp(t0 + 6 * EPOCH); // +6 epochs → 0
         assertEq(stakerV.biasOf(101, block.timestamp), 0, "6wk = 0");
         assertEq(stakerV.totalWeight(), 1000e18, "bob remains at full");
     }

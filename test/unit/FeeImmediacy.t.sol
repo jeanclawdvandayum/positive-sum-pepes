@@ -61,8 +61,8 @@ contract FeeImmediacyTest is Test {
     address bob = makeAddr("bob");
     address carol = makeAddr("carol");
 
-    uint256 constant VEST = 42 days;
-    uint256 constant EPOCH = 7 days; // VEST / 6
+    uint256 constant VEST = 28 days;
+    uint256 constant EPOCH = VEST / 6;
     uint256 t0; // setUp ends exactly on the epoch-2 boundary
 
     function setUp() public {

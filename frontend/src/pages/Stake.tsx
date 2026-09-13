@@ -1,3 +1,4 @@
+import AmountSlider from '../components/AmountSlider'
 import { positionFeesEarned } from '../lib/positionFees'
 import { minimumOutput, MIN_BUY_INPUT } from '../lib/gameRules'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
@@ -9,7 +10,7 @@ import { controllerAbi, erc20Abi, faucetAbi, hookAbi, stakerAbi, reinvestorAbi, 
 import { useRound, useBalances } from '../lib/useRound'
 import { useRpcReads } from '../lib/useRpcReads'
 import { rpcCall } from '../lib/rpc'
-import { fmtAmount, parseAmountToWad, wadToExact } from '../lib/format'
+import { fmtAmount, fmtCountdown, parseAmountToWad, wadToExact } from '../lib/format'
 import MixLogo from '../components/MixLogo'
 import PepePicker from '../components/PepePicker'
 import PepeCards, { type PepeEntry } from '../components/PepeCards'
@@ -40,7 +41,7 @@ import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 
 type Step = 'idle' | 'approve' | 'tx' | 'done'
 
-export default function Stake() {
+export default function Stake({ variant }: { variant?: 'alt' } = {}) {
   const round = useRound()
   const dnaVersion = usePepeDnaVersion(round.staker)
   const nftVersion = useNftVersion(round.staker)
@@ -381,9 +382,9 @@ export default function Stake() {
   // bottom stat cards folded into the continuous ticker (B3 item 5)
   const tickerItems: TickerItem[] = [
     { label: 'round', value: round.id.toString() },
-    { label: 'your stake', value: `${fmtAmount(totalStaked)} psp` },
+    { label: 'your lePSP', value: `${fmtAmount(totalStaked)} lePSP` },
     ...(totalValueMix !== undefined
-      ? [{ label: 'staked value', value: `≈ ${fmtAmount(totalValueMix, 4)} mix` }]
+      ? [{ label: 'lePSP value', value: `≈ ${fmtAmount(totalValueMix, 4)} mix` }]
       : []),
     ...(totalValueUsd !== undefined
       ? [
@@ -396,7 +397,7 @@ export default function Stake() {
     { label: 'your pepes', value: String(entries.length) },
     { label: 'fees earned', value: totalEarned === undefined ? '…' : `${fmtAmount(totalEarned, 4)} mix` },
     ...(round.totalLocked !== undefined
-      ? [{ label: 'all psp locked', value: `${fmtAmount(round.totalLocked)} psp` }]
+      ? [{ label: 'total lePSP', value: `${fmtAmount(round.totalLocked)} lePSP` }]
       : []),
   ]
 
@@ -434,10 +435,11 @@ export default function Stake() {
   ) : null
 
   return (
-    <div className="st-page font-body text-text-hi">
+    <div className={`st-page font-body text-text-hi ${variant === "alt" ? "alt-stake" : ""}`}>
+      {variant === "alt" && <div className="page-heading"><h1>put your bags to work.</h1><p>your pepes. your lePSP. your share of the fees.</p></div>}
       <StakeStyles />
 
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:grid-rows-[auto_1fr]">
+      <div className="alt-stake-layout grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:grid-rows-[auto_1fr]">
         {/* ── left: identity and earned fees ── */}
         <div className="flex min-w-0 flex-col gap-4">
           {claimable && (
@@ -445,7 +447,7 @@ export default function Stake() {
               <h2 className="font-display text-lg">your first bag is waiting</h2>
               <p className="mt-1 text-xs leading-relaxed text-text-lo">
                 your {fmtAmount(myDep!.mixETHAmount)} mixETH predeposit bought a share of the launch PSP.
-                claim it into a fresh pepe NFT. your PSP stays staked, and you keep your share of the fees earned before claiming.
+                claim it into a fresh pepe NFT. your lePSP stays locked, and you keep your share of the fees earned before claiming.
               </p>
               {canChooseGenesis && <div className="mt-4">
                 <p className="mb-3 text-xs text-text-lo">pick your first frog. the art is yours when the claim lands.</p>
@@ -495,7 +497,7 @@ export default function Stake() {
               <PspIcon px={20} /> stake psp
             </h2>
             <p className="mt-1 text-xs text-text-lo">
-              park your PSP with your pepe. staked PSP earns trading fees; requesting withdrawal starts a six-epoch exit.
+              lock PSP with your pepe as lePSP, locked earning PSP. it earns trading fees. requesting withdrawal starts this round’s six-epoch exit{vest !== undefined ? `, up to ${fmtCountdown(Number(vest))}` : ''}.
             </p>
 
             <div className="mt-4">
@@ -503,7 +505,7 @@ export default function Stake() {
                 <span>stake amount {hasPepes ? (pickedId !== null ? '(picked pepe)' : '(fresh pepe)') : ''}</span>
                 <span className="flex items-center gap-2">
                   {!hasPepes && amountWad === 0n && <span className="text-pepe">0 = pepe only</span>}
-                  <span className="tabular font-data">bal {fmtAmount(pspBal)}</span>
+                  <button type="button" className="tabular font-data hover:underline" title="Use full PSP balance" disabled={busy || pspBal === undefined} onClick={() => setAmount(wadToExact(pspBal))}>balance {fmtAmount(pspBal)} · max</button>
                 </span>
               </div>
               <div className="mt-2 flex gap-2">
@@ -514,10 +516,11 @@ export default function Stake() {
                   inputMode="decimal"
                   onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                 />
-                <button type="button" className="st-btn shrink-0" onClick={() => setAmount(wadToExact(pspBal))}>
+                <button type="button" className="st-btn shrink-0" disabled={busy || pspBal === undefined} onClick={() => setAmount(wadToExact(pspBal))}>
                   max
                 </button>
               </div>
+              <AmountSlider amount={amount} maximum={pspBal} onChange={setAmount} disabled={busy} label="share of your PSP to stake" />
               <button
                 type="button"
                 className="st-btn st-btn-primary mt-3 w-full"
@@ -540,7 +543,7 @@ export default function Stake() {
                   <MixLogo className="mr-3 shrink-0 text-[1.6em]" />
                   <div className="flex-1">
                     <div className="text-xs font-semibold">faucet</div>
-                    <div className="text-[11px] text-text-lo">free playtest mixETH · 1000 per click</div>
+                    <div className="text-[11px] text-text-lo">1000 mixETH per click</div>
                   </div>
                   <button
                     type="button"
@@ -560,7 +563,7 @@ export default function Stake() {
         </div>
 
         {/* ── below the overview on desktop; after the form on mobile ── */}
-        <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
+        <div className="alt-identity-row flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
           <ReferralsCard />
 
           <NameRegistrationCard />
@@ -569,8 +572,8 @@ export default function Stake() {
       </div>
 
       {hasPepes && (
-        <section className="mt-6" aria-label="your staked pepes">
-          <h2 className="mb-3 font-display text-xl">your staked pepes</h2>
+        <section className="mt-6" aria-label="your lePSP positions">
+          <h2 className="mb-3 font-display text-xl">your lePSP positions</h2>
           <PepeCards round={round} entries={entries} pendings={pendings} vest={vest} approved={reinvestApproved} nftVersion={nftVersion} walletBalance={pspBal} onDone={refresh} />
         </section>
       )}

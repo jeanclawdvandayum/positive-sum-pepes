@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="theme-color" content="#08131c"/>
+<meta name="description" content="Positive Sum Pepes. A design prototype of a repeating on-chain game. Explore the clock, the ladder and the consequences of a buy."/>
+<title>Positive Sum Pepes — alternative prototype</title>
+<link rel="icon" type="image/svg+xml" href="./assets/pepe-0.svg"/>
+<script>
+try { const saved = localStorage.getItem('psp-alt-theme'); document.documentElement.dataset.theme = saved === 'light' || saved === 'dark' ? saved : matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
+catch { document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
+</script>
+<link rel="stylesheet" href="./style.css"/>
+<link rel="stylesheet" href="./theme.css"/>
+<link rel="stylesheet" href="./diagrams.css"/>
+<link rel="stylesheet" href="./editorial.css"/>
+</head>
+<body>
+<div class="prototype-strip"><span><i></i> design prototype</span><span class="strip-clock" data-clock aria-label="Round countdown"></span><span>simulated data · testnet mechanics · zero real transactions</span></div>
+<header class="site-header"><a class="brand" href="#/" aria-label="Positive Sum Pepes home"><img src="./assets/pepe-0.svg" alt=""/><span>positive sum<br><strong>pepes</strong></span></a><nav id="nav" aria-label="Main navigation"><a href="#/" data-route="/">explainer</a><a href="#/play" data-route="/play">play</a><a href="#/stake" data-route="/stake">stake</a><a href="#/graveyard" data-route="/graveyard">graveyard</a></nav><div class="header-tools"><span class="mini-clock" data-clock></span><button class="icon-button" id="theme-toggle" aria-label="Switch to light theme">☼</button><button class="wallet-button" id="wallet-button">enter demo <span>↗</span></button><button class="icon-button menu-toggle" id="menu-toggle" aria-label="Open navigation" aria-expanded="false">☰</button></div></header>
+<main id="app"></main>
+<footer><a class="footer-wordmark" href="#/">positive sum pepes<span>the frogs have a pot problem.</span></a><div class="footer-links"><button data-action="scenario">demo controls</button><a href="./rolling-paper.html">rolling paper ↗</a><a href="#/graveyard">past rounds ↗</a><button data-action="about">about this prototype ↗</button></div><span class="footer-bottom">made of pixels and math. <span>alt-frontend / 01</span></span></footer>
+<div id="dialog-root"></div><div id="toast-root" aria-live="polite"></div>
+<script type="module" src="./app.js"></script>
+</body></html>

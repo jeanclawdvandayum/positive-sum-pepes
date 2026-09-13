@@ -1,6 +1,8 @@
+import AmountSlider from '../components/AmountSlider'
+import { AltClock } from '../alt/AltCommon'
 import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
-import { capHeadroom, predepositLimit, predepositAmountAllowed, predepositProgress, predepositRemainder } from '../lib/predeposit'
-import { usePredepositMinimum } from '../lib/usePredepositMinimum'
+import { capHeadroom, predepositUncapped, predepositLimit, predepositAmountAllowed, predepositProgress, predepositRemainder } from '../lib/predeposit'
+import { usePredepositRules } from '../lib/usePredepositMinimum'
 import { predepositResult } from '../lib/chainResults'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useRef, useState } from 'react'
@@ -35,10 +37,10 @@ interface PdState {
 }
 
 
-export default function Predeposit() {
+export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
   const round = useRound()
   const dnaVersion = usePepeDnaVersion(round.staker)
-  const minimum = usePredepositMinimum(round.controller)
+  const { minimum, version: predepositVersion } = usePredepositRules(round.controller)
   const [selectedPepe, setSelectedPepe] = useState<bigint | null>(null)
   const [pickerSeed, setPickerSeed] = useState(1)
   const { address, isConnected } = useAccount()
@@ -170,8 +172,9 @@ export default function Predeposit() {
     walletCap !== undefined && walletCap > 0n && amountWad > 0n && myDepAmount + amountWad > walletCap
   /// the most THIS wallet can still deposit: balance ∧ wallet headroom ∧ global headroom
   const maxDeposit = mixBal !== undefined && pd && walletCap !== undefined && myDep !== undefined
-    ? predepositLimit(mixBal, pd.total, pd.cap, walletCap, myDepAmount) : undefined
-  const globalRemaining = pd ? capHeadroom(pd.total, pd.cap) : undefined
+    ? predepositLimit(mixBal, pd.total, pd.cap, walletCap, myDepAmount, predepositVersion) : undefined
+  const uncapped = !!pd && predepositUncapped(predepositVersion, pd.cap)
+  const globalRemaining = pd && !uncapped ? capHeadroom(pd.total, pd.cap) : undefined
   const globalCapExceeded = globalRemaining !== undefined && amountWad > globalRemaining
   const belowMinimum = amountWad > 0n && amountWad < minimum
   const legacyDust = globalRemaining !== undefined && globalRemaining > 0n && globalRemaining < minimum
@@ -279,7 +282,7 @@ export default function Predeposit() {
               : `approve ${wadToExact(amountWad)} mixETH`
 
   return (
-    <div className="pd-page space-y-4">
+    <div className={`pd-page space-y-4 ${variant === "alt" ? "alt-predeposit" : ""}`}>
       <RefBanner />
       <style>{`
         .pd-picker > div { height: 100%; }
@@ -308,7 +311,7 @@ export default function Predeposit() {
       `}</style>
 
       {pd && !pd.closed && endTime !== undefined && (
-        <ClockBand label="predeposit clock" className="pd-clock">
+        variant === "alt" ? <section className="predeposit-state"><p>the opening is public.</p><h1>get in on the ground floor.</h1><AltClock deadline={endTime}/><p>choose your pepe. join the pooled first buy.</p></section> : <ClockBand label="predeposit clock" className="pd-clock">
           <h1 className="mb-3 w-full max-w-4xl text-center font-display text-2xl leading-tight text-[#e8f0f7] sm:mb-3 sm:text-3xl">
             {remaining !== undefined && remaining > 0 ? 'predeposit window ends in:' : 'predeposit window elapsed'}
           </h1>
@@ -321,7 +324,7 @@ export default function Predeposit() {
           <h2 className="text-2xl font-black text-slate-900">predeposit</h2>
         </div>
         <p className="mt-1 font-body text-sm leading-relaxed text-slate-500">
-          get your frog in the door. deposit mixETH before launch to join the pooled first buy. after launch, claim your share as PSP staked in a pepe NFT.
+          get your frog in the door. deposit mixETH before launch to join the pooled first buy. after launch, claim your share as lePSP, locked earning PSP held in a pepe NFT.
         </p>
       </div>
 
@@ -329,16 +332,16 @@ export default function Predeposit() {
           {/* b. progress */}
           <div className="pd-progress card p-4 lg:col-start-2 lg:row-start-1">
             <div className="mb-1 flex justify-between text-[11px] font-bold uppercase tracking-wide text-slate-400">
-              <span>window fill</span>
-              <span className="min-w-0 break-all text-right">{pd ? predepositProgress(pd.total, pd.cap) : '…'}</span>
+              <span>{uncapped ? 'pooled buy-in' : 'window fill'}</span>
+              <span className="min-w-0 break-all text-right">{pd ? predepositProgress(pd.total, pd.cap, predepositVersion) : '…'}</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-sky-100">
+            {!uncapped && <div className="h-2 overflow-hidden rounded-full bg-sky-100">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400"
                 style={{ width: `${pct}%` }}
               />
-            </div>
-            {pd && <p className="mt-2 break-all text-xs text-slate-500">{predepositRemainder(pd.total, pd.cap)}</p>}
+            </div>}
+            {pd && <p className="mt-2 break-all text-xs text-slate-500">{predepositRemainder(pd.total, pd.cap, predepositVersion)}</p>}
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="pd-stat rounded-2xl bg-white/80 shadow-sm">
                 <div className="text-lg font-black text-slate-900">
@@ -393,7 +396,7 @@ export default function Predeposit() {
                   type="button"
                   title="fill the most you can deposit"
                   onClick={() => setAmount(wadToExact(maxDeposit))}
-                  disabled={maxDeposit === undefined || maxDeposit <= 0n}
+                  disabled={busy || maxDeposit === undefined || maxDeposit <= 0n}
                   className="rounded-md px-1.5 py-0.5 transition hover:bg-sky-100 hover:text-sky-600 disabled:opacity-40"
                 >
                   balance {fmtAmount(mixBal)}
@@ -409,6 +412,7 @@ export default function Predeposit() {
                 inputMode="decimal"
                 onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
               />
+              <AmountSlider amount={amount} maximum={maxDeposit} onChange={setAmount} disabled={busy || !!pd?.closed} label="share of your available deposit" />
               {walletCap !== undefined && walletCap > 0n && myDep !== undefined && (
                 <div className="mt-1 break-words text-[11px] font-bold text-slate-400">
                   per-wallet cap {wadToExact(walletCap)} mix · yours {wadToExact(myDep.mixETHAmount)} ·{' '}
@@ -466,7 +470,7 @@ export default function Predeposit() {
                     <>
                       <p className="mt-1 text-sm text-slate-500">
                         ✅ claimed. your pepe is holding your first bag on the stake page.
-                        the PSP stays staked until you request withdrawal, which starts the six-epoch exit.
+                        your lePSP earns fees. request withdrawal to start its exit schedule.
                       </p>
                       <Link to="/stake" className="btn-primary mt-3 block w-full text-center">
                         see your pepe →
@@ -476,7 +480,7 @@ export default function Predeposit() {
                     <>
                       <p className="mt-1 text-sm text-slate-500">
                         your first bag is waiting. claim your share of the launch PSP into a pepe NFT,
-                        with the PSP staked inside.
+                        with lePSP earning fees inside.
                       </p>
                       <Link to="/stake" className="btn-primary mt-3 block w-full text-center">
                         claim your PSP on the stake page →
@@ -491,7 +495,7 @@ export default function Predeposit() {
               ) : (
                 <>
                   <p className="mt-1 text-sm text-slate-500">
-                    cap reached or window over — anyone may launch the pooled genesis buy.
+                    {uncapped ? 'the window is over. anyone may launch the pooled genesis buy.' : 'cap reached or window over. anyone may launch the pooled genesis buy.'}
                   </p>
                   <button className="btn-primary mt-3 w-full" disabled={launchStep === 'tx'} onClick={launch}>
                     {launchStep === 'done' ? '✅ launched' : launchStep === 'tx' ? 'confirm in wallet…' : 'launch pooled buy'}

@@ -1,3 +1,5 @@
+import { userFacingContractError } from './contractErrors.ts'
+
 /** EIP-5792 atomic support includes wallets that can upgrade with user consent. */
 export function supportsAtomicBatch(capabilities: unknown): boolean {
   const status = (capabilities as { atomic?: { status?: string } } | undefined)?.atomic?.status
@@ -39,6 +41,7 @@ export async function confirmAtomicTransaction(operations: {
     operations.notify('success', hash)
     return hash!
   } catch (error) {
+    error = userFacingContractError(error)
     operations.notify(submitted && !failed ? 'unknown' : 'failed', hash,
       error instanceof Error ? error.message.slice(0, 200) : 'Batch failed.')
     throw error

@@ -15,13 +15,13 @@ import tailwindcss from '@tailwindcss/vite'
 // provider isn't erroring).
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const target = env.VITE_RPC_PROXY_TARGET || ''
+  const target = env.PSP_RPC_PROXY_TARGET || env.VITE_RPC_PROXY_TARGET || ''
   const proxy =
-    target.startsWith('http') && new URL(target).pathname.length > 1
+    target.startsWith('http')
       ? {
           '/rpc': {
             target: new URL(target).origin,
-            rewrite: () => new URL(target).pathname,
+            rewrite: () => new URL(target).pathname + new URL(target).search,
             changeOrigin: true,
           },
         }

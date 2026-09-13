@@ -1,3 +1,5 @@
+import { userFacingContractError } from './contractErrors.ts'
+
 export type TxStage = 'preparing' | 'simulating' | 'wallet' | 'pending' | 'success' | 'failed' | 'unknown'
 export type TxToast = { id: number; dna: bigint; label: string; chainId: number; account: `0x${string}`; stage: TxStage; hash?: `0x${string}`; detail?: string; updated: number }
 let entries: TxToast[] = []
@@ -26,6 +28,7 @@ export function startTransactionToast(label: string, chainId: number, account: `
   return {
     update,
     fail(error: unknown) {
+      error = userFacingContractError(error)
       if (['success', 'failed', 'unknown'].includes(entry.stage)) return
       const detail = error instanceof Error ? ('shortMessage' in error ? String(error.shortMessage) : error.message) : 'Please try again.'
       update(entry.hash ? 'unknown' : 'failed', undefined, detail.slice(0, 200))

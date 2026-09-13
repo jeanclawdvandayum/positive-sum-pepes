@@ -74,7 +74,7 @@ export default function SpawnRoundPanel({
           onClick={spawn}
           disabled={step !== 'idle'}
           data-pending={step !== 'idle' || undefined}
-          className="relative mt-4 w-full overflow-hidden rounded-xl border border-line bg-bg-2 px-5 py-3 font-semibold text-text-hi transition hover:border-accent disabled:cursor-wait"
+          className="tx-action relative mt-4 w-full overflow-hidden rounded-xl border border-line bg-bg-2 px-5 py-3 font-semibold text-text-hi transition hover:border-accent disabled:cursor-wait"
         >
           <span className="pl-btn-fill" aria-hidden="true" />
           <span className="relative">

@@ -168,8 +168,8 @@ export function BeatDiagram({ kind }: { kind: BeatKind }) {
       {kind === 'jackpot' && (
         <svg viewBox="0 0 160 112">
           <text x="80" y="21" textAnchor="middle" className="xd-clock-add"
-            style={{ fontFamily: 'var(--font-clock)', fontSize: 16, fill: 'var(--accent)' }}>+4:20</text>
-          <text x="80" y="36" textAnchor="middle">per 0.005 mixETH</text>
+            style={{ fontFamily: 'var(--font-clock)', fontSize: 16, fill: 'var(--accent)' }}>+1:09</text>
+          <text x="80" y="36" textAnchor="middle">per ladder ticket</text>
           {[48, 62, 76].map(y => (
             <rect key={y} x="19" y={y} width="122" height="9" rx="2" fill="var(--bg-2)" stroke="var(--line)" />
           ))}
@@ -182,7 +182,7 @@ export function BeatDiagram({ kind }: { kind: BeatKind }) {
         <>
           <span className="xd-nft-pepe" dangerouslySetInnerHTML={{ __html: nftPepe }} />
           <svg viewBox="0 0 160 112">
-            <text x="15" y="15">PSP → pepe → fees</text>
+            <text x="15" y="15">PSP → lePSP → fees</text>
             <path d="M93 81 H147" stroke="var(--line)" />
             <g className="xd-nft-rewards" fill="var(--pepe)">
               <rect x="99" y="63" width="9" height="18" rx="2" />

@@ -159,7 +159,7 @@ export default function NameRegistrationCard() {
       {ns.parentLabel}.wei lives on Ethereum. Registration is being prepared for this PSP deployment.
     </p> : <>
       {nameSource && <p className="mt-3 text-xs leading-relaxed text-text-lo">
-        Names register on Ethereum. A verifier checks your PSP stake on {CHAIN_ID === 84532 ? 'Base Sepolia' : 'the game network'}.
+        Names register on Ethereum. A verifier checks your PSP stake on the game network.
         Fresh stakes and transfers qualify once finalized. Your wallet handles the two registration transactions.
       </p>}
       <label className="mt-4 block text-xs text-text-lo" htmlFor="pepe-name">your alias</label>
@@ -183,7 +183,7 @@ export default function NameRegistrationCard() {
       </p>}
       {query.isError && <p className="mt-2 break-words text-xs text-phase-critical">{errorMessage(query.error)}</p>}
         <button type="button" onClick={registerName} disabled={!address || !state || !available || status?.busy || (reveal ? wait > 0 : !validLabel)}
-          className="mt-3 w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-black disabled:opacity-40">
+          className="tx-action mt-3 w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-black disabled:opacity-40">
           {!address ? 'connect your wallet to register' : status?.busy ? 'waiting for confirmation…' : reveal ? 'register your name' : 'reserve your name'}
         </button>
       {reveal && !status?.busy && <button type="button" className="mt-2 text-xs text-text-lo underline" onClick={() => {

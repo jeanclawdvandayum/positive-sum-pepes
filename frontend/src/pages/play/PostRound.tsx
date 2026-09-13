@@ -162,7 +162,7 @@ export default function PostRound({
                   onClick={redeem}
                   disabled={redeemStep !== 'idle' && redeemStep !== 'done'}
                   data-pending={(redeemStep === 'approve' || redeemStep === 'redeem') || undefined}
-                  className="relative w-full overflow-hidden rounded-xl border border-line bg-bg-2 px-5 py-2.5 font-semibold text-text-hi transition hover:border-accent disabled:cursor-wait"
+                  className="tx-action relative w-full overflow-hidden rounded-xl border border-line bg-bg-2 px-5 py-2.5 font-semibold text-text-hi transition hover:border-accent disabled:cursor-wait"
                 >
                   <span className="pl-btn-fill" aria-hidden="true" />
                   <span className="relative">
@@ -183,14 +183,14 @@ export default function PostRound({
           </Card>
 
           {/* ── immediate unlock of staked positions ────────────────────── */}
-          <Card title="staked positions">
+          <Card title="lePSP positions">
             <p className="mt-1 text-xs text-text-lo">
               detonation opened every lock — withdrawing skips the vest entirely. unlocked PSP lands
               in your wallet; redeem it above if you want the mix.
             </p>
             {dead.positions.length === 0 ? (
               <p className="mt-auto pt-4 text-xs text-text-lo">
-                {!isConnected ? 'connect wallet to check your positions.' : 'your wallet has 0 staked positions in this round.'}
+                {!isConnected ? 'connect wallet to check your positions.' : 'your wallet has 0 lePSP positions in this round.'}
               </p>
             ) : (
               <ul className="mt-3 flex flex-col gap-2">
@@ -203,13 +203,13 @@ export default function PostRound({
                     >
                       <span className="min-w-0 truncate text-text-lo">
                         pepe <span className="font-data text-text-hi">#{p.id.toString()}</span> ·{' '}
-                        <span className="tabular font-data text-text-hi">{fmtAmount(p.amount)} psp</span> staked
+                        <span className="tabular font-data text-text-hi">{fmtAmount(p.amount)} lePSP</span>
                       </span>
                       <button
                         onClick={() => unlock(p.id, p.amount)}
                         disabled={busy}
                         data-pending={busy || undefined}
-                        className="relative shrink-0 overflow-hidden rounded-lg border border-line bg-bg-1 px-3 py-1.5 text-xs font-semibold text-text-hi transition hover:border-accent disabled:cursor-wait"
+                        className="tx-action relative shrink-0 overflow-hidden rounded-lg border border-line bg-bg-1 px-3 py-1.5 text-xs font-semibold text-text-hi transition hover:border-accent disabled:cursor-wait"
                       >
                         <span className="pl-btn-fill" aria-hidden="true" />
                         <span className="relative">{busy ? 'confirming…' : p.amount > 0n ? 'unlock' : `claim ${fmtAmount(p.pendingFees)} mixETH fees`}</span>

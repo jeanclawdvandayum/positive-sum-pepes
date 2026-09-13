@@ -13,6 +13,7 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {FixedPointMathLib as FPML} from "solady/src/utils/FixedPointMathLib.sol";
 
 import {CurveMath} from "./libraries/CurveMath.sol";
 import {SineMath} from "./libraries/SineMath.sol";
@@ -43,6 +44,7 @@ contract CurveHook is BaseHook {
     error BuyZeroAmount();
     error SellExceedsSupply();
     error InsufficientFees();
+    error SwapTooLarge(); // V4 deltas encode each input and output in signed 128 bits.
     error SwapTooSmall(); // C-1 fix: blocks dust-scale precision arb on the curve
     error ZeroOutput(); // a swap must deliver a nonzero user output — never absorb input silently
     error WrongPoolCurrencies(); // L-2 fix: pool-key gate on initialization
@@ -88,7 +90,7 @@ contract CurveHook is BaseHook {
         if (r <= boot) return FEE_BPS_PRE_WAVE;
         if (r >= target) return FEE_BPS_ABOVE_WAVE;
         // floor → the fee slice rounds UP in the reserve's favor
-        return uint24(FEE_BPS_PRE_WAVE - ((FEE_BPS_PRE_WAVE - FEE_BPS_ABOVE_WAVE) * (r - boot)) / (target - boot));
+        return uint24(FEE_BPS_PRE_WAVE - FPML.fullMulDiv(FEE_BPS_PRE_WAVE - FEE_BPS_ABOVE_WAVE, r - boot, target - boot));
     }
     /// @dev Referral leg of the swap fee (CLOCK-REDESIGN §3 REVISED
     ///      2026-09-01): referral attribution pays 5% OF THE FEE, tier-split
@@ -110,18 +112,15 @@ contract CurveHook is BaseHook {
 
     // ─────────────── Detonation clock (CLOCK-REDESIGN §1) ───────────────
     /// @dev Armed at the Active transition: detonationAt = now + detWindow.
-    ///      Buys add TIME_PER_UNIT per MIN_BUY_INPUT of gross mixETH, capped so
+    ///      Buys add TIME_PER_UNIT per ticketPrice() of gross mixETH, capped so
     ///      remaining never exceeds detWindow. At zero the round is DEAD —
     ///      buys AND sells revert TradingHalted; nothing resurrects the clock.
-    ///      The window is tunable via packed timing slot [2] (2026-09-03): a
-    ///      fixed 72h on curves that mint millions of whole PSP per buy
-    ///      re-caps the clock to its ceiling on EVERY trade — the countdown
-    ///      never visibly moves.
-    uint256 public constant DET_WINDOW = 72 hours;
+    ///      Packed timing slot [2] permits shorter constructor playtest clocks.
+    uint256 public constant DET_WINDOW = 69 hours + 4 minutes + 20 seconds;
     uint256 public constant MIN_BUY_INPUT = GameRules.MIN_BUY;
     uint256 public constant TIME_PER_UNIT = GameRules.SECONDS_PER_UNIT;
     /// @dev Live detonation window, decoded from packed timing slot [2] at
-    ///      construction. 0 = DET_WINDOW (72h) — mainnet/composed default.
+    ///      construction. 0 = DET_WINDOW (69:04:20), the default.
     uint256 public immutable detWindow;
 
     /// @dev Fee split, in bps OF THE FEE amount (CLOCK-REDESIGN §3 REVISED
@@ -146,6 +145,8 @@ contract CurveHook is BaseHook {
     // the ACTUAL predeposit raise, so every wave boundary is boot-invariant.
     // When sineActive, buy/sell price off SineMath (reserve-parametrized);
     // the zone path below remains for legacy/gallery rounds.
+    /// @notice Version 2 uses dimensionless IBCO growth and per-wave trend.
+    uint256 public constant SINE_RULES_VERSION = 2;
     SineMath.Params public sineParams;
     bool public sineConfigured;
     SineMath.Curve public sineCurve;   // auto-getter returns the scalars (no arrays anymore)
@@ -174,6 +175,16 @@ contract CurveHook is BaseHook {
     ///      forever, never mutated afterwards. potPaid tracks what claims
     ///      have drained.
     uint256 public potBalance;
+    uint256 public genesisPotBalance;
+    uint256 public constant TICKET_RULES_VERSION = 2;
+
+    /// @notice Gross mixETH per ticket before the next trade. Linear 0.42%
+    /// of the 0.005 base per whole mixETH added after genesis, including fractions.
+    function ticketPrice() public view returns (uint256) {
+        uint256 growth = potBalance > genesisPotBalance ? potBalance - genesisPotBalance : 0;
+        // growth * 21 / 1e6, without intermediate overflow. Round down <1 wei.
+        return MIN_BUY_INPUT + (growth / 1_000_000) * 21 + (growth % 1_000_000) * 21 / 1_000_000;
+    }
     uint256 public potPaid;
 
     // ─────────────── Deployer credit (CLOCK-REDESIGN §3 REVISED) ───────────────
@@ -221,7 +232,7 @@ contract CurveHook is BaseHook {
         curveConfig = _config;
         referralRegistry = _referralRegistry;
         deployerCutTo = _deployerCutTo;
-        // timing slot [2]: detonation window in seconds, 0 = 72h default
+        // timing slot [2]: detonation window in seconds, 0 = 69:04:20 default
         uint256 dw = (_config.timings >> (2 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK;
         detWindow = dw == 0 ? DET_WINDOW : dw;
     }
@@ -345,6 +356,7 @@ contract CurveHook is BaseHook {
         }
 
         if (params.amountSpecified >= 0) revert("ExactOutNotSupported");
+        if (params.amountSpecified < -int256(type(int128).max)) revert SwapTooLarge();
 
         uint256 inputAmount = uint256(int256(-params.amountSpecified));
 
@@ -403,7 +415,7 @@ contract CurveHook is BaseHook {
             // AUD-16: owner deduplication leaves holes inside a valid chain.
             // Preserve later ancestors' original tiers instead of truncating.
             if (who[i] == address(0)) continue;
-            uint256 cut = (legMixETH * bps[i]) / 10000;
+            uint256 cut = FPML.fullMulDiv(legMixETH, bps[i], 10000);
             if (cut > 0) {
                 mix.safeTransfer(who[i], cut);
                 paid += cut;
@@ -423,15 +435,15 @@ contract CurveHook is BaseHook {
     ///      Returns the staker leg for the accumulator feed. Invariant:
     ///      stakerLeg + potΔ + deployerCreditΔ + referralPaid == feeMixETH.
     function _splitFee(address trader, uint256 feeMixETH, Currency mixETH) internal returns (uint256 stakerLeg) {
-        stakerLeg = (feeMixETH * STAKER_BPS) / 10000;
-        uint256 potLeg = (feeMixETH * POT_BPS) / 10000;
+        stakerLeg = FPML.fullMulDiv(feeMixETH, STAKER_BPS, 10000);
+        uint256 potLeg = FPML.fullMulDiv(feeMixETH, POT_BPS, 10000);
         uint256 refLeg = feeMixETH - stakerLeg - potLeg; // ~5% + rounding dust
 
         uint256 paid = _payReferrals(trader, refLeg, mixETH);
         if (paid != 0) {
             potBalance += potLeg + (refLeg - paid); // unpaid tier weight + dust → pot
         } else {
-            uint256 deployerLeg = (feeMixETH * DEPLOYER_BPS) / 10000;
+            uint256 deployerLeg = FPML.fullMulDiv(feeMixETH, DEPLOYER_BPS, 10000);
             deployerCredit += deployerLeg;
             potBalance += potLeg + (refLeg - deployerLeg); // 4% + dust → pot
         }
@@ -461,31 +473,34 @@ contract CurveHook is BaseHook {
         // routed by _splitFee — 60% stakers / 35% pot / 5% referral chain
         // (attributed) or 4% pot / 1% deployerCredit (unattributed);
         // remainders → pot escrow.
-        uint256 feeMixETH = (mixETHInput * swapFeeBps()) / 10000;
+        uint256 feeMixETH = FPML.fullMulDiv(mixETHInput, swapFeeBps(), 10000);
         uint256 curveMixETH = mixETHInput - feeMixETH;
 
         uint256 pspOut = sineActive
             ? SineMath.buyOut(sineCurve, reserveMixETH, curveMixETH)
             : CurveMath.computeBuyOutput(curveMixETH, totalSupplyPSP, curveConfig);
         if (pspOut == 0) revert ZeroOutput();
+        if (pspOut > uint256(uint128(type(int128).max))) revert SwapTooLarge();
 
         // CEI: update state before external calls
         reserveMixETH += curveMixETH;
         totalSupplyPSP += pspOut;
 
         // AUD-1: gross mixETH purchase units drive the clock independently of PSP price.
-        uint256 units = mixETHInput / MIN_BUY_INPUT;
+        uint256 units = mixETHInput / ticketPrice();
         address buyer = refTrader != address(0) ? refTrader : sender;
         {
             uint256 previous = detonationAt;
-            uint256 newDet = previous + TIME_PER_UNIT * units;
             uint256 cap = block.timestamp + detWindow;
-            detonationAt = newDet > cap ? cap : newDet;
+            uint256 headroom = cap > previous ? cap - previous : 0;
+            // Cap before multiplication so huge buys cannot overflow the clock.
+            uint256 added = units > headroom / TIME_PER_UNIT ? headroom : units * TIME_PER_UNIT;
+            detonationAt = previous + added;
             emit TimeAdded(buyer, detonationAt - previous, detonationAt);
         }
 
-        // One seat per 0.005 mixETH; only the newest ten need storage writes.
-        {
+        // Only whole tickets enter the board. Smaller buys still trade normally.
+        if (units > 0) {
             uint256 seats = units < 10 ? units : 10;
             uint64 ts = uint64(block.timestamp);
             uint128 seatPsp = uint128(pspOut / units);
@@ -556,9 +571,10 @@ contract CurveHook is BaseHook {
         // The ENTIRE sold PSP is burned — backing stays clean. Sells mint
         // NO ticket and add NO time (only buys do); they only pass the
         // halt gate at zero.
-        uint256 feeMixETH = (mixETHOut * swapFeeBps()) / 10000;
+        uint256 feeMixETH = FPML.fullMulDiv(mixETHOut, swapFeeBps(), 10000);
         uint256 mixETHToUser = mixETHOut - feeMixETH;
         if (mixETHToUser == 0) revert ZeroOutput();
+        if (mixETHToUser > uint256(uint128(type(int128).max))) revert SwapTooLarge();
 
         // CEI: full out-value leaves the reserve (user + fees + referrals all
         // draw from it); supply drops by the FULL burned input.
@@ -608,7 +624,7 @@ contract CurveHook is BaseHook {
         // flatPrice = reserveMixETH / totalSupplyPSP (in 1e18)
         // totalMixETHOut = pspInputAmount * flatPrice / 1e18
         //   = pspInputAmount * reserveMixETH / totalSupplyPSP
-        uint256 totalMixETHOut = (pspInputAmount * reserveMixETH) / totalSupplyPSP;
+        uint256 totalMixETHOut = FPML.fullMulDiv(pspInputAmount, reserveMixETH, totalSupplyPSP);
         // F-9 fix (2026-08-19): NO fee in Flat — exits pay exactly pro-rata
         // avg backing, floor-only. (The previous A7/L-3 ceils guarded the
         // fee slices that no longer exist in this mode; the Active curve
@@ -616,6 +632,7 @@ contract CurveHook is BaseHook {
         // R1*S >= R*S1 exactly — no user dust in either direction.)
         uint256 mixETHToUser = totalMixETHOut;
         if (mixETHToUser == 0) revert ZeroOutput();
+        if (mixETHToUser > uint256(uint128(type(int128).max))) revert SwapTooLarge();
 
         reserveMixETH -= totalMixETHOut;
         totalSupplyPSP -= pspInputAmount;
@@ -689,7 +706,7 @@ contract CurveHook is BaseHook {
         if (pspAmount == 0) revert BuyZeroAmount();
         if (pspAmount > totalSupplyPSP) revert SellExceedsSupply();
 
-        mixETHOut = (pspAmount * reserveMixETH) / totalSupplyPSP;
+        mixETHOut = FPML.fullMulDiv(pspAmount, reserveMixETH, totalSupplyPSP);
         reserveMixETH -= mixETHOut;
         totalSupplyPSP -= pspAmount;
 
@@ -757,7 +774,7 @@ contract CurveHook is BaseHook {
         for (uint256 i; i < n; ++i) {
             uint256 seat = ticketCount - 1 - i;
             if (tickets[seat % 10].buyer == who && !seatClaimed[seat]) {
-                amount += (potBalance * _ladderBps(i)) / denom;
+                amount += FPML.fullMulDiv(potBalance, _ladderBps(i), denom);
             }
         }
     }
@@ -775,7 +792,7 @@ contract CurveHook is BaseHook {
             uint256 seat = ticketCount - 1 - i;
             if (tickets[seat % 10].buyer == msg.sender && !seatClaimed[seat]) {
                 seatClaimed[seat] = true;
-                amount += (potBalance * _ladderBps(i)) / denom;
+                amount += FPML.fullMulDiv(potBalance, _ladderBps(i), denom);
             }
         }
         if (amount == 0) revert NothingToClaim();
@@ -822,7 +839,7 @@ contract CurveHook is BaseHook {
         }
 
         // CLOCK-REDESIGN §1: the clock is ARMED at the Active transition —
-        // the launch buy that flips the round live starts the 72h countdown.
+        // the launch buy starts the constructor-configured countdown.
         // Predeposit never touches it; the Active→Flat transition (detonate)
         // leaves detonationAt as the frozen historical zero point.
         if (newMode == Mode.Active) {
@@ -844,6 +861,7 @@ contract CurveHook is BaseHook {
         if (msg.sender != address(controller)) revert NotController();
         if (poolInitialized) revert InvalidMode();
         potBalance += _genesisPotFee; // genesis launch fee → ladder pot
+        genesisPotBalance = potBalance;
 
         // Sine flavor: materialize the wave from the ACTUAL boot raised —
         // anchors, tread positions and the top price are invariant to it.
@@ -893,7 +911,7 @@ contract CurveHook is BaseHook {
     /// @return mixETH-denominated flat-mode price (NK24: no ETH conversion)
     function getFlatPrice() external view returns (uint256) {
         if (totalSupplyPSP == 0) return 0;
-        return (reserveMixETH * 1e18) / totalSupplyPSP;
+        return FPML.fullMulDiv(reserveMixETH, 1e18, totalSupplyPSP);
     }
 
     /// @param mixETHInput mixETH to spend on the curve
@@ -909,7 +927,7 @@ contract CurveHook is BaseHook {
         if (mode != Mode.Active) revert NotActive();
         if (block.timestamp >= detonationAt) revert TradingHalted();
         if (mixETHInput < MIN_BUY_INPUT) revert SwapTooSmall();
-        uint256 fee = (mixETHInput * swapFeeBps()) / 10000;
+        uint256 fee = FPML.fullMulDiv(mixETHInput, swapFeeBps(), 10000);
         uint256 curveMix = mixETHInput - fee;
         return sineActive
             ? SineMath.buyOut(sineCurve, reserveMixETH, curveMix)
@@ -923,12 +941,12 @@ contract CurveHook is BaseHook {
         // exits are fee-free pro-rata (F-9) and stay open forever. Curve
         // sells halt at zero exactly like the swap path (CLOCK-REDESIGN §1).
         if (mode == Mode.Flat) {
-            return (pspInput * reserveMixETH) / totalSupplyPSP;
+            return FPML.fullMulDiv(pspInput, reserveMixETH, totalSupplyPSP);
         }
         if (block.timestamp >= detonationAt) revert TradingHalted();
         uint256 out = sineActive
             ? SineMath.sellOut(sineCurve, reserveMixETH, pspInput)
             : CurveMath.computeSellOutput(pspInput, totalSupplyPSP, curveConfig);
-        return out - (out * swapFeeBps()) / 10000;
+        return out - FPML.fullMulDiv(out, swapFeeBps(), 10000);
     }
 }

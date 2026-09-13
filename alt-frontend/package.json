@@ -1,0 +1,1 @@
+{"name":"psp-alt-frontend","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"python3 -m http.server 4180 --bind 127.0.0.1","test":"node --test *.test.mjs"}}

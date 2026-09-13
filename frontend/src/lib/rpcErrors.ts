@@ -1,3 +1,5 @@
+import { userFacingContractError } from './contractErrors.ts'
+
 /** Preserve contract and wallet failures, while avoiding raw RPC bodies in UI. */
 export function isRpcUnavailable(error: unknown): boolean {
   let current = error
@@ -13,6 +15,8 @@ export function isRpcUnavailable(error: unknown): boolean {
 }
 
 export function userFacingRpcError(error: unknown): unknown {
+  const readable = userFacingContractError(error)
+  if (readable !== error) return readable
   let current = error
   const seen = new Set<unknown>()
   while (current instanceof Error && !seen.has(current)) {

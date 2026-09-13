@@ -6,7 +6,7 @@ import { userFacingRpcError } from '../src/lib/rpcErrors.ts'
 const a = n => `0x${n.toString(16).padStart(40, '0')}`
 const values = { rounds: [a(2), a(3), a(4)], mixETH: a(5), staker: a(6),
   curveConfig: [1n, 7200n], detWindow: 7200n, MIN_BUY_INPUT: 5000000000000000n,
-  TIME_PER_UNIT: 260n, sineConfigured: true }
+  TIME_PER_UNIT: 69n, TICKET_RULES_VERSION: 2n, sineConfigured: true }
 
 test('failed rule reads retry without caching an incompatible deployment', async () => {
   let fail = true, calls = 0

@@ -37,8 +37,10 @@ def integral(fn, end, n=1024):
 
 
 def reference(boot, amplitude, points):
-    p0, pre, target, pt = D('0.00001'), D('0.004605170185988092'), D(10000), D('0.06')
+    p0, pre, target, pt = D('0.00001'), D('0.004477562267871699'), D(10000), D('0.06')
     boot = D(boot)
+    target *= boot / 450
+    pre *= 450 / boot
     lam = (target-boot)/3
     B = p0*(pre*boot).exp()
     trend = (pt/B).ln()/3
@@ -71,7 +73,7 @@ def generate():
     with localcontext() as ctx:
         ctx.prec = 60
         rows=[]
-        for boot in (1,90,450):
+        for boot in (1,90,450,1_000_000):
             for amp in (0,5000,10000):
                 for r,p,q in reference(boot,amp,['0','0.001','0.25','0.5','0.999999','1','1.000001','2.5','3','6']):
                     rows.append((boot*WAD,amp,r,p,q))

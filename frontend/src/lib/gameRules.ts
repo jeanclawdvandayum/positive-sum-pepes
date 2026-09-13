@@ -1,7 +1,10 @@
 /** Gross mixETH input; checked against deployed getters before wallet writes. */
 export const MIN_BUY_INPUT = 5_000_000_000_000_000n
-export const TIME_PER_UNIT = 260n
-export const purchaseUnits = (mixIn: bigint) => mixIn / MIN_BUY_INPUT
+export const TIME_PER_UNIT = 69n
+export const purchaseUnits = (mixIn: bigint, ticketPrice: bigint | undefined = MIN_BUY_INPUT) =>
+  ticketPrice !== undefined && ticketPrice > 0n ? mixIn / ticketPrice : 0n
+export const linearTicketPrice = (pot: bigint, genesisPot: bigint) =>
+  MIN_BUY_INPUT + (pot > genesisPot ? (pot - genesisPot) * 21n / 1_000_000n : 0n)
 export class GameRulesMismatch extends Error {}
 
 /** Never convert token amounts to floating point for transaction protection. */
@@ -15,8 +18,8 @@ export function minimumOutput(quote: bigint, slippageBps: number): bigint {
   return result
 }
 
-export function assertGameRules(minimum: bigint, seconds: bigint): void {
-  if (minimum !== MIN_BUY_INPUT || seconds !== TIME_PER_UNIT) {
+export function assertGameRules(minimum: bigint, seconds: bigint, ticketRules = 2n): void {
+  if (minimum !== MIN_BUY_INPUT || seconds !== TIME_PER_UNIT || ticketRules !== 2n) {
     throw new GameRulesMismatch('This deployment uses different game rules. Use the interface for that deployment.')
   }
 }

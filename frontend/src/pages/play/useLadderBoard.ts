@@ -44,7 +44,7 @@ export function useLadderBoard(hook: `0x${string}` | undefined): BoardState {
           rpcCall(target, hookAbi, 'board', [BigInt(i)])
             .then((r) => {
               const [addr, psp, mix, ts] = r as [`0x${string}`, bigint, bigint, bigint]
-              if (isZeroAddr(addr) || psp === 0n) return undefined
+              if (isZeroAddr(addr)) return undefined
               return { addr, pspWad: psp, mixWad: mix, ts } satisfies BoardTicket
             })
             .catch(() => undefined as BoardTicket | undefined),

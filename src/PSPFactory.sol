@@ -496,18 +496,20 @@ contract PSPFactory is Ownable2Step {
         controller.setHook(hook);
         controller.setFactoryRoundId(r.newRoundId);
 
-        // 5b. carry — the destroyed round's entire backing, seeded as the
-        //     new round's opening predeposit (cap-exempt). BEFORE pool
-        //     init: a failing seedCarry must not leave an initialized pool.
+        // Factory-held funds join the successor's uncapped pooled buy.
+        // Old-round redemption backing remains in its hook. Seed before pool
+        // init so a failing transfer rolls back the full wiring step.
         uint256 carry;
         if (r.fromRoundId != 0) {
             carry = mixETH.balanceOf(address(this));
-            // AUD-8: unsolicited factory donations must not push the sine
-            // launch beyond its validated boot range and trap public deposits.
-            if (useSine && carry > controller.PREDEPOSIT_CAP()) carry = controller.PREDEPOSIT_CAP();
             if (carry > 0) {
                 mixETH.forceApprove(address(controller), carry);
-                controller.seedCarry(carry);
+                // Unsolicited donations may exceed the arithmetic domain.
+                // Retain them here rather than blocking every future birth.
+                try controller.seedCarry(carry) {} catch {
+                    mixETH.forceApprove(address(controller), 0);
+                    carry = 0;
+                }
             }
         }
 

@@ -1,0 +1,74 @@
+/* Live components share the paper palette and the alternative layout. */
+body.alt-mode {--bg-0:var(--bg);--bg-1:var(--panel);--bg-2:var(--raised);--text-hi:var(--ink);--text-lo:var(--muted);--text-mid:var(--muted);--accent:var(--green);--pepe:var(--green);--font-display:Pixel,monospace;--font-body:Plex,Arial,sans-serif;--font-data:Mono,monospace;background:var(--bg);color:var(--ink)}
+.alt-shell{font-family:var(--body);min-width:0}.alt-shell main{width:100%}.alt-shell .random-pepe>svg{width:100%;height:100%;display:block}.brand>.random-pepe{width:42px;height:42px;flex-shrink:0;border-radius:50%;overflow:hidden}.alt-shell h2{font-weight:400}.alt-shell .font-display{font-family:var(--display)}.alt-shell .font-data{font-family:var(--mono)}.alt-shell .font-body{font-family:var(--body)}
+.alt-shell .play-clockband h1{font-size:clamp(30px,3.8vw,57px);max-width:1100px;margin:auto;line-height:1.3}.pixel-unit,.bombing-money{font-family:var(--display)}.bombing-money{font-size:1.18em;text-shadow:0 0 24px color-mix(in srgb,var(--amber) 24%,transparent)}.alt-shell .alt-clock{font-family:Segment,var(--mono);display:block;border:0;background:none;padding:0;max-width:100%;height:auto}.alt-shell .play-clockband .alt-clock{font-size:clamp(42px,8.5vw,112px);margin:26px 0}.hero-random{width:145px;margin:22px auto;transform:rotate(-5deg);border:6px solid var(--raised);outline:1px solid var(--line)}.podium-art{width:100%!important;height:auto!important;aspect-ratio:1}.podium-card small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.podium-card.podium-rank-1{width:123px;transform:rotate(1deg) translateY(3px);border-color:var(--green);z-index:1}.live-tape{margin:22px 0}.play-grid{align-items:stretch}.ladder-panel{display:flex;flex-direction:column;min-width:0}.ladder-panel #board-content{flex:1;display:flex;flex-direction:column}.ladder-panel .ladder{flex:1;display:flex;flex-direction:column}.ladder-panel .ladder-row{flex:1;min-height:70px}.ladder-art{width:42px!important;height:42px!important;border-radius:4px}.ladder-person{min-width:0;overflow-wrap:anywhere}.empty-ladder .random-pepe{width:90px;margin:0 auto 20px}.receive-token .random-pepe{width:25px;height:25px}.trade-box .btn{margin-top:18px}.trade-box .info-button{width:20px;height:20px;border:1px solid var(--line);border-radius:50%;background:none;font-size:12px}.slippage-choice{display:flex;gap:10px;align-items:center;margin-top:18px;font-size:12px}.slippage-choice span{margin-right:auto;color:var(--muted)}.slippage-choice button{background:none;padding:5px 9px;border:1px solid var(--line)}.slippage-choice .selected{border-color:var(--green);color:var(--green)}.alt-faucet{display:flex;gap:16px;align-items:center;padding:0 0 25px;font-size:13px}.alt-faucet p{overflow-wrap:anywhere;color:var(--red)}.curve-readout{display:flex;gap:24px;flex-wrap:wrap;padding-top:20px;font-size:12px}.curve-readout strong{font-family:var(--mono);color:var(--amber)}.actual-curve{padding-top:35px}.actual-curve h2{font-size:32px}.alt-shell .card,.alt-shell .st-panel{background:var(--panel);border:1px solid var(--line);border-radius:0;box-shadow:none}.alt-shell .st-btn,.alt-shell .btn-primary{border-radius:0;font-family:var(--body)}.alt-shell .st-btn-primary,.alt-shell .btn-primary{background:var(--action);color:var(--action-ink)}.alt-shell input:not([type=range]){color:var(--ink)}.alt-shell .text-slate-900,.alt-shell .text-slate-700{color:var(--ink)}.alt-shell .text-slate-500,.alt-shell .text-slate-400{color:var(--muted)}.alt-shell .bg-white,.alt-shell .bg-white\/80,.alt-shell .bg-sky-50\/60{background:var(--raised)}.alt-shell .border-sky-100{border-color:var(--line)}
+.alt-stake .alt-stake-layout{gap:30px;grid-template-rows:auto auto}.alt-stake .alt-identity-row{grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:10px}.alt-stake .alt-identity-row>div,.alt-stake .alt-identity-row>section{border-radius:0;background:none;border-width:1px 0 0;padding:24px 0}.alt-stake>section{padding:36px 0;border-top:1px solid var(--line)}.alt-stake>section>h2{font-size:34px}.alt-stake .rounded-2xl,.alt-stake .rounded-xl{border-radius:3px}.alt-stake .st-panel h2{font-size:29px}.alt-predeposit{padding-bottom:50px}.alt-predeposit .predeposit-state{padding:36px 0 24px;border-bottom:1px solid var(--line)}.alt-predeposit .predeposit-state h1{font-size:clamp(36px,4vw,58px)}.alt-predeposit .pd-grid{gap:24px}.alt-predeposit .pd-stat{padding:16px!important;border-radius:0;box-shadow:none}.alt-predeposit .pd-picker .st-panel{height:100%}.alt-predeposit .pd-picker h2{font-size:28px}.alt-predeposit .pd-reserved-card{max-width:280px}.alt-graveyard{padding:35px 0 60px}.alt-graveyard h1{font-size:64px}.alt-graveyard .rounded-xl{border-radius:0}.alt-graveyard .grave-positions{grid-column:1/-1}.alt-graveyard .grave-positions ul{grid-template-columns:repeat(3,minmax(0,1fr))}.alt-graveyard .grave-positions li{padding:18px;background:var(--panel);border-radius:0}.grave-tag{font:24px var(--display);margin:15px 0}.alt-graveyard .grave-positions li>[role=img]{max-width:220px;margin:14px auto;border:8px solid var(--raised);outline:1px solid var(--line);transform:rotate(-3deg)}
+@media(max-width:800px){.alt-stake .alt-stake-layout{grid-template-columns:1fr}.alt-stake .alt-identity-row{grid-row:auto;grid-template-columns:1fr}.alt-graveyard .grave-positions ul{grid-template-columns:repeat(2,minmax(0,1fr))}.alt-shell .ladder-row{min-height:70px}.alt-shell .play-clockband h1{font-size:32px}.alt-shell .site-header{flex-wrap:nowrap}.alt-shell .header-tools{min-width:0;gap:5px}.alt-shell .brand span{font-size:10px}.alt-shell .brand strong{font-size:18px}.alt-shell .brand>.random-pepe{width:34px;height:34px}}
+@media(max-width:480px){.alt-shell main{padding:0 16px}.alt-shell .play-clockband h1{font-size:27px}.alt-shell .ladder-row{grid-template-columns:20px 32px minmax(0,1fr) auto;gap:8px}.ladder-art{width:32px!important;height:32px!important}.alt-graveyard .grave-positions ul{grid-template-columns:1fr}.alt-shell .header-tools [data-rk]{max-width:155px}.alt-shell .instrument-details{gap:12px}.alt-shell .chart-head{align-items:start}.alt-shell .chart-head p{font-size:12px}}
+.alt-stake .alt-stake-layout>div:nth-child(2){grid-row:1;grid-column:2}.alt-stake [aria-label="your pepe"] h1{font-size:32px;overflow-wrap:anywhere}.alt-stake .alt-stake-layout h2{font-size:30px}.alt-stake .alt-identity-row h3{font-size:29px}.alt-shell .mini-clock:empty{display:none}.alt-stake [aria-label="your pepe"]{height:100%}.alt-stake .alt-stake-layout>div:first-child{align-self:stretch}
+@media(max-width:800px){.alt-stake .alt-stake-layout>div:nth-child(2){grid-column:1;grid-row:auto}}
+.under-hero>.editorial-pepe{width:27px;height:27px;flex-shrink:0}.editorial-pepe svg{width:100%;height:100%;display:block}
+.alt-shell .predeposit-state .alt-clock,.alt-shell .play-clockband .alt-clock{width:fit-content;margin:24px auto;padding:14px 24px;background:var(--clock-housing);color:var(--clock-money);border:1px solid var(--clock-line);border-radius:0;box-shadow:5px 5px 0 var(--shadow)}
+@media(max-width:480px){.alt-shell .predeposit-state .alt-clock,.alt-shell .play-clockband .alt-clock{font-size:clamp(39px,10vw,50px);padding:12px 14px}}
+.wallet-art{width:24px!important;height:24px!important;flex-shrink:0;border-radius:4px}.alt-shell .wallet-button{min-width:0}.alt-shell .wallet-label{font-family:var(--body);font-size:12px}
+
+/* Balance fills and sell sizing share the trade panel's accent. */
+.alt-shell .balance-max { color: inherit; background: transparent; border: 0; cursor: pointer; font: inherit; }
+.alt-shell .balance-max small { color: var(--accent); margin-left: .35rem; }
+.alt-shell .balance-max:hover { text-decoration: underline; }
+.alt-shell .balance-max:disabled { opacity: .5; cursor: default; }
+.alt-shell .sell-slider { padding: 16px 0; }
+.alt-shell .sell-slider label, .alt-shell .sell-slider-ends { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.alt-shell .sell-slider input { display: block; width: 100%; min-width: 0; margin: 14px 0 8px; accent-color: var(--accent); cursor: pointer; }
+.alt-shell .sell-slider output { font-variant-numeric: tabular-nums; }
+
+/* One action-button treatment across the live app. */
+.alt-shell :is(.tx-action, .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button) {
+  background: var(--action);
+  color: var(--action-ink);
+  border: 1px solid transparent;
+  border-radius: 0;
+  clip-path: polygon(0 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%);
+  min-height: 44px;
+  padding: 13px 18px;
+  font-family: var(--body);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  transition: filter .15s, transform .15s;
+}
+.alt-shell :is(.tx-action, .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button):enabled:hover {
+  color: var(--action-ink);
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+}
+.alt-shell :is(.tx-action, .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button):focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+  clip-path: none;
+}
+.alt-shell :is(.tx-action, .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button):disabled {
+  background: var(--raised);
+  color: var(--muted);
+  border-color: var(--line);
+  opacity: 1;
+  cursor: not-allowed;
+  filter: none;
+  transform: none;
+}
+.alt-shell .alt-graveyard button:not([aria-expanded]) .pl-btn-fill { display: none; }
+html[data-theme=light] .alt-shell :is(.tx-action, .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button) {
+  clip-path: none;
+  border-color: var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.alt-shell .tx-action .pl-btn-fill { display: none; }
+
+/* Square geometry throughout the alternative interface. */
+.alt-shell *,
+.alt-shell *::before,
+.alt-shell *::after {
+  border-radius: 0 !important;
+}

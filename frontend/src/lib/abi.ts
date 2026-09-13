@@ -1,3 +1,4 @@
+import { curveErrorSignatures } from './contractErrors.ts'
 import { parseAbi, type Address } from 'viem'
 
 /// Minimal, hand-rolled ABIs — only what the UI touches.
@@ -23,6 +24,7 @@ export const factoryAbi = parseAbi([
 ])
 
 export const controllerAbi = parseAbi([
+  ...curveErrorSignatures,
   'error ERC20InsufficientAllowance(address spender, uint256 allowance, uint256 needed)',
   'error PepeDnaTaken()',
   'error BadPepeId()',
@@ -108,6 +110,11 @@ export const descriptorAbi = parseAbi([
 ])
 
 export const hookAbi = parseAbi([
+  ...curveErrorSignatures,
+  'function ticketPrice() view returns (uint256)',
+  'function genesisPotBalance() view returns (uint256)',
+  'function TICKET_RULES_VERSION() view returns (uint256)',
+  'function SINE_RULES_VERSION() view returns (uint256)',
   'function mode() view returns (uint8)',
   'function reserveMixETH() view returns (uint256)',
   'function totalSupplyPSP() view returns (uint256)',
@@ -121,7 +128,7 @@ export const hookAbi = parseAbi([
   'function sineConfigured() view returns (bool)',
   'function sineActive() view returns (bool)',
   'function sineParams() view returns (uint256 p0, uint256 preK, uint256 pTarget, uint256 targetReserve, uint24 ampBps)',
-  'function sineCurve() view returns (uint256 p0, uint256 preK, uint256 boot, uint256 targetReserve, uint256 lam, uint256 B, uint256 slope, uint256 amp, uint256 g, uint256 W, uint256 q0)',
+  'function sineCurve() view returns (uint256 p0, uint256 preGrowth, uint256 boot, uint256 targetReserve, uint256 lam, uint256 B, uint256 waveTrend, uint256 amp, uint256 g, uint256 W, uint256 q0)',
   'function sinePriceAt(uint256 R) view returns (uint256)',
   'event Buy(address indexed buyer, uint256 mixETHIn, uint256 pspOut, uint256 newSupply, uint256 newReserveMixETH)',
   'event Sell(address indexed seller, uint256 pspIn, uint256 mixETHOut, uint256 newSupply, uint256 newReserveMixETH)',
@@ -161,12 +168,14 @@ export const mixVaultAbi = parseAbi([
 ])
 
 export const zapInAbi = parseAbi([
+  ...curveErrorSignatures,
   'function zapInBuy((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 minPspOut, uint256 deadline) payable returns (uint256 pspOut)',
   'function buyWithMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 mixIn, uint256 minPspOut, uint256 deadline) returns (uint256 pspOut)',
   'function zapInPredeposit(address controller, uint256 minSharesMinted) payable returns (uint256 shares)',
 ])
 
 export const zapOutAbi = parseAbi([
+  ...curveErrorSignatures,
   'function zapOut((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 pspIn, uint256 minMixOut, uint256 deadline) returns (uint256 ethOut)',
   'function sellToMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 pspIn, uint256 minMixOut, uint256 deadline) returns (uint256 mixOut)',
 ])
@@ -174,6 +183,7 @@ export const zapOutAbi = parseAbi([
 /// PSPReferralRegistry — per-round referral attribution graph (2026-08-27).
 /// buyWithMix binds msg.sender in the purchase; record remains an optional direct path.
 export const registryAbi = parseAbi([
+  ...curveErrorSignatures,
   'function PURCHASE_REFERRAL_VERSION() view returns (uint256)',
   'function buyWithMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 mixIn, uint256 minPspOut, uint256 deadline, uint256 referrerNftId) returns (uint256 pspOut)',
   'event Referred(address indexed trader, uint256 indexed traderNftId, uint256 indexed referrerNftId)',
@@ -191,6 +201,7 @@ export const faucetAbi = parseAbi([
 
 /// PSPReinvestor — claims mixETH fees and compounds them into PSP stakes.
 export const reinvestorAbi = parseAbi([
+  ...curveErrorSignatures,
   'function ATTRIBUTION_VERSION() view returns (uint256)',
   'function reinvest(uint256 pepeId, (address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 minPspOut, uint256 deadline)',
   'function reinvestAll(uint256[] pepeIds, (address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 minPspOut, uint256 deadline)',

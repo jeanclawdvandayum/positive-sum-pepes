@@ -188,8 +188,9 @@ contract ReinvestAttributionTest is RealV4Base {
         uint256 buyerMix = mixETH.balanceOf(operator);
         uint256 callerMix = mixETH.balanceOf(address(this));
         uint256 callerPsp = pspToken.balanceOf(address(this));
-        uint256 out = zapIn.buyWithMixFor(poolKey, 0.005e18, 1, block.timestamp, operator);
-        assertEq(mixETH.balanceOf(address(this)), callerMix - 0.005e18);
+        uint256 price = hook.ticketPrice();
+        uint256 out = zapIn.buyWithMixFor(poolKey, price, 1, block.timestamp, operator);
+        assertEq(mixETH.balanceOf(address(this)), callerMix - price);
         assertEq(mixETH.balanceOf(operator), buyerMix);
         assertEq(pspToken.balanceOf(address(this)), callerPsp + out);
         assertEq(pspToken.balanceOf(operator), 0);

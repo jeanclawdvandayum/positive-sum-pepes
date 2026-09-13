@@ -66,7 +66,7 @@ export default function DetonateButton({
         disabled={step !== 'idle'}
         data-pending={step === 'pending' || undefined}
         aria-label="detonate — settle the round"
-        className="relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-phase-critical/60 bg-phase-critical/10 px-8 py-3 font-display text-xl text-phase-critical transition hover:bg-phase-critical/20 active:translate-y-[1px] disabled:cursor-wait disabled:opacity-80"
+        className="tx-action relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-phase-critical/60 bg-phase-critical/10 px-8 py-3 font-display text-xl text-phase-critical transition hover:bg-phase-critical/20 active:translate-y-[1px] disabled:cursor-wait disabled:opacity-80"
       >
         <span className="pl-btn-fill" aria-hidden="true" />
         <PixelIcon name="bomb" size={20} />

@@ -48,11 +48,12 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
       } else try {
         const id = await client.readContract({ address: factory, abi: factoryAbi, functionName: 'currentRoundId', blockNumber })
         const round = await client.readContract({ address: factory, abi: factoryAbi, functionName: 'rounds', args: [id], blockNumber })
-        const [minimum, seconds] = await Promise.all([
+        const [minimum, seconds, ticketRules] = await Promise.all([
           client.readContract({ address: round[2], abi: hookAbi, functionName: 'MIN_BUY_INPUT', blockNumber }),
           client.readContract({ address: round[2], abi: hookAbi, functionName: 'TIME_PER_UNIT', blockNumber }),
+          client.readContract({ address: round[2], abi: hookAbi, functionName: 'TICKET_RULES_VERSION', blockNumber }),
         ])
-        assertGameRules(minimum, seconds)
+        assertGameRules(minimum, seconds, ticketRules)
         if (options && 'referralPurchase' in options) {
           const intent = options.referralPurchase
           const atomicBuy = parameters.functionName === 'buyWithMix' && parameters.args?.length === 5

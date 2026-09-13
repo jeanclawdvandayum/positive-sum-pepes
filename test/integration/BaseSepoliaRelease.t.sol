@@ -124,21 +124,21 @@ contract BaseSepoliaReleaseTest is Test {
         assertEq(address(c.reinvestor.mix()), address(c.factory.mixETH()));
         assertEq(address(c.reinvestor.zapIn()), vm.envAddress("PSP_ZAPIN"));
         assertEq(c.r.hook.MIN_BUY_INPUT(), 0.005e18);
-        assertEq(c.r.hook.TIME_PER_UNIT(), 260);
+        assertEq(c.r.hook.TIME_PER_UNIT(), 69);
         assertEq(c.r.hook.FEE_BPS_PRE_WAVE(), 1000);
         assertEq(c.r.hook.FEE_BPS_ABOVE_WAVE(), 250);
         assertEq(c.r.hook.STAKER_BPS(), 6000);
         assertEq(c.r.hook.POT_BPS(), 3500);
-        assertEq(c.r.controller.PREDEPOSIT_RULES_VERSION(), 1);
+        assertEq(c.r.controller.PREDEPOSIT_RULES_VERSION(), 2);
         assertEq(c.staker.PEPE_DNA_VERSION(), 2);
         assertEq(c.registry.PURCHASE_REFERRAL_VERSION(), 1);
         assertEq(c.reinvestor.ATTRIBUTION_VERSION(), 1);
         assertTrue(c.staker.supportsInterface(0x80ac58cd));
-        assertEq(c.r.controller.PREDEPOSIT_CAP(), 1000e18);
+        assertEq(c.r.controller.PREDEPOSIT_CAP(), 0);
         assertEq(c.r.controller.PREDEPOSIT_CAP_PER_WALLET(), vm.envOr("PSP_WALLET_CAP_MIX", uint256(0)) * 1e18);
-        assertEq(c.r.controller.PREDEPOSIT_DURATION(), vm.envOr("PSP_PREDEPOSIT_SEC", uint256(86400)));
-        assertEq(c.r.controller.VEST_DURATION(), vm.envOr("PSP_VEST_SEC", uint256(3600)));
-        assertEq(c.r.hook.detWindow(), vm.envOr("PSP_DET_SEC", uint256(15600)));
+        assertEq(c.r.controller.PREDEPOSIT_DURATION(), vm.envOr("PSP_PREDEPOSIT_SEC", uint256(259200)));
+        assertEq(c.r.controller.VEST_DURATION(), vm.envOr("PSP_VEST_SEC", uint256(2419200)));
+        assertEq(c.r.hook.detWindow(), vm.envOr("PSP_DET_SEC", uint256(248660)));
     }
 
     function _freshGenesis(ReleaseContext memory c) internal returns (uint256 idA, uint256 idB) {
@@ -285,7 +285,7 @@ contract BaseSepoliaReleaseTest is Test {
         address a = makeAddr("release-alice");
         address b = makeAddr("release-bob");
         assertEq(r.hook.MIN_BUY_INPUT(), 0.005e18);
-        assertEq(r.hook.TIME_PER_UNIT(), 260);
+        assertEq(r.hook.TIME_PER_UNIT(), 69);
         assertEq(address(reinvestor.staker()), address(staker));
 
         IFreeMix(address(mix)).mint(a, 50e18);
@@ -337,7 +337,7 @@ contract BaseSepoliaReleaseTest is Test {
         skip(next.controller.PREDEPOSIT_DURATION());
         next.controller.launchPooledBuy();
         assertEq(uint8(next.hook.mode()), uint8(CurveHook.Mode.Active));
-        assertEq(next.hook.TIME_PER_UNIT(), 260);
+        assertEq(next.hook.TIME_PER_UNIT(), 69);
 
         // The new round is active before the old round's final exits.
         vm.prank(b); staker.withdraw(idB);

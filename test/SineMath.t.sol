@@ -30,12 +30,12 @@ contract SineMathTest is Test {
     function setUp() public {
         p = SineMath.Params({
             p0: 1e13,                       // 1e-5
-            preK: 4_605_170_185_988_092,    // ln(10)/500 → B = 1e-4 at 500 mix
+            preK: 4_477_562_267_871_699,    // ln(7.5)/450 at the reference raise
             pTarget: 0.06e18,
             targetReserve: 10_000e18,
             ampBps: 10_000
         });
-        c = SineMath.materialize(p, 500e18);
+        c = SineMath.materialize(p, 450e18);
         caller = new SineLibCaller();
     }
 
@@ -123,8 +123,8 @@ contract SineMathTest is Test {
 
     /// The 10k target sits on a tread 3 wavelengths out — wave geometry.
     function test_WaveGeometry() public view {
-        assertApproxEqAbs(c.lam * 3, 9_500e18, 2, "lam covers seam-to-target");
-        assertLe(c.lam * 3, 10_000e18 - 500e18, "tread lands at/inside target");
+        assertApproxEqAbs(c.lam * 3, 9_550e18, 2, "lam covers seam-to-target");
+        assertLe(c.lam * 3, 10_000e18 - 450e18, "tread lands at/inside target");
     }
 
     /// Validation guards.
@@ -143,10 +143,13 @@ contract SineMathTest is Test {
         caller.callValidate(bad);
     }
 
-    /// Boot past the target cannot anchor (wave would point backwards).
-    function test_MaterializeBootBeyondTarget() public {
-        vm.expectRevert(SineMath.InvalidParams.selector);
-        caller.callMaterialize(p, 20_000e18);
+    /// A larger raise moves the target forward by the same factor.
+    function test_MaterializeBootBeyondReferenceTarget() public view {
+        SineMath.Curve memory larger = SineMath.materialize(p, 20_000e18);
+        assertEq(larger.targetReserve, uint256(10_000e18) * 20_000 / 450);
+        assertGt(larger.targetReserve, larger.boot);
+        assertEq(larger.B, c.B);
+        assertEq(larger.waveTrend, c.waveTrend);
     }
 
     function test_RejectUnrepresentableCustomCurveBeforeDeposits() public {
@@ -166,7 +169,7 @@ contract SineMathTest is Test {
         SineMath.validate(config);
         uint256 boot = bound(rawBoot, 0.0045e18, 450e18);
         SineMath.Curve memory curve = SineMath.materialize(config, boot);
-        assertGt(curve.slope, 0);
+        assertGt(curve.waveTrend, 0);
         assertGt(curve.g, 1e18);
         uint256 bought = SineMath.buyOut(curve, boot, 0.0045e18);
         assertGt(bought, 0, "minimum net buy is representable");

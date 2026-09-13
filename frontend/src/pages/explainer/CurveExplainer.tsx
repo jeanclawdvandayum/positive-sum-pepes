@@ -118,7 +118,7 @@ export default function CurveExplainer() {
             </p>
           </div>
           <p className="mt-6 text-sm leading-relaxed text-text-lo">
-            the amount of mixETH behind PSP determines where you are on the curve.
+            the IBCO sets the scale. the amount of mixETH behind PSP determines where you are on the curve.
           </p>
         </div>
       </div>

@@ -240,7 +240,7 @@ export function PepeCard({
 
       <div className="grid grid-cols-2 gap-2 text-sm">
         <div>
-          <div className="text-[10px] text-text-lo">staked</div>
+          <div className="text-[10px] text-text-lo">lePSP</div>
           <div className="font-data text-text-hi">{fmtAmount(amount)}</div>
         </div>
         <div className="text-right">
@@ -287,7 +287,7 @@ export function PepeCard({
           className="st-btn text-xs"
           disabled={busy || (decaying ? !canCancel : !canRequest)}
           onClick={() => act(decaying ? 'cancelWithdraw' : 'requestWithdraw')}
-          title={decaying ? 'cancel withdrawal and restore full staking weight' : 'start the six-epoch exit ramp'}
+          title={decaying ? 'cancel withdrawal and restore full staking weight' : 'start this round’s withdrawal schedule'}
         >
           {decaying ? '↩ keep staking' : 'request withdraw'}
         </button>

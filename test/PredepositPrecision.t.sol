@@ -40,22 +40,18 @@ contract PredepositPrecisionTest is BBase {
         assertEq(stakerV.dnaOf(stakerV.primaryOf(bob)), preview);
     }
 
-    function testUnrepresentableOneWeiWholePoolCanBeToppedUpAfterWindow() public {
+    function testOneWeiWholePoolCanLaunchAndClaim() public {
         vm.startPrank(alice);
-        mixETH.approve(address(controller), 100e18);
+        mixETH.approve(address(controller), 1);
         controller.predeposit(1);
         vm.stopPrank();
-        skip(7 days);
-        vm.expectRevert(SineMath.InvalidParams.selector);
-        controller.launchPooledBuy();
-        assertFalse(controller.predepositClosed());
-        assertEq(mixETH.balanceOf(address(controller)), 1);
-        vm.prank(alice);
-        controller.predeposit(100e18 - 1);
+        skip(controller.PREDEPOSIT_DURATION());
         controller.launchPooledBuy();
         vm.prank(alice);
         controller.claimPredepositPSP();
         assertTrue(controller.predepositClosed());
         assertEq(stakerV.balanceOf(alice), 1);
+        assertGt(psp.totalSupply(), 0);
+        assertEq(hook.reserveMixETH(), 1);
     }
 }

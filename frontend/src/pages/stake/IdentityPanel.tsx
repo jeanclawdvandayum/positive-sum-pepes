@@ -38,9 +38,9 @@ export default function IdentityPanel({
   const { address } = useAccount()
   const [teaser] = useState(() => renderDecorativePepeSvg())
   const staker = round.staker
-  const nameLine = 'staked position(s)'
+  const nameLine = 'lePSP position(s)'
   const subLine = !address ? 'connect your wallet to find your pepe.'
-    : ids.length > 0 ? 'your pepes. your share of the trading fees.'
+    : ids.length > 0 ? 'locked earning PSP. your share of the trading fees.'
     : 'pick your accomplice below. add PSP to stake, or enter zero to mint the NFT.'
 
   return (
@@ -59,9 +59,9 @@ export default function IdentityPanel({
 
           <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-2 border-t border-line pt-4 text-sm sm:grid-cols-2">
             <div className="flex items-baseline justify-between gap-3 sm:block">
-              <dt className="text-xs text-text-lo">staked</dt>
+              <dt className="text-xs text-text-lo">locked earning PSP</dt>
               <dd className="tabular font-data text-text-hi">
-                {fmtAmount(staked)} <span className="text-xs text-text-lo">psp</span>
+                {fmtAmount(staked)} <span className="text-xs text-text-lo">lePSP</span>
               </dd>
             </div>
             <div className="flex items-baseline justify-between gap-3 sm:block">

@@ -1,3 +1,5 @@
+import { userFacingContractError } from './contractErrors.ts'
+
 /** Resolves only after successful inclusion, including a repriced replacement. */
 export async function confirmTransaction<P>(steps: {
   simulate: (params: P) => Promise<unknown>
@@ -20,6 +22,7 @@ export async function confirmTransaction<P>(steps: {
     notify?.('success', hash)
     return hash
   } catch (error) {
+    error = userFacingContractError(error)
     const detail = error instanceof Error ? ('shortMessage' in error ? String(error.shortMessage) : error.message) : 'Transaction failed.'
     notify?.(hash && !resolved ? 'unknown' : 'failed', hash, detail.slice(0, 200))
     throw error

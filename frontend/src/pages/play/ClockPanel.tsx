@@ -109,7 +109,7 @@ export default function ClockPanel({
         </div>
         {lastTime === undefined ? (
           <p className="pl-context mt-3 font-data text-xs">
-            feed the clock. each full 0.005 mixETH in a buy adds up to +4:20.
+            feed the clock. each whole ladder ticket adds up to 69 seconds. ticket prices rise with the pot.
           </p>
         ) : (
           <p className="pl-context mt-3 flex items-center gap-1.5 font-data text-xs">

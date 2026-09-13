@@ -151,7 +151,7 @@ contract PSPStaker is ReentrancyGuard {
     IERC20 public immutable psp;
     IRoundController public immutable controller;
 
-    /// @dev epoch length = VEST_DURATION / 6 (mainnet 42d → 7d, testnet 6h → 1h).
+    /// @dev epoch length = VEST_DURATION / 6 (default 28d → 4d 16h; playtests can shorten it).
     ///      Read lazily from the controller — the staker is deployed during
     ///      the controller's OWN constructor (finding 47: counterparty has no
     ///      code yet), so no eager VEST_DURATION read at construction.
@@ -874,14 +874,12 @@ contract PSPStaker is ReentrancyGuard {
         if (pendingFeesMixETH == 0) return;
         uint256 w = _pointNow().weight;
         if (w == 0) return; // orphaned: distributes once weight exists
-        uint256 delta = (pendingFeesMixETH * CREDIT_PRECISION) / w;
+        uint256 delta = Math.mulDiv(pendingFeesMixETH, CREDIT_PRECISION, w);
         if (delta == 0) return; // sub-precision: keep rolling in pending
         // AUD-12: creditPerWeight retains fractional entitlements between
         // feeds. Debit their CEILING from pending so that fraction cannot
         // also be allocated again as a rolling remainder on the next feed.
-        uint256 numerator = delta * w;
-        uint256 distributed = numerator / CREDIT_PRECISION;
-        if (numerator % CREDIT_PRECISION != 0) ++distributed; // <= pendingFeesMixETH
+        uint256 distributed = Math.mulDiv(delta, w, CREDIT_PRECISION, Math.Rounding.Ceil);
         uint256 epoch = _epoch();
         if (feeEpochs.length == 0 || feeEpochs[feeEpochs.length - 1].epoch != epoch) {
             feeEpochs.push(FeeEpoch(epoch, creditPerWeight));

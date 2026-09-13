@@ -9,7 +9,7 @@ import {SineVectors} from "./SineVectors.sol";
 /// @notice Independent Decimal/Simpson price and integral vectors plus inverse properties.
 contract SineOracleTest is Test {
     function curve(uint256 boot, uint24 amp) internal pure returns (SineMath.Curve memory) {
-        return SineMath.materialize(SineMath.Params(1e13, 4_605_170_185_988_092, 0.06e18, 10_000e18, amp), boot);
+        return SineMath.materialize(SineMath.Params(1e13, 4_477_562_267_871_699, 0.06e18, 10_000e18, amp), boot);
     }
 
     function test_IndependentDecimalVectors() public pure {
@@ -24,9 +24,9 @@ contract SineOracleTest is Test {
 
     function testFuzz_RoundtripNoProfit(uint96 rawBoot, uint96 rawReserve, uint64 rawBuy, uint16 rawAmp) public pure {
         uint256 boot = bound(rawBoot, 0.005e18, 450e18);
-        uint256 reserve = bound(rawReserve, boot, 30_000e18);
-        uint256 spend = bound(rawBuy, 0.005e18, 10e18);
         SineMath.Curve memory c = curve(boot, uint24(bound(rawAmp, 0, 10000)));
+        uint256 reserve = bound(rawReserve, boot, boot + 8 * c.lam);
+        uint256 spend = bound(rawBuy, 0.0045e18, 10e18);
         uint256 out = SineMath.buyOut(c, reserve, spend);
         if (out == 0) return;
         uint256 back = SineMath.sellOut(c, reserve + spend, out);

@@ -1,3 +1,4 @@
+import AltShell from './alt/AltShell'
 import TransactionToasts from './components/TransactionToasts'
 import { useEffect } from 'react'
 import { WagmiProvider } from 'wagmi'
@@ -120,7 +121,7 @@ function Shell() {
             <ReferralProvider>
             {/* bg-0 in both themes — the old wrapper was a light-only gradient
                 (inventory red-line #14); scanlines ride above, pointer-dead */}
-            <div className="min-h-dvh bg-bg-0">
+            {import.meta.env.VITE_ALT_UI === '1' ? <><DeadlineWire /><AltShell /><TransactionToasts /></> : <div className="min-h-dvh bg-bg-0">
               <DeadlineWire />
               <Topbar />
               <TransactionToasts />
@@ -138,7 +139,7 @@ function Shell() {
               </main>
               <RulesNotice />
               <Footer />
-            </div>
+            </div>}
             </ReferralProvider>
           </HashRouter>
         </RainbowKitProvider>

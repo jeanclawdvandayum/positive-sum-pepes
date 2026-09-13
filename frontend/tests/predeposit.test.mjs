@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { parseAmountToWad, wadToExact } from '../src/lib/format.ts'
 import { MIN_BUY_INPUT } from '../src/lib/gameRules.ts'
-import { capHeadroom, predepositLimit, predepositMinimum, predepositAmountAllowed, predepositProgress, predepositRemainder } from '../src/lib/predeposit.ts'
+import { capHeadroom, predepositUncapped, predepositLimit, predepositMinimum, predepositAmountAllowed, predepositProgress, predepositRemainder } from '../src/lib/predeposit.ts'
 const cap = 500n * 10n ** 18n
 
 test('499.9999999 stays visibly below 500 and MAX preserves its exact dust remainder', () => {
@@ -34,7 +34,7 @@ test('all positive sub-buy-minimum deposits qualify, beyond just a final-cap-fil
 })
 test('legacy and unreadable deployments retain their actual old minimum', () => {
   assert.equal(predepositMinimum(1n), 1n)
-  for (const version of [undefined, null, 0n, 2n, '1', 1]) {
+  for (const version of [undefined, null, 0n, 3n, '1', 1]) {
     const minimum = predepositMinimum(version)
     assert.equal(minimum, MIN_BUY_INPUT)
     assert(!predepositAmountAllowed(1n, minimum, cap))
@@ -59,4 +59,28 @@ test('wei-scale MAX remains exact across a deterministic range of wallet, balanc
     assert.equal(predepositAmountAllowed(limit, 1n, limit), limit > 0n)
     assert(!predepositAmountAllowed(limit + 1n, 1n, limit))
   }
+})
+
+test('version two zero-cap IBCOs take exact wallet balance, including tiny and very large raises', () => {
+  assert.equal(predepositMinimum(2n), 1n)
+  for (const total of [0n, 1n, cap, 10n ** 60n]) {
+    for (const balance of [1n, cap, 10n ** 50n]) {
+      assert.equal(predepositLimit(balance, total, 0n, 0n, total, 2n), balance)
+      assert(predepositAmountAllowed(balance, predepositMinimum(2n), balance))
+    }
+    assert.equal(predepositLimit(100n, total, 0n, 50n, 49n, 2n), 1n)
+    assert.equal(predepositLimit(100n, total, 0n, 50n, 50n, 2n), 0n)
+  }
+  assert.equal(predepositProgress(cap, 0n, 2n), '500 mixETH pooled')
+  assert.equal(predepositRemainder(cap, 0n, 2n), 'uncapped IBCO')
+})
+test('zero means unlimited only with the exact on-chain version capability', () => {
+  for (const version of [undefined, null, 0n, 1n, 3n, '2', 2]) {
+    assert.equal(predepositUncapped(version, 0n), false)
+    assert.equal(predepositLimit(cap, cap, 0n, 0n, 0n, version), 0n)
+  }
+  assert.equal(predepositUncapped(2n, 0n), true)
+  // Historical caps stay enforced even if a new version is misconfigured.
+  assert.equal(predepositUncapped(2n, cap), false)
+  assert.equal(predepositLimit(cap, cap - 1n, cap, 0n, 0n, 2n), 1n)
 })

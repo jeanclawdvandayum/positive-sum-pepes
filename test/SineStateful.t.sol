@@ -32,9 +32,10 @@ contract SineStatefulTest is RealV4Base {
         uint256 amount=bound(seed,0.005e18,balance<100e18?balance:100e18);
         uint256 quote=hook.getBuyOutput(amount);
         uint256 before=hook.ticketCount();
+        uint256 price=hook.ticketPrice();
         uint256 got=zapIn.buyWithMix(poolKey,amount,quote,block.timestamp);
         assertEq(got,quote,"buy quote matches real settlement");
-        assertEq(hook.ticketCount()-before,amount/0.005e18);
+        assertEq(hook.ticketCount()-before,amount/price);
         successfulBuys++;
     }
 

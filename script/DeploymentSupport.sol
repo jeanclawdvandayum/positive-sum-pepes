@@ -37,9 +37,9 @@ abstract contract DeploymentSupport is Script {
 
     function _testnetTimings() internal view returns (uint256) {
         return CurveMath.packTimingsCapped(
-            vm.envOr("PSP_PREDEPOSIT_SEC", uint256(24 hours)),
-            vm.envOr("PSP_VEST_SEC", uint256(1 hours)),
-            vm.envOr("PSP_DET_SEC", uint256(4 hours + 20 minutes)),
+            vm.envOr("PSP_PREDEPOSIT_SEC", uint256(3 days)),
+            vm.envOr("PSP_VEST_SEC", uint256(28 days)),
+            vm.envOr("PSP_DET_SEC", uint256(69 hours + 4 minutes + 20 seconds)),
             vm.envOr("PSP_WALLET_CAP_MIX", uint256(0))
         );
     }
@@ -112,8 +112,8 @@ abstract contract DeploymentSupport is Script {
         require(r.controller.hookAddress() == address(r.hook) && address(r.hook.controller()) == address(r.controller)
             && r.token.controller() == address(r.controller), "round wiring mismatch");
         require(address(r.hook.poolManager()) == address(factory.poolManager()), "hook PoolManager mismatch");
-        require(r.hook.MIN_BUY_INPUT() == 0.005e18 && r.hook.TIME_PER_UNIT() == 260, "game rules mismatch");
-        require(r.controller.PREDEPOSIT_RULES_VERSION() == 1 && r.controller.PREDEPOSIT_CAP() == 1000e18,
+        require(r.hook.MIN_BUY_INPUT() == 0.005e18 && r.hook.TIME_PER_UNIT() == 69 && r.hook.TICKET_RULES_VERSION() == 2, "game rules mismatch");
+        require(r.controller.PREDEPOSIT_RULES_VERSION() == 2 && r.controller.PREDEPOSIT_CAP() == 0,
             "predeposit rules mismatch");
         PSPStaker staker = r.controller.staker();
         require(address(staker).code.length != 0 && address(staker.controller()) == address(r.controller)
@@ -141,20 +141,17 @@ abstract contract DeploymentSupport is Script {
         });
     }
 
-    /// @dev Tilted-sine params (2026-09-03 indefinite redesign): the whole
-    ///      curve past boot is ONE endless wave — no pre-wave/top/tail split.
-    ///      Defaults target price 0.06 mixETH/PSP at 10,000 mixETH reserves
-    ///      (p0 1e-5 → B 1e-4 at a 500-mix boot via preK = ln(10)/500; the
-    ///      trend lands 0.06 on a tread exactly 3 wavelengths out; ampBps
-    ///      10000 = the 45° tilt: flat treads, monotone). Env overrides:
-    ///      PSP_SINE_P0 / PSP_SINE_PREK / PSP_SINE_PTARGET /
-    ///      PSP_SINE_TARGET_RESERVE / PSP_SINE_AMPBPS.
+    /// @dev Reference calibration at 450 mixETH of net IBCO backing.
+    ///      The opening price rises 7.5x, then reaches 0.06 mixETH/PSP
+    ///      after three waves (800x the launch price). The 10,000 mixETH
+    ///      reference target scales with the actual net IBCO backing.
+    ///      Environment overrides use the same 450-mixETH reference.
     function _sineParams() internal view returns (SineMath.Params memory) {
         uint256 amp = vm.envOr("PSP_SINE_AMPBPS", uint256(10_000));
         require(amp <= 10_000, "PSP_SINE_AMPBPS must be at most 10000");
         return SineMath.Params({
             p0: vm.envOr("PSP_SINE_P0", uint256(1e13)),
-            preK: vm.envOr("PSP_SINE_PREK", uint256(4_605_170_185_988_092)),
+            preK: vm.envOr("PSP_SINE_PREK", uint256(4_477_562_267_871_699)),
             pTarget: vm.envOr("PSP_SINE_PTARGET", uint256(0.06e18)),
             targetReserve: vm.envOr("PSP_SINE_TARGET_RESERVE", uint256(10_000e18)),
             ampBps: uint24(amp)

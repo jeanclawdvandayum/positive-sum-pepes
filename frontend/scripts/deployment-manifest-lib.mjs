@@ -55,15 +55,18 @@ export function verifyFactoryCreation({ factory, receipt, canonicalBlockHash, sn
 }
 
 export function assertTimingProfile(timings) {
+  const version = timings.PREDEPOSIT_RULES_VERSION
+  if (version !== 1n && version !== 2n) throw Error('Unsupported predeposit rules version')
+  const current = version === 2n
   const packed = timings.packed
   const mask = (1n << 64n) - 1n
-  const predeposit = packed === 0n ? 7n * 86400n : packed & mask
-  const vest = packed === 0n ? 42n * 86400n : (packed >> 64n) & mask
-  const clock = ((packed >> 128n) & mask) || 72n * 3600n
+  const predeposit = packed === 0n ? (current ? 3n : 7n) * 86400n : packed & mask
+  const vest = packed === 0n ? (current ? 28n : 42n) * 86400n : (packed >> 64n) & mask
+  const clock = ((packed >> 128n) & mask) || (current ? 248660n : 72n * 3600n)
   const walletCap = ((packed >> 192n) & mask) * 10n ** 18n
   if (timings.PREDEPOSIT_DURATION !== predeposit || timings.VEST_DURATION !== vest ||
       timings.detWindow !== clock || timings.PREDEPOSIT_CAP_PER_WALLET !== walletCap ||
-      timings.PREDEPOSIT_CAP !== 1000n * 10n ** 18n || timings.epochSize !== vest / 6n) {
+      timings.PREDEPOSIT_CAP !== (current ? 0n : 1000n * 10n ** 18n) || timings.epochSize !== vest / 6n) {
     throw Error('Deployed timing/cap getters do not match the four-field factory timing profile')
   }
 }

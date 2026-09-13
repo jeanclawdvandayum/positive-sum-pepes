@@ -1,0 +1,416 @@
+{
+  "date": "2026-09-13",
+  "network": "local Anvil",
+  "chainId": 31337,
+  "settings": {
+    "predepositSeconds": 259200,
+    "predepositCap": 0,
+    "walletCap": 0,
+    "withdrawalSeconds": 2419200,
+    "detonationSeconds": 248660,
+    "secondsPerTicket": 69
+  },
+  "factory": "0x5fc8d32690cc91d4c39d9d3abcbd16989f875707",
+  "note": "The 10-million-mixETH stress branch used an Anvil snapshot, then reverted to continue the lifecycle. Receipts were checked before the snapshot rollback.",
+  "deploymentTransactions": [
+    {
+      "hash": "0x5ecf5c40b2f7d6c0c0c3b0db8ce5bcbac537d27da806ee101e7112e4a6b85c61",
+      "contract": "MockPoolManager",
+      "type": "CREATE"
+    },
+    {
+      "hash": "0x2e3442fd1eac83ba9117852fcd24a0eba81e4eac41530857b7657d7a3758c290",
+      "contract": "MockMixETH",
+      "type": "CREATE"
+    },
+    {
+      "hash": "0xb6327027a76bebaf187a54d7d9558d3fe2146bb9e77cb79834c3037db10bfc49",
+      "contract": "HookDeployer",
+      "type": "CREATE"
+    },
+    {
+      "hash": "0xfca5ed675334fb76a10e3fcb1fe195c984e670315602f653636c2434cbdfe88b",
+      "contract": "ControllerDeployer",
+      "type": "CREATE"
+    },
+    {
+      "hash": "0x895786bbc8378ecc48e1ce68806f2cf0a7acde2232db7ee843fbff5c26ad4248",
+      "contract": "StakerDeployer",
+      "type": "CREATE"
+    },
+    {
+      "hash": "0xec23dd1eec049dcebafdd87b106f68b9d6821b0007c3c90ce6e5fdf1eaa105c7",
+      "contract": "PSPFactory",
+      "type": "CREATE"
+    },
+    {
+      "hash": "0x417e39d2a126783c062b9f912240de4941293ba6410fa45301cee198473a5905",
+      "contract": "PepeExpandedDescriptor",
+      "type": "CREATE"
+    },
+    {
+      "hash": "0x89a7070d157cb52408428089c6c7e3dac4fd8133d7f86ba6732e7229a67b9e5f",
+      "contract": "PSPFactory",
+      "type": "CALL"
+    },
+    {
+      "hash": "0xa192fdda81b7c1c2f0735ce359898f3aeee39047cf6b5662f5042dc9ec94a118",
+      "contract": "PSPFactory",
+      "type": "CALL"
+    },
+    {
+      "hash": "0x7a0c5a174869285e8642d536fa529f657fda8b3194039798d6a8a952b3628016",
+      "contract": "PSPFactory",
+      "type": "CALL"
+    },
+    {
+      "hash": "0x3d358814444cb9c42b9f2884e867f2663b62e7113363ea215d10f4611c926cc7",
+      "contract": "PSPFactory",
+      "type": "CALL"
+    },
+    {
+      "hash": "0xf6e1839e071037f46f6681af076207917d9103a94cbe1ebfafd6a1fda8f38750",
+      "contract": "PSPFactory",
+      "type": "CALL"
+    },
+    {
+      "hash": "0x1e775cd6ee038bc54fcec66ffd5e90a553b23eaae52d2bc3c96fdab86e068baf",
+      "contract": "PSPFactory",
+      "type": "CALL"
+    },
+    {
+      "hash": "0x0ba747eed094a94d5cc41f3122bd0a7dea6de61ae6a32f7a1e3a9bd5f533558f",
+      "contract": "PSPFactory",
+      "type": "CALL"
+    },
+    {
+      "hash": "0xd2fd8aecc9de4060eeb0e8b02a5300371db4931f12f49ae434e0b193e534f7fa",
+      "contract": "PSPZapIn",
+      "type": "CREATE"
+    },
+    {
+      "hash": "0x9ccca04b0904eeadc56fd4f70f7a2fc907e0633bfae3cfebc2aff919856cb0bb",
+      "contract": "PSPZapOut",
+      "type": "CREATE"
+    }
+  ],
+  "actions": [
+    {
+      "functionName": "faucet",
+      "hash": "0x40d3dc94a2b0eaf0574b8e6bfe40c8d85e9371c2ed4148c4515d34dfdf373468",
+      "status": "success",
+      "gas": "67791"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x479f1981f9fd6a3230845309b5fa5f308657d5b99435ff6d65f9865b76504a73",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0xbbb6df324f9cc618e52cc1e9f1d7c6dfc19458f1e5c34dbf377c1ea3b57ed9ba",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "faucet",
+      "hash": "0xf9146542b80535504ee8fead5fd04be068f046103817fb5ea376a239b80b1fb5",
+      "status": "success",
+      "gas": "50691"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x23557637979b9cc58267133a7f96deda345db03507f89f25b8d5f390e28e2227",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0xb1182c4d62c7ae8d0e43b6fee315aef4871839dc419cb19d4a6ec2142946e2fc",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "faucet",
+      "hash": "0xe934fd1b921624f0b77436c6c5203de1fd86519e3a982039642a7cc868f37760",
+      "status": "success",
+      "gas": "50691"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x83e7eb8f75a1f3fbe1256f8c8395bc3822223c3170a48cb4e757fd53447d1f54",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0xba4b80a494434112182b282e9538b97f971fdc6ef2c9b8c68246e75aa8ff3dc8",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "predepositWithPepe",
+      "hash": "0x90a5efb7b26503aaa3c24c5e56da3e3f218ebb34d8118ad9bec948e4d2182f35",
+      "status": "success",
+      "gas": "289633"
+    },
+    {
+      "functionName": "predepositWithPepe",
+      "hash": "0x43f640bf7dca24e2d9d803cbf43ceb61341dce74039f9b4f8c6b293b0fb44834",
+      "status": "reverted",
+      "gas": "112133"
+    },
+    {
+      "functionName": "predepositWithPepe",
+      "hash": "0x1300e0c21ab3aac40053234d9f9ef915dd3895e655281e4cbb1e5adc730e4705",
+      "status": "success",
+      "gas": "410614"
+    },
+    {
+      "functionName": "predepositWithPepe",
+      "hash": "0x880abbbea16fe2dc72020448c55f0af3dc4f29fa8249f1e5e077b3c2180a8bc2",
+      "status": "success",
+      "gas": "412714"
+    },
+    {
+      "functionName": "launchPooledBuy",
+      "hash": "0xaf3085f68021fc73d0f6b4939a2bb1cdbad29601673c36b6c4301448f0cb3fec",
+      "status": "reverted",
+      "gas": "35316"
+    },
+    {
+      "functionName": "launchPooledBuy",
+      "hash": "0x8ae552472e953d5a40338aae408cffc3b5e2395f3256ad56eec6bcec19b88f28",
+      "status": "success",
+      "gas": "1109783"
+    },
+    {
+      "functionName": "claimPredepositPSP",
+      "hash": "0x2fd1744f0d8fcca6d1eadb2fc908b1f0e5dac256d86531bfc294bc0bc3d8c71f",
+      "status": "success",
+      "gas": "255094"
+    },
+    {
+      "functionName": "buyWithMix",
+      "hash": "0x919d0b14ee2ce03132028e24617a17f281d24cb2397459c644890bfe675896a2",
+      "status": "success",
+      "gas": "865991"
+    },
+    {
+      "functionName": "buyWithMix",
+      "hash": "0xe083b6ba6dd4daf4242e2cb1b3a839018913729d99de2adbb0f318154f4ee6cb",
+      "status": "success",
+      "gas": "385352"
+    },
+    {
+      "functionName": "buyWithMix",
+      "hash": "0xf5241428dfaa1d8278044857e0fb8ea0c492be9587e9938baead94838ff0b8d1",
+      "status": "success",
+      "gas": "457513"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x623d00e9364f42fac7cf5914f841fba3d5860103dd2f148d4c5b3cd641f14d0a",
+      "status": "success",
+      "gas": "46316"
+    },
+    {
+      "functionName": "sellToMix",
+      "hash": "0x9831c696ff195bb4a30c4b062502a079451a3ad303af657365ec669a8db40ffc",
+      "status": "success",
+      "gas": "3508593"
+    },
+    {
+      "functionName": "buyWithMix",
+      "hash": "0xff5f447cba76b25e940cc5d288ed01bb5a3c2793472abce23bf22173f0244150",
+      "status": "success",
+      "gas": "545082"
+    },
+    {
+      "functionName": "buyWithMix",
+      "hash": "0x22f536178627432ffe2192eadf9d5820a840329c9451108bd9cae9fc38421248",
+      "status": "reverted",
+      "gas": "488314"
+    },
+    {
+      "functionName": "buyWithMix",
+      "hash": "0xa225c97933b554b51983b40d78e0e9a65d91a04576c02ac4d6fe9c9768cb6efb",
+      "status": "success",
+      "gas": "455234"
+    },
+    {
+      "functionName": "setApprovalForAll",
+      "hash": "0x0976a2a91e77b26a822635ac65ea9237282eea8a1d1c42954df5b1605805ac79",
+      "status": "success",
+      "gas": "46841"
+    },
+    {
+      "functionName": "reinvestAll",
+      "hash": "0x1aacbf06b7e6bb77c076d1c8b5b3328cf613f0332eac1fa9bb1e1b27ebea7039",
+      "status": "success",
+      "gas": "715354"
+    },
+    {
+      "functionName": "requestWithdraw",
+      "hash": "0x93747f378939cbf48b5742308a2be993dd55c6019b93d526f449e39d3b912822",
+      "status": "success",
+      "gas": "145646"
+    },
+    {
+      "functionName": "cancelWithdraw",
+      "hash": "0xe225ef1651ab6564eacc511c30a6174b27e82bbc43c905f7ac6196f32b3bbc0a",
+      "status": "success",
+      "gas": "79488"
+    },
+    {
+      "functionName": "buyWithMix",
+      "hash": "0xe197cd60b548088278586eeead44a4d36156ab6fab957d0d8a7beea3d92354d6",
+      "status": "reverted",
+      "gas": "152205"
+    },
+    {
+      "functionName": "detonate",
+      "hash": "0x233e9204ef5e6aeeb594dbbbc09d2355f3cdb06737d5c7b255f6ebc9b7821231",
+      "status": "success",
+      "gas": "82701"
+    },
+    {
+      "functionName": "claimPot",
+      "hash": "0xd43133349b2f3353c527afe66241a779d7db9c0f135792e69bc3afdc0eaebcb5",
+      "status": "success",
+      "gas": "326957"
+    },
+    {
+      "functionName": "claimPredepositPSP",
+      "hash": "0x8809f28da6efc3d95792a1e83f289a57bfc4c633e7960a6876c1567baca23ddd",
+      "status": "success",
+      "gas": "421404"
+    },
+    {
+      "functionName": "withdraw",
+      "hash": "0x8850963935f956d48fbb008dae01891aa44c91524663f6fcdae5891f133f2110",
+      "status": "success",
+      "gas": "104069"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x4dab38e80ee7ada272d5982a9640e7c1c2486434bdfb7be35fb07d23b262f5b4",
+      "status": "success",
+      "gas": "46064"
+    },
+    {
+      "functionName": "redeemBacking",
+      "hash": "0x91b9006c38730ffe49514dda34455f99193d0988df797da9d12793293c332fe3",
+      "status": "success",
+      "gas": "86968"
+    },
+    {
+      "functionName": "reserveSpawn",
+      "hash": "0x02726994b6da322b50141bb2d0d4d087d3f008d39d519a5600445b77bb4d4bf5",
+      "status": "success",
+      "gas": "5892009"
+    },
+    {
+      "functionName": "birthStep",
+      "hash": "0x3132400def24db327083eab1959b3c202e005fcc099dc44d1eea67c9412fdf9e",
+      "status": "success",
+      "gas": "9666762"
+    },
+    {
+      "functionName": "birthStep",
+      "hash": "0x5184982b1abb76d9c23b2cb36a8b57b64ccfc330dcee9420c13ce28424664709",
+      "status": "success",
+      "gas": "9180703"
+    },
+    {
+      "functionName": "birthStep",
+      "hash": "0x8509cf90b633da86f6d11af8fe4e13bbe056ec2285db24d4860003190bbd5f51",
+      "status": "success",
+      "gas": "542115"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x9a4bc26d237fcc8e7a16f88245fbcd014ea1182852015d73d5db84e7afa4f8dd",
+      "status": "success",
+      "gas": "46271"
+    },
+    {
+      "functionName": "predepositWithPepe",
+      "hash": "0x1e6f5087d2eac7c4b1b458a4d71f22d8e43224dda56f386eba78032b5ef1fba0",
+      "status": "success",
+      "gas": "452445"
+    },
+    {
+      "functionName": "launchPooledBuy",
+      "hash": "0x5829443320204d54a2cf05a618aa9c87d1ddb36c7986a3865d39e958416c81c0",
+      "status": "reverted",
+      "gas": "35316"
+    },
+    {
+      "functionName": "launchPooledBuy",
+      "hash": "0xd0e2458d5330d1ea2942bab628ff4c0c26a415fdcacb0a256efa471d26cbdad5",
+      "status": "success",
+      "gas": "1109783"
+    },
+    {
+      "functionName": "buyWithMix",
+      "hash": "0x5b687bdad6ac486ec943ac837dd453333001fb7fd99a1177c9bdd82fa81f53ce",
+      "status": "success",
+      "gas": "496816"
+    }
+  ],
+  "curves": {
+    "curve1": [
+      "10000000000000",
+      "2014903020542264550",
+      "1800000000000000000000",
+      "40000000000000000000000",
+      "12733333333333333333333",
+      "74999999999999",
+      "2228203909222646876",
+      "354629666369469084",
+      "9283177667225599038",
+      "77775892475700468448601604",
+      "77423081115842589240000000"
+    ],
+    "curve2": [
+      "10000000000000",
+      "2014903020542264550",
+      "4500000000000000000000",
+      "100000000000000000000000",
+      "31833333333333333333333",
+      "74999999999999",
+      "2228203909222646876",
+      "354629666369469084",
+      "9283177667225599038",
+      "194439731189251171121513954",
+      "193557702789606473100000000"
+    ]
+  },
+  "frontendComparison": [
+    {
+      "round": "curve1",
+      "boot": 1800,
+      "thirdWaveReserve": 40000,
+      "bootPrice": 7.5e-05,
+      "thirdWavePrice": 0.05999999999999999,
+      "multiple": 800,
+      "originalSupplyRelativeError": 1.1730683091570882e-10,
+      "prototypeSupplyRelativeError": 9.43689570931383e-15,
+      "markersChecked": 13
+    },
+    {
+      "round": "curve2",
+      "boot": 4500,
+      "thirdWaveReserve": 99999.99999999999,
+      "bootPrice": 7.5e-05,
+      "thirdWavePrice": 0.059999999999999935,
+      "multiple": 799.9999999999992,
+      "originalSupplyRelativeError": 1.1730683091570882e-10,
+      "prototypeSupplyRelativeError": 9.43689570931383e-15,
+      "markersChecked": 13
+    }
+  ],
+  "localForkTestsPassed": 35
+}

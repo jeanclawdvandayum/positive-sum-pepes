@@ -81,3 +81,34 @@ test('ten-million reserve extrapolation is bounded without inventing capped pric
     assert.ok(last.price > c.points.at(-2).price)
   }
 })
+
+test('dimensionless v2 charts preserve legacy geometry and scale with the IBCO', () => {
+  const wad = 10n ** 18n
+  const normalized = [...raw]
+  normalized[1] = raw[1] * raw[2] / wad
+  normalized[6] = raw[6] * raw[4] / wad
+  const legacy = sampleSineChart(raw)
+  const current = sampleSineChart(normalized, 0, 2)
+  for (let i = 0; i < legacy.markers.length; i++) {
+    close(current.markers[i].reserve, legacy.markers[i].reserve, 1e-12)
+    close(current.markers[i].price, legacy.markers[i].price, 1e-12)
+  }
+  for (const scale of [1n, 1000000n, 10n ** 36n]) {
+    const scaled = [...normalized]
+    for (const index of [2, 3, 4, 9, 10]) scaled[index] *= scale
+    const chart = sampleSineChart(scaled, Number(1000n * scale), 2)
+    close(chart.boot, current.boot * Number(scale), 1e-12)
+    close(chart.markers[12].reserve, current.markers[12].reserve * Number(scale), 1e-12)
+    close(chart.markers[12].price, current.markers[12].price, 1e-10)
+    close(chart.points.find(p => p.reserve === chart.boot).supply,
+      Number(raw[10] * scale) / 1e18, 1e-12)
+    assert.ok(chart.points.every(p => [p.price, p.reserve, p.supply].every(Number.isFinite)))
+  }
+  assert.throws(() => sampleSineChart(normalized, 0, 3), /Unsupported sine/)
+})
+
+test('scaled rounds use wavelength headroom instead of a fixed 1000 mixETH jump',()=>{
+ close(sineChartHeadroom(4.5,31.833333,2),36.333333);
+ assert.equal(sineChartHeadroom(4.5,31.833333,1),1004.5);
+ assert.equal(sineChartHeadroom(50000,1000,2),55000);
+});

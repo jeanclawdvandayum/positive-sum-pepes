@@ -40,6 +40,7 @@ test('factory history starts at a successful canonical CREATE receipt for that f
 
 test('timing inspection pins detonation and wallet cap to their separate 64-bit fields', () => {
   const custom = {
+    PREDEPOSIT_RULES_VERSION: 1n,
     packed: 900n | (3600n << 64n) | (7200n << 128n) | (500n << 192n),
     PREDEPOSIT_DURATION: 900n, VEST_DURATION: 3600n, detWindow: 7200n,
     PREDEPOSIT_CAP_PER_WALLET: 500n * 10n ** 18n, PREDEPOSIT_CAP: 1000n * 10n ** 18n, epochSize: 600n,
@@ -48,6 +49,23 @@ test('timing inspection pins detonation and wallet cap to their separate 64-bit 
   assert.throws(() => assertTimingProfile({ ...custom, detWindow: 500n }), /four-field/)
   assert.throws(() => assertTimingProfile({ ...custom, PREDEPOSIT_CAP_PER_WALLET: 7200n * 10n ** 18n }), /four-field/)
   assert.doesNotThrow(() => assertTimingProfile({ ...custom, packed: 0n, PREDEPOSIT_DURATION: 604800n, VEST_DURATION: 3628800n, detWindow: 259200n, PREDEPOSIT_CAP_PER_WALLET: 0n, epochSize: 604800n }))
+})
+
+test('uncapped version two defaults and short playtest overrides are independently verified', () => {
+  const current = {
+    PREDEPOSIT_RULES_VERSION: 2n, packed: 0n,
+    PREDEPOSIT_DURATION: 259200n, VEST_DURATION: 2419200n, detWindow: 248660n,
+    PREDEPOSIT_CAP_PER_WALLET: 0n, PREDEPOSIT_CAP: 0n, epochSize: 403200n,
+  }
+  assert.doesNotThrow(() => assertTimingProfile(current))
+  assert.doesNotThrow(() => assertTimingProfile({ ...current,
+    packed: 60n | (3600n << 64n) | (90n << 128n),
+    PREDEPOSIT_DURATION: 60n, VEST_DURATION: 3600n, detWindow: 90n, epochSize: 600n,
+  }))
+  for (const change of [{ PREDEPOSIT_RULES_VERSION: 3n }, { PREDEPOSIT_RULES_VERSION: undefined },
+    { PREDEPOSIT_CAP: 1000n * 10n ** 18n }, { VEST_DURATION: 3628800n }, { detWindow: 15600n }]) {
+    assert.throws(() => assertTimingProfile({ ...current, ...change }))
+  }
 })
 
 const manifest = () => ({

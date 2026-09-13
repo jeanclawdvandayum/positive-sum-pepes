@@ -44,7 +44,7 @@ contract ClockDetonation is CBase {
 
     /// @dev CBase._launchRound1 IS the live launch now (2026-09-01
     ///      conversion): warp to epoch 1, predeposit, launch, claim — no
-    ///      terminal warp, detonationAt == launch ts + 72h, clock ALIVE.
+    ///      terminal warp, detonationAt == launch ts + 69h4m20s, clock ALIVE.
     ///      Kept as an alias so the clock-matrix rows read naturally.
     function _launchLive() internal returns (uint256 launchTs) {
         return _launchRound1();
@@ -116,23 +116,57 @@ contract ClockDetonation is CBase {
         assertEq(mixETH.balanceOf(who) - before, expect, err);
     }
 
+
+    function test_DynamicTickets_GenesisBaselineAndFractionalGrowth() public {
+        _launchLive();
+        assertEq(hook1.ticketPrice(), 0.005 ether);
+        assertEq(hook1.genesisPotBalance(), hook1.potBalance());
+        uint256 baseline = hook1.genesisPotBalance();
+        _buyAs(alice, 1 ether);
+        uint256 growth = hook1.potBalance() - baseline;
+        assertGt(growth, 0);
+        assertEq(hook1.ticketPrice(), 0.005 ether + growth * 21 / 1_000_000);
+    }
+    function test_DynamicTickets_ZeroTicketsStillBuys() public {
+        _launchLive();
+        _buyAs(alice, 1 ether);
+        skip(1000);
+        uint256 count = hook1.ticketCount();
+        uint256 deadline = hook1.detonationAt();
+        assertGt(_buyAs(bob, 0.005 ether), 0);
+        assertEq(hook1.ticketCount(), count);
+        assertEq(hook1.detonationAt(), deadline);
+    }
+    function test_DynamicTickets_TenTicketsAtSnapshotPriceAdd690Seconds() public {
+        _launchLive();
+        _buyAs(alice, 1 ether);
+        skip(1000);
+        uint256 price = hook1.ticketPrice();
+        uint256 count = hook1.ticketCount();
+        uint256 deadline = hook1.detonationAt();
+        _buyAs(bob, price * 10);
+        assertEq(hook1.ticketCount(), count + 10);
+        assertEq(hook1.detonationAt(), deadline + 690);
+        assertGt(hook1.ticketPrice(), price);
+    }
+
     // ═════════════════════════════════════════════════════════
     //  §1 — the clock
     // ═════════════════════════════════════════════════════════
 
-    /// Arms at Active: detonationAt == launch ts + 72h. Predeposit never
+    /// Arms at Active: detonationAt == launch ts + 69h4m20s. Predeposit never
     /// touches it (stays 0).
-    function test_Clock_ArmsAt72h_AtActiveTransition() public {
+    function test_Clock_ArmsAt69h4m20s_AtActiveTransition() public {
         assertEq(hook1.detonationAt(), 0, "Predeposit never arms the clock");
 
         uint256 launchTs = _launchLive();
-        assertEq(hook1.detonationAt(), launchTs + 72 hours, "armed at now + DET_WINDOW");
-        assertEq(hook1.DET_WINDOW(), 72 hours, "window constant");
-        assertEq(hook1.TIME_PER_UNIT(), 260, "seconds per mixETH unit");
+        assertEq(hook1.detonationAt(), launchTs + (69 hours + 4 minutes + 20 seconds), "armed at now + DET_WINDOW");
+        assertEq(hook1.DET_WINDOW(), (69 hours + 4 minutes + 20 seconds), "window constant");
+        assertEq(hook1.TIME_PER_UNIT(), 69, "seconds per mixETH unit");
     }
 
-    /// Two whole mixETH units plus a remainder add exactly 8m40s.
-    function test_Clock_TwoUnits_AddExactly520Seconds() public {
+    /// Two whole mixETH units plus a remainder add exactly 2m18s.
+    function test_Clock_TwoUnits_AddExactly138Seconds() public {
         _launchLive();
         skip(1 hours);
         uint256 armed = hook1.detonationAt();
@@ -141,23 +175,23 @@ contract ClockDetonation is CBase {
         vm.startPrank(alice);
         mixETH.approve(address(tSwapper), amt);
         vm.expectEmit(true, false, false, true, address(hook1));
-        emit CurveHook.TimeAdded(alice, 520, armed + 520);
+        emit CurveHook.TimeAdded(alice, 138, armed + 138);
         tSwapper.buy(_key(), amt, alice, alice);
         vm.stopPrank();
-        assertEq(hook1.detonationAt(), armed + 520);
+        assertEq(hook1.detonationAt(), armed + 138);
     }
 
-    /// Extension cap: remaining may never exceed 72h — a monster buy pins
+    /// Extension cap: remaining may never exceed 69h4m20s — a monster buy pins
     /// detonationAt at now + DET_WINDOW exactly.
-    function test_Clock_ExtensionCapped_AtNowPlus72h() public {
+    function test_Clock_ExtensionCapped_AtNowPlus69h4m20s() public {
         uint256 launchTs = _launchLive();
-        vm.warp(launchTs + 1 hours); // inside the window, 71h remaining
+        vm.warp(launchTs + 1 hours); // inside the live window
 
         // a huge buy: hundreds of whole psp -> uncapped extension would add
         // days; the cap holds remaining at exactly DET_WINDOW
         _buyAs(alice, 1_000e18);
 
-        assertEq(hook1.detonationAt(), block.timestamp + 72 hours, "capped at now + 72h");
+        assertEq(hook1.detonationAt(), block.timestamp + (69 hours + 4 minutes + 20 seconds), "capped at now + 69h4m20s");
     }
 
     /// Zero is DEAD: past detonationAt a buy reverts TradingHalted even
@@ -224,7 +258,7 @@ contract ClockDetonation is CBase {
             // 2026-09-03: seats = min(wholePSP, 10) — size each buy just
             // over one whole PSP (~1.04 psp out at P0=0.001) so every
             // buyer takes exactly ONE seat and the board stays distinct.
-            outs[i] = _buyAs(buyers[i], 5e15 + i);
+            outs[i] = _buyAs(buyers[i], hook1.ticketPrice());
             vm.warp(block.timestamp + 60); // separate the seats in time
         }
 
@@ -344,9 +378,9 @@ contract ClockDetonation is CBase {
         address b2 = makeAddr("small2");
         _buyAs(b0, 5e15); // ~1 whole psp -> 1 seat
         vm.warp(block.timestamp + 60);
-        _buyAs(b1, 5e15);
+        _buyAs(b1, hook1.ticketPrice());
         vm.warp(block.timestamp + 60);
-        _buyAs(b2, 5e15);
+        _buyAs(b2, hook1.ticketPrice());
 
         vm.warp(hook1.detonationAt() + 1);
         vm.prank(rando);
@@ -377,7 +411,7 @@ contract ClockDetonation is CBase {
         address b1 = makeAddr("late");
         _buyAs(b0, 5e15); // ~1 whole psp -> 1 seat
         vm.warp(block.timestamp + 60);
-        _buyAs(b1, 5e15);
+        _buyAs(b1, hook1.ticketPrice());
 
         vm.warp(hook1.detonationAt() + 1);
         vm.prank(rando);
@@ -688,9 +722,9 @@ contract ClockDetonationBoom is CBase {
 
 // ─────────────── 2026-09-03 additions ───────────────
 // Ladder seats per WHOLE PSP (was: one seat per buy tx) + tunable det
-// window (packed timing slot [2]; 0 = 72h hook default).
+// window (packed timing slot [2]; 0 = 69h4m20s hook default).
 
-/// @dev CBase curve has timings == 0 → detWindow must decode to the 72h
+/// @dev CBase curve has timings == 0 → detWindow must decode to the 69h4m20s
 ///      hook default even though the pack layout changed around it.
 contract DetWindowDefault is CBase {
     TicketSwapper tSwapper;
@@ -700,8 +734,8 @@ contract DetWindowDefault is CBase {
         tSwapper = new TicketSwapper(IPoolManager(address(poolManager)), IERC20(address(mixETH)));
     }
 
-    function test_DetWindow_DefaultsTo72h_WhenTimingsZero() public view {
-        assertEq(hook1.detWindow(), 72 hours, "slot [2] zero = 72h default");
+    function test_DetWindow_DefaultsTo69h4m20s_WhenTimingsZero() public view {
+        assertEq(hook1.detWindow(), (69 hours + 4 minutes + 20 seconds), "slot [2] zero = 69h4m20s default");
     }
 }
 
@@ -751,6 +785,47 @@ contract DetWindowTunable is CBase {
         c.launchPooledBuy();
         assertEq(uint8(r.hook.mode()), uint8(CurveHook.Mode.Active), "live");
         assertEq(r.hook.detonationAt() - block.timestamp, 30 minutes, "armed at tuned window");
+    }
+
+    function test_ShortProfilePersistsAcrossDelayedSuccessorBirth() public {
+        PSPFactory.Round memory first = f.getRound(1);
+        mixETH.depositETH{value: 1000e18}();
+        mixETH.approve(address(first.controller), 10e18);
+        first.controller.predeposit(10e18);
+        skip(2 hours);
+        vm.prank(bob);
+        first.controller.launchPooledBuy();
+        assertEq(first.hook.detonationAt(), block.timestamp + 30 minutes);
+
+        skip(30 minutes);
+        // Capped-chain detonation leaves successor birth to later callers.
+        first.controller.detonate{gas: 1_000_000}();
+        assertEq(uint8(first.hook.mode()), uint8(CurveHook.Mode.Flat));
+        assertTrue(f.getRound(1).destroyed);
+        skip(12 hours);
+        f.reserveSpawn(1);
+        f.birthStep();
+        f.birthStep();
+        skip(1 hours);
+        f.birthStep();
+
+        PSPFactory.Round memory second = f.getRound(2);
+        assertEq(second.controller.predepositStartTime(), block.timestamp);
+        assertEq(second.controller.PREDEPOSIT_DURATION(), 2 hours);
+        assertEq(second.controller.VEST_DURATION(), 1 hours);
+        assertEq(second.hook.detWindow(), 30 minutes);
+        (,,,, bool capReached, bool windowOver, bool launchable) = second.controller.predepositState();
+        assertFalse(capReached);
+        assertFalse(windowOver);
+        assertFalse(launchable);
+
+        mixETH.approve(address(second.controller), 10e18);
+        second.controller.predeposit(10e18);
+        skip(2 hours);
+        vm.prank(bob);
+        second.controller.launchPooledBuy();
+        assertEq(second.hook.detonationAt(), second.controller.predepositStartTime() + 2 hours + 30 minutes);
+        assertEq(second.hook.TIME_PER_UNIT(), 69);
     }
 
 }

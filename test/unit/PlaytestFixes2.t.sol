@@ -142,13 +142,13 @@ contract PlaytestFixes2 is Test {
 
     function test_UncappedProfileHasNoWalletCap() public {
         // the default (timings == 0) factory is UNCAPPED — one wallet may
-        // predeposit the whole global cap (mainnet + legacy-test semantics)
+        // predeposit above the former global cap and add more later
         assertEq(controller.PREDEPOSIT_CAP_PER_WALLET(), 0);
         vm.startPrank(alice);
         mixETH.approve(address(controller), type(uint256).max);
-        controller.predeposit(1000e18);
+        controller.predeposit(2000e18);
         vm.stopPrank();
-        assertEq(controller.totalPredepositMixETH(), 1000e18);
+        assertEq(controller.totalPredepositMixETH(), 2000e18);
     }
 
     // ─────────────── #6: factory UI views + rebirth ───────────────
@@ -196,8 +196,8 @@ contract PlaytestFixes2 is Test {
         // mainnet-default timings (factory constructed with _timings == 0).
         // CLOCK-REDESIGN §4: the vote + flat-exit slots died with governance
         // and the exit window — roundInfo carries predeposit/vest only.
-        assertEq(pd, 7 days);
-        assertEq(vest, 42 days);
+        assertEq(pd, 3 days);
+        assertEq(vest, 28 days);
     }
 
     function test_FactoryViews_UnknownRoundReverts() public {

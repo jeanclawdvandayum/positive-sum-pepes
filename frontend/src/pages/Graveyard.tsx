@@ -1,3 +1,4 @@
+import GravePositionDetails from '../alt/GravePositionDetails'
 import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useMemo, useState } from 'react'
@@ -158,11 +159,11 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
           </div>
         </Card>
 
-        <div className="flex min-w-0 flex-col gap-4">
-          {[{ title: 'staked positions', positions: round.positions.filter(p => p.amount > 0n) },
+        <div className="grave-positions flex min-w-0 flex-col gap-4">
+          {[{ title: 'lePSP positions', positions: round.positions.filter(p => p.amount > 0n) },
             { title: 'dead pepe collection', positions: round.positions.filter(p => p.amount === 0n) }].map(group => (
             <Card key={group.title} title={group.title}>
-              <p className="mt-1 text-xs text-text-lo">{group.title === 'staked positions'
+              <p className="mt-1 text-xs text-text-lo">{group.title === 'lePSP positions'
                 ? 'unlock your PSP and redeem it above. earned mixETH stays claimable after detonation.'
                 : 'unlocked, still yours. these pepes carry the scars of past rounds.'}</p>
               {group.positions.length === 0 ? <p className="mt-4 text-xs text-text-lo">{!isConnected ? 'connect wallet to see your pepes.' : 'your collection is empty for this round.'}</p> : (
@@ -172,13 +173,14 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
                     return <li key={pos.id.toString()} className="min-w-0 rounded-lg border border-line bg-bg-2 p-3 text-sm">
                       <GraveyardArt staker={round.staker} id={pos.id} />
                       <p className="mt-2 truncate font-data" title={pos.id.toString()}>pepe #{fmtPepeId(pos.id)}</p>
-                      {pos.amount > 0n && <p className="mt-1 text-xs text-text-lo">{fmtAmount(pos.amount)} PSP staked</p>}
+                      {pos.amount > 0n && <p className="mt-1 text-xs text-text-lo">{fmtAmount(pos.amount)} lePSP</p>}
                       {pos.pendingFees > 0n && <button disabled={busy} onClick={() => unlock(pos.id, 0n)} className="mt-3 w-full rounded-lg border border-line bg-bg-1 px-3 py-2 text-xs font-semibold hover:border-accent disabled:opacity-50">
                         {busy ? 'confirming…' : `claim ${fmtAmount(pos.pendingFees)} mixETH`}
                       </button>}
                       {pos.amount > 0n && <button disabled={busy} onClick={() => unlock(pos.id, pos.amount)} className="mt-2 w-full rounded-lg border border-line bg-bg-1 px-3 py-2 text-xs font-semibold hover:border-accent disabled:opacity-50">
                         {busy ? 'confirming…' : 'unlock PSP'}
                       </button>}
+                      <GravePositionDetails round={round} id={pos.id} amount={pos.amount}/>
                     </li>
                   })}
                 </ul>

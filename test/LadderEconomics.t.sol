@@ -48,7 +48,7 @@ contract LadderEconomicsTest is RealV4Base {
         uint256 fees = controller.staker().pendingFeesOf(id);
         controller.staker().claimFees(id);
         vm.stopPrank();
-        assertEq(hook.ticketCount(), 20, "buy/sell/buy earns only the two buys' tickets");
+        assertEq(hook.ticketCount(), 19, "first buy earns ten, the higher second price earns nine");
         assertGt(hook.potBalance(), potBefore);
         assertEq(controller.staker().totalFeesPaid() - paidBefore, fees);
         assertApproxEqAbs(fees, controller.staker().totalFeesReceived() - receivedBefore, 1);

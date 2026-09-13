@@ -13,7 +13,7 @@ contract MaterializeDirect is Test {
         console.log("g", c.g);
         console.log("W", c.W);
         console.log("q0", c.q0);
-        console.log("slope", c.slope);
+        console.log("wave trend", c.waveTrend);
         console.log("lam", c.lam);
     }
 }

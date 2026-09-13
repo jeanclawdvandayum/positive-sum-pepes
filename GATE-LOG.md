@@ -1463,3 +1463,48 @@ Footer links to the paper. Both are anonymous 24-hour publications.
   horizontal overflow. UI rebuilt against confirmed contracts.
 - Existing Ethereum registrar retained, gate rotated and local verifier
   rewired. See `docs/audit/2026-09-10-release.md` and deployment records.
+
+## 2026-09-11 — linear ladder tickets (source only)
+
+`bash scripts/check-audit.sh` passed: 540 Solidity tests / 70 suites,
+165 frontend tests, 11 name-verifier tests, 164 ABI entries, 38 production
+artifact size checks, independent sine oracle, art fixtures, no-governance
+check, TypeScript and Vite build. CurveHook runtime: 23,536 bytes.
+
+Tickets add 69 seconds. The price starts at 0.005 mixETH and rises linearly
+by 0.42% of that base per additional mixETH in the pot after genesis.
+Purchases use the pre-trade price. Tests cover fractional growth, zero-ticket
+purchases, ten-ticket time additions, and stateful buy/sell sequences.
+Both paper routes load, and the whitepaper interactive figures pass at
+1440px and 390px, including the new pot-growth example.
+Existing deployments retain their original rules. No deployment was sent.
+
+## 2026-09-12 — Anvil ticket lifecycle
+
+Local-only end-to-end verification: 16 deployment receipts succeeded; 42
+checked action receipts (38 success, four expected reverts). Two rounds
+exercised with 24h predeposit, 1,000 mixETH cap, 4h20m maximum clock and the
+new 69-second linear tickets. Real V4 / clock / stateful local-fork suites:
+35 passed. Isolated production UI passed at 1440px and 390px.
+See `docs/audit/2026-09-12-anvil-tickets.md` for coverage and the zero-output
+curve limit observed after the 10-million-mixETH stress buy.
+
+## 2026-09-13: final spec, source and local verification
+
+Default profile: three-day uncapped IBCO, 69:04:20 maximum clock, 69 seconds per whole ticket and a four-week withdrawal horizon. Constructor overrides remain available. The curve scales with each net IBCO raise, using a 7.5-times opening ramp and 800-times launch-price rise to the third wave. Locked earning PSP is displayed as lePSP.
+
+The full deterministic gate passed: **553 Solidity tests / 72 suites**, **175 frontend tests**, **11 verifier tests**, **165 ABI declarations** and **38 production artifact size checks**. Independent oracle, art, governance, TypeScript and Vite checks passed. CurveHook runtime is **23,899 bytes**, with **677 bytes** of headroom.
+
+Local Anvil verification passed: **16 deployment receipts**, **44 checked action receipts** (39 success, five expected reverts), two rounds and **35 local-fork tests**. Gross IBCOs of 2,000 and 5,000 mixETH scale the third-wave targets to 40,000 and 100,000 reserves. The delayed successor receives a fresh three-day window. Both frontend calculations match the actual curve tuples. Prototype tests: **25/25 passed**.
+
+Includes full-precision claim and redemption arithmetic, invalid-deposit rollback, signed-128 swap bounds and protection against oversized factory donations. Existing public deployments remain unchanged. See [verification](docs/audit/2026-09-13-final-spec.md) and [the final spec](docs/FINAL-SPEC.md).
+
+## September 13 — live alternative UI, 600-second clocks
+
+553 Solidity tests / 72 suites, 177 frontend tests and 11 verifier tests pass.
+The deterministic gate passes. A fresh Base Sepolia rehearsal and the live
+deployment each pass both deployed-code lifecycle tests. All 17 live deployment
+receipts succeed. The alternative UI uses actual contract state and transactions.
+Browser checks cover reserved-art deposit, buy, genesis claim and graveyard
+controls, with equal trade-panel heights and no mobile horizontal overflow.
+See `docs/audit/2026-09-13-alt-ui.md`.

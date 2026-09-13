@@ -6,6 +6,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 
@@ -32,6 +33,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     error ClockStillLive(); // CLOCK-REDESIGN §4: detonate() before the clock struck zero
     error NotPredeposit();
     error PredepositClosed();
+    error PredepositCapacityExceeded();
     error ZeroAmount();
     error ZeroAddress();
     error FactoryMarkFailed();
@@ -90,25 +92,14 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     uint256 public totalInitialPSP; // snapshot of PSP minted at launch
     bool public predepositClosed;
 
-    /// @dev Predeposit window opens at final factory wiring, not controller creation.
-    ///      Anyone may launch once the cap is reached or the week elapses;
-    ///      the owner (factory) may also launch early. Carry seeding from a
-    ///      previous round's destruction is exempt from the cap — it IS the
-    ///      bootstrap, and if it alone reaches the cap the round is instantly
-    ///      launchable by anyone.
-    // ─────────────── Timing profile ───────────────
-    // Constants → constructor-set immutables (2026-08-18): packed `_timings`
-    // arg allows a fast testnet profile; 0 (mainnet default) keeps the
-    // original values. CLOCK-REDESIGN §4 (2026-09-01) repacked the profile
-    // WITHOUT the vote slot (governance is dead) and WITHOUT the flat-exit
-    // slot (redemption is indefinite): THREE slots now — [0] predeposit,
-    // [85] vest, [170] per-wallet cap — each TIMINGS_WIDTH = 256/3 = 85
-    // bits, widths DERIVED from the field count in CurveMath (LESSONS
-    // 2026-08-24/2026-08-18: hand-set widths drift from data reality).
-    uint256 public immutable PREDEPOSIT_DURATION; // default 7 days
-    uint256 public constant PREDEPOSIT_CAP = 1000e18; // 1,000 mixETH
-    /// @notice Version 1 accepts any positive predeposit, subject to the caps.
-    uint256 public constant PREDEPOSIT_RULES_VERSION = 1;
+    /// @dev The public IBCO window starts at final factory wiring. Deposits
+    ///      have no global cap. Anyone may launch after the window elapses.
+    ///      Packed timings preserve shorter windows for local playtests.
+    uint256 public immutable PREDEPOSIT_DURATION; // default 3 days
+    /// @notice Zero means the pooled IBCO has no total deposit cap.
+    uint256 public constant PREDEPOSIT_CAP = 0;
+    /// @notice Version 2 accepts positive uncapped pooled deposits.
+    uint256 public constant PREDEPOSIT_RULES_VERSION = 2;
     /// @dev Genesis pooled buy routes this share of the boot into the hook's
     ///      ladder pot at launch (mirrors the sine pre-wave fee). The rest
     ///      seeds the curve; predepositors claim their pro-rata of the PSP
@@ -127,7 +118,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // (2026-08-19) the lock ledger, accumulator, and fee claims moved to
     // PSPStaker (ERC-721 positions). The controller keeps the timing
     // immutables — the staker reads them through IRoundController.
-    uint256 public immutable VEST_DURATION; // 6 weeks (decay horizon)
+    uint256 public immutable VEST_DURATION; // 4 weeks (six-epoch decay horizon)
     uint256 public constant PRECISION = 1e18;
 
     /// @dev detonation time — nonzero means the round is flat and every
@@ -157,8 +148,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // lock, and births the successor. No quorum, no votes, no window.
 
     // ─────────────── Constructor ───────────────
-    /// @dev `_config.timings == 0` → mainnet defaults (7d/42d, uncapped).
-    ///      Non-zero: three TIMINGS_WIDTH-bit slots decode verbatim
+    /// @dev `_config.timings == 0` → defaults (3d/28d, uncapped).
+    ///      Non-zero: four TIMINGS_WIDTH-bit slots decode verbatim
     ///      (CurveMath.packTimings / packTimingsCapped) and both timing
     ///      fields must be non-zero — a zero slot reverts
     ///      TimingsIncomplete (2026-08-19 lesson: the pre-guard 5x64 layout
@@ -177,8 +168,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // embedded inside ControllerDeployer — under EIP-170's 24.5kB cap.
         uint256 t = _config.timings;
         if (t == 0) {
-            PREDEPOSIT_DURATION = 7 days;
-            VEST_DURATION = 42 days;
+            PREDEPOSIT_DURATION = 3 days;
+            VEST_DURATION = 28 days;
             PREDEPOSIT_CAP_PER_WALLET = 0; // uncapped (mainnet)
         } else {
             // Widths DERIVED in CurveMath (TIMINGS_COUNT=4, TIMINGS_WIDTH=64):
@@ -258,7 +249,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         uint256 totalAssets = _getTotalAssets();
         uint256 totalSupply = mixETH.totalSupply();
         if (totalSupply == 0) return mixETHAmount; // 1:1 if no supply yet
-        return (mixETHAmount * totalAssets) / totalSupply;
+        return Math.mulDiv(mixETHAmount, totalAssets, totalSupply);
     }
 
     function _getTotalAssets() internal view returns (uint256) {
@@ -328,13 +319,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         if (address(hook) == address(0)) revert NotPredeposit();
         if (predepositClosed) revert PredepositClosed();
         if (mixETHAmount == 0) revert ZeroAmount();
-        // Public deposits are capped: hitting the cap exactly ends the window
-        // (anyone may then launch). A deposit that would overshoot reverts —
-        // the depositor retries with the remaining headroom.
-        if (totalPredepositMixETH + mixETHAmount > PREDEPOSIT_CAP) revert CapExceeded();
-        // Per-wallet friction (scoopy 2026-08-29): optional cap (testnet packs
-        // 10 mixETH) per beneficiary across the whole window. Sybil-able by
-        // design — the point is friction, not prevention. 0 = uncapped.
+        // Constructor profiles can retain an optional beneficiary cap for
+        // private playtests. The default profile leaves wallets uncapped.
         if (
             PREDEPOSIT_CAP_PER_WALLET != 0
                 && predeposits[beneficiary].mixETHAmount + mixETHAmount > PREDEPOSIT_CAP_PER_WALLET
@@ -355,11 +341,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         _recordPredeposit(beneficiary, actualAmount);
     }
 
-    /// @notice Factory-only carry seeding from a destroyed previous round.
-    /// @dev Exempt from PREDEPOSIT_CAP: the carry IS the bootstrap. If the
-    ///      carry alone reaches the cap, the round is instantly launchable
-    ///      by anyone. Not subject to the window either — the window exists
-    ///      to give the public time to join, and the carry joined first.
+    /// @notice Factory-only carry seeding from the factory's own balance.
+    /// @dev Carry joins the pooled buy. It does not shorten the public window.
     function seedCarry(uint256 mixETHAmount) external nonReentrant {
         if (msg.sender != factory) revert NotFactory();
         if (mixETHAmount == 0) revert ZeroAmount();
@@ -388,6 +371,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         mixETH.safeTransferFrom(msg.sender, address(this), mixETHAmount);
         uint256 actualAmount = mixETH.balanceOf(address(this)) - balBefore;
         if (actualAmount == 0) revert ZeroAmount();
+        _validateBootstrap(totalPredepositMixETH + carryBonusMixETH + actualAmount);
         carryBonusMixETH += actualAmount;
     }
 
@@ -395,7 +379,21 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     ///      joins totalBoot at launch, thickening the curve for everyone.
     uint256 public carryBonusMixETH;
 
+    /// @dev Reject arithmetic capacity failures before crediting a deposit.
+    /// Dust pools can grow into a representable launch. Above the reference
+    /// raise, validate the exact curve that launch will materialize.
+    function _validateBootstrap(uint256 totalBoot) private view {
+        if (!hook.sineConfigured()) return;
+        uint256 netBoot = totalBoot - Math.mulDiv(totalBoot, GENESIS_POT_FEE_BPS, 10000);
+        if (netBoot >= 450e18) {
+            try hook.sineGenesisPSP(netBoot) returns (uint256) {} catch {
+                revert PredepositCapacityExceeded();
+            }
+        }
+    }
+
     function _recordPredeposit(address depositor, uint256 amount) internal {
+        _validateBootstrap(totalPredepositMixETH + carryBonusMixETH + amount);
         if (predeposits[depositor].mixETHAmount == 0) {
             totalPredepositors++;
         }
@@ -408,8 +406,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     }
 
     /// @dev Window state, shared by launchPooledBuy and the UI.
-    function _capReached() internal view returns (bool) {
-        return totalPredepositMixETH >= PREDEPOSIT_CAP;
+    function _capReached() internal pure returns (bool) {
+        return false; // PREDEPOSIT_CAP == 0 denotes an uncapped IBCO.
     }
 
     function _windowOver() internal view returns (bool) {
@@ -444,14 +442,12 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     }
 
     /// @notice Launch the bonding curve with the pooled predeposit.
-    /// @dev Permissionless: anyone may call once the cap is reached OR the
-    ///      7-day window has elapsed. The owner (factory) may also launch
-    ///      early — the window is a floor for public participation, not a
-    ///      constraint on the protocol itself.
+    /// @dev Anyone may launch after the three-day window (or constructor
+    ///      override). The controller's existing factory-only bypass remains.
     function launchPooledBuy() external nonReentrant {
         if (address(hook) == address(0)) revert NotPredeposit();
         if (predepositClosed) revert PredepositClosed();
-        if (msg.sender != owner() && !_capReached() && !_windowOver()) revert PredepositOpen();
+        if (msg.sender != owner() && !_windowOver()) revert PredepositOpen();
         predepositClosed = true;
 
         // Boot pool = public predeposit + any carry bonus (old-pot deposits).
@@ -461,7 +457,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // "a 10% fee from that should have gone to the pot"). The remaining
         // 90% seeds the curve; initialPSP is computed on the post-fee boot so
         // the wave anchors to what actually landed on the curve.
-        uint256 potFee = (totalBoot * GENESIS_POT_FEE_BPS) / 10000;
+        uint256 potFee = Math.mulDiv(totalBoot, GENESIS_POT_FEE_BPS, 10000);
         uint256 curveBoot = totalBoot - potFee;
 
         // Transfer boot mixETH to hook (hook holds all curve reserves + fees)
@@ -550,7 +546,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // claim can be retried later if a larger share ever applies.
         // Denominator is the predeposit pool; numerator is the claimable
         // genesis pool (pot's slice already excluded).
-        uint256 share = (genesisPSPSnapshot * dep.mixETHAmount) / totalPredepositMixETH;
+        uint256 share = Math.mulDiv(genesisPSPSnapshot, dep.mixETHAmount, totalPredepositMixETH);
         if (share == 0) revert ZeroShare();
 
         dep.claimed = true;

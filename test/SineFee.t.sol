@@ -139,7 +139,7 @@ contract SineFee is Test {
         // g, W, q0)
         (,, uint256 boot, uint256 target,,,,,,,) = hook1.sineCurve();
         assertEq(boot, 90e18, "boot = actual raise minus the genesis pot fee");
-        assertEq(target, 10_000e18, "target reserve = 10k mix (scoopy target)");
+        assertApproxEqAbs(target, 2_000e18, 3, "target scales to the 100-mix gross IBCO");
         assertEq(hook1.detWindow() != 0, true, "hook live");
 
         // launch seam: R == boot → pre-wave fee (r <= boot)
@@ -161,7 +161,7 @@ contract SineFee is Test {
         // past the target reserve: R >= target -> 2.5% (buy past the 10k
         // target; the fee itself is mid-wave-priced, so leave headroom —
         // this is a ~20,000-mix buy on a 90-mix boot: deep dust, wave top)
-        _buy(10_000e18); // ~9,100 mix of curve depth needed to cross 10k
+        _buy(2_000e18); // Cross the scaled third-wave target.
         assertGe(hook1.reserveMixETH(), target, "past the target reserve");
         assertEq(hook1.swapFeeBps(), 250, "2.5% above the sine");
     }

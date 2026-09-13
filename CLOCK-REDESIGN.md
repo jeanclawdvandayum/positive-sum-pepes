@@ -1,4 +1,23 @@
+> September 13 amendment: [docs/FINAL-SPEC.md](docs/FINAL-SPEC.md) supersedes
+> the timing, IBCO cap, curve calibration and locked-PSP terminology below.
+> The final spec preserves the other game rules and constructor playtest overrides.
+
 # CLOCK REDESIGN — PSP goes full SigmaBF (scoopy directive 2026-08-31)
+
+## September 11 source update — linear ladder tickets (not deployed)
+
+Each whole ticket adds 69 seconds, subject to the round’s maximum clock.
+The active gross-buy minimum remains 0.005 mixETH. Ticket price starts at
+0.005 mixETH after genesis and rises linearly by 0.42% of that base per
+additional mixETH in the pot. Fractional pot growth counts proportionally.
+
+`ticketPrice = 0.005 ether + floor((potBalance - genesisPotBalance) * 21 / 1_000_000)`
+
+The baseline includes all genesis pot funding. Each buy uses the price before
+its own fees enter the pot. Smaller valid buys receive PSP but earn zero tickets
+and add zero time. Only the newest ten seats need storage writes. This change
+requires a fresh deployment. Existing rounds retain their original rules.
+
 
 "The sigmabf version. No governance for carpetBomb — the countdown timer
 controls it. Once the clock strikes 0, no subsequent buys can push it past

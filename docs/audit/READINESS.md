@@ -1,5 +1,43 @@
 # Audit preparation — September 2026
 
+## September 13 — alternative UI deployment
+
+Factory `0x6126f0a736c4d137bf3b99d0f79807b6faf19f8f` on Base Sepolia uses the
+final spec with 600-second predeposit and countdown overrides. The live alt UI
+is served locally on port 4180. See [release](2026-09-13-alt-ui.md).
+
+
+## September 13 final spec — source update, not deployed
+
+Fresh deployments use a three-day uncapped IBCO, a 69:04:20 maximum clock,
+69 seconds per ticket and a 28-day withdrawal horizon. Constructor timing
+profiles remain available for short playtests. Locked earning PSP is called
+lePSP. The six-step withdrawal engine stays the same.
+
+The third-wave reserve target scales with the actual net IBCO backing. The
+opening price rises 7.5 times, then reaches approximately 800 times the launch
+price at the third wave. Sine rules version 2 uses dimensionless coefficients.
+Predeposit rules version 2 uses a zero global cap to mean unlimited.
+
+See [the final spec](../FINAL-SPEC.md) for formulas, examples and compatibility.
+Existing deployments retain their deployed rules. Earlier entries below are historical.
+
+
+## September 11 source update — linear ladder tickets (not deployed)
+
+Each whole ticket adds 69 seconds, subject to the round’s maximum clock.
+The active gross-buy minimum remains 0.005 mixETH. Ticket price starts at
+0.005 mixETH after genesis and rises linearly by 0.42% of that base per
+additional mixETH in the pot. Fractional pot growth counts proportionally.
+
+`ticketPrice = 0.005 ether + floor((potBalance - genesisPotBalance) * 21 / 1_000_000)`
+
+The baseline includes all genesis pot funding. Each buy uses the price before
+its own fees enter the pot. Smaller valid buys receive PSP but earn zero tickets
+and add zero time. Only the newest ten seats need storage writes. This change
+requires a fresh deployment. Existing rounds retain their original rules.
+
+
 ## September 10 deployment — expanded art
 
 Fresh testnet profile: 24-hour predeposit, 1,000 mixETH global cap and

@@ -79,28 +79,16 @@ abstract contract BBase is Test {
         vm.deal(bob, 1000 ether);
         vm.deal(carol, 1000 ether);
 
-        // Realistic clock: foundry's default block.timestamp = 1 is EPOCH 0,
-        // and the staker's `lastPointEpoch == 0` doubles as the "never
-        // anchored" sentinel — a pure-genesis round (no _stake write yet)
-        // would read totalWeight() == 0 from _pointNow. On-chain epochs are
-        // never 0; warp so the harness matches reality (surfaced 2026-08-29
-        // by the totalVotableWeight asserts).
-        vm.warp(7 days * 1000 + 3 days + 1);
+        // Exercise mature epoch state while separate tests cover epoch zero.
+        vm.warp(controller.staker().epochSize() * 1000 + 1);
     }
 
     // ─────────────── lifecycle helpers ───────────────
 
     function _launch(uint256 bootAmount) internal {
-        // CLOCK-REDESIGN §1 (2026-09-01): anchor the launch in a FRESH epoch
-        // and never warp after it. The old terminal skip (next 7-day boundary
-        // AFTER the claims) landed 1 day past detonationAt == launch + 72h —
-        // every downstream buy/sell hit the wrapped TradingHalted wall.
-        // Skipping BEFORE the predeposit keeps ts == launch ts, so the clock
-        // is armed and ALIVE for 72h of test time; genesis claims anchor in
-        // the new epoch (never epoch 0). Tests needing LIVE staker weight
-        // (epoch+1) must skip AFTER trading — that warp kills the clock
-        // (7-day epoch > 72h window), so trade first.
-        skip((((block.timestamp / 7 days) + 1) * 7 days + 1) - block.timestamp);
+        // Anchor before launch so subsequent trades use the live clock.
+        uint256 epoch = controller.staker().epochSize();
+        skip((((block.timestamp / epoch) + 1) * epoch + 1) - block.timestamp);
         vm.startPrank(alice);
         mixETH.approve(address(controller), bootAmount);
         controller.predeposit(bootAmount);

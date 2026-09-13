@@ -123,11 +123,11 @@ async function main() {
   const params = await read(hook, parseAbi(['function sineParams() view returns(uint256 p0,uint256 preK,uint256 pTarget,uint256 targetReserve,uint24 ampBps)']), 'sineParams')
   const minimumBuy = await read(hook, hookAbi, 'MIN_BUY_INPUT')
   const timePerUnit = await read(hook, hookAbi, 'TIME_PER_UNIT')
-  if (minimumBuy !== 5_000_000_000_000_000n || timePerUnit !== 260n) throw Error('Deployment does not match approved game rules')
+  if (minimumBuy !== 5_000_000_000_000_000n || timePerUnit !== 69n) throw Error('Deployment does not match approved game rules')
   const features = {}
-  for (const [role, getter] of [['controller', 'PREDEPOSIT_RULES_VERSION'], ['registry', 'PURCHASE_REFERRAL_VERSION'], ['staker', 'NFT_INTERFACE_VERSION'], ['staker', 'PEPE_DNA_VERSION'], ...(addresses.reinvestor ? [['reinvestor', 'ATTRIBUTION_VERSION']] : [])]) {
+  for (const [role, getter] of [['controller', 'PREDEPOSIT_RULES_VERSION'], ['controller', 'PREDEPOSIT_ART_VERSION'], ['hook', 'TICKET_RULES_VERSION'], ['hook', 'SINE_RULES_VERSION'], ['registry', 'PURCHASE_REFERRAL_VERSION'], ['staker', 'NFT_INTERFACE_VERSION'], ['staker', 'PEPE_DNA_VERSION'], ...(addresses.reinvestor ? [['reinvestor', 'ATTRIBUTION_VERSION']] : [])]) {
     const version = await read(addresses[role], uintGetter(getter), getter)
-    if (version !== (getter === 'PEPE_DNA_VERSION' ? 2n : 1n)) throw Error(`Unsupported ${getter}`)
+    if (version !== (['PEPE_DNA_VERSION', 'PREDEPOSIT_RULES_VERSION', 'PREDEPOSIT_ART_VERSION', 'TICKET_RULES_VERSION', 'SINE_RULES_VERSION'].includes(getter) ? 2n : 1n)) throw Error(`Unsupported ${getter}`)
     features[getter] = version
   }
   const supportsAbi = parseAbi(['function supportsInterface(bytes4) view returns(bool)'])
@@ -138,10 +138,10 @@ async function main() {
     features.nftInterfaces[label] = supported
   }
   features.genesisPreview = { wallet: '0x0000000000000000000000000000000000000001', dna: await read(staker, stakerAbi, 'genesisPepeDna', ['0x0000000000000000000000000000000000000001']) }
-  features.genesisArt = 'round-block-hash-seed-with-wallet-and-collision-resolution'
+  features.genesisArt = 'deposit-time-selected-pepe-with-permanent-dna-reservation'
   await read(staker, stakerAbi, 'dnaOf', [0n])
   if (await read(staker, stakerAbi, 'isPepeAvailable', [0n])) throw Error('Zero chosen NFT ID is unexpectedly available')
-  const timings = {}
+  const timings = { PREDEPOSIT_RULES_VERSION: features.PREDEPOSIT_RULES_VERSION }
   for (const name of ['PREDEPOSIT_DURATION', 'VEST_DURATION', 'PREDEPOSIT_CAP_PER_WALLET', 'PREDEPOSIT_CAP', 'predepositStartTime']) timings[name] = await read(controller, uintGetter(name), name)
   timings.detWindow = await read(hook, uintGetter('detWindow'), 'detWindow')
   timings.packed = await read(factory, uintGetter('roundTimings'), 'roundTimings')

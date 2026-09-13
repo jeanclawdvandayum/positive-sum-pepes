@@ -147,7 +147,7 @@ export default function PotBoard({
             onClick={claim}
             disabled={claimStep === 'pending'}
             data-pending={claimStep === 'pending' || undefined}
-            className="relative overflow-hidden rounded-lg border border-line bg-bg-1 px-4 py-1.5 text-xs font-semibold text-text-hi transition hover:border-accent disabled:cursor-wait"
+            className="tx-action relative overflow-hidden rounded-lg border border-line bg-bg-1 px-4 py-1.5 text-xs font-semibold text-text-hi transition hover:border-accent disabled:cursor-wait"
           >
             <span className="pl-btn-fill" aria-hidden="true" />
             <span className="relative">

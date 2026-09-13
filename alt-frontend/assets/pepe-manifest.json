@@ -1,0 +1,196 @@
+{
+  "artVersion": 2,
+  "source": "frontend/src/lib/pepeRender.ts",
+  "axes": [
+    "expression",
+    "eyes",
+    "hat",
+    "eyewear",
+    "item",
+    "skin",
+    "iris",
+    "background"
+  ],
+  "pepes": [
+    {
+      "file": "pepe-0.svg",
+      "dna": "269488903",
+      "traits": [
+        7,
+        0,
+        3,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      "description": "gold-crowned shades"
+    },
+    {
+      "file": "pepe-1.svg",
+      "dna": "536936865",
+      "traits": [
+        1,
+        10,
+        1,
+        0,
+        1,
+        0,
+        0,
+        2
+      ],
+      "description": "classic cap"
+    },
+    {
+      "file": "pepe-2.svg",
+      "dna": "894603859",
+      "traits": [
+        3,
+        5,
+        2,
+        9,
+        2,
+        5,
+        5,
+        3
+      ],
+      "description": "lime tinfoil"
+    },
+    {
+      "file": "pepe-3.svg",
+      "dna": "1097889386",
+      "traits": [
+        10,
+        6,
+        6,
+        7,
+        0,
+        7,
+        1,
+        4
+      ],
+      "description": "green top hat"
+    },
+    {
+      "file": "pepe-4.svg",
+      "dna": "36710402",
+      "traits": [
+        2,
+        0,
+        8,
+        2,
+        0,
+        3,
+        2,
+        0
+      ],
+      "description": "diamond wizard"
+    },
+    {
+      "file": "pepe-5.svg",
+      "dna": "1434913190",
+      "traits": [
+        6,
+        10,
+        9,
+        0,
+        7,
+        8,
+        5,
+        5
+      ],
+      "description": "toad hoodie"
+    },
+    {
+      "file": "pepe-6.svg",
+      "dna": "543188737",
+      "traits": [
+        1,
+        0,
+        7,
+        6,
+        0,
+        6,
+        0,
+        2
+      ],
+      "description": "orange beret"
+    },
+    {
+      "file": "pepe-7.svg",
+      "dna": "891552907",
+      "traits": [
+        11,
+        8,
+        4,
+        0,
+        4,
+        2,
+        5,
+        3
+      ],
+      "description": "zombie headband"
+    },
+    {
+      "file": "pepe-8.svg",
+      "dna": "402893351",
+      "traits": [
+        7,
+        2,
+        10,
+        10,
+        3,
+        0,
+        8,
+        1
+      ],
+      "description": "classic expanded haircut"
+    },
+    {
+      "file": "pepe-9.svg",
+      "dna": "1175487810",
+      "traits": [
+        2,
+        4,
+        5,
+        8,
+        0,
+        1,
+        6,
+        4
+      ],
+      "description": "gold ninja"
+    },
+    {
+      "file": "pepe-10.svg",
+      "dna": "60207225",
+      "traits": [
+        9,
+        7,
+        0,
+        11,
+        6,
+        9,
+        3,
+        0
+      ],
+      "description": "sick unibrow"
+    },
+    {
+      "file": "pepe-11.svg",
+      "dna": "1464877923",
+      "traits": [
+        3,
+        6,
+        3,
+        4,
+        0,
+        5,
+        7,
+        5
+      ],
+      "description": "lime crown"
+    }
+  ]
+}

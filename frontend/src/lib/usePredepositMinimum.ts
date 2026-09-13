@@ -6,12 +6,16 @@ import { predepositMinimum } from './predeposit'
 
 /** Immutable capability, separately queried so a legacy controller's missing
  * selector cannot break its existing state reads. Keys isolate round changes. */
-export function usePredepositMinimum(controller?: `0x${string}`) {
+export function usePredepositRules(controller?: `0x${string}`) {
   const result = useQuery({
     queryKey: ['predeposit-rules', CHAIN_ID, controller],
     enabled: !!controller,
     queryFn: () => rpcCall(controller!, controllerAbi, 'PREDEPOSIT_RULES_VERSION'),
     staleTime: Infinity, retry: false,
   })
-  return predepositMinimum(result.data)
+  return { version: result.data, minimum: predepositMinimum(result.data) }
+}
+
+export function usePredepositMinimum(controller?: `0x${string}`) {
+  return usePredepositRules(controller).minimum
 }

@@ -270,9 +270,10 @@ contract RealV4LifecycleTest is RealV4Base {
         vm.prank(alice);
         zapIn.zapInBuy{value: 0.005e18}(poolKey, 1, 0);
         assertEq(hook.ticketCount(), 1);
-        assertEq(hook.detonationAt(), deadline + 260);
+        assertEq(hook.detonationAt(), deadline + 69);
+        uint256 tenTickets = hook.ticketPrice() * 10;
         vm.prank(alice);
-        zapIn.zapInBuy{value: 0.05e18}(poolKey, 1, 0);
+        zapIn.zapInBuy{value: tenTickets}(poolKey, 1, 0);
         assertEq(hook.ticketCount(), 11);
         for (uint256 i; i < 10; i++) {
             (address who,,,)=hook.board(i);
@@ -377,10 +378,15 @@ contract RealV4LifecycleTest is RealV4Base {
         factory.reserveSpawn(1);
         for(uint256 i;i<3;++i)factory.birthStep{gas:12_000_000}();
         RoundController next=factory.getRound(2).controller;
-        assertEq(next.totalPredepositMixETH(),1000e18);
+        assertEq(next.totalPredepositMixETH(),50_000e18);
+        vm.expectRevert(RoundController.PredepositOpen.selector);
+        next.launchPooledBuy();
+        skip(next.PREDEPOSIT_DURATION());
         next.launchPooledBuy();
         assertEq(uint256(factory.getRound(2).hook.mode()),1);
-        assertEq(mixETH.balanceOf(address(factory)),49_000e18);
+        assertEq(mixETH.balanceOf(address(factory)),0);
+        (,,, uint256 target,,,,,,,) = factory.getRound(2).hook.sineCurve();
+        assertApproxEqAbs(target, 1_000_000e18, 3);
     }
 }
 

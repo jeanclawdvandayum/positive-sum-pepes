@@ -2,12 +2,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { assertGameRules, MIN_BUY_INPUT, TIME_PER_UNIT, purchaseUnits, minimumOutput } from '../src/lib/gameRules.ts'
 
-test('minimum ladder threshold, multiple seats, and 4:20 increments',()=>{
+test('minimum ladder threshold, multiple seats, and 69-second increments',()=>{
  assert.equal(purchaseUnits(MIN_BUY_INPUT-1n),0n)
  assert.equal(purchaseUnits(MIN_BUY_INPUT),1n)
  assert.equal(purchaseUnits(MIN_BUY_INPUT*10n),10n)
  assert.equal(purchaseUnits(MIN_BUY_INPUT*3n-1n),2n)
- assert.equal(TIME_PER_UNIT*10n,2600n)
+ assert.equal(TIME_PER_UNIT*10n,690n)
 })
 test('split orders cannot manufacture seats or time from remainders',()=>{
  for(let i=1n;i<1000n;i++){
@@ -26,7 +26,22 @@ test('slippage preserves exact integer floor beyond JS number precision',()=>{
 
 
 test('legacy deployment rules cannot authorize new-interface actions', () => {
-  assert.doesNotThrow(() => assertGameRules(5_000_000_000_000_000n, 260n))
+  assert.doesNotThrow(() => assertGameRules(5_000_000_000_000_000n, 69n))
   assert.throws(() => assertGameRules(5_000_000_000_000_000n, 300n), /different game rules/)
-  assert.throws(() => assertGameRules(1n, 260n), /different game rules/)
+  assert.throws(() => assertGameRules(1n, 69n), /different game rules/)
+})
+
+test('linear tickets rise smoothly from the genesis pot and floor only whole tickets', async () => {
+ const { linearTicketPrice } = await import('../src/lib/gameRules.ts')
+ const wad = 10n ** 18n, genesis = 100n * wad
+ assert.equal(linearTicketPrice(genesis, genesis), MIN_BUY_INPUT)
+ assert.equal(linearTicketPrice(genesis + 100n * wad, genesis), 7100000000000000n)
+ assert.equal(linearTicketPrice(genesis + 1000n * wad, genesis), 26000000000000000n)
+ assert.equal(linearTicketPrice(genesis + wad / 2n, genesis), 5010500000000000n)
+ const price = linearTicketPrice(genesis + wad, genesis)
+ assert.equal(purchaseUnits(price - 1n, price), 0n)
+ assert.equal(purchaseUnits(price * 10n, price), 10n)
+ assert.equal(TIME_PER_UNIT * 10n, 690n)
+ assert.equal(purchaseUnits(wad, 0n), 0n)
+ assert.throws(() => assertGameRules(MIN_BUY_INPUT, 69n, 0n), /different game rules/)
 })
