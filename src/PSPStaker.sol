@@ -728,6 +728,44 @@ contract PSPStaker is ReentrancyGuard {
         emit Withdrawn(msg.sender, pepeId, amount);
     }
 
+    /// @notice Operator path for principal withdrawal (grave-zap unlock leg,
+    ///         2026-09-14): an authorized operator — per-id approval or
+    ///         collection approval — may withdraw on the owner's behalf, with
+    ///         principal AND settled fees paid to the OWNER, never the caller.
+    ///         Post-Flat this opens the lock in one tx inside a zap. Operators
+    ///         already hold strictly more power (NFT transfer moves the whole
+    ///         position), so this adds no new theft surface.
+    function withdrawFor(uint256 pepeId) external nonReentrant {
+        _requireAuthorized(pepeId);
+        address owner = _ownerOf[pepeId];
+        Position storage pos = positions[pepeId];
+        if (pos.amount == 0) revert NotLocker();
+        bool flat = controller.flatTime() != 0;
+        if (!isWithdrawing[pepeId]) {
+            if (!flat) revert NotDecaying(); // must request first
+        } else if (!flat && _epoch() < pos.requestEpoch + VEST_EPOCHS) {
+            revert VestNotComplete();
+        }
+
+        _settleAndPay(pepeId, owner, true); // fees to the owner, not the operator
+
+        uint256 amount = pos.amount;
+        GlobalPoint memory p = _checkpoint();
+        uint256 currentWeight = weightAt(pepeId, p.epoch);
+        if (isWithdrawing[pepeId]) p = _unscheduleDecay(pos, p);
+        p.weight -= currentWeight;
+        points[p.epoch] = p;
+        totalLocked -= amount;
+        _stakedByOwner[owner] -= amount;
+        // Keep deferred fees and fractional credits on the surviving NFT.
+        delete positions[pepeId];
+        delete isWithdrawing[pepeId];
+
+        psp.safeTransfer(owner, amount);
+
+        emit Withdrawn(owner, pepeId, amount);
+    }
+
     /// @dev Remove only this position's pending/active decay schedule.
     function _unscheduleDecay(Position storage pos, GlobalPoint memory p)
         private returns (GlobalPoint memory)

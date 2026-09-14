@@ -3,7 +3,8 @@ import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
-import { erc20Abi, hookAbi, stakerAbi, controllerAbi } from '../lib/abi'
+import { erc20Abi, hookAbi, stakerAbi, controllerAbi, graveZapAbi } from '../lib/abi'
+import { ADDRESSES } from '../lib/config'
 import { fmtAmount, fmtPrice, fmtPepeId } from '../lib/format'
 import { useGraveyard, type GraveyardRound } from './play/useGraveyard'
 import { PlayStyles } from './play/PlayStyles'
@@ -22,6 +23,7 @@ function GraveyardArt({ staker, id }: { staker?: `0x${string}`; id: bigint }) {
 }
 
 type RedeemStep = 'idle' | 'approve' | 'redeem' | 'done'
+type Write = Parameters<typeof useConfirmedWrite> extends never ? never : Parameters<ReturnType<typeof useConfirmedWrite>['writeWithApprovals']>[0]
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -34,7 +36,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 function DeadRoundCard({ round }: { round: GraveyardRound }) {
   const { address, isConnected } = useAccount()
-  const { writeContractAsync } = useConfirmedWrite({ exitRoundId: round.roundId })
+  const { writeContractAsync, writeWithApprovals } = useConfirmedWrite({ exitRoundId: round.roundId })
   const [claiming, setClaiming] = useState(false)
   const [redeemStep, setRedeemStep] = useState<RedeemStep>('idle')
   const [redeemErr, setRedeemErr] = useState<string | null>(null)
@@ -91,6 +93,48 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
     }
   }
 
+  // ── one-tx exit (PSPGraveZap): pot claim + fee claim + unlock + fee-free
+  //    redemption, all in a single transaction. Hidden until the zap is
+  //    deployed (VITE_GRAVE_ZAP) and there is something to exit.
+  const GZ = ADDRESSES.graveZap
+  const staked = round.positions.filter(p => p.amount > 0n)
+  const unlockY = staked.reduce((s, p) => s + p.amount, 0n)
+  const feesDue = staked.reduce((s, p) => s + p.pendingFees, 0n)
+  const claimX = round.claimablePot + feesDue
+  const convertP = unlockY + round.pspBal
+  const mixZ = convertP > 0n && round.supply > 0n
+    ? (convertP * round.reserve) / round.supply
+    : 0n
+  const exitLine = [
+    ...(claimX > 0n ? [`claim ${fmtAmount(claimX)} mixETH`] : []),
+    ...(unlockY > 0n ? [`unlock ${fmtAmount(unlockY)} PSP`] : []),
+    ...(convertP > 0n ? [`convert ${fmtAmount(convertP)} PSP → ${fmtAmount(mixZ)} mixETH`] : []),
+  ].join(' · ')
+  const exitReady = GZ !== '0x' && !!round.staker && !!round.hook && isConnected && (claimX > 0n || unlockY > 0n)
+  const [exitStep, setExitStep] = useState<'idle' | 'sign' | 'done'>('idle')
+  const [exitErr, setExitErr] = useState<string | null>(null)
+
+  async function exitRound() {
+    if (!round.staker || !round.hook || !exitReady) return
+    setExitErr(null); setExitStep('sign')
+    try {
+      const action: Write = {
+        address: GZ, abi: graveZapAbi, functionName: 'exit',
+        args: [round.hook, round.staker, staked.map(p => p.id), convertP, mixZ,
+               BigInt(Math.floor(Date.now() / 1000) + 600)],
+      }
+      const approvals: Write[] = [
+        { address: round.staker, abi: stakerAbi, functionName: 'setApprovalForAll', args: [GZ, true] },
+        ...(convertP > 0n ? [{ address: round.token, abi: erc20Abi, functionName: 'approve', args: [GZ, convertP] } as Write] : []),
+      ]
+      await writeWithApprovals(action, approvals)
+      setExitStep('done')
+    } catch (e) {
+      setExitErr(e instanceof Error ? e.message.slice(0, 160) : 'exit failed. your positions are unchanged.')
+      setExitStep('idle')
+    }
+  }
+
 
   return (
     <div className="rounded-xl border border-line bg-bg-1">
@@ -120,6 +164,22 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
           catch (e) { setRedeemErr(e instanceof Error ? e.message : 'Pot claim failed') }
           finally { setClaiming(false) }
         }}>{claiming ? 'claiming…' : `claim ${fmtAmount(round.claimablePot)} mixETH ladder winnings`}</button>
+      )}
+      {exitReady && (
+        <div className="m-4 rounded-xl border border-line bg-bg-2 p-4">
+          <p className="text-xs leading-relaxed text-text-lo">
+            {exitLine} — all in one transaction. approvals are bundled: atomic wallets sign once.
+          </p>
+          <button
+            className="st-btn mt-3 w-full text-xs"
+            disabled={exitStep === 'sign'}
+            data-pending={exitStep === 'sign' || undefined}
+            onClick={() => { void exitRound() }}
+          >
+            {exitStep === 'sign' ? 'exiting…' : exitStep === 'done' ? '✓ exited' : 'exit round — one transaction'}
+          </button>
+          {exitErr && <p role="alert" className="mt-2 break-words text-xs text-phase-critical">{exitErr}</p>}
+        </div>
       )}
       <ReferralRewards roundId={round.roundId} className="mx-5 mt-4" />
       <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">

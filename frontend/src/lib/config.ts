@@ -36,6 +36,7 @@ export const ADDRESSES = {
   factory: (env.VITE_FACTORY || '0x') as `0x${string}`,
   zapIn: (env.VITE_ZAP_IN || '0x') as `0x${string}`,
   zapOut: (env.VITE_ZAP_OUT || '0x') as `0x${string}`,
+  graveZap: (env.VITE_GRAVE_ZAP || '0x') as `0x${string}`,
   mix: (env.VITE_MIX || '0x') as `0x${string}`,
   faucet: (env.VITE_FAUCET || '0x') as `0x${string}`,
   reinvestor: (env.VITE_REINVESTOR || '0x') as `0x${string}`,

@@ -180,6 +180,15 @@ export const zapOutAbi = parseAbi([
   'function sellToMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 pspIn, uint256 minMixOut, uint256 deadline) returns (uint256 mixOut)',
 ])
 
+/// PSPGraveZap — one-tx graveyard exit (2026-09-14): ladder pot claim,
+/// fee claim, lock withdrawal, and fee-free pro-rata redemption together.
+export const graveZapAbi = parseAbi([
+  ...curveErrorSignatures,
+  'function exit(address hook, address staker, uint256[] pepeIds, uint256 pspIn, uint256 minMixOut, uint256 deadline) returns (uint256 mixOut)',
+  'error Expired()',
+  'error InsufficientOutput()',
+])
+
 /// PSPReferralRegistry — per-round referral attribution graph (2026-08-27).
 /// buyWithMix binds msg.sender in the purchase; record remains an optional direct path.
 export const registryAbi = parseAbi([

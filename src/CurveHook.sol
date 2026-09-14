@@ -781,10 +781,24 @@ contract CurveHook is BaseHook {
         }
     }
 
+    /// @notice Claim every seat `who` owns on the frozen board, paying `who`
+    ///         directly. Lets a helper contract (the grave zap) pull a user's
+    ///         pot inside the user's exit transaction WITHOUT the funds ever
+    ///         passing through the helper. Anyone may call; the payout always
+    ///         lands on the seat owner — a third-party call can only credit
+    ///         `who`, never itself (2026-09-14, grave-zap companion).
+    function claimPotFor(address who) external {
+        _claimPotTo(who);
+    }
+
     /// @notice Claim every seat the caller owns on the frozen board. PULL-based,
     ///         forever: no deadline, no sweep — a claimant returning a year
     ///         (or a century) later is still paid in full.
     function claimPot() external {
+        _claimPotTo(msg.sender);
+    }
+
+    function _claimPotTo(address who) private {
         if (mode == Mode.Predeposit || mode == Mode.Active) revert NotDetonated();
 
         uint256 n = seatedCount();
@@ -792,7 +806,7 @@ contract CurveHook is BaseHook {
         uint256 amount;
         for (uint256 i; i < n; ++i) {
             uint256 seat = ticketCount - 1 - i;
-            if (tickets[seat % 10].buyer == msg.sender && !seatClaimed[seat]) {
+            if (tickets[seat % 10].buyer == who && !seatClaimed[seat]) {
                 seatClaimed[seat] = true;
                 amount += FPML.fullMulDiv(potBalance, _ladderBps(i), denom);
             }
@@ -802,9 +816,14 @@ contract CurveHook is BaseHook {
         // CEI: books updated before the transfer; potBalance stays FROZEN as
         // the distribution base — potPaid tracks the drain.
         potPaid += amount;
-        IERC20(Currency.unwrap(controller.getMixETH())).safeTransfer(msg.sender, amount);
+        _payMix(who, amount);
 
-        emit PotClaimed(msg.sender, amount);
+        emit PotClaimed(who, amount);
+    }
+
+    /// @dev Shared mixETH payout (EIP-170 byte saver, 2026-09-14).
+    function _payMix(address to, uint256 amount) private {
+        IERC20(Currency.unwrap(controller.getMixETH())).safeTransfer(to, amount);
     }
 
     /// @notice Claim the accrued deployer rake (1% legs of unattributed
@@ -816,7 +835,7 @@ contract CurveHook is BaseHook {
         // CEI: books updated before the transfer; deployerCredit stays as
         // the gross accrual record — deployerCreditPaid tracks the drain.
         deployerCreditPaid += outstanding;
-        IERC20(Currency.unwrap(controller.getMixETH())).safeTransfer(deployerCutTo, outstanding);
+        _payMix(deployerCutTo, outstanding);
 
         emit DeployerCreditClaimed(deployerCutTo, outstanding);
     }
