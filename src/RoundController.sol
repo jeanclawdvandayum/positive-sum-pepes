@@ -184,7 +184,11 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
                 ((t >> (3 * CurveMath.TIMINGS_WIDTH)) & CurveMath.TIMINGS_MASK) * 1e18;
             // 2026-08-19 tripwire: a truncated slot deployed silently once —
             // never again. (Wallet cap exempt: zero = uncapped is legal.)
-            if (PREDEPOSIT_DURATION == 0 || VEST_DURATION == 0) revert TimingsIncomplete();
+            // 2026-09-13 (audit L-M1): vest < 6 also reverts — epochSize()
+            // = VEST_DURATION / 6 truncates to 0 below six seconds and every
+            // epoch path panics 0x11 (division by zero), first inside
+            // launchPooledBuy, stranding the predeposit pool with no abort.
+            if (PREDEPOSIT_DURATION == 0 || VEST_DURATION < 6) revert TimingsIncomplete();
         }
         if (address(_pspToken) == address(0)) revert ZeroAddress();
         if (address(_mixETH) == address(0)) revert ZeroAddress();

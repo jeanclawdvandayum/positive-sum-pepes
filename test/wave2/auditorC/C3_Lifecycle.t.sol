@@ -139,6 +139,40 @@ contract C3_Lifecycle is CBase {
         factory.markDestroyed(1);
     }
 
+    /// Audit L-M1 (2026-09-13, fixed same day): a hand-assembled timing word
+    /// with vest in [1,5] seconds passed the ==0 tripwire, truncated
+    /// PSPStaker.epochSize() to zero, and panicked 0x11 (division by zero) on
+    /// every epoch path — first inside launchPooledBuy — stranding the whole
+    /// predeposit pool with no abort and no refund. The controller (the
+    /// slot's decode site, reached by every deployment path including direct
+    /// vessel births) now rejects vest < 6. Boundary proof: 6s is legal.
+    function test_C3_RejectsSubEpochalVest() public {
+        PSPToken vestToken = new TokenDeployer().deployToken("Vest", "VEST", rando);
+        // hoisted: expectRevert latches onto the NEXT external call — an
+        // inline `new StakerDeployer()` argument would swallow it
+        StakerDeployer sd = new StakerDeployer();
+
+        // hand-assembled word: 3-day predeposit | vest slots 1..5 seconds —
+        // every one must revert TimingsIncomplete at decode, never deploy
+        for (uint256 v = 1; v < 6; v++) {
+            CurveMath.CurveConfig memory cfg = _curve();
+            cfg.timings = 3 days | (v << 64);
+            vm.expectRevert(RoundController.TimingsIncomplete.selector);
+            controllerDeployer.deployController(
+                vestToken, IERC20(address(mixETH)), cfg, rando, address(0), sd
+            );
+        }
+
+        // boundary: 6s is the smallest epochal vest (epochSize = 1) — packs
+        // legally, decodes verbatim, deploys clean
+        CurveMath.CurveConfig memory ok = _curve();
+        ok.timings = 3 days | (6 << 64);
+        RoundController c = controllerDeployer.deployController(
+            vestToken, IERC20(address(mixETH)), ok, rando, address(0), sd
+        );
+        assertEq(c.VEST_DURATION(), 6, "vest=6 boundary accepted");
+    }
+
     /// deployRound is the only owner-gated entry; spawn/markDestroyed/credit
     /// hold without it. Non-owner deployRound reverts.
     function test_C3_DeployRoundOwnerOnly() public {
