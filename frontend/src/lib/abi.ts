@@ -185,6 +185,9 @@ export const zapOutAbi = parseAbi([
 export const registryAbi = parseAbi([
   ...curveErrorSignatures,
   'function PURCHASE_REFERRAL_VERSION() view returns (uint256)',
+  'function REFERRAL_REWARDS_VERSION() view returns (uint256)',
+  'function claimableReferral(address) view returns (uint256)',
+  'function claimReferralRewards()',
   'function buyWithMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 mixIn, uint256 minPspOut, uint256 deadline, uint256 referrerNftId) returns (uint256 pspOut)',
   'event Referred(address indexed trader, uint256 indexed traderNftId, uint256 indexed referrerNftId)',
   'event ReferralSkipped(address indexed trader, uint256 indexed referrerNftId, bytes4 reason)',

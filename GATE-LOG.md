@@ -1508,3 +1508,21 @@ receipts succeed. The alternative UI uses actual contract state and transactions
 Browser checks cover reserved-art deposit, buy, genesis claim and graveyard
 controls, with equal trade-panel heights and no mobile horizontal overflow.
 See `docs/audit/2026-09-13-alt-ui.md`.
+
+## 2026-09-13 — claimable referral rewards (source only)
+
+- `bash scripts/check-audit.sh`: PASS. 569 Solidity tests / 74 suites,
+  185 frontend tests, 11 name-verifier tests. Art, ABI (168 entries),
+  independent curve oracle, governance exclusion, TypeScript and Vite build passed.
+- Runtime size gate: PASS. CurveHook 24,019 bytes; ControllerDeployer
+  17,834; PSPReferralRegistry 7,434; ReferralRegistryInitCode 8,131.
+- Local deployment simulation: `PSP_ANVIL=1 PSP_TESTNET=0
+  PSP_PREDEPOSIT_SEC=600 PSP_DET_SEC=600 forge script script/DeployPSP.s.sol`
+  passed without broadcasting.
+- Added funded referral escrow and wallet claims that survive NFT transfer,
+  withdrawal, detonation and successor birth. Sixteen added contract tests
+  cover rewards and creation-code helper behavior, including conservation fuzzing.
+- Stake and graveyard use versioned claim controls with confirmed transactions.
+  Creation-code helper is included in manifest and source-verification tooling.
+- Existing on-chain deployments and hosted sites were not changed.
+  See `docs/audit/2026-09-13-referral-rewards.md`.

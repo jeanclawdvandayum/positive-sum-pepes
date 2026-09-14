@@ -30,7 +30,8 @@ interface IReferralHook {
 ///         Links carry ref=<tokenId>, refRegistry and refChain. Chain edges ride the NFT —
 ///         transfer a position and its referral subtree (the fees its
 ///         referees generate) transfers with it. Payouts resolve to the
-///         NFT's CURRENT owner at swap time, live.
+///         NFT's CURRENT owner at swap time. Earned mixETH stays claimable
+///         by that wallet after NFT transfers and after the round ends.
 ///
 ///         AUD-15: a buyer can record the link and buy PSP in ONE signed
 ///         buyWithMix transaction. Both paths bind msg.sender only. Raw V4
@@ -40,7 +41,8 @@ interface IReferralHook {
 ///         current NFT owners across up to five deduplicated tiers.
 ///
 ///         Purchases transfer mixETH directly from the caller to V4 and take
-///         PSP directly to the caller. The registry retains no purchase funds.
+///         PSP directly to the caller. Only credited referral rewards remain
+///         in the registry; purchase principal passes directly to V4.
 ///         An invalid/ineligible link is skipped; a failed purchase rolls back
 ///         new attribution, fees and token movements together.
 contract PSPReferralRegistry is ReentrancyGuard {
@@ -58,16 +60,23 @@ contract PSPReferralRegistry is ReentrancyGuard {
     error Expired();
     error InsufficientOutput();
     error UnauthorizedCallback();
+    error UnauthorizedRewardCredit();
+    error UnbackedRewards();
+    error NothingToClaim();
 
     // ─────────────── Events ───────────────
     event Referred(address indexed trader, uint256 indexed traderNftId, uint256 indexed referrerNftId);
 
     event ReferralSkipped(address indexed trader, uint256 indexed referrerNftId, bytes4 reason);
+    event ReferralRewardsCredited(address indexed recipient, uint256 amount);
+    event ReferralRewardsClaimed(address indexed recipient, uint256 amount);
 
     // ─────────────── Constants ───────────────
     uint256 public constant MAX_DEPTH = 5;
     /// @notice Atomic purchase binding and immutable wallet-entry semantics.
     uint256 public constant PURCHASE_REFERRAL_VERSION = 1;
+    /// @notice Referral rewards accrue here and are claimed separately from lePSP fees.
+    uint256 public constant REFERRAL_REWARDS_VERSION = 1;
 
     struct Purchase {
         PoolKey key;
@@ -100,6 +109,10 @@ contract PSPReferralRegistry is ReentrancyGuard {
     /// @dev One attribution per trader per round — the graph resets by
     ///      rebirth, this flag enforces one record per round.
     mapping(address => bool) public attributed;
+    /// @notice Earned mixETH belongs to the wallet that owned the referral NFT at accrual.
+    mapping(address => uint256) public claimableReferral;
+    /// @notice Sum of all unpaid referral balances, backed by this registry's mixETH.
+    uint256 public totalReferralOutstanding;
 
     // ─────────────── Constructor ───────────────
 
@@ -108,6 +121,42 @@ contract PSPReferralRegistry is ReentrancyGuard {
         if (_minStakePSP == 0) revert ZeroAddress();
         staker = IPSPStaker(_staker);
         MIN_STAKE_PSP = _minStakePSP;
+    }
+
+    // ─────────────── Referral rewards ───────────────
+
+    /// @notice Credit funded tier rewards. Only this round's hook can allocate them.
+    /// @dev The hook transfers the aggregate mixETH before this call. This callback
+    ///      also runs inside buyWithMix while its nonReentrant guard is held, so it
+    ///      uses hook authentication instead of taking that guard a second time.
+    function creditReferralRewards(address[5] calldata recipients, uint256[5] calldata amounts) external {
+        IRoundController ctl = IReferralStaker(address(staker)).controller();
+        if (msg.sender != ctl.hookAddress()) revert UnauthorizedRewardCredit();
+        uint256 total;
+        for (uint256 i; i < MAX_DEPTH; ++i) {
+            uint256 amount = amounts[i];
+            if (amount == 0) continue;
+            if (recipients[i] == address(0)) revert ZeroAddress();
+            total += amount;
+            claimableReferral[recipients[i]] += amount;
+            emit ReferralRewardsCredited(recipients[i], amount);
+        }
+        totalReferralOutstanding += total;
+        if (IERC20(Currency.unwrap(ctl.getMixETH())).balanceOf(address(this)) < totalReferralOutstanding) {
+            revert UnbackedRewards();
+        }
+    }
+
+    /// @notice Claim all of your earned referral mixETH. Claims stay open after detonation.
+    /// @dev Effects precede transfer. A failed payout reverts the balance changes.
+    function claimReferralRewards() external nonReentrant {
+        uint256 amount = claimableReferral[msg.sender];
+        if (amount == 0) revert NothingToClaim();
+        claimableReferral[msg.sender] = 0;
+        totalReferralOutstanding -= amount;
+        IRoundController ctl = IReferralStaker(address(staker)).controller();
+        IERC20(Currency.unwrap(ctl.getMixETH())).safeTransfer(msg.sender, amount);
+        emit ReferralRewardsClaimed(msg.sender, amount);
     }
 
     // ─────────────── Attribution ───────────────

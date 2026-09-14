@@ -63,3 +63,20 @@ lePSP means locked earning PSP. It names the PSP principal held in a Pepe NFT po
 The original frontend, alternative prototype, rolling paper and deployment settings use this spec. The original frontend continues to read the actual settings of existing deployments. The alternative frontend remains a local simulation.
 
 No public deployment forms part of this change. Test results belong in the corresponding GATE-LOG entry.
+
+## Referral reward claims
+
+Each round’s referral registry holds the mixETH allocated to eligible referrers.
+The hook credits each recipient at trade time using the existing five tiers.
+Recipients call `claimReferralRewards()` to collect their full balance.
+
+Earned rewards belong to the wallet that owned the referral NFT at accrual.
+An NFT transfer changes the recipient of future rewards. Existing credits stay
+with their original recipient, even after all of that recipient’s NFTs move.
+Claims remain open after detonation and after successor rounds launch.
+
+The 60% staker share, 35% base pot share, 5% referral allocation, and 1%
+unattributed deployer credit retain their current rules. Missing tiers and
+rounding retain their existing treatment. Referral credits stay separate from
+lePSP trading fees, pot claims, and deployer credit. Existing deployments
+continue direct referral payouts until replaced with a fresh deployment.

@@ -50,7 +50,7 @@ contract ReferralPurchaseTest is RealV4Base {
         return id;
     }
 
-    function test_FirstPurchaseBindsPaysAndCreditsBuyerAtomically() public {
+    function test_FirstPurchaseBindsAndEscrowsRewardsAtomically() public {
         uint256 beforeBob = mixETH.balanceOf(bob);
         uint256 beforePot = hook.potBalance();
         uint256 beforeDeployer = hook.deployerCredit();
@@ -61,12 +61,14 @@ contract ReferralPurchaseTest is RealV4Base {
         uint256 out = _buy(alice, bobNft);
         assertTrue(reg.attributed(alice));
         assertEq(reg.traderRefNftOf(alice), bobNft);
-        assertEq(mixETH.balanceOf(bob) - beforeBob, referralLeg * 8000 / 10000);
+        assertEq(mixETH.balanceOf(bob), beforeBob, "referrer pulls rewards separately");
+        assertEq(reg.claimableReferral(bob), referralLeg * 8000 / 10000);
         assertEq(hook.potBalance() - beforePot, potLeg + referralLeg - referralLeg * 8000 / 10000);
         assertEq(hook.deployerCredit(), beforeDeployer);
         assertEq(pspToken.balanceOf(alice), out);
         assertEq(mixETH.balanceOf(alice), 100e18 - 0.005e18);
-        assertEq(mixETH.balanceOf(address(reg)), 0);
+        assertEq(mixETH.balanceOf(address(reg)), reg.totalReferralOutstanding());
+        assertEq(reg.totalReferralOutstanding(), reg.claimableReferral(bob));
         assertEq(pspToken.balanceOf(address(reg)), 0);
         (address owner,,,) = hook.board(0);
         assertEq(owner, alice);
@@ -85,6 +87,9 @@ contract ReferralPurchaseTest is RealV4Base {
         assertEq(hook.potBalance(), pot);
         assertEq(mixETH.balanceOf(bob), balance);
         assertEq(mixETH.balanceOf(alice), 100e18);
+        assertEq(reg.claimableReferral(bob), 0);
+        assertEq(reg.totalReferralOutstanding(), 0);
+        assertEq(mixETH.balanceOf(address(reg)), 0);
     }
 
     function test_ExpiredAndBelowMinimumPurchasesCannotBind() public {
@@ -246,24 +251,27 @@ contract ReferralPurchaseTest is RealV4Base {
         assertFalse(reg.attributed(alice));
     }
 
-    function test_TransferReferrerNftPaysItsNewOwnerWithoutChangingEntry() public {
+    function test_TransferReferrerNftCreditsFutureRewardsToNewOwner() public {
         _buy(alice, bobNft);
         vm.prank(bob);
         staker.transferFrom(bob, carol, bobNft);
+        uint256 beforeBob = reg.claimableReferral(bob);
         uint256 beforeCarol = mixETH.balanceOf(carol);
         _buy(alice, 0);
-        assertGt(mixETH.balanceOf(carol), beforeCarol);
+        assertEq(mixETH.balanceOf(carol), beforeCarol);
+        assertGt(reg.claimableReferral(carol), 0);
+        assertEq(reg.claimableReferral(bob), beforeBob, "earned rewards stay with the old owner");
         assertEq(reg.traderRefNftOf(alice), bobNft);
     }
 
     function test_RecordedReferralSurvivesSellAndBuy() public {
         uint256 amount = _buy(alice, bobNft);
-        uint256 beforeBob = mixETH.balanceOf(bob);
+        uint256 beforeBob = reg.claimableReferral(bob);
         vm.startPrank(alice);
         pspToken.approve(address(zapOut), amount);
         zapOut.sellToMix(poolKey, amount, 1, 0);
         vm.stopPrank();
-        assertGt(mixETH.balanceOf(bob), beforeBob);
+        assertGt(reg.claimableReferral(bob), beforeBob);
         _buy(alice, 0);
         assertEq(reg.traderRefNftOf(alice), bobNft);
     }

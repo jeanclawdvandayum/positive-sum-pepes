@@ -246,6 +246,7 @@ contract SineFee is Test {
         uint256 potBefore = hook1.potBalance();
         uint256 depBefore = hook1.deployerCredit();
         uint256 aliceMixBefore = mixETH.balanceOf(alice);
+        uint256 accruedBefore = regV.claimableReferral(alice);
 
         uint256 out = _buyAttributed(inAmt, rando);
         assertGt(out, 0);
@@ -257,7 +258,9 @@ contract SineFee is Test {
         uint256 paid = (refLeg * 8000) / 10000; // tier 0: 80% of the leg to alice
         uint256 potLeg = potSlice + (refLeg - paid); // unpaid tiers + dust -> pot
 
-        assertEq(mixETH.balanceOf(alice) - aliceMixBefore, paid, "tier-0 referrer paid live, to the wei");
+        assertEq(mixETH.balanceOf(alice), aliceMixBefore, "referral waits for a claim");
+        assertEq(regV.claimableReferral(alice) - accruedBefore, paid, "tier-0 credit, to the wei");
+        assertEq(mixETH.balanceOf(address(regV)), regV.totalReferralOutstanding(), "reward liabilities fully backed");
         assertEq(hook1.potBalance() - potBefore, potLeg, "35% + unpaid tier weight + dust -> pot");
         assertEq(hook1.deployerCredit(), depBefore, "NO rake on attributed flow");
         assertEq(stakerLeg + potLeg + paid, fee, "legs conserve the fee exactly");

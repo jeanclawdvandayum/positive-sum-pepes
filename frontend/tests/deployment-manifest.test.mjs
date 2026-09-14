@@ -1,10 +1,40 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { BASE_SEPOLIA_ID, releaseContext, assertRuntimeMatches, verifyFactoryCreation, assertTimingProfile, renderFrontendEnv } from '../scripts/deployment-manifest-lib.mjs'
+import { BASE_SEPOLIA_ID, releaseContext, assertRuntimeMatches, verifyFactoryCreation, assertTimingProfile, renderFrontendEnv, discoverRegistryInitCode } from '../scripts/deployment-manifest-lib.mjs'
 
 const address = digit => `0x${digit.repeat(40)}`
 const factory = address('1')
 const context = { rpcUrl: 'https://provider.example/private-key', chainId: BASE_SEPOLIA_ID, clientVersion: '', rehearsalRequested: false, sourceDirty: false }
+
+const oracleArtifact = { abi: [{ type: 'function', name: 'registryInitOracle', inputs: [], outputs: [{ type: 'address' }] }] }
+
+test('registry helper discovery requires the current getter and rejects failed or invalid reads', async () => {
+  let reads = 0
+  const discovered = await discoverRegistryInitCode({ artifact: oracleArtifact, readOracle: async () => { ++reads; return address('7') } })
+  assert.equal(discovered, address('7'))
+  assert.equal(reads, 1)
+  await assert.rejects(discoverRegistryInitCode({ artifact: oracleArtifact, readOracle: async () => { throw Error('RPC unavailable') } }), /RPC unavailable/)
+  for (const result of [undefined, '0x1234', address('0')]) {
+    await assert.rejects(discoverRegistryInitCode({ artifact: oracleArtifact, readOracle: async () => result }), /Invalid registry/)
+  }
+})
+
+test('legacy deployer artifacts omit the helper without an RPC probe', async () => {
+  let reads = 0
+  const result = await discoverRegistryInitCode({ artifact: { abi: [] }, readOracle: async () => { ++reads; throw Error('legacy getter absent') } })
+  assert.equal(result, undefined)
+  assert.equal(reads, 0)
+  await assert.rejects(discoverRegistryInitCode({ artifact: {}, readOracle: async () => address('7') }), /Missing ControllerDeployer ABI/)
+  const malformed = { abi: [{ ...oracleArtifact.abi[0], outputs: [{ type: 'bytes' }] }] }
+  await assert.rejects(discoverRegistryInitCode({ artifact: malformed, readOracle: async () => address('7') }), /Unsupported registryInitOracle/)
+})
+
+test('registry helper executable code must match without immutable exclusions', () => {
+  const artifact = { deployedBytecode: { object: '0x6000600055', immutableReferences: {} } }
+  assert.doesNotThrow(() => assertRuntimeMatches('0x6000600055', artifact, 'registryInitCode'))
+  assert.throws(() => assertRuntimeMatches('0x6001600055', artifact, 'registryInitCode'), /Runtime differs/)
+  assert.throws(() => assertRuntimeMatches('0x', artifact, 'registryInitCode'), /Missing/)
+})
 
 test('dirty-source bypass is limited to an explicitly labeled local Base Sepolia Anvil rehearsal', () => {
   assert.deepEqual(releaseContext(context), { rehearsal: false, sourceDirty: false })

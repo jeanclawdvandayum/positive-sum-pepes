@@ -8,6 +8,7 @@ import { fmtAmount, fmtPrice, fmtPepeId } from '../lib/format'
 import { useGraveyard, type GraveyardRound } from './play/useGraveyard'
 import { PlayStyles } from './play/PlayStyles'
 import HallOfDetonations from './graveyard/HallOfDetonations'
+import ReferralRewards from '../components/ReferralRewards'
 
 import { usePepeDna } from '../lib/usePepeDna'
 import { renderPepeSvg } from '../lib/pepeRender'
@@ -120,6 +121,7 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
           finally { setClaiming(false) }
         }}>{claiming ? 'claiming…' : `claim ${fmtAmount(round.claimablePot)} mixETH ladder winnings`}</button>
       )}
+      <ReferralRewards roundId={round.roundId} className="mx-5 mt-4" />
       <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
         <Card title="redeem your psp">
           <p className="mt-1 text-xs text-text-lo">

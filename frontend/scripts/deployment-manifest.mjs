@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { createPublicClient, http, isAddress, keccak256, parseAbi } from 'viem'
 import { factoryAbi, controllerAbi, hookAbi, stakerAbi } from '../src/lib/abi.ts'
-import { BASE_SEPOLIA_POOL_MANAGER, releaseContext, assertRuntimeMatches, verifyFactoryCreation, assertTimingProfile, renderFrontendEnv } from './deployment-manifest-lib.mjs'
+import { BASE_SEPOLIA_POOL_MANAGER, releaseContext, assertRuntimeMatches, verifyFactoryCreation, assertTimingProfile, renderFrontendEnv, discoverRegistryInitCode } from './deployment-manifest-lib.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const addressGetter = name => parseAbi([`function ${name}() view returns(address)`])
@@ -69,6 +69,11 @@ async function main() {
   addresses.hookInitCode = await read(addresses.hookDeployer, addressGetter('initOracle'), 'initOracle')
   addresses.hookCodeFirst = await read(addresses.hookInitCode, addressGetter('first'), 'first')
   addresses.hookCodeSecond = await read(addresses.hookInitCode, addressGetter('second'), 'second')
+  const registryInitCode = await discoverRegistryInitCode({
+    artifact: loadArtifact('ControllerDeployer'),
+    readOracle: () => read(addresses.controllerDeployer, addressGetter('registryInitOracle'), 'registryInitOracle'),
+  })
+  if (registryInitCode) addresses.registryInitCode = registryInitCode
   addresses.artData = await read(addresses.descriptor, addressGetter('artData'), 'artData')
   const codeHashes = {}, codes = {}
   for (const [key, address] of Object.entries(addresses)) {
@@ -81,7 +86,7 @@ async function main() {
   // executable bytes and metadata distinguish fresh source from legacy APIs
   // with unchanged version numbers (including block-hash genesis art).
   const artifacts = {}
-  const runtimeContracts = { factory: 'PSPFactory', token: 'PSPToken', controller: 'RoundController', hook: 'CurveHook', staker: 'PSPStaker', registry: 'PSPReferralRegistry', mix: 'SepoliaMixETH', descriptor: 'PepeExpandedDescriptor', hookDeployer: 'HookDeployer', controllerDeployer: 'ControllerDeployer', stakerDeployer: 'StakerDeployer', tokenDeployer: 'TokenDeployer', hookInitCode: 'HookInitCode', zapIn: 'PSPZapIn', zapOut: 'PSPZapOut', faucet: 'MixETHFaucet', reinvestor: 'PSPReinvestor' }
+  const runtimeContracts = { factory: 'PSPFactory', token: 'PSPToken', controller: 'RoundController', hook: 'CurveHook', staker: 'PSPStaker', registry: 'PSPReferralRegistry', mix: 'SepoliaMixETH', descriptor: 'PepeExpandedDescriptor', hookDeployer: 'HookDeployer', controllerDeployer: 'ControllerDeployer', stakerDeployer: 'StakerDeployer', tokenDeployer: 'TokenDeployer', hookInitCode: 'HookInitCode', registryInitCode: 'ReferralRegistryInitCode', zapIn: 'PSPZapIn', zapOut: 'PSPZapOut', faucet: 'MixETHFaucet', reinvestor: 'PSPReinvestor' }
   for (const [key, contract] of Object.entries(runtimeContracts)) {
     if (!addresses[key]) continue
     const artifact = loadArtifact(contract, contract === 'TokenDeployer' ? 'ControllerDeployer' : contract)
@@ -108,6 +113,7 @@ async function main() {
     ['hook', 'controller', controller], ['hook', 'referralRegistry', registry], ['hook', 'poolManager', addresses.poolManager],
     ['registry', 'staker', staker],
   ]) await wire(role, getter, expected)
+  if (addresses.registryInitCode) await wire('controllerDeployer', 'registryInitOracle', addresses.registryInitCode)
   const deployerCutTo = await read(factory, addressGetter('deployerCutTo'), 'deployerCutTo')
   await wire('hook', 'deployerCutTo', deployerCutTo)
   if (await read(controller, uintGetter('factoryRoundId'), 'factoryRoundId') !== roundId) throw Error('Controller round ID wiring mismatch')

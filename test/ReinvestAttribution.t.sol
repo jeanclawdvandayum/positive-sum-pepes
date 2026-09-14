@@ -135,7 +135,7 @@ contract ReinvestAttributionTest is RealV4Base {
         uint256 quote = hook.getBuyOutput(fees);
         uint256 fee = fees * hook.swapFeeBps() / 10000;
         uint256 referral = (fee - fee * 6000 / 10000 - fee * 3500 / 10000) * 8000 / 10000;
-        uint256 refBefore = mixETH.balanceOf(alice);
+        uint256 refBefore = hook.referralRegistry().claimableReferral(alice);
         uint256 ticketsBefore = hook.ticketCount();
         uint256 nftsBefore = staking.balanceOf(bob);
         vm.recordLogs();
@@ -146,19 +146,22 @@ contract ReinvestAttributionTest is RealV4Base {
         uint256 buys;
         uint256 times;
         uint256 referrals;
+        address registry = address(hook.referralRegistry());
         for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].emitter != address(hook)) continue;
             bytes32 eventId = logs[i].topics[0];
-            if (eventId == keccak256("Buy(address,uint256,uint256,uint256,uint256)")) {
+            if (logs[i].emitter == registry && eventId == keccak256("ReferralRewardsCredited(address,uint256)")) {
+                assertEq(address(uint160(uint256(logs[i].topics[1]))), alice, "owner's referral recipient");
+                assertEq(abi.decode(logs[i].data, (uint256)), referral, "credited referral amount");
+                ++referrals;
+            } else if (logs[i].emitter != address(hook)) continue;
+            else if (eventId == keccak256("Buy(address,uint256,uint256,uint256,uint256)")) {
                 assertEq(address(uint160(uint256(logs[i].topics[1]))), bob, "buy owner"); ++buys;
             } else if (eventId == keccak256("TimeAdded(address,uint256,uint256)")) {
                 assertEq(address(uint160(uint256(logs[i].topics[1]))), bob, "clock owner"); ++times;
-            } else if (eventId == keccak256("ReferralPaid(address,address,uint256,uint256)")) {
-                assertEq(address(uint160(uint256(logs[i].topics[1]))), bob, "referral trader"); ++referrals;
             }
         }
-        assertEq(buys, 1, "one Buy event"); assertEq(times, 1, "one TimeAdded event"); assertEq(referrals, 1, "one ReferralPaid event");
-        assertEq(mixETH.balanceOf(alice) - refBefore, referral, "owner's recorded referral chain paid");
+        assertEq(buys, 1, "one Buy event"); assertEq(times, 1, "one TimeAdded event"); assertEq(referrals, 1, "one ReferralRewardsCredited event");
+        assertEq(hook.referralRegistry().claimableReferral(alice) - refBefore, referral, "owner's recorded referral chain credited");
         assertEq(hook.ticketCount() - ticketsBefore, fees / 0.005e18);
         for (uint256 i; i < 10; ++i) { (address buyer,,,) = hook.board(i); assertEq(buyer, bob); }
         for (uint256 i; i < ids.length; ++i) {

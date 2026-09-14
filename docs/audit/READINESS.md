@@ -1,5 +1,14 @@
 # Audit preparation — September 2026
 
+## September 13 — claimable referral rewards (source only)
+
+Fresh registries expose `REFERRAL_REWARDS_VERSION() == 1`. Eligible referral
+mixETH accumulates in the per-round registry and is claimed with
+`claimReferralRewards()`. Credits belong to the wallet at trade time and
+survive NFT transfer, detonation, and successor rounds. The fee split and
+referral graph rules stay the same. Existing deployments keep their direct
+payout behavior. A fresh deployment is required for this source change.
+
 ## September 13 — alternative UI deployment
 
 Factory `0x6126f0a736c4d137bf3b99d0f79807b6faf19f8f` on Base Sepolia uses the

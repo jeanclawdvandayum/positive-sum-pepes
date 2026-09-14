@@ -39,6 +39,7 @@ export function startTransactionToast(label: string, chainId: number, account: `
 export function transactionLabel(name: string) {
   return ({ drip: 'mint mixETH', approve: 'token approval', setApprovalForAll: 'Pepe approval',
     buyWithMix: 'buy PSP', sell: 'sell PSP', claim: 'claim fees', claimFees: 'claim fees',
+    claimReferralRewards: 'claim referral rewards',
     reinvest: 'reinvest fees', reinvestAll: 'reinvest all', claimMany: 'claim all fees',
     requestWithdraw: 'start withdrawal', cancelWithdraw: 'keep staking', withdraw: 'unlock PSP',
     stakeFor: 'add PSP', lockWithPepe: 'stake PSP', detonate: 'detonate round',

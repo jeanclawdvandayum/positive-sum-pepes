@@ -94,7 +94,8 @@ contract BaseSepoliaReleaseTest is Test {
         assertGt(bought, 0);
         assertEq(c.r.token.balanceOf(address(this)), bought);
         assertEq(c.registry.traderRefNftOf(address(this)), c.idB);
-        assertGt(c.mix.balanceOf(c.b), beforeB, "first buy pays its referral");
+        assertEq(c.mix.balanceOf(c.b), beforeB, "first buy escrows its referral");
+        assertGt(c.registry.claimableReferral(c.b), 0);
         assertEq(c.r.hook.ticketCount(), 400);
         (address leader,,,) = c.r.hook.board(0);
         assertEq(leader, address(this), "registry buy credits the purchaser");
@@ -102,7 +103,13 @@ contract BaseSepoliaReleaseTest is Test {
         assertEq(c.registry.traderRefNftOf(address(this)), c.idB, "later hints cannot replace entry");
         vm.expectRevert(PSPReferralRegistry.AlreadyReferred.selector);
         c.registry.record(c.idA);
-        assertEq(c.mix.balanceOf(address(c.registry)), 0);
+        assertEq(c.mix.balanceOf(address(c.registry)), c.registry.totalReferralOutstanding());
+        uint256 reward = c.registry.claimableReferral(c.b);
+        vm.prank(c.b);
+        c.registry.claimReferralRewards();
+        assertEq(c.mix.balanceOf(c.b), beforeB + reward);
+        assertEq(c.registry.claimableReferral(c.b), 0);
+        assertEq(c.registry.totalReferralOutstanding(), 0);
         assertEq(c.r.token.balanceOf(address(c.registry)), 0);
 
         _individualReinvestAndSafeTransfer(c);

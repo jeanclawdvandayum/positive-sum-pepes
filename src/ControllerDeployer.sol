@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {RoundController} from "./RoundController.sol";
 import {PSPToken} from "./PSPToken.sol";
-import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
+import {ReferralRegistryInitCode} from "./ReferralRegistryInitCode.sol";
 import {StakerDeployer} from "./StakerDeployer.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
 
@@ -19,6 +19,13 @@ import {CurveMath} from "./libraries/CurveMath.sol";
 ///         combined embeds overflowed this contract (2026-08-18).
 contract ControllerDeployer {
     error DeployFailed();
+
+    /// @notice Immutable creation-code helper shared by registry prediction and deployment.
+    ReferralRegistryInitCode public immutable registryInitOracle;
+
+    constructor() {
+        registryInitOracle = new ReferralRegistryInitCode();
+    }
 
     /// @dev EIP-170 shrink (2026-08-19, wave2b): deployController's ABI
     ///      signature is type-for-type identical to RoundController's
@@ -155,14 +162,34 @@ contract ControllerDeployer {
         external
         returns (address registry)
     {
-        registry = address(new PSPReferralRegistry(staker, minStakePSP));
+        bytes memory initCode = registryInitOracle.registryInitCode(staker, minStakePSP);
+        assembly ("memory-safe") {
+            registry := create(0, add(initCode, 0x20), mload(initCode))
+        }
+        _requireRegistry(registry);
     }
 
     function deployRegistryAt(bytes32 salt, address staker, uint256 minStakePSP)
         external
         returns (address registry)
     {
-        registry = address(new PSPReferralRegistry{salt: salt}(staker, minStakePSP));
+        bytes memory initCode = registryInitOracle.registryInitCode(staker, minStakePSP);
+        assembly ("memory-safe") {
+            registry := create2(0, add(initCode, 0x20), mload(initCode), salt)
+        }
+        _requireRegistry(registry);
+    }
+
+    /// @dev Preserve constructor reverts for both registry deployment paths.
+    function _requireRegistry(address registry) private pure {
+        if (registry != address(0)) return;
+        assembly ("memory-safe") {
+            if returndatasize() {
+                returndatacopy(0, 0, returndatasize())
+                revert(0, returndatasize())
+            }
+        }
+        revert DeployFailed();
     }
 
     function predictRegistry(bytes32 salt, address staker, uint256 minStakePSP)
@@ -174,10 +201,7 @@ contract ControllerDeployer {
             bytes1(0xff),
             address(this),
             salt,
-            keccak256(abi.encodePacked(
-                type(PSPReferralRegistry).creationCode,
-                abi.encode(staker, minStakePSP)
-            ))
+            keccak256(registryInitOracle.registryInitCode(staker, minStakePSP))
         )))));
     }
 }

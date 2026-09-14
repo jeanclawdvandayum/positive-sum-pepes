@@ -5,6 +5,18 @@ export const BASE_SEPOLIA_ID = 84532
 export const BASE_SEPOLIA_POOL_MANAGER = '0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408'
 const auxiliaryNames = ['zapIn', 'zapOut', 'faucet', 'reinvestor']
 
+export async function discoverRegistryInitCode({ artifact, readOracle }) {
+  if (!Array.isArray(artifact.abi)) throw Error('Missing ControllerDeployer ABI')
+  const getter = artifact.abi.find(item => item.type === 'function' && item.name === 'registryInitOracle')
+  if (!getter) return undefined
+  if (getter.inputs?.length !== 0 || getter.outputs?.length !== 1 || getter.outputs[0].type !== 'address') {
+    throw Error('Unsupported registryInitOracle getter')
+  }
+  const address = await readOracle()
+  if (!isAddress(address || '') || /^0x0{40}$/i.test(address)) throw Error('Invalid registry creation-code helper address')
+  return address
+}
+
 export function releaseContext({ rpcUrl, chainId, clientVersion, rehearsalRequested, sourceDirty }) {
   if (chainId !== BASE_SEPOLIA_ID) throw Error('Fresh release inspection requires Base Sepolia chain ID 84532')
   let rehearsalRpc

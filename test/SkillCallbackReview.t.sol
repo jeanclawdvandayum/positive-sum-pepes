@@ -69,23 +69,23 @@ contract SkillCallbackReviewTest is RealV4Base {
         assertTrue(registry.canReferNft(id));
     }
 
-    function test_BuyPaysDistinctAncestorsAfterDuplicateOwner() public {
+    function test_BuyCreditsDistinctAncestorsAfterDuplicateOwner() public {
         uint256 fee = 0.005e18 * uint256(hook.swapFeeBps()) / 10000;
         uint256 stakerLeg = fee * 6000 / 10000;
         uint256 potLeg = fee * 3500 / 10000;
         uint256 referralLeg = fee - stakerLeg - potLeg;
-        uint256 daveBefore = mixETH.balanceOf(dave);
-        uint256 erinBefore = mixETH.balanceOf(erin);
-        uint256 bobBefore = mixETH.balanceOf(bob);
-        uint256 frankBefore = mixETH.balanceOf(frank);
+        uint256 daveBefore = registry.claimableReferral(dave);
+        uint256 erinBefore = registry.claimableReferral(erin);
+        uint256 bobBefore = registry.claimableReferral(bob);
+        uint256 frankBefore = registry.claimableReferral(frank);
         uint256 potBefore = hook.potBalance();
         vm.prank(alice);
         registry.buyWithMix(poolKey, 0.005e18, 1, 0, 0);
 
-        uint256 paidBob = mixETH.balanceOf(bob) - bobBefore;
-        uint256 paidDave = mixETH.balanceOf(dave) - daveBefore;
-        uint256 paidErin = mixETH.balanceOf(erin) - erinBefore;
-        uint256 paidFrank = mixETH.balanceOf(frank) - frankBefore;
+        uint256 paidBob = registry.claimableReferral(bob) - bobBefore;
+        uint256 paidDave = registry.claimableReferral(dave) - daveBefore;
+        uint256 paidErin = registry.claimableReferral(erin) - erinBefore;
+        uint256 paidFrank = registry.claimableReferral(frank) - frankBefore;
         assertEq(paidBob, referralLeg * 8000 / 10000, "duplicate owner receives only first tier");
         assertEq(paidDave, referralLeg * 500 / 10000, "distinct third tier is not truncated");
         assertEq(paidErin, referralLeg * 200 / 10000, "distinct fourth tier is not truncated");
@@ -93,26 +93,26 @@ contract SkillCallbackReviewTest is RealV4Base {
         assertEq(hook.potBalance() - potBefore, potLeg + referralLeg - paidBob - paidDave - paidErin - paidFrank);
     }
 
-    function test_SellPaysDistinctAncestorsAfterDuplicateOwner() public {
+    function test_SellCreditsDistinctAncestorsAfterDuplicateOwner() public {
         vm.startPrank(alice);
         uint256 bought = registry.buyWithMix(poolKey, 0.005e18, 1, 0, 0);
         pspToken.approve(address(zapOut), bought);
         vm.stopPrank();
-        uint256 daveBefore = mixETH.balanceOf(dave);
-        uint256 erinBefore = mixETH.balanceOf(erin);
+        uint256 daveBefore = registry.claimableReferral(dave);
+        uint256 erinBefore = registry.claimableReferral(erin);
         uint256 reserveBefore = hook.reserveMixETH();
         uint256 feeBps = uint256(hook.swapFeeBps());
         vm.prank(alice);
         zapOut.sellToMix(poolKey, bought, 1, 0);
         uint256 fee = (reserveBefore - hook.reserveMixETH()) * feeBps / 10000;
         uint256 referralLeg = fee - fee * 6000 / 10000 - fee * 3500 / 10000;
-        assertEq(mixETH.balanceOf(dave) - daveBefore, referralLeg * 500 / 10000,
+        assertEq(registry.claimableReferral(dave) - daveBefore, referralLeg * 500 / 10000,
             "sell pays distinct third tier after duplicate");
-        assertEq(mixETH.balanceOf(erin) - erinBefore, referralLeg * 200 / 10000,
+        assertEq(registry.claimableReferral(erin) - erinBefore, referralLeg * 200 / 10000,
             "sell pays distinct fourth tier after duplicate");
     }
 
-    function testFuzz_TransferredChainPaysEachOwnerFirstTierOnly(uint256 seed) public {
+    function testFuzz_TransferredChainCreditsEachOwnerFirstTierOnly(uint256 seed) public {
         address[5] memory actors = [bob, carol, dave, erin, frank];
         uint256[5] memory tiers = [uint256(8000), 1200, 500, 200, 100];
         uint256[5] memory expected;
@@ -129,14 +129,14 @@ contract SkillCallbackReviewTest is RealV4Base {
                 seen[ownerIndex] = true;
                 expected[ownerIndex] = leg * tiers[i] / 10000;
             }
-            beforeBalance[i] = mixETH.balanceOf(actors[i]);
+            beforeBalance[i] = registry.claimableReferral(actors[i]);
         }
         uint256 potBefore = hook.potBalance();
         vm.prank(alice);
         registry.buyWithMix(poolKey, 0.005e18, 1, 0, 0);
         uint256 paid;
         for (uint256 i; i < 5; ++i) {
-            assertEq(mixETH.balanceOf(actors[i]) - beforeBalance[i], expected[i], "first owned tier only");
+            assertEq(registry.claimableReferral(actors[i]) - beforeBalance[i], expected[i], "first owned tier only");
             paid += expected[i];
         }
         assertEq(hook.potBalance() - potBefore, fee * 3500 / 10000 + leg - paid);

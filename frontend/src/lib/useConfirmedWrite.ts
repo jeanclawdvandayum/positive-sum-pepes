@@ -14,9 +14,10 @@ import { confirmTransaction } from './transactions'
 import { userFacingRpcError } from './rpcErrors'
 import { assertReferralPurchase } from './referrals'
 import { assertReinvestor } from './reinvestRules'
+import { verifyReferralClaim } from './referralRewards'
 
 /** AUD-4: every UI write simulates, waits for mining, and checks receipt status. */
-export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } | { nftRoundId: bigint | undefined } | { referralPurchase: { roundId: bigint; registry?: `0x${string}` } }) {
+export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } | { nftRoundId: bigint | undefined } | { referralClaimRoundId: bigint | undefined } | { referralPurchase: { roundId: bigint; registry?: `0x${string}` } }) {
   const { address } = useAccount()
   const client = usePublicClient({ chainId: CHAIN_ID })
   const { writeContractAsync } = useWriteContract()
@@ -29,7 +30,12 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
       // Immutable legacy deployments do not acquire the new purchase rules.
       const factory = ADDRESSES.factory as `0x${string}`
       const blockNumber = await client.getBlockNumber().catch(error => { throw userFacingRpcError(error) })
-      if (options && 'nftRoundId' in options) {
+      if (options && 'referralClaimRoundId' in options) {
+        await verifyReferralClaim({
+          registry: id => client.readContract({ address: factory, abi: factoryAbi, functionName: 'referralRegistryOf', args: [id], blockNumber }),
+          version: registry => client.readContract({ address: registry, abi: registryAbi, functionName: 'REFERRAL_REWARDS_VERSION', blockNumber }),
+        }, options.referralClaimRoundId, parameters)
+      } else if (options && 'nftRoundId' in options) {
         if (!options.nftRoundId) throw new Error('Wait for the selected round to load.')
         const round = await client.readContract({ address: factory, abi: factoryAbi, functionName: 'rounds', args: [options.nftRoundId], blockNumber })
         const staker = await client.readContract({ address: round[1], abi: controllerAbi, functionName: 'staker', blockNumber })

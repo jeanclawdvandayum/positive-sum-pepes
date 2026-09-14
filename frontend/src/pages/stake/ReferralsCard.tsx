@@ -4,7 +4,7 @@
 // presentation; data hooks and the X sharing panel are shared with predeposit.
 //
 // Referral chains split 5% of attributed trade fees; the closest tier gets
-// 80% of that leg. These are live transfers, not a per-block accumulator.
+// 80% of that leg. Versioned registries retain rewards for wallet claims.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from 'react'
@@ -12,8 +12,11 @@ import { useAccount } from 'wagmi'
 import { fmtPepeId } from '../../lib/format'
 import { useCanRefer, refLinkFor, useReferral } from '../../components/ReferralCard'
 import ReferralShare from '../../components/ReferralShare'
+import ReferralRewards from '../../components/ReferralRewards'
+import { useRound } from '../../lib/useRound'
 
 export default function ReferralsCard() {
+  const round = useRound()
   const { isConnected } = useAccount()
   const { pepeIds, registry, version } = useReferral()
   const [selected, setSelected] = useState<bigint | null>(null)
@@ -81,6 +84,7 @@ export default function ReferralsCard() {
       <p className="mt-3 text-xs leading-relaxed text-text-lo">
         the closest referrer gets 80% of the referral share. the other tiers split the rest. each referred trade pays the chain.
       </p>
+      <ReferralRewards roundId={round.id} className="mt-4" />
     </section>
   )
 }

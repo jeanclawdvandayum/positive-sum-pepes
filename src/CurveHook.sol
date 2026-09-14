@@ -218,7 +218,6 @@ contract CurveHook is BaseHook {
     event ModeChanged(Mode newMode);
     event PoolInitialized();
     event FeesSent(address indexed to, uint256 mixETHAmount);
-    event ReferralPaid(address indexed trader, address indexed referrer, uint256 tier, uint256 mixETHAmount);
     event TimeAdded(address indexed buyer, uint256 secondsAdded, uint256 newDetonationAt);
     event PotClaimed(address indexed who, uint256 mixETHAmount);
     event DeployerCreditClaimed(address indexed who, uint256 mixETHAmount);
@@ -388,7 +387,7 @@ contract CurveHook is BaseHook {
 
     // ─────────────── Referral payouts ───────────────
 
-    /// @dev Live tier payouts on the trader's RECORDED attribution, paid out
+    /// @dev Tier rewards on the trader's RECORDED attribution, escrowed
     ///      of the 5% referral LEG of the fee (§3 REVISED 2026-09-01 — the
     ///      2026-08-19 fixed-50bps-of-volume carve-out is RETIRED). Tier
     ///      cuts use the registry's existing tier weights UNCHANGED
@@ -410,17 +409,20 @@ contract CurveHook is BaseHook {
 
         (address[5] memory who, uint24[5] memory bps) = reg.payoutFor(trader);
         if (who[0] == address(0)) return 0; // unattributed — caller re-splits
-        IERC20 mix = IERC20(Currency.unwrap(mixETH));
+        uint256[5] memory amounts;
         for (uint256 i = 0; i < 5; i++) {
             // AUD-16: owner deduplication leaves holes inside a valid chain.
             // Preserve later ancestors' original tiers instead of truncating.
             if (who[i] == address(0)) continue;
             uint256 cut = FPML.fullMulDiv(legMixETH, bps[i], 10000);
             if (cut > 0) {
-                mix.safeTransfer(who[i], cut);
+                amounts[i] = cut;
                 paid += cut;
-                emit ReferralPaid(trader, who[i], i, cut);
             }
+        }
+        if (paid != 0) {
+            IERC20(Currency.unwrap(mixETH)).safeTransfer(address(reg), paid);
+            reg.creditReferralRewards(who, amounts);
         }
     }
 
