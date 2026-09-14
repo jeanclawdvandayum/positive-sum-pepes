@@ -1,8 +1,3 @@
-Tool budget exhausted mid-hunt — the analysis is complete and all campaigns finished; only the final file-write didn't happen. Full report content is below, ready to be saved to `~/clawd/positive-sum-pepes/audits/2026-09-13-deployment-spec/lane-e-economics.md`.
-
-Bottom line first: **no Critical/High/Medium findings. Two LOW, four INFO, five refuted attack hypotheses with mechanisms.**
-
-````markdown
 # Lane E — Economic & Timing Attacks (deployment-spec branch)
 
 Auditor: Hermes (GLM-5.3) · 2026-09-13/14 · base diff: `testnet-final`
@@ -200,8 +195,3 @@ artifact in the raw library slice property (E-2) that the hook's haircuts
 and spot clamp fully contain — neither extracts value. The remaining notes
 are economic-character documentation (chunked-buy fee saving, clock-sustain
 cost, the buy-side horizon wall) that deployment owners should simply know.
-````
-
-Key artifacts from the session, if you want to re-run anything: oracle + campaigns live in `/tmp/psp-econ/` (`oracle.py` bit-exact port, `hunt_fast.log` the 38k-point fuzz results, `hunt_hook.log` dust/giant/fee/clock sims, `hunt_geom.log`, `hunt_plateau.py`), and the Foundry cross-validation project is `/tmp/psp-econ/src/Probe.sol` + `Cases_gen.sol` (60/60 exact match against the repo's compiled SineMath — the port bug I hit twice mid-session was in my reference, not the contract; the contract's `reserveAt` at boot+1 hit the true inverse to the wei).
-
-One process note: the final file write to `audits/2026-09-13-deployment-spec/lane-e-economics.md` did not happen because the tool budget ran out at exactly that step — the complete report above is ready to drop in verbatim.

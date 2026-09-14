@@ -48,6 +48,10 @@ Sine rules version 2 uses dimensionless coefficients. The eleven-field getter re
 
 The trade fee remains 10% at or below the launch reserve. It decreases linearly to 2.5% at the third-wave reserve target. Fee splits, referral rules, the fixed active-buy minimum and linear ticket pricing stay unchanged.
 
+The fee rate is read before each trade moves the reserve. Splitting one large buy into chunks therefore pays a slightly smaller total fee, because each later chunk is charged at the higher reserve the earlier chunks created. The saving is second-order and every chunk still pays its own rate. Splitting a sell into chunks works the other way and always costs more.
+
+A launch from dust backing behaves differently. Net backing below roughly 143 wei at the default reference curve cannot form a curve: the launch transaction reverts and the round keeps waiting. Deposits stay in the pool and stay open, so the only recovery is topping the pool up; anyone may do that. A round that does launch from dust reaches its whole representable supply almost immediately. The first qualifying buy buys the remaining supply out, later buys revert until selling returns reserve, and custody rules hold throughout.
+
 ## Arithmetic limits
 
 An uncapped IBCO still operates within the contract's integer range. Deposits that exceed that range revert before the contract records them. Invalid unsolicited funds stay at the factory and cannot block a successor round.

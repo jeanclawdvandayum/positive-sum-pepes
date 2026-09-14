@@ -3,8 +3,8 @@
 a memecoin with a mechanical soul. **PSP** mints and burns along a deterministic bonding curve inside a [uniswap v4](https://v4.uniswap.org) hook — no standard LP positions; round settlement follows the detonation clock. the entire reserve sits in mixETH (an ETH yield token), so the pot earns from *outside* the game: your backing compounds whether the chart is green or not. the intended external yield source is production mixETH; the public-mint testnet token does not demonstrate that yield.
 
 - **bonding curve market** — every buy climbs a preset price curve; every sell walks it back down. sells pay a toll that flows to stakers.
-- **stake & earn** — lock PSP for 90 days and every curve fee flows to you pro-rata, in mixETH.
-- **carpet bomb** — if stakers vote with 69% quorum, the round is flattened: locks open, the curve goes flat, everyone exits toll-free at average backing. the remainder seeds round n+1.
+- **stake & earn** — lock PSP and every curve fee flows to you pro-rata, in mixETH. unstaking vests in six steps over about 28 days; detonation opens every lock instantly.
+- **detonation clock** — a countdown capped at 69:04:20 arms at launch, and buys add 69 seconds per whole ticket unit at the current ticket price. at zero anyone can settle the round: the fee pot pays a last-ten-buyers ladder, the curve flattens, locks open, and the next round is born in the same transaction.
 - **your pepe** — every stake hatches a fully on-chain generated pepe NFT: 8-axis DNA (expression / eyes / hat / eyewear / item / skin / iris / background), 100,000,000 combinations, rendered to SVG at view time from RLE stamps inside the contract. no IPFS, no servers.
 
 ## quickstart
@@ -45,7 +45,7 @@ gotchas: TODO-SEPOLIA.md.
 
 ## repo map
 
-- `src/` — everything on-chain: `PSPFactory` (round lifecycle), `CurveHook` (the v4 hook), `CurveMath` + `src/curves/` (price curves: glide / longswell / switchback), `PSPStaker` (locks, fees, pepe NFTs), `PepeDescriptor` + `PepeArtData` (on-chain art), `PSPZapIn`/`PSPZapOut` (single-tx ETH routers)
+- `src/` — everything on-chain: `PSPFactory` (round lifecycle), `CurveHook` (the v4 hook) + `SineMath` (the tilted-sine curve), `RoundController` (deposits → launch → detonation), `PSPStaker` (locks, fees, pepe NFTs), `PSPReferralRegistry` (referral escrow), `PSPGraveZap` (one-tx post-detonation exit), `PepeDescriptor` + `PepeArtData` (on-chain art), `PSPZapIn`/`PSPZapOut` (single-tx ETH routers)
 - `script/` — `DeployPSP.s.sol` (one-shot deploy), `DriveAnvil.s.sol` (local e2e driver), `gen_pepe_art.py` (trait files → contract art), `app.html` (the walk-away UI published on-chain via `factory.setHtml`)
 - `studio/` — the browser trait studio where the pepe art was authored + compiled (byte-identical to the repo pipeline); try it: `python3 -m http.server` in `studio/dist`
 - `test/` — unit / integration / invariant / adversarial suites, incl. curve round-trip fuzzing and multi-system attack tests
