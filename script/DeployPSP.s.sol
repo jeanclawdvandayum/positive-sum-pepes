@@ -9,10 +9,11 @@ import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PSPFactory} from "../src/PSPFactory.sol";
 import {HookDeployer} from "../src/HookDeployer.sol";
 import {ControllerDeployer} from "../src/ControllerDeployer.sol";
-import {SineMath} from "../src/libraries/SineMath.sol";
+
 import {PepeExpandedDescriptor} from "../src/PepeExpandedDescriptor.sol";
 import {PSPZapIn} from "../src/PSPZapIn.sol";
 import {PSPZapOut} from "../src/PSPZapOut.sol";
+import {SineV3Math} from "../src/SineV3Math.sol";
 import {IMixETH} from "../src/interfaces/IMixETH.sol";
 import {SepoliaMixETH} from "../src/testnet/SepoliaMixETH.sol";
 import {MixETHFaucet} from "../src/testnet/MixETHFaucet.sol";
@@ -37,8 +38,7 @@ contract DeployPSP is DeploymentSupport {
         bool testnet = vm.envOr("PSP_TESTNET", false);
         _validateModes(anvil, testnet);
         // Parse and validate all configuration before spending deployment gas.
-        SineMath.Params memory sine = _sineParams();
-        SineMath.validate(sine);
+        uint128 sinePL = _sinePL();
         uint256 timings = (testnet || anvil) ? _testnetTimings() : 0;
         string memory htmlPath = _htmlPath(testnet);
         string memory htmlSource = vm.readFile(htmlPath);
@@ -92,16 +92,26 @@ contract DeployPSP is DeploymentSupport {
         // the documented mainnet value — scoopy's wallet. (If a different
         // broadcaster ever runs mainnet, pass PSP_DEPLOYER_CUT_TO
         // explicitly or the rake lands on the wrong wallet.)
+        vm.startBroadcast();
+        // The v3 settlement helper — ONE shared read-only SineV3Math per
+        // factory. Born before the factory so its address is pinned in the
+        // factory constructor and every round's hook from genesis on.
+        SineV3Math sineV3Table = new SineV3Math();
+        vm.stopBroadcast();
+
+        vm.startBroadcast();
         PSPFactory factory = new PSPFactory(
             IPoolManager(pm),
             mix,
             new HookDeployer(),
             new ControllerDeployer(),
             new StakerDeployer(),
+            address(sineV3Table),
             timings,
             deployerCut
         );
         console.log("deployerCutTo (1% unattributed rake):", deployerCut);
+        console.log("sineV3Table (shared settlement helper):", address(sineV3Table));
 
         // wire the on-chain pepe art FIRST — it's global on the factory and
         // every round's staker is born with it (rides deployController's
@@ -111,13 +121,13 @@ contract DeployPSP is DeploymentSupport {
         vm.stopBroadcast();
 
         vm.startBroadcast();
-        // THE curve is the tilted sine (scoopy 2026-08-30: "just for
-        // simplicity have the rebirth just be the sine curve"). Armed once
-        // on the factory, EVERY round — genesis and every rebirth — prices
-        // off the parametric wave; the zone config below is creation-code
+        // THE curve is sine rules v3 (2026-09-14): one continuous tilted
+        // sine, softened cube-root growth, pot-priced tickets. Armed once on
+        // the factory, EVERY round — genesis and every rebirth — settles on
+        // it via the shared helper; the zone config below is creation-code
         // shape only. The zone-curve libraries stay stashed in src/curves/
         // (see CURVES-STASH.md) for possible future flavors.
-        factory.configureSine(sine);
+        factory.configureSineV3(sinePL);
         // Staged genesis (2026-09-03): the post-clock-redesign composed
         // deployRound is ~18.6-21M — over Base Sepolia's ≈2^24 per-tx cap —
         // so the birth runs as THREE deterministic birthStep txs (token+

@@ -17,7 +17,6 @@ import {PSPToken} from "./PSPToken.sol";
 import {CurveHook} from "./CurveHook.sol";
 import {RoundController} from "./RoundController.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
-import {SineMath} from "./libraries/SineMath.sol";
 import {HookDeployer} from "./HookDeployer.sol";
 import {ControllerDeployer, TokenDeployer} from "./ControllerDeployer.sol";
 import {StakerDeployer} from "./StakerDeployer.sol";
@@ -95,19 +94,25 @@ contract PSPFactory is Ownable2Step {
     ///      its descendants.
     CurveMath.CurveConfig public gameCurve;
 
-    /// @notice Tilted-sine flavor (2026-08-29): when armed, every round's hook
-    ///         prices off the parametric sine curve (see SineMath). Survives
-    ///         rebirths like gameCurve.
-    SineMath.Params public gameSineParams;
+    /// @notice Sine flavor v3 (2026-09-14): when armed, every round's hook
+    ///         settles on the one continuous tilted-sine curve evaluated by
+    ///         the shared SineV3Math helper. Survives rebirths like gameCurve.
+    uint128 public gameSinePL;
     bool public useSine;
+    /// @dev The shared, read-only v3 settlement helper (deployed once by the
+    ///      deploy script, immutable here from construction). Every round's
+    ///      hook is pinned to this exact table at birth.
+    address public immutable sineV3Table;
 
-    /// @dev Owner arms the sine flavor for current + future rounds. Params
-    ///      validated (ampBps ≤ 10000 = 45° tilt cap). Call before deployRound.
-    function configureSine(SineMath.Params calldata p) external onlyOwner {
-        SineMath.validate(p);
-        gameSineParams = p;
+    /// @dev Owner arms the v3 sine flavor for current + future rounds. The
+    ///      launch spot price P_L bounds mirror the hook's configureSineV3.
+    function configureSineV3(uint128 pL) external onlyOwner {
+        if (pL < 1e9 || pL > 1e18) revert InvalidSineParams();
+        gameSinePL = pL;
         useSine = true;
     }
+
+    error InvalidSineParams();
 
     /// @dev Fresh referral graph per round; wallet entries bind once for that round.
     mapping(uint256 => address) public referralRegistryOf;
@@ -136,7 +141,7 @@ contract PSPFactory is Ownable2Step {
     ///      spawned hook's immutable 1% unattributed-fee rake — wired from
     ///      the deploy script's broadcaster (testnet: the throwaway
     ///      deployer; mainnet: scoopy's address, documented in DeployPSP).
-    constructor(IPoolManager _poolManager, IERC20 _mixETH, HookDeployer _hookDeployer, ControllerDeployer _controllerDeployer, StakerDeployer _stakerDeployer, uint256 _timings, address _deployerCutTo)
+    constructor(IPoolManager _poolManager, IERC20 _mixETH, HookDeployer _hookDeployer, ControllerDeployer _controllerDeployer, StakerDeployer _stakerDeployer, address _sineV3Table, uint256 _timings, address _deployerCutTo)
         Ownable(msg.sender)
     {
         if (address(_poolManager) == address(0)) revert ZeroAddress();
@@ -144,6 +149,7 @@ contract PSPFactory is Ownable2Step {
         if (address(_hookDeployer) == address(0)) revert ZeroAddress();
         if (address(_controllerDeployer) == address(0)) revert ZeroAddress();
         if (address(_stakerDeployer) == address(0)) revert ZeroAddress();
+        if (_sineV3Table == address(0) || _sineV3Table.code.length == 0) revert ZeroAddress();
         if (_deployerCutTo == address(0)) revert ZeroAddress(); // the 1% rake needs a home
         poolManager = _poolManager;
         mixETH = _mixETH;
@@ -151,6 +157,7 @@ contract PSPFactory is Ownable2Step {
         tokenDeployer = new TokenDeployer();
         controllerDeployer = _controllerDeployer;
         stakerDeployer = _stakerDeployer;
+        sineV3Table = _sineV3Table;
         roundTimings = _timings;
         deployerCutTo = _deployerCutTo;
     }
@@ -389,7 +396,7 @@ contract PSPFactory is Ownable2Step {
             token: token,
             controller: controller,
             hook: hook,
-            contextHash: keccak256(abi.encode(cfg, descriptor, name, symbol, useSine, gameSineParams)),
+            contextHash: keccak256(abi.encode(cfg, descriptor, name, symbol, useSine, gameSinePL, sineV3Table)),
             active: true,
             name: name,
             symbol: symbol,
@@ -413,7 +420,7 @@ contract PSPFactory is Ownable2Step {
     function _birthContracts() internal {
         SpawnReservation storage r = reservation;
         CurveMath.CurveConfig memory cfg = _configWithTimings();
-        if (keccak256(abi.encode(cfg, descriptor, r.name, r.symbol, useSine, gameSineParams)) != r.contextHash) {
+        if (keccak256(abi.encode(cfg, descriptor, r.name, r.symbol, useSine, gameSinePL, sineV3Table)) != r.contextHash) {
             revert ReservationStale();
         }
 
@@ -470,9 +477,10 @@ contract PSPFactory is Ownable2Step {
             if (h != r.hook) revert PredictMismatch();
         }
 
-        // Sine flavor: arm THIS round's hook before pool init (guard inside
-        // configureSine enforces pre-init + factory identity).
-        if (useSine) hook.configureSine(gameSineParams);
+        // Sine flavor v3: arm THIS round's hook before pool init with the
+        // factory's exact helper address (guards inside configureSineV3
+        // enforce pre-init + factory identity).
+        if (useSine) hook.configureSineV3(gameSinePL, sineV3Table);
     }
 
     /// @dev Birth phase 3: stale-context re-check (fail closed before ANY
@@ -483,7 +491,7 @@ contract PSPFactory is Ownable2Step {
     function _birthWire() internal returns (uint256 roundId, address hookAddr) {
         SpawnReservation storage r = reservation;
         CurveMath.CurveConfig memory cfg = _configWithTimings();
-        if (keccak256(abi.encode(cfg, descriptor, r.name, r.symbol, useSine, gameSineParams)) != r.contextHash) {
+        if (keccak256(abi.encode(cfg, descriptor, r.name, r.symbol, useSine, gameSinePL, sineV3Table)) != r.contextHash) {
             revert ReservationStale();
         }
 

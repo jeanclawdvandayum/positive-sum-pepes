@@ -21,6 +21,9 @@ for artifact in sorted(Path('out').glob('*.sol/*.json')):
     if artifact.stem in ('CurveHook', 'PSPFactory', 'HookDeployer', 'HookInitCode'):
         assert n < 24076, f'{artifact.stem}: less than 500 bytes runtime headroom'
         print(f'{artifact.stem}: runtime {n}, initcode {i}')
+    elif artifact.stem == 'SineV3Math':
+        assert n < 24076, f'{artifact.stem}: less than 500 bytes runtime headroom'
+        print(f'{artifact.stem}: runtime {n}, initcode {i}')
     checked += 1
 assert checked > 0, 'No production artifacts; run forge build first'
 print(f'Size gate: {checked} production artifacts passed (constructor arguments require deployment checks).')

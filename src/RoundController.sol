@@ -383,16 +383,23 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     ///      joins totalBoot at launch, thickening the curve for everyone.
     uint256 public carryBonusMixETH;
 
+    /// @dev Largest net boot whose prelaunch span stays inside the v3
+    ///      helper's 16-wave table edge: (16*955e18)^2 / 450e18. Above this
+    /// the curve cannot materialize — an arithmetic capacity bound, not an
+    /// economic fundraising cap (~518,841 mixETH net).
+    uint256 private constant BOOT_NET_MAX = 518840888888888888888888; // (16*955e18)^2 / 450e18, floored
+
     /// @dev Reject arithmetic capacity failures before crediting a deposit.
-    /// Dust pools can grow into a representable launch. Above the reference
-    /// raise, validate the exact curve that launch will materialize.
+    /// v3 has no dust cliff — a one-wei boot materializes a valid (tiny)
+    /// curve — so every deposit above one wei and below the table edge is
+    /// launchable. The exact genesis the launch WILL run is still dry-run
+    /// so no funded configuration can ever strand.
     function _validateBootstrap(uint256 totalBoot) private view {
         if (!hook.sineConfigured()) return;
         uint256 netBoot = totalBoot - Math.mulDiv(totalBoot, GENESIS_POT_FEE_BPS, 10000);
-        if (netBoot >= 450e18) {
-            try hook.sineGenesisPSP(netBoot) returns (uint256) {} catch {
-                revert PredepositCapacityExceeded();
-            }
+        if (netBoot > BOOT_NET_MAX) revert PredepositCapacityExceeded();
+        try hook.sineGenesisPSP(netBoot) returns (uint256) {} catch {
+            revert PredepositCapacityExceeded();
         }
     }
 

@@ -9,7 +9,13 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
 import {IPSPStaker} from "./interfaces/IPSPStaker.sol";
 import {IPSPZapIn} from "./interfaces/IPSPZapIn.sol";
-import {GameRules} from "./libraries/GameRules.sol";
+
+/// @dev Live round minimum via the hook's version-aware getter: exactly one
+///      current ladder spot on v3 rounds (dynamic — can sit far below 0.005),
+///      the historical constant on legacy rounds.
+interface IHookMinimum {
+    function MIN_BUY_INPUT() external view returns (uint256);
+}
 
 /// @title PSPReinvestor — claim fees and compound them back into the stake
 /// @notice For a staked pepe: pulls the position's accrued mixETH fees to
@@ -62,7 +68,7 @@ contract PSPReinvestor is ReentrancyGuard {
         uint256 mixBefore = mix.balanceOf(address(this));
         staker.claimFeesTo(pepeId, address(this));
         uint256 mixIn = mix.balanceOf(address(this)) - mixBefore;
-        if (mixIn < GameRules.MIN_BUY) revert NothingToReinvest();
+        if (mixIn < IHookMinimum(address(key.hooks)).MIN_BUY_INPUT()) revert NothingToReinvest();
 
         uint256 pspBefore = psp.balanceOf(address(this));
         zapIn.buyWithMixFor(key, mixIn, minPspOut, deadline, owner);
@@ -97,7 +103,7 @@ contract PSPReinvestor is ReentrancyGuard {
         uint256 mixBefore = mix.balanceOf(address(this));
         staker.claimAllTo(pepeIds, address(this));
         uint256 mixIn = mix.balanceOf(address(this)) - mixBefore;
-        if (mixIn < GameRules.MIN_BUY) revert NothingToReinvest();
+        if (mixIn < IHookMinimum(address(key.hooks)).MIN_BUY_INPUT()) revert NothingToReinvest();
 
         // fail fast on any decaying pepe (stakeFor would revert post-buy)
         // and size the proportional split basis

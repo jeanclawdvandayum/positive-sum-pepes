@@ -16,8 +16,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {FixedPointMathLib as FPML} from "solady/src/utils/FixedPointMathLib.sol";
 
 import {CurveMath} from "./libraries/CurveMath.sol";
-import {SineMath} from "./libraries/SineMath.sol";
 import {GameRules} from "./libraries/GameRules.sol";
+import {ISineV3Math} from "./interfaces/ISineV3Math.sol";
 import {IRoundController} from "./interfaces/IRoundController.sol";
 import {PSPReferralRegistry} from "./PSPReferralRegistry.sol";
 
@@ -51,6 +51,8 @@ contract CurveHook is BaseHook {
     error WrongPoolParams(); // NK24: canonical fee/tickSpacing gate — no decoy pools
     error NotFactoryInitializer();
     error ZeroDeployerCut(); // CLOCK-REDESIGN §3: deployerCutTo must be a real address
+    error ZeroTable(); // v3: the sine helper address must be real
+    error InvalidSineParams(); // v3: launch spot price out of bounds
     error TradingHalted(); // CLOCK-REDESIGN §1: block.timestamp >= detonationAt — the round is dead
     error NotDetonated(); // claims open only once the clock struck zero and detonate() ran
     error BadSeatIndex(); // board(i) out of the seated window
@@ -84,8 +86,8 @@ contract CurveHook is BaseHook {
     /// @notice The swap fee this round charges right now, in bps.
     function swapFeeBps() public view returns (uint24) {
         if (!sineActive) return SWAP_FEE_BIPS;
-        uint256 boot = sineCurve.boot;
-        uint256 target = sineCurve.targetReserve;
+        uint256 boot = sineV3.boot;
+        uint256 target = sineV3.target;
         uint256 r = reserveMixETH;
         if (r <= boot) return FEE_BPS_PRE_WAVE;
         if (r >= target) return FEE_BPS_ABOVE_WAVE;
@@ -117,7 +119,6 @@ contract CurveHook is BaseHook {
     ///      buys AND sells revert TradingHalted; nothing resurrects the clock.
     ///      Packed timing slot [2] permits shorter constructor playtest clocks.
     uint256 public constant DET_WINDOW = 69 hours + 4 minutes + 20 seconds;
-    uint256 public constant MIN_BUY_INPUT = GameRules.MIN_BUY;
     uint256 public constant TIME_PER_UNIT = GameRules.SECONDS_PER_UNIT;
     /// @dev Live detonation window, decoded from packed timing slot [2] at
     ///      construction. 0 = DET_WINDOW (69:04:20), the default.
@@ -140,17 +141,38 @@ contract CurveHook is BaseHook {
     uint256 public totalSupplyPSP;  // total PSP minted by curve
     bool public poolInitialized;
 
-    // ─────────────── Sine flavor (2026-08-29, scoopy round-2 ruling) ───────────────
-    // Factory-configured BEFORE pool init; materialized at initializeCurve from
-    // the ACTUAL predeposit raise, so every wave boundary is boot-invariant.
-    // When sineActive, buy/sell price off SineMath (reserve-parametrized);
-    // the zone path below remains for legacy/gallery rounds.
-    /// @notice Version 2 uses dimensionless IBCO growth and per-wave trend.
-    uint256 public constant SINE_RULES_VERSION = 2;
-    SineMath.Params public sineParams;
+    // ─────────────── Sine flavor v3 (2026-09-14, one continuous curve) ───────────────
+    // Factory-configured BEFORE pool init; materialized at initializeCurve
+    // from the ACTUAL post-fee boot. When sineActive, buy/sell settle on the
+    // SineV3Math helper (reserve-parametrized); the zone path below remains
+    // for legacy/gallery rounds.
+    /// @notice Version 3: one price formula across prelaunch and active
+    ///         reserves; softened cube-root growth to 1,000x launch price at
+    ///         the tenth wave; genesis supply from the same cumulative curve.
+    uint256 public constant SINE_RULES_VERSION = 3;
+    /// @dev The factory's shared SineV3Math helper (read-only settlement).
+    address public sineV3Table;
+    /// @dev Launch spot price P_L, WAD mixETH per PSP (default 0.000075).
+    uint128 public sinePL;
     bool public sineConfigured;
-    SineMath.Curve public sineCurve;   // auto-getter returns the scalars (no arrays anymore)
+    /// @notice Materialized v3 curve scalars (auto-getter `sineV3()`).
+    struct SineV3Curve {
+        uint256 boot;    // actual post-fee backing at launch
+        uint256 lam;     // wavelength = 955*sqrt(boot/450), floored
+        uint256 target;  // boot + 10*lam — the fee schedule's 2.5% anchor
+        uint256 q0;      // genesis supply Q(b) on the same curve
+    }
+    SineV3Curve public sineV3;
     bool public sineActive;
+
+    /// @notice Version-3 curve getter: everything pricing and display need.
+    function sineV3Info()
+        external
+        view
+        returns (uint256 version, uint256 pL, uint256 boot, uint256 lam, uint256 target, uint256 q0, address table)
+    {
+        return (SINE_RULES_VERSION, sinePL, sineV3.boot, sineV3.lam, sineV3.target, sineV3.q0, sineV3Table);
+    }
 
     // ─────────────── Clock + tickets + pot (CLOCK-REDESIGN §1-3) ───────────────
     /// @dev The detonation clock, in SECONDS (block.timestamp domain). Zero
@@ -176,16 +198,37 @@ contract CurveHook is BaseHook {
     ///      have drained.
     uint256 public potBalance;
     uint256 public genesisPotBalance;
-    uint256 public constant TICKET_RULES_VERSION = 2;
+    /// @notice Version 3 tickets: each ladder spot is priced from the entire
+    ///         accounted pot — ceil(potBalance / 10_000), minimum 1 wei.
+    uint256 public constant TICKET_RULES_VERSION = 3;
 
-    /// @notice Gross mixETH per ticket before the next trade. Linear 0.42%
-    /// of the 0.005 base per whole mixETH added after genesis, including fractions.
+    uint256 public potPaid;
+
+    /// @notice The authoritative active gross-buy minimum. Version 3 sine
+    ///         rounds: exactly one current ladder spot (ticketPrice()).
+    ///         Legacy zone rounds: the historical 0.005 constant. Same
+    ///         selector as the old constant getter — clients read ONE value.
+    function MIN_BUY_INPUT() public view returns (uint256) {
+        return sineConfigured ? ticketPrice() : GameRules.MIN_BUY;
+    }
+
+    /// @notice Gross mixETH per ticket before the next trade.
+    ///         v3 (TICKET_RULES_VERSION 3): the ENTIRE current accounted pot
+    ///         prices 10,000 spots — ceil(potBalance/10_000), floored at one
+    ///         wei. Sampled before a purchase contributes its own fees, so
+    ///         an exact one-ticket buy can never lose its ticket to its own
+    ///         fee. v2/zone legacy rounds keep the linear 0.42% growth rule.
     function ticketPrice() public view returns (uint256) {
+        if (sineConfigured) {
+            // overflow-safe ceiling division (q < potBalance always)
+            uint256 q = potBalance / 10_000;
+            if (potBalance % 10_000 != 0) ++q;
+            return q == 0 ? 1 : q;
+        }
         uint256 growth = potBalance > genesisPotBalance ? potBalance - genesisPotBalance : 0;
         // growth * 21 / 1e6, without intermediate overflow. Round down <1 wei.
-        return MIN_BUY_INPUT + (growth / 1_000_000) * 21 + (growth % 1_000_000) * 21 / 1_000_000;
+        return GameRules.MIN_BUY + (growth / 1_000_000) * 21 + (growth % 1_000_000) * 21 / 1_000_000;
     }
-    uint256 public potPaid;
 
     // ─────────────── Deployer credit (CLOCK-REDESIGN §3 REVISED) ───────────────
     /// @dev Recipient of the 1% unattributed rake — set once at deploy
@@ -360,8 +403,10 @@ contract CurveHook is BaseHook {
         uint256 inputAmount = uint256(int256(-params.amountSpecified));
 
         // C-1 fix: reject dust swaps — below this size the curve math's
-        // fixed-point precision can make round-trips profitable (in wei terms)
-        if (inputAmount < MIN_SWAP_INPUT) revert SwapTooSmall();
+        // fixed-point precision can make round-trips profitable (in wei terms).
+        // v3 sine buys are exempt: their minimum is exactly one current
+        // ladder spot (enforced in _handleBuy), which can sit below 1e12 wei.
+        if (inputAmount < MIN_SWAP_INPUT && !(isBuy && sineConfigured)) revert SwapTooSmall();
 
         // Referral payout identity (A-1 fix 2026-08-26): canonical zaps
         // forward the TRADER address through hookData so payouts resolve
@@ -465,21 +510,27 @@ contract CurveHook is BaseHook {
             revert BuyingDisabled();
         }
         // AUD-1: enforce at the hook, including direct PoolManager callers.
-        if (mixETHInput < MIN_BUY_INPUT) revert SwapTooSmall();
+        // v3: the active gross-buy minimum is EXACTLY one current ladder
+        // spot, sampled once here — before this buy's own fees can move the
+        // pot — and reused for the unit count below. Every successful active
+        // buy therefore earns at least one ticket. Legacy zone rounds keep
+        // the historical 0.005 floor and zero-ticket trades.
+        uint256 tp = ticketPrice();
+        if (mixETHInput < (sineConfigured ? tp : GameRules.MIN_BUY)) revert SwapTooSmall();
 
         // NK24 fix: mixETH is the unit of account — the curve is solved
         // directly in mixETH. No vault-rate read anywhere in this path.
         //
         // Fee split (CLOCK-REDESIGN §3 REVISED): swapFeeBps() slice (10%
-        // pre-wave → 2.5% above on sine rounds, flat 5% on zone rounds)
-        // routed by _splitFee — 60% stakers / 35% pot / 5% referral chain
-        // (attributed) or 4% pot / 1% deployerCredit (unattributed);
-        // remainders → pot escrow.
+        // pre-wave → 2.5% above the tenth-wave target on sine rounds, flat
+        // 5% on zone rounds) routed by _splitFee — 60% stakers / 35% pot /
+        // 5% referral chain (attributed) or 4% pot / 1% deployerCredit
+        // (unattributed); remainders → pot escrow.
         uint256 feeMixETH = FPML.fullMulDiv(mixETHInput, swapFeeBps(), 10000);
         uint256 curveMixETH = mixETHInput - feeMixETH;
 
         uint256 pspOut = sineActive
-            ? SineMath.buyOut(sineCurve, reserveMixETH, curveMixETH)
+            ? ISineV3Math(sineV3Table).buyOut(reserveMixETH, sineV3.boot, sineV3.lam, sinePL, curveMixETH)
             : CurveMath.computeBuyOutput(curveMixETH, totalSupplyPSP, curveConfig);
         if (pspOut == 0) revert ZeroOutput();
         if (pspOut > uint256(uint128(type(int128).max))) revert SwapTooLarge();
@@ -489,7 +540,9 @@ contract CurveHook is BaseHook {
         totalSupplyPSP += pspOut;
 
         // AUD-1: gross mixETH purchase units drive the clock independently of PSP price.
-        uint256 units = mixETHInput / ticketPrice();
+        // Same pre-fee sample as the minimum check above — a buy's own fees
+        // reprice tickets for LATER buys only, never its own units.
+        uint256 units = mixETHInput / tp;
         address buyer = refTrader != address(0) ? refTrader : sender;
         {
             uint256 previous = detonationAt;
@@ -565,7 +618,7 @@ contract CurveHook is BaseHook {
         // sell extracted other holders' backing; a 95% drop underflowed the
         // reserve and bricked every sell).
         uint256 mixETHOut = sineActive
-            ? SineMath.sellOut(sineCurve, reserveMixETH, pspInputAmount)
+            ? ISineV3Math(sineV3Table).sellOut(reserveMixETH, sineV3.boot, sineV3.lam, sinePL, pspInputAmount)
             : CurveMath.computeSellOutput(pspInputAmount, totalSupplyPSP, curveConfig);
 
         // Fee split (CLOCK-REDESIGN §3 REVISED): swapFeeBps() of the
@@ -884,10 +937,16 @@ contract CurveHook is BaseHook {
         potBalance += _genesisPotFee; // genesis launch fee → ladder pot
         genesisPotBalance = potBalance;
 
-        // Sine flavor: materialize the wave from the ACTUAL boot raised —
-        // anchors, tread positions and the top price are invariant to it.
+        // Sine flavor v3: materialize the curve from the ACTUAL post-fee
+        // boot — wavelength, tenth-wave target, and genesis supply all anchor
+        // to what really landed on the curve. q0 is recomputed on the same
+        // helper the controller quoted; it must equal _initialSupply.
         if (sineConfigured) {
-            sineCurve = SineMath.materialize(sineParams, _reserveMixETH);
+            ISineV3Math table = ISineV3Math(sineV3Table);
+            uint256 lam = table.lamAt(_reserveMixETH);
+            uint256 q0 = table.supplyWad(_reserveMixETH, _reserveMixETH, lam, sinePL);
+            if (q0 != _initialSupply) revert InvalidMode();
+            sineV3 = SineV3Curve(_reserveMixETH, lam, _reserveMixETH + 10 * lam, q0);
             sineActive = true;
         }
 
@@ -898,27 +957,33 @@ contract CurveHook is BaseHook {
         emit PoolInitialized();
     }
 
-    /// @notice Factory-only: arm the tilted-sine curve for this round. Must be
-    ///         called before launch (pool init); params validated (ampBps ≤
-    ///         10000 = the 45° tilt cap ⇒ monotone wave by construction).
-    function configureSine(SineMath.Params calldata p) external {
+    /// @notice Factory-only: arm the v3 sine curve for this round. Must be
+    ///         called before launch (pool init). The factory passes its own
+    ///         deployed SineV3Math helper — the round's settlement math is
+    ///         pinned to that exact table from birth.
+    function configureSineV3(uint128 pL, address table) external {
         if (msg.sender != controller.factory()) revert NotController();
         if (poolInitialized || sineConfigured) revert InvalidMode();
-        SineMath.validate(p);
-        sineParams = p;
+        if (table == address(0)) revert ZeroTable();
+        if (pL < 1e9 || pL > 1e18) revert InvalidSineParams();
+        sineV3Table = table;
+        sinePL = pL;
         sineConfigured = true;
     }
 
-    /// @notice Genesis PSP the sine curve mints for the actual boot (view —
+    /// @notice Genesis PSP the v3 curve mints for the actual boot (view —
     ///         the controller reads this at launch; initializeCurve re-runs
-    ///         the same pure computation to store the curve).
+    ///         the same computation and requires equality). Reverts
+    ///         SineV3Domain when the boot is outside the supported span.
     function sineGenesisPSP(uint256 bootActual) external view returns (uint256) {
-        return SineMath.materialize(sineParams, bootActual).q0;
+        ISineV3Math table = ISineV3Math(sineV3Table);
+        uint256 lam = table.lamAt(bootActual);
+        return table.supplyWad(bootActual, bootActual, lam, sinePL);
     }
 
     /// @notice Marginal price at cumulative reserve R (mixETH per PSP) — UI view.
     function sinePriceAt(uint256 R) external view returns (uint256) {
-        return SineMath.priceAt(sineCurve, R);
+        return ISineV3Math(sineV3Table).priceWad(R, sineV3.boot, sineV3.lam, sinePL);
     }
 
 
@@ -944,14 +1009,16 @@ contract CurveHook is BaseHook {
         // Sine-aware + sliding-fee-aware (2026-08-30): this used to quote the
         // ZONE math on sine rounds — wrong curve, wrong fee. CLOCK-REDESIGN:
         // at zero the view reverts TradingHalted exactly like the swap path.
+        // v3 (2026-09-14): the minimum mirrors execution too — exactly one
+        // current ladder spot, which can sit below the historical 0.005.
         if (mode == Mode.Flat) revert BuyingDisabled();
         if (mode != Mode.Active) revert NotActive();
         if (block.timestamp >= detonationAt) revert TradingHalted();
-        if (mixETHInput < MIN_BUY_INPUT) revert SwapTooSmall();
+        if (mixETHInput < MIN_BUY_INPUT()) revert SwapTooSmall();
         uint256 fee = FPML.fullMulDiv(mixETHInput, swapFeeBps(), 10000);
         uint256 curveMix = mixETHInput - fee;
         return sineActive
-            ? SineMath.buyOut(sineCurve, reserveMixETH, curveMix)
+            ? ISineV3Math(sineV3Table).buyOut(reserveMixETH, sineV3.boot, sineV3.lam, sinePL, curveMix)
             : CurveMath.computeBuyOutput(curveMix, totalSupplyPSP, curveConfig);
     }
 
@@ -966,7 +1033,7 @@ contract CurveHook is BaseHook {
         }
         if (block.timestamp >= detonationAt) revert TradingHalted();
         uint256 out = sineActive
-            ? SineMath.sellOut(sineCurve, reserveMixETH, pspInput)
+            ? ISineV3Math(sineV3Table).sellOut(reserveMixETH, sineV3.boot, sineV3.lam, sinePL, pspInput)
             : CurveMath.computeSellOutput(pspInput, totalSupplyPSP, curveConfig);
         return out - FPML.fullMulDiv(out, swapFeeBps(), 10000);
     }

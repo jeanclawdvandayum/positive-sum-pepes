@@ -9,7 +9,7 @@ import {PSPZapIn} from "../src/PSPZapIn.sol";
 import {PSPZapOut} from "../src/PSPZapOut.sol";
 import {CurveHook} from "../src/CurveHook.sol";
 import {CurveMath} from "../src/libraries/CurveMath.sol";
-import {SineMath} from "../src/libraries/SineMath.sol";
+
 import {Curve1Zones} from "../src/curves/Curve1Zones.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
@@ -112,7 +112,14 @@ abstract contract DeploymentSupport is Script {
         require(r.controller.hookAddress() == address(r.hook) && address(r.hook.controller()) == address(r.controller)
             && r.token.controller() == address(r.controller), "round wiring mismatch");
         require(address(r.hook.poolManager()) == address(factory.poolManager()), "hook PoolManager mismatch");
-        require(r.hook.MIN_BUY_INPUT() == 0.005e18 && r.hook.TIME_PER_UNIT() == 69 && r.hook.TICKET_RULES_VERSION() == 2, "game rules mismatch");
+        // v3 game rules: the minimum IS the live ticket price (both read the
+        // same pot), tickets are pot-priced, and the round's hook is pinned
+        // to the factory's exact settlement helper.
+        require(r.hook.TICKET_RULES_VERSION() == 3 && r.hook.SINE_RULES_VERSION() == 3
+            && r.hook.MIN_BUY_INPUT() == r.hook.ticketPrice() && r.hook.TIME_PER_UNIT() == 69,
+            "game rules mismatch");
+        require(r.hook.sineV3Table() == factory.sineV3Table() && r.hook.sinePL() == factory.gameSinePL(),
+            "sine v3 helper or launch price mismatch");
         require(r.controller.PREDEPOSIT_RULES_VERSION() == 2 && r.controller.PREDEPOSIT_CAP() == 0,
             "predeposit rules mismatch");
         PSPStaker staker = r.controller.staker();
@@ -141,20 +148,24 @@ abstract contract DeploymentSupport is Script {
         });
     }
 
-    /// @dev Reference calibration at 450 mixETH of net IBCO backing.
-    ///      The opening price rises 7.5x, then reaches 0.06 mixETH/PSP
-    ///      after three waves (800x the launch price). The 10,000 mixETH
-    ///      reference target scales with the actual net IBCO backing.
-    ///      Environment overrides use the same 450-mixETH reference.
-    function _sineParams() internal view returns (SineMath.Params memory) {
-        uint256 amp = vm.envOr("PSP_SINE_AMPBPS", uint256(10_000));
-        require(amp <= 10_000, "PSP_SINE_AMPBPS must be at most 10000");
-        return SineMath.Params({
-            p0: vm.envOr("PSP_SINE_P0", uint256(1e13)),
-            preK: vm.envOr("PSP_SINE_PREK", uint256(4_477_562_267_871_699)),
-            pTarget: vm.envOr("PSP_SINE_PTARGET", uint256(0.06e18)),
-            targetReserve: vm.envOr("PSP_SINE_TARGET_RESERVE", uint256(10_000e18)),
-            ampBps: uint24(amp)
-        });
+    /// @dev Sine rules v3 (2026-09-14): one continuous curve; the only
+    ///      deployment knob left is the launch spot price P_L (default
+    ///      0.000075 mixETH/PSP). The v2 overrides are RETIRED — setting
+    ///      any of them fails loudly instead of being silently ignored.
+    function _sinePL() internal view returns (uint128) {
+        string[5] memory retired = [
+            "PSP_SINE_P0",
+            "PSP_SINE_PREK",
+            "PSP_SINE_PTARGET",
+            "PSP_SINE_TARGET_RESERVE",
+            "PSP_SINE_AMPBPS"
+        ];
+        for (uint256 i; i < retired.length; ++i) {
+            require(bytes(vm.envOr(retired[i], string(""))).length == 0,
+                string.concat(retired[i], " is retired under sine rules v3"));
+        }
+        uint256 pL = vm.envOr("PSP_SINE_PL", uint256(75_000_000_000_000)); // 0.000075
+        require(pL >= 1e9 && pL <= 1e18, "PSP_SINE_PL out of bounds");
+        return uint128(pL);
     }
 }
