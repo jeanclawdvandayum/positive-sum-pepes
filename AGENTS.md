@@ -19,7 +19,12 @@ Decimal/Simpson oracle; owner/operator reinvestment; resumable three-step birth.
 latest GATE-LOG entry, not the historical baseline below. Existing deployments
 remain unchanged until redeployed. Timing packing is four 64-bit fields.
 
-# AGENTS.md — Positive Sum Pepes (PSP), `sigma-testnet`
+# AGENTS.md — Positive Sum Pepes (PSP), `deployment-spec`
+
+> **Base branch (2026-09-14):** `deployment-spec` — all deployment work bases
+> here. Change log for the switch: `docs/audit/2026-09-14-deployment-spec-changes.md`.
+> `testnet-final` is frozen history (live Sept-7 rounds); `sigma-testnet` /
+> `sepolia-fixes` are superseded.
 
 ## What this is
 
