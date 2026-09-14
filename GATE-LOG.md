@@ -1526,3 +1526,5 @@ See `docs/audit/2026-09-13-alt-ui.md`.
   Creation-code helper is included in manifest and source-verification tooling.
 - Existing on-chain deployments and hosted sites were not changed.
   See `docs/audit/2026-09-13-referral-rewards.md`.
+
+2026-09-14 — DEPLOYMENT-SPEC FULL AGENTIC AUDIT (orchestrator + 4 fresh-eyes lanes, evm-cortex): NO Critical/High; 2 Medium (L-M1 vest 1-5s timing word strands pool — one-line fix pending; N-1 v2-descriptor-on-v1-factory duplicate art — procedure-gated), 5 Low, dynamic fee/ticket/clock/economic core PROVEN sound (bit-exact oracle 60/60 vs compiled SineMath, ~50k adversarial points, round trips −4.95%..−19%). GATES: branch AS PUSHED DID NOT COMPILE — SineCustodyInvariants.t.sol still on v1 field names; auditor migrated it (test-only) → forge 583 pass/1 env-fail/3 skip; deep fuzz P1/P2 @2000 runs green; slither 0H/0M; no-gov clean. Full report: audits/2026-09-13-deployment-spec/REPORT.md. Pre-mainnet: land the L-M1 guard + commit the harness migration + spec language for window/dust semantics.
