@@ -2,6 +2,14 @@
 
 These rules apply to fresh deployments. Existing contracts retain their deployed rules.
 
+**September 15 review status: release blocked.** The source implements the intended
+price shape and pot-based tickets, but its rounded price and supply can decrease
+at adjacent reserve values. Its fixed table range also lacks the arithmetic
+justification required by the original handoff. See the
+[review](audit/2026-09-15-single-sine-review.md) and the regression tests before
+deploying. This document describes intended rules; it is not proof that the
+current source meets all of them.
+
 ## Timing and deposits
 
 | Setting | Default |
@@ -55,11 +63,17 @@ The launch spot price `P_L` defaults to 0.000075 mixETH per PSP. The full-amplit
 
 The price at zero reserve is derived, not pinned: about 0.000036 mixETH per PSP at the reference calibration. The prelaunch span uses the same signed formula — there is no exponential IBCO leg.
 
-Genesis supply comes from the SAME curve's cumulative integral: the initial PSP equals `Q(b)`, the integral of `1/P` from reserve zero to launch. Buys and sells use the same cumulative function with conservative rounding and a justified haircut, so numerical error can never create backing and chopped trades telescope exactly.
+Genesis supply comes from the same curve's cumulative integral. Initial PSP equals `Q(b)`, the integral of `1/P` from reserve zero to launch. Buys use differences between cumulative values. Sells invert that function. The implementation must bound numerical error and preserve backing.
 
-Dust pools have no cliff under these rules: a one-wei net backing materializes a valid (tiny) curve — the wavelength formula never rounds to zero — and every deposit above one wei is launchable. The arithmetic capacity edge is explicit: net backing above roughly 518,841 mixETH (a prelaunch span past sixteen wavelengths) or a buy past the sixty-fourth wavelength reverts with a capacity error before any state changes. These are arithmetic limits, not economic fundraising caps.
+Ideal interval differences telescope. Actual receipts also reflect fees, integer rounding, and per-buy output reductions. Passing a telescoping identity alone does not prove safe settlement.
 
-The trade fee remains 10% at or below the launch reserve, decreasing linearly to 2.5% at the tenth-wave target. Fee splits, referral rules, and linear ticket pricing rules stay as described below. Chunking a large buy into pieces pays a slightly smaller total fee because each piece is charged at the reserve it created; chunking sells always costs more.
+The wavelength formula supports a one-wei net launch backing. Admission checks require a positive opening price, a representable genesis mint, and at least one PSP wei per unit of pooled contribution. That allocation check keeps every accepted positive contribution claimable, including after later deposits or carry. Some tiny aggregates at the highest custom launch price fail this precision check; the default one-wei deposit remains supported.
+
+The helper covers every launch whose opening price is at least one price wei, over the allowed custom launch prices. The old sixteen-wave launch limit is removed. Trading continues through wave 4,096: beyond that point, the entire remaining analytical integral is less than 0.005 PSP wei for every admitted launch. The one-wei output reduction makes that tail unmintable. Buys that cross this capacity fail before state changes. Sells and death redemption remain available from accepted states. See the [capacity derivation](audit/2026-09-15-single-sine-domain.md).
+
+Settlement uses a monotone price approximation and a cumulative primitive with ordered Bernstein controls. Four immutable data contracts hold canonical endpoints at 36 decimal places; the helper checks each complete code hash at construction. Exact reserve fractions retain 54 decimal places before interpolation. The inverse searches the canonical endpoints, caches one cell, and verifies its final adjacent-reserve bracket. The specified error tolerances remain 1e-11 relative plus one price unit, and 1e-9 relative plus one PSP wei for supply.
+
+The trade fee remains 10% at or below the launch reserve. It decreases linearly to 2.5% at the tenth-wave target. Fee splits and referral rules remain in place. Pot-based ticket pricing is defined below. Split trades sample a fee rate at each new reserve state. Their full receipts include rounding and output reductions, so the difference from one large trade is not fixed.
 
 ## Ladder tickets — pot pricing (version 3)
 
@@ -79,7 +93,7 @@ lePSP means locked earning PSP. It names the PSP principal held in a Pepe NFT po
 
 ## Scope
 
-The original frontend, alternative prototype, rolling paper and deployment settings use this spec. The original frontend continues to read the actual settings of existing deployments. The alternative frontend remains a local simulation.
+The original frontend, alternative frontend, rolling paper, and deployment settings use this spec. Both interfaces read transaction rules from the selected deployment. The explanatory figures use example inputs and do not supply trade quotes.
 
 Sine rules versions 1 and 2 describe older rounds and keep their original formulas for reading; the version is read before selecting any interpretation. No public deployment forms part of this change. Test results belong in the corresponding GATE-LOG entry.
 

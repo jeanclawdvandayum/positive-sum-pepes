@@ -12,6 +12,7 @@ import {PSPZapIn} from "../../src/PSPZapIn.sol";
 import {PSPZapOut} from "../../src/PSPZapOut.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
 import {SineV3Math} from "../../src/SineV3Math.sol";
+import {SineV3TestData as SineV3Data} from "../helpers/SineV3TestData.sol";
 import {IMixETH} from "../../src/interfaces/IMixETH.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -97,7 +98,7 @@ contract DeploymentScriptsTest is Test {
         factory = new PSPFactory(
             IPoolManager(address(new MockPoolManager())), IERC20(address(new MockMixETH())),
             new HookDeployer(), new ControllerDeployer(), new StakerDeployer(),
-            address(new SineV3Math()),
+            address(new SineV3Math(SineV3Data.deploy())),
             CurveMath.packTimingsCapped(7200, 3600, 7200, 0), address(this)
         );
         factory.setDescriptor(address(new PepeDescriptor()));

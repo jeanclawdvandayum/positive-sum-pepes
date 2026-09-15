@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {SineV3Math} from "../src/SineV3Math.sol";
+import {SineV3TestData as SineV3Data} from "./helpers/SineV3TestData.sol";
 import {SineV3Fixtures} from "./SineV3Fixtures.sol";
 
 /// @title SineV3Oracle — independent Decimal vectors vs the on-chain helper
@@ -16,7 +17,7 @@ contract SineV3OracleTest is Test {
     uint256 constant P_L = 75_000_000_000_000; // 0.000075
 
     function setUp() public {
-        math = new SineV3Math();
+        math = new SineV3Math(SineV3Data.deploy());
     }
 
     function test_LamFormula() public view {
@@ -37,13 +38,19 @@ contract SineV3OracleTest is Test {
         for (uint256 i; i < rows.length; ++i) {
             SineV3Fixtures.Row memory r = rows[i];
             uint256 p = math.priceWad(r.R, r.boot, r.lam, P_L);
-            assertApproxEqRel(
-                p, r.price, 1e11, string.concat("price row ", vm.toString(i))
-            ); // 1e-11 relative (1e11 denom)
+            // The integer oracle and implementation each round to price wei.
+            // Permit one output unit, then enforce the specified 1e-11 bound.
+            uint256 priceTolerance = r.price / 100_000_000_000 + 1;
+            assertLe(
+                p > r.price ? p - r.price : r.price - p,
+                priceTolerance,
+                string.concat("price row ", vm.toString(i))
+            );
             if (r.supply != 0) {
                 uint256 q = math.supplyWad(r.R, r.boot, r.lam, P_L);
-                // 1e-9 relative + 1e6 wei absolute floor for tiny pools
-                uint256 tol = q / 1_000_000_000 + 1_000_000_000_000;
+                // One output unit covers final flooring without swallowing
+                // the complete 13,333-wei genesis of a one-wei launch.
+                uint256 tol = r.supply / 1_000_000_000 + 1;
                 assertLe(
                     q > r.supply ? q - r.supply : r.supply - q,
                     tol,
@@ -125,10 +132,10 @@ contract SineV3OracleTest is Test {
         uint256 boot = 450e18;
         uint256 lam = 955e18;
         vm.expectRevert(SineV3Math.SineV3Domain.selector);
-        math.supplyWad(boot + 64 * lam + 1, boot, lam, P_L);
+        math.supplyWad(boot + 4096 * lam + 1, boot, lam, P_L);
         vm.expectRevert(SineV3Math.SineV3Domain.selector);
-        math.priceWad(boot + 64 * lam + 1, boot, lam, P_L);
-        uint256 edge = boot + 64 * lam;
+        math.priceWad(boot + 4096 * lam + 1, boot, lam, P_L);
+        uint256 edge = boot + 4096 * lam;
         math.supplyWad(edge, boot, lam, P_L); // edge itself is in-domain
         math.priceWad(edge, boot, lam, P_L);
     }

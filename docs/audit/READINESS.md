@@ -1,5 +1,19 @@
 # Audit preparation — September 2026
 
+## September 15 — single-sine review blocks release
+
+The `single-sine-spec` review found price and supply decreases at adjacent
+reserve values. Three regression tests expose these open defects. The fixed
+sixteen-wave prelaunch and sixty-four-wave active limits also lack the
+arithmetic justification required by the handoff. The branch is not approved
+for deployment. See [the review](2026-09-15-single-sine-review.md).
+
+Local fixes address graveyard-zap ownership, an incomplete sell inverse,
+quote limits, reinvestment hook identity, deployment tooling, and chart loading.
+The rolling paper and explainers now use the intended v3 formula and exact
+pot-based ticket examples. Existing deployments remain unchanged. Test counts
+and open failures belong to the latest GATE-LOG entry.
+
 ## September 14 — sine rules v3 (source only, branch `single-sine-spec`)
 
 Fresh deployments use ONE continuous tilted-sine curve through the IBCO and

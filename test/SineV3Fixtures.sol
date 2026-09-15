@@ -5,7 +5,7 @@ pragma solidity 0.8.26;
 // Independent Decimal reference vectors for the v3 curve.
 // Prices: closed form at the sample reserves. Supplies: composite
 // tanh-sinh double-exponential quadrature (method-independent from the
-// on-chain GL8 + knot table). Row: (boot, lam, R, priceWad, supplyPSPWei).
+// on-chain Bernstein interpolation and GL32 anchors). Row: (boot, lam, R, priceWad, supplyPSPWei).
 // supplyPSPWei == 0 marks a price-only row.
 library SineV3Fixtures {
     struct Row { uint256 boot; uint256 lam; uint256 R; uint256 price; uint256 supply; }

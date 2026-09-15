@@ -542,7 +542,7 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
 
       {side === 'buy' && (
         <p className="mt-3 text-xs text-text-lo">
-          {predepositPhase ? pdMinimum === 1n ? 'any positive mixETH amount' : `this round’s minimum: ${wadToExact(pdMinimum)} mixETH` : 'minimum 0.005 mixETH'}{!predepositPhase && ` · ${purchaseUnits(mixIn, round.ticketPrice ?? 0n) > 10n ? 10n : purchaseUnits(mixIn, round.ticketPrice ?? 0n)} ${purchaseUnits(mixIn, round.ticketPrice ?? 0n) === 1n ? 'seat' : 'seats'} · +${purchaseUnits(mixIn, round.ticketPrice ?? 0n) * TIME_PER_UNIT / 60n}m ${purchaseUnits(mixIn, round.ticketPrice ?? 0n) * TIME_PER_UNIT % 60n}s before the clock cap`}
+          {predepositPhase ? pdMinimum === 1n ? 'any positive mixETH amount' : `this round’s minimum: ${wadToExact(pdMinimum)} mixETH` : minimum === undefined ? 'minimum unavailable' : `minimum ${wadToExact(minimum)} mixETH`}{!predepositPhase && ` · ${purchaseUnits(mixIn, quotedTicketPrice ?? 0n) > 10n ? 10n : purchaseUnits(mixIn, quotedTicketPrice ?? 0n)} ${purchaseUnits(mixIn, quotedTicketPrice ?? 0n) === 1n ? 'seat' : 'seats'} · +${purchaseUnits(mixIn, quotedTicketPrice ?? 0n) * TIME_PER_UNIT / 60n}m ${purchaseUnits(mixIn, quotedTicketPrice ?? 0n) * TIME_PER_UNIT % 60n}s before the clock cap`}
           {!predepositPhase && ' · estimated at the current ticket price. Other trades can change it before yours lands.'}
         </p>
       )}

@@ -15,9 +15,7 @@ const ANVIL_SENDER = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const defaults = {
   PSP_PREDEPOSIT_SEC: '259200', PSP_VEST_SEC: '2419200', PSP_DET_SEC: '248660', PSP_WALLET_CAP_MIX: '0',
-  PSP_SINE_P0: '10000000000000', PSP_SINE_PREK: '4477562267871699',
-  PSP_SINE_PTARGET: '60000000000000000', PSP_SINE_TARGET_RESERVE: '10000000000000000000000',
-  PSP_SINE_AMPBPS: '10000',
+  PSP_SINE_PL: '75000000000000',
 }
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 const writeJson = (file, value) => fs.writeFileSync(file, JSON.stringify(value, (_, v) =>
@@ -45,6 +43,9 @@ export function options(argv, env = process.env) {
   }
   if (result.broadcast && result.sender.toLowerCase() === ANVIL_SENDER.toLowerCase()) throw Error('Use a dedicated testnet wallet, not the public Anvil account')
   if (result.verify && !result.broadcast) throw Error('--verify applies to live Base Sepolia deployments only')
+  for (const key of ['PSP_SINE_P0', 'PSP_SINE_PREK', 'PSP_SINE_PTARGET', 'PSP_SINE_TARGET_RESERVE', 'PSP_SINE_AMPBPS']) {
+    if (env[key]) throw Error(`${key} is retired under sine rules v3. Use PSP_SINE_PL for the launch price.`)
+  }
   const settings = {}
   for (const [key, fallback] of Object.entries(defaults)) {
     const raw = env[key] || fallback
@@ -56,7 +57,9 @@ export function options(argv, env = process.env) {
   }
   if (BigInt(settings.PSP_PREDEPOSIT_SEC) === 0n || BigInt(settings.PSP_DET_SEC) === 0n) throw Error('Use explicit positive testnet windows')
   if (BigInt(settings.PSP_VEST_SEC) < 6n || BigInt(settings.PSP_VEST_SEC) % 6n) throw Error('Vest duration must be positive and divisible by six')
-  if (BigInt(settings.PSP_SINE_AMPBPS) > 10000n) throw Error('Sine amplitude must be at most 10000 bps')
+  if (BigInt(settings.PSP_SINE_PL) < 1_000_000_000n || BigInt(settings.PSP_SINE_PL) > 10n ** 18n) {
+    throw Error('PSP_SINE_PL must be between 1000000000 and 1000000000000000000 wei per PSP')
+  }
   if (env.PSP_DEPLOYER_CUT_TO) {
     if (!isAddress(env.PSP_DEPLOYER_CUT_TO) || /^0x0+$/.test(env.PSP_DEPLOYER_CUT_TO)) throw Error('Invalid PSP_DEPLOYER_CUT_TO')
     settings.PSP_DEPLOYER_CUT_TO = env.PSP_DEPLOYER_CUT_TO

@@ -25,6 +25,7 @@ import {PSPReinvestor} from "../src/PSPReinvestor.sol";
 import {IPSPStaker} from "../src/interfaces/IPSPStaker.sol";
 import {IPSPZapIn} from "../src/interfaces/IPSPZapIn.sol";
 import {SineV3Math} from "../src/SineV3Math.sol";
+import {SineV3TestData as SineV3Data} from "./helpers/SineV3TestData.sol";
 import {MockMixETH} from "./mocks/MockMixETH.sol";
 import {StakerDeployer} from "src/StakerDeployer.sol";
 
@@ -57,7 +58,7 @@ abstract contract RealV4Base is Test {
 
         factory = new PSPFactory(
             poolManager, IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer()
-        , address(new SineV3Math()), testTimings(),
+        , address(new SineV3Math(SineV3Data.deploy())), testTimings(),
             address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );
         zapIn = new PSPZapIn(IMixETH(address(mixETH)), poolManager);

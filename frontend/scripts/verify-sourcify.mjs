@@ -7,6 +7,8 @@ const [manifestPath, buildDirectory, outputPath] = process.argv.slice(2)
 const manifest = JSON.parse(fs.readFileSync(manifestPath))
 if (manifest.chainId !== 84532) throw Error('This release verifier is Base Sepolia only.')
 const contracts = {
+  sineV3Math:'src/SineV3Math.sol:SineV3Math',
+  ...Object.fromEntries(Array.from({length:4},(_,i)=>[`sineV3Data${i}`,`src/SineV3Data.sol:SineV3Data${i}`])),
   factory:'src/PSPFactory.sol:PSPFactory', token:'src/PSPToken.sol:PSPToken',
   controller:'src/RoundController.sol:RoundController', hook:'src/CurveHook.sol:CurveHook',
   staker:'src/PSPStaker.sol:PSPStaker', mix:'src/testnet/SepoliaMixETH.sol:SepoliaMixETH',

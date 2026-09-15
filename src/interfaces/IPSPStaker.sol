@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {IRoundController} from "./IRoundController.sol";
+
 /// @dev Slice of PSPStaker the reinvestor touches (EIP-170: interfaces
 ///      only — no concrete imports into the reinvestor).
 interface IPSPStaker {
@@ -13,6 +15,7 @@ interface IPSPStaker {
     }
 
     function isWithdrawing(uint256 pepeId) external view returns (bool);
+    function controller() external view returns (IRoundController);
     function ownerOf(uint256 pepeId) external view returns (address);
     function getApproved(uint256 pepeId) external view returns (address);
     function isApprovedForAll(address owner, address operator) external view returns (bool);

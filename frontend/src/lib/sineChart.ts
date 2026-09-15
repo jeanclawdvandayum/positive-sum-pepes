@@ -25,6 +25,7 @@ export interface SineCurveData {
 /// prelaunch and active reserves; display-only floats, never amounts.
 export const SINE_V3 = {
   /** K = ln(1000) / (∛11 − 1): ten waves reach 1,000× the launch price. */
+  maxWaves: 4096,
   K: Math.log(1000) / (Math.cbrt(11) - 1),
   /** s(x) = x − sin(2πx)/(2π) — the monotone signed phase. */
   s: (x: number) => x - Math.sin(2 * Math.PI * x) / (2 * Math.PI),
@@ -92,10 +93,8 @@ export function sampleSineChart(raw: readonly bigint[], liveReserve = 0, version
     q0: raw[10], checkpoints: [], points, markers }
 }
 
-/// v3: one continuous curve, softened cube-root growth. Chart x-domain spans
-/// waves −1..+12 (launch price is P(R=boot); the signed extension prices the
-/// prelaunch window down to one wave below boot). Supply is anchored at the
-/// materialized genesis mint and integrated outward along the same curve.
+/// v3: include the full nonnegative prelaunch reserve range and ten milestones.
+/// Supply is anchored at the materialized genesis mint.
 export function sampleSineV3Chart(raw: readonly bigint[], liveReserve = 0): SineCurveData {
   if (raw.length !== 7) throw new Error('Invalid sine curve response')
   const [pL, boot, lam, target] = [raw[1], raw[2], raw[3], raw[4]].map(v => Number(v) / 1e18)
@@ -105,20 +104,25 @@ export function sampleSineV3Chart(raw: readonly bigint[], liveReserve = 0): Sine
   }
   if (!Number.isFinite(liveReserve) || liveReserve < 0) throw new Error('Invalid live reserve')
   const price = (r: number) => pL * Math.exp(SINE_V3.K * SINE_V3.H(SINE_V3.s((r - boot) / lam)))
-  // Bounded domain: waves −1..+12, extended in whole waves only when the live
-  // reserve (or an extreme extrapolation) genuinely needs the room.
+  // Start with twelve postlaunch waves, then extend toward the live reserve.
   const waves = Math.max(12, Math.ceil((Math.max(target, sineChartHeadroom(liveReserve, lam, 3)) - boot) / lam))
-  // exp() overflows past ~709; keep K·H(s(x)) inside numeric range.
-  const maxArg = SINE_V3.K * SINE_V3.H(SINE_V3.s(Math.pow(690 / SINE_V3.K, 3)))
-  const numericEnd = boot + Math.pow(maxArg / SINE_V3.K, 3) * lam
+  // Beyond this endpoint the remaining integral is below one mintable PSP
+  // wei throughout the admitted launch domain. Match settlement capacity.
+  const supportedEnd = boot + SINE_V3.maxWaves * lam
   const requestedEnd = boot + waves * lam
-  const end = Math.min(requestedEnd, numericEnd)
+  const end = Math.min(requestedEnd, supportedEnd)
   const truncated = end < requestedEnd
-  const start = boot - lam
+  const start = 0
   const reserves = new Set<number>([start, 0, boot, Math.min(target, end)])
   for (let i = 1; i <= 64; i++) reserves.add(boot * i / 64) // prelaunch ramp
-  const steps = Math.min(8192, Math.ceil((end - start) / lam) * 128)
+  const steps = Math.min(4096, Math.ceil((end - start) / lam) * 32)
   for (let i = 1; i <= steps; i++) reserves.add(start + (end - start) * i / steps)
+  // Keep the launch and early waves resolved when distant reserves expand
+  // the chart. A uniform distant grid would lose their supply curvature.
+  const detailStart = Math.max(start, boot - 16 * lam)
+  const detailEnd = Math.min(end, boot + 16 * lam)
+  const detailSteps = Math.ceil((detailEnd - detailStart) / lam) * 128
+  for (let i = 0; i <= detailSteps; i++) reserves.add(detailStart + (detailEnd - detailStart) * i / detailSteps)
   const grid = [...reserves].sort((a, b) => a - b)
   const bootIndex = grid.findIndex(r => r >= boot)
   const humanQ0 = Number(q0) / 1e18
@@ -132,7 +136,7 @@ export function sampleSineV3Chart(raw: readonly bigint[], liveReserve = 0): Sine
   for (let j = bootIndex + 1; j < grid.length; j++) supplies[j] = supplies[j - 1] + step(j - 1, j)
   for (let i = bootIndex - 1; i >= 0; i--) {
     supplies[i] = Math.max(0, supplies[i + 1] - step(i, i + 1))
-    if (grid[i] <= 0) supplies[i] = 0 // Q(0) = 0; below-zero reserve is display-only
+    if (grid[i] === 0) supplies[i] = 0 // Q(0) = 0
   }
   const points: CurvePoint[] = grid.map((r, i) => ({ reserve: r, price: price(r), supply: supplies[i] }))
   // Ten postlaunch wave milestones plus the launch: multiples 1 → 1000.

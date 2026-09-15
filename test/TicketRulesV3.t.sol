@@ -110,7 +110,9 @@ contract TicketRulesV3Test is RealV4Base {
         skip(1 hours);
         // exactly q: ONE ticket, 69 seconds
         uint256 det = hook.detonationAt();
-        swapper.buy(_keyOf(hook), q, alice, alice);
+        uint256 quoted = hook.getBuyOutput(q);
+        uint256 actual = swapper.buy(_keyOf(hook), q, alice, alice);
+        assertEq(actual, quoted, "sub-dust quote matches the real V4 output");
         assertEq(hook.ticketCount(), tickets + 1, "one spot earns one ticket");
         assertEq(hook.detonationAt(), det + 69);
 

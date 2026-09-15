@@ -12,19 +12,20 @@ Mathematical specification (2026-09-14 handoff, binding):
     Q(R) = integral_0^R dr / P(r) = (lambda/P_L) * (F(x(R)) - F(x(0)))
     F(x) = integral_0^x exp(-K*H(s(t))) dt
 
-This script generates:
-  src/SineV3Knots.sol     — canonical quarter-wave |F| knots, x in [-16, 64]
-                            (321 values, WAD, floored; balanced lookup tree)
-  test/SineV3Fixtures.sol — independent verification vectors
+This script generates immutable cumulative anchors, authenticated shard
+metadata, fixed-node Bernstein coefficients, and independent oracle fixtures.
+The grid uses full waves outside +/-128, half waves inside that interval,
+and quarter waves from -1 through +1. Its domain is [-580.5, 4096].
 
-Reference method: 70-digit Decimal. Knots integrate each quarter-wave cell
-with 16-point Gauss-Legendre cumulatively, certified against split-cell
-recomputation. Fixture supplies use tanh-sinh (double-exponential) quadrature — a
-different method than the knot-building GL16 — with level-doubling
-convergence; fixture prices at wave milestones are closed-form. Nothing here is derived from Solidity output.
+Anchors use 70-digit Decimal GL32 quadrature, checked against split cells.
+Fixture supplies use a different method: tanh-sinh quadrature with successive
+step refinement. Prices use the analytic sine, cube root, and exponential.
+No fixture is derived from Solidity output. The separate primitive validator
+checks integer density coefficients against the analytic function in every cell.
 
---check regenerates both files and verifies byte-for-byte equality.
-No third-party dependencies. Run from the repository root.
+--check regenerates all files and requires byte-for-byte equality.
+No third-party Python dependencies. Run from the repository root; cast is
+required to hash the immutable data contracts.
 """
 from decimal import Decimal as D, localcontext, getcontext
 import argparse
@@ -44,14 +45,6 @@ LAM_REF_WEI = 955 * WAD                 # reference wavelength at b = 450 mixETH
 B_REF_WEI = 450 * WAD                   # reference net backing
 WAVES = 10                              # waves to target
 GROWTH_MULT = D(1000)
-
-# canonical table domain (dimensionless waves); prelaunch edge -16 caps net
-# boot at ~518,841 mixETH (arithmetic capacity, far above any economic cap),
-# postlaunch edge +64 caps price at ~1,927 mixETH/PSP for every round.
-XMIN, XMAX = -16, 64
-KNOT_COUNT = (XMAX - XMIN) * 4 + 1      # 321
-ZERO_INDEX = -XMIN * 4                  # index of x = 0
-
 
 def cbrt(x: D) -> D:
     if x == 0:
@@ -122,9 +115,6 @@ def legendre_gauss(n: int):
     return [p[0] for p in pairs], [p[1] for p in pairs]
 
 
-GL16 = legendre_gauss(16)
-
-
 def gl(rule, a: D, b: D, fn) -> D:
     nodes, weights = rule
     h = b - a
@@ -137,55 +127,6 @@ def gl(rule, a: D, b: D, fn) -> D:
 QUART = D(1) / 4
 
 
-def build_knots():
-    """Cumulative GL16 |F| at quarter-wave knots; split-cell certified.
-
-    Returns list of INTEGER WAD values (floored), index 0..320, x = (i-64)/4.
-    """
-    frac = {}
-    frac[0] = D(0)
-    cert_worst = D(0)
-    for k in range(0, XMAX * 4):
-        a = D(k) * QUART
-        whole = gl(GL16, a, a + QUART, density)
-        h1 = gl(GL16, a, a + QUART / 2, density)
-        h2 = gl(GL16, a + QUART / 2, a + QUART, density)
-        err = abs(whole - (h1 + h2))
-        if err > abs(whole) * D('1e-27') + D('1e-54'):
-            raise SystemExit(f'GL16 not converged on cell {k}: {err:.2e}')
-        cert_worst = max(cert_worst, err / (abs(whole) + D('1e-60')))
-        frac[k + 1] = frac[k] + whole
-    for k in range(0, XMIN * 4 - 1, -1):
-        a = D(k) * QUART
-        whole = gl(GL16, a, a + QUART, density)
-        h1 = gl(GL16, a, a + QUART / 2, density)
-        h2 = gl(GL16, a + QUART / 2, a + QUART, density)
-        err = abs(whole - (h1 + h2))
-        if err > abs(whole) * D('1e-27') + D('1e-54'):
-            raise SystemExit(f'GL16 not converged on cell {k}: {err:.2e}')
-        cert_worst = max(cert_worst, err / (abs(whole) + D('1e-60')))
-        frac[k] = frac[k + 1] - whole
-    assert frac[0] == 0
-    knots = []
-    for i in range(KNOT_COUNT):
-        qi = i - ZERO_INDEX
-        v = frac[qi]
-        if v >= 0:
-            knots.append(int(v * WAD_D))            # floor toward zero
-        else:
-            # negative side: store |F|; floor of |F| == ceil of F (toward zero)
-            knots.append(int(-v * WAD_D))
-    # invariants the Solidity side relies on: |F| is V-shaped around x = 0
-    # (F itself is strictly increasing; stored magnitudes shrink toward the
-    # zero index, then grow). No flat steps exist in-domain.
-    for i in range(ZERO_INDEX):
-        assert knots[i + 1] <= knots[i], f'|F| not shrinking toward 0 at {i}'
-    for i in range(ZERO_INDEX, KNOT_COUNT - 1):
-        assert knots[i + 1] > knots[i], f'|F| not strictly growing at {i}'
-    assert knots[ZERO_INDEX] == 0
-    return knots, cert_worst
-
-
 def lam_wei(b_wei: int) -> int:
     """lambdaWei = floorSqrt(fullMulDiv((955e18)^2, bWei, 450e18))."""
     return math.isqrt((LAM_REF_WEI ** 2) * b_wei // B_REF_WEI)
@@ -196,7 +137,7 @@ def _dequad(a: D, b: D) -> D:
 
     Handles the C^5 kink of H(s(t)) at t = 0 sitting on cell boundaries —
     node clustering at the endpoints makes the kink harmless. Independent
-    of both the on-chain GL8 and the knot-building GL16.
+    of both the on-chain Bernstein interpolation and the GL32 anchors.
     """
     if b <= a:
         return D(0)
@@ -238,7 +179,7 @@ def _dequad(a: D, b: D) -> D:
     raise SystemExit(f'dequad did not converge on [{a}, {b}]')
 
 
-def Q_ref(b_wei: int, lam_w: int, R_wei: int) -> int:
+def q_reference_decimal(b_wei: int, lam_w: int, R_wei: int) -> D:
     """Cumulative supply in PSP-wei via the tanh-sinh path (independent)."""
     x0 = -D(b_wei) / D(lam_w)
     xR = (D(R_wei) - D(b_wei)) / D(lam_w)
@@ -251,52 +192,16 @@ def Q_ref(b_wei: int, lam_w: int, R_wei: int) -> int:
             nxt = xR
         total += _dequad(cur, nxt)
         cur = nxt
-    q = D(lam_w) * total * WAD / D(P_L_WEI)   # PSP-wei
-    return int(q)
+    return D(lam_w) * total * WAD / D(P_L_WEI)   # PSP-wei
+
+
+def Q_ref(b_wei: int, lam_w: int, R_wei: int) -> int:
+    return int(q_reference_decimal(b_wei, lam_w, R_wei))
 
 
 def price_wei(b_wei: int, lam_w: int, R_wei: int) -> int:
     x = (D(R_wei) - D(b_wei)) / D(lam_w)
     return int(price_dec(x) * D(P_L_WEI))
-
-
-def gen_knots_sol(knots) -> str:
-    lines = []
-    lines.append('// SPDX-License-Identifier: MIT')
-    lines.append('pragma solidity 0.8.26;')
-    lines.append('')
-    lines.append('// Generated by scripts/sine_v3.py — DO NOT HAND-EDIT.')
-    lines.append('// Canonical quarter-wave knots of F(x) = int_0^x exp(-K*H(s(t))) dt,')
-    lines.append('// K = ln(1000)/(cbrt(11)-1). Domain x in [-16, +64] waves, 321 knots.')
-    lines.append('// Entry i is |F((i - 64)/4)| in WAD, floored: F(x) = x >= 0 ? +v : -v.')
-    lines.append('// Reference: 70-digit Decimal, cumulative 16-point Gauss-Legendre,')
-    lines.append('// split-cell certified below 1e-27 relative. F(0) = 0 at index 64.')
-    lines.append('library SineV3Knots {')
-    lines.append(f'    uint256 internal constant COUNT = {KNOT_COUNT};')
-    lines.append(f'    uint256 internal constant ZERO_INDEX = {ZERO_INDEX};')
-    lines.append(f'    /// @dev K = ln(1000)/(cbrt(11)-1) = 5.64368271363719722487..., WAD, round-half-even.')
-    lines.append(f'    uint256 internal constant K_WAD = {K_WAD};')
-    lines.append('')
-    lines.append('    /// @dev |F| at x = (i - 64)/4, WAD. Balanced dispatch keeps reads O(log n).')
-    lines.append('    function knot(uint256 i) internal pure returns (uint256) {')
-    lines.extend(_tree(knots, 0, KNOT_COUNT, 2))
-    lines.append('    }')
-    lines.append('}')
-    return '\n'.join(lines) + '\n'
-
-
-def _tree(knots, lo, hi, indent) -> list:
-    """Balanced if-tree over [lo, hi)."""
-    pad = ' ' * indent
-    if hi - lo == 1:
-        return [f'{pad}return {knots[lo]};']
-    mid = (lo + hi) // 2
-    out = [f'{pad}if (i < {mid}) {{']
-    out.extend(_tree(knots, lo, mid, indent + 4))
-    out.append(f'{pad}}} else {{')
-    out.extend(_tree(knots, mid, hi, indent + 4))
-    out.append(f'{pad}}}')
-    return out
 
 
 def gen_fixtures_sol() -> str:
@@ -339,7 +244,7 @@ def gen_fixtures_sol() -> str:
     lines.append('// Independent Decimal reference vectors for the v3 curve.')
     lines.append('// Prices: closed form at the sample reserves. Supplies: composite')
     lines.append('// tanh-sinh double-exponential quadrature (method-independent from the')
-    lines.append("// on-chain GL8 + knot table). Row: (boot, lam, R, priceWad, supplyPSPWei).")
+    lines.append("// on-chain Bernstein interpolation and GL32 anchors). Row: (boot, lam, R, priceWad, supplyPSPWei).")
     lines.append('// supplyPSPWei == 0 marks a price-only row.')
     lines.append('library SineV3Fixtures {')
     lines.append(f'    struct Row {{ uint256 boot; uint256 lam; uint256 R; uint256 price; uint256 supply; }}')
@@ -351,26 +256,223 @@ def gen_fixtures_sol() -> str:
     return '\n'.join(lines) + '\n', rows
 
 
+def gen_sell_fixtures_sol():
+    # Invert a local tanh-sinh integral, retaining the fractional cumulative
+    # supply until the comparison. No on-chain primitive or table is used.
+    rows = []
+    cases = [(158_000_000*WAD, None, WAD, 10**35),
+             (10**12, 32, None, 10**12), (10**12, 63, None, 10**12)]
+    for boot, wave, reserve, sold in cases:
+        lam = lam_wei(boot)
+        reserve = reserve if reserve is not None else boot+wave*lam
+        q = q_reference_decimal(boot, lam, reserve)
+        target = int(q)-sold
+        x = (D(reserve)-boot)/lam
+        low = 0
+        high = min(reserve, math.ceil(D(sold+1)*price_dec(x)*P_L_WEI/WAD)+1)
+        while high-low > 1:
+            out = (low+high)//2
+            dq = D(lam)*_dequad((D(reserve-out)-boot)/lam, x)*WAD/P_L_WEI
+            if int(q-dq) < target:
+                high = out
+            else:
+                low = out
+        rows.append((boot, lam, reserve, sold, int(q), low))
+    lines = ['// SPDX-License-Identifier: MIT', 'pragma solidity 0.8.26;', '',
+             '// Generated by scripts/sine_v3.py. Do not edit by hand.',
+             '// Independent tanh-sinh cumulative supply and local inverse.',
+             'library SineV3SellFixtures {',
+             '    struct Row { uint256 boot; uint256 lam; uint256 reserve; uint256 sold; uint256 supply; uint256 grossOut; }',
+             '    function rows() internal pure returns (Row[3] memory r) {']
+    for i, row in enumerate(rows):
+        lines.append(f'        r[{i}] = Row('+', '.join(map(str, row))+');')
+    lines += ['    }', '}']
+    return '\n'.join(lines)+'\n'
+
+
+# Monotone v3 cumulative primitive. Query interpolation uses canonical nodes,
+# not nodes whose positions change with the queried reserve endpoint.
+PRIMITIVE_SCALE = 10 ** 36
+BERNSTEIN_DEGREE = 16
+MATRIX_SCALE = 10 ** 27
+PRIMITIVE_XS = ([D('-580.5')] + [D(n) for n in range(-580, -127)]
+                + [D(n) / 2 for n in range(-255, -1)]
+                + [D(n) / 4 for n in range(-3, 5)]
+                + [D(n) / 2 for n in range(3, 257)]
+                + [D(n) for n in range(129, 4097)])
+PRIMITIVE_ZERO = PRIMITIVE_XS.index(D(0))
+
+
+def invert_decimal(matrix):
+    n = len(matrix)
+    a = [row[:] + [D(i == j) for j in range(n)] for i, row in enumerate(matrix)]
+    for col in range(n):
+        pivot = max(range(col, n), key=lambda i: abs(a[i][col]))
+        a[col], a[pivot] = a[pivot], a[col]
+        divisor = a[col][col]
+        a[col] = [x / divisor for x in a[col]]
+        for i in range(n):
+            if i != col:
+                factor = a[i][col]
+                a[i] = [a[i][j] - factor * a[col][j] for j in range(2 * n)]
+    return [row[n:] for row in a]
+
+
+def bernstein_matrix():
+    n = BERNSTEIN_DEGREE
+    nodes = [(1 - sine(PI / 2 + PI * D(i) / n)) / 2 for i in range(n + 1)]
+    nodes[0], nodes[-1] = D(0), D(1)
+    matrix = []
+    for t in nodes:
+        if t == 0 or t == 1:
+            matrix.append([D(j == (0 if t == 0 else n)) for j in range(n + 1)])
+        else:
+            matrix.append([D(math.comb(n, j)) * t**j * (1-t)**(n-j) for j in range(n+1)])
+    return nodes, invert_decimal(matrix)
+
+
+def gen_bernstein_sol():
+    nodes, matrix = bernstein_matrix()
+    # Reflection symmetry halves the constant matrix. Runtime rows 9..16
+    # reverse both the row index and the density sample index.
+    values = [int((x * MATRIX_SCALE).to_integral_value(rounding='ROUND_HALF_EVEN'))
+              for row in matrix[:9] for x in row]
+    packed = b''.join(v.to_bytes(16, 'big', signed=True) for v in values).hex()
+    phases = []
+    for kind in range(7):
+        for t in nodes:
+            frac = t if kind == 0 else (t / 2 if kind == 1 else ((1+t)/2 if kind == 2 else (kind-3+t)/4))
+            phases.append(int((s_of(frac)*WAD_D).to_integral_value(rounding='ROUND_HALF_EVEN')))
+    phase_hex = b''.join(v.to_bytes(8, 'big') for v in phases).hex()
+    return f'''// SPDX-License-Identifier: MIT
+pragma solidity 0.8.26;
+
+// Generated by scripts/sine_v3.py. Do not edit by hand.
+// Inverse Bernstein interpolation matrix at 17 Chebyshev-Lobatto nodes.
+// Matrix entries use signed 128-bit integers at 1e27 precision.
+library SineV3Bernstein {{
+    uint256 internal constant DEGREE = 16;
+    uint256 internal constant MATRIX_SCALE = 1e27;
+    bytes internal constant MATRIX = hex"{packed}";
+    // Canonical s offsets: one whole-wave, two half-wave, four quarter-wave sets.
+    bytes internal constant PHASES = hex"{phase_hex}";
+
+    function matrix() internal pure returns (bytes memory) {{ return MATRIX; }}
+    function phases() internal pure returns (bytes memory) {{ return PHASES; }}
+}}
+'''
+
+
+def build_primitive_anchors():
+    # GL32 handles a complete wave. Splitting the interval independently
+    # checks convergence; neither step copies on-chain interpolation.
+    rule = legendre_gauss(32)
+    cells = []
+    worst = D(0)
+    for i, (a, b) in enumerate(zip(PRIMITIVE_XS, PRIMITIVE_XS[1:])):
+        whole = gl(rule, a, b, density)
+        mid = (a+b)/2
+        split = gl(rule, a, mid, density) + gl(rule, mid, b, density)
+        err = abs(whole-split)
+        rel = err / max(abs(split), D('1e-100'))
+        # Integral error is far below the required 1e-9 supply goal.
+        # Use the split result for the canonical cumulative anchors.
+        if rel > D('1e-24'):
+            raise SystemExit(f'primitive quadrature not converged in cell {i}: {rel}')
+        worst = max(worst, rel)
+        cells.append(split)
+        if i and i % 512 == 0:
+            print(f'primitive anchors: {i}/{len(PRIMITIVE_XS)-1}', flush=True)
+    f = [D(0)] * len(PRIMITIVE_XS)
+    for i in range(PRIMITIVE_ZERO, len(cells)):
+        f[i+1] = f[i] + cells[i]
+    for i in range(PRIMITIVE_ZERO-1, -1, -1):
+        f[i] = f[i+1] - cells[i]
+    values = [int(abs(x) * PRIMITIVE_SCALE) for x in f]
+    signed = [-v if i < PRIMITIVE_ZERO else v for i, v in enumerate(values)]
+    if not all(a <= b for a, b in zip(signed, signed[1:])):
+        raise SystemExit('primitive anchors are not monotone')
+    print(f'primitive anchors: {len(values)}, split-cell relative error {worst:.3e}', flush=True)
+    return values
+
+
+def gen_primitive_data(values):
+    import subprocess
+    import json
+    records = [v.to_bytes(24 if i < PRIMITIVE_ZERO else 16, 'big') for i, v in enumerate(values)]
+    shards, starts, cursor = [], [], 0
+    for record in records:
+        if not shards or len(shards[-1]) + len(record) > 22000:
+            shards.append(bytearray())
+            starts.append(cursor)
+        shards[-1].extend(record)
+        cursor += len(record)
+    if len(shards) != 4:
+        raise SystemExit(f'expected four data shards, got {len(shards)}')
+    hashes = [subprocess.check_output(['cast', 'keccak', '0x00'+bytes(x).hex()], text=True).strip() for x in shards]
+    contracts = ['// SPDX-License-Identifier: MIT', 'pragma solidity 0.8.26;', '',
+                 '// Generated by scripts/sine_v3.py. Do not edit by hand.',
+                 '// Each constructor returns immutable STOP-prefixed primitive data.']
+    for i, blob in enumerate(shards):
+        contracts += [f'contract SineV3Data{i} {{', '    constructor() {',
+                      f'        bytes memory data = hex"00{bytes(blob).hex()}";',
+                      '        assembly ("memory-safe") { return(add(data, 32), mload(data)) }', '    }', '}', '']
+    contracts += ['/// @notice Deployment utility for scripts and tests only.',
+                  '/// Do not link this utility into production constructor code.',
+                  'library SineV3Data {', '    function deploy() internal returns (address[4] memory shards) {']
+    for i in range(4):
+        contracts.append(f'        shards[{i}] = address(new SineV3Data{i}());')
+    contracts += ['    }', '}']
+    info = ['// SPDX-License-Identifier: MIT', 'pragma solidity 0.8.26;', '',
+            '// Generated by scripts/sine_v3.py. Do not edit by hand.',
+            'library SineV3DataInfo {', f'    uint256 internal constant COUNT = {len(values)};',
+            f'    uint256 internal constant ZERO_INDEX = {PRIMITIVE_ZERO};',
+            f'    uint256 internal constant FIRST_HALF_INDEX = {PRIMITIVE_XS.index(D(-128))};',
+            f'    uint256 internal constant FIRST_QUARTER_INDEX = {PRIMITIVE_XS.index(D(-1))};',
+            f'    uint256 internal constant LAST_QUARTER_INDEX = {PRIMITIVE_XS.index(D(1))};',
+            f'    uint256 internal constant LAST_HALF_INDEX = {PRIMITIVE_XS.index(D(128))};',
+            f'    uint256 internal constant NEGATIVE_BYTES = {PRIMITIVE_ZERO*24};']
+    for i in range(4):
+        info += [f'    bytes32 internal constant HASH{i} = {hashes[i]};',
+                 f'    uint256 internal constant START{i} = {starts[i]};',
+                 f'    uint256 internal constant BYTES{i} = {len(shards[i])+1};']
+    info += ['}']
+    metadata = {'scale': str(PRIMITIVE_SCALE), 'knots': len(values),
+                'minimumPhase': '-580.5', 'maximumPhase': '4096',
+                'shards': [{'contract': f'SineV3Data{i}', 'hash': hashes[i], 'bytes': len(shards[i])+1}
+                           for i in range(4)]}
+    return '\n'.join(contracts)+'\n', '\n'.join(info)+'\n', json.dumps(metadata, indent=2)+'\n'
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--check', action='store_true')
     ap.add_argument('--print-k', action='store_true')
+    ap.add_argument('--primitive-only', action='store_true')
     args = ap.parse_args()
     root = Path(__file__).resolve().parents[1]
     with localcontext() as ctx:
         ctx.prec = 70
-        knots, cert = build_knots()
         if args.print_k:
             print('K_WAD =', K_WAD)
-            print('worst split-cell cert:', f'{cert:.2e}')
-            print('knots:', len(knots), 'last |F| wad:', knots[-1])
             return
-        knots_sol = gen_knots_sol(knots)
-        fixtures_sol, _ = gen_fixtures_sol()
+        fixtures_sol = None
+        sell_fixtures_sol = None
+        if not args.primitive_only:
+            fixtures_sol, _ = gen_fixtures_sol()
+            sell_fixtures_sol = gen_sell_fixtures_sol()
+        primitive_values = build_primitive_anchors()
+        data_sol, data_info_sol, metadata = gen_primitive_data(primitive_values)
+        bernstein_sol = gen_bernstein_sol()
     targets = {
-        root / 'src/SineV3Knots.sol': knots_sol,
         root / 'test/SineV3Fixtures.sol': fixtures_sol,
+        root / 'test/SineV3SellFixtures.sol': sell_fixtures_sol,
+        root / 'src/SineV3Data.sol': data_sol,
+        root / 'src/SineV3DataInfo.sol': data_info_sol,
+        root / 'src/SineV3Bernstein.sol': bernstein_sol,
+        root / 'scripts/sine_v3_data.json': metadata,
     }
+    targets = {path: want for path, want in targets.items() if want is not None}
     if args.check:
         for path, want in targets.items():
             if not path.exists() or path.read_text() != want:

@@ -14,6 +14,7 @@ import {PepeExpandedDescriptor} from "../src/PepeExpandedDescriptor.sol";
 import {PSPZapIn} from "../src/PSPZapIn.sol";
 import {PSPZapOut} from "../src/PSPZapOut.sol";
 import {SineV3Math} from "../src/SineV3Math.sol";
+import {SineV3Data} from "../src/SineV3Data.sol";
 import {IMixETH} from "../src/interfaces/IMixETH.sol";
 import {SepoliaMixETH} from "../src/testnet/SepoliaMixETH.sol";
 import {MixETHFaucet} from "../src/testnet/MixETHFaucet.sol";
@@ -86,7 +87,7 @@ contract DeployPSP is DeploymentSupport {
         // factory constructor and every round's hook from genesis on. Its
         // own broadcast: one deploy per tx, per the gas-cap convention below.
         vm.startBroadcast();
-        SineV3Math sineV3Table = new SineV3Math();
+        SineV3Math sineV3Table = new SineV3Math(SineV3Data.deploy());
         vm.stopBroadcast();
 
         // Each deployment/call is a separate broadcast transaction. Genesis

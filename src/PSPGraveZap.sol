@@ -13,6 +13,7 @@ interface GraveHook {
 
 interface GraveStaker {
     function psp() external view returns (address);
+    function ownerOf(uint256 pepeId) external view returns (address);
     function pendingFeesOf(uint256 pepeId) external view returns (uint256);
     function claimAllTo(uint256[] calldata pepeIds, address to) external;
     function withdrawFor(uint256 pepeId) external;
@@ -39,6 +40,7 @@ contract PSPGraveZap {
 
     error Expired();
     error InsufficientOutput();
+    error NotNftOwner();
 
     /// @dev The mix token claims and redemptions pay out. One zap deployment
     ///      per mixETH deployment, mirroring PSPZapOut's constructor pin.
@@ -65,6 +67,11 @@ contract PSPGraveZap {
         uint256 deadline
     ) external returns (uint256 mixOut) {
         if (deadline != 0 && block.timestamp > deadline) revert Expired();
+        // V3-INT-1: approval grants the zap access, not arbitrary callers.
+        // Each position must belong to the caller before any exit leg runs.
+        for (uint256 i; i < pepeIds.length; ++i) {
+            if (GraveStaker(staker).ownerOf(pepeIds[i]) != msg.sender) revert NotNftOwner();
+        }
         GraveHook hook = GraveHook(hookAddr);
 
         // Leg 1 — ladder pot, user-direct.

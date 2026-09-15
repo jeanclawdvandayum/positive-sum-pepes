@@ -375,7 +375,9 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         mixETH.safeTransferFrom(msg.sender, address(this), mixETHAmount);
         uint256 actualAmount = mixETH.balanceOf(address(this)) - balBefore;
         if (actualAmount == 0) revert ZeroAmount();
-        _validateBootstrap(totalPredepositMixETH + carryBonusMixETH + actualAmount);
+        uint256 oldBoot = totalPredepositMixETH + carryBonusMixETH;
+        if (actualAmount > type(uint256).max - oldBoot) revert PredepositCapacityExceeded();
+        _validateBootstrap(oldBoot + actualAmount, totalPredepositMixETH);
         carryBonusMixETH += actualAmount;
     }
 
@@ -383,28 +385,30 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     ///      joins totalBoot at launch, thickening the curve for everyone.
     uint256 public carryBonusMixETH;
 
-    /// @dev Largest net boot whose prelaunch span stays inside the v3
-    ///      helper's 16-wave table edge: (16*955e18)^2 / 450e18. Above this
-    /// the curve cannot materialize — an arithmetic capacity bound, not an
-    /// economic fundraising cap (~518,841 mixETH net).
-    uint256 private constant BOOT_NET_MAX = 518840888888888888888888; // (16*955e18)^2 / 450e18, floored
-
-    /// @dev Reject arithmetic capacity failures before crediting a deposit.
-    /// v3 has no dust cliff — a one-wei boot materializes a valid (tiny)
-    /// curve — so every deposit above one wei and below the table edge is
-    /// launchable. The exact genesis the launch WILL run is still dry-run
-    /// so no funded configuration can ever strand.
-    function _validateBootstrap(uint256 totalBoot) private view {
+    /// @dev AUD-V3-3: the immutable helper checks price and integral capacity.
+    ///      Genesis minting, staking and allocation use uint256, not V4's
+    ///      signed128 swap deltas. Re-run the exact genesis calculation that
+    ///      launch and hook initialization use; reject a zero allocation.
+    ///      Requiring Q >= the share denominator also proves that every
+    ///      positive contribution receives at least one PSP wei. A later
+    ///      deposit or bonus must preserve that property for earlier users.
+    ///      `shareDenominator` includes seedCarry shares, but excludes the
+    ///      legacy potDeposit bonus, which creates no predeposit shares.
+    function _validateBootstrap(uint256 totalBoot, uint256 shareDenominator) private view {
         if (!hook.sineConfigured()) return;
         uint256 netBoot = totalBoot - Math.mulDiv(totalBoot, GENESIS_POT_FEE_BPS, 10000);
-        if (netBoot > BOOT_NET_MAX) revert PredepositCapacityExceeded();
-        try hook.sineGenesisPSP(netBoot) returns (uint256) {} catch {
+        try hook.sineGenesisPSP(netBoot) returns (uint256 genesisPSP) {
+            if (genesisPSP == 0 || genesisPSP < shareDenominator) revert PredepositCapacityExceeded();
+        } catch {
             revert PredepositCapacityExceeded();
         }
     }
 
     function _recordPredeposit(address depositor, uint256 amount) internal {
-        _validateBootstrap(totalPredepositMixETH + carryBonusMixETH + amount);
+        uint256 oldBoot = totalPredepositMixETH + carryBonusMixETH;
+        if (amount > type(uint256).max - oldBoot) revert PredepositCapacityExceeded();
+        uint256 sharesAfter = totalPredepositMixETH + amount;
+        _validateBootstrap(oldBoot + amount, sharesAfter);
         if (predeposits[depositor].mixETHAmount == 0) {
             totalPredepositors++;
         }

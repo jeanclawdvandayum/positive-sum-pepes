@@ -1,5 +1,6 @@
 // Adapted from frontend/src/pages/explainer/diagrams.tsx.
 import {renderDecorativePepeSvg} from '../lib/pepeRender';
+import {illustrationPoint, illustrationFrames} from '../pages/explainer/curveIllustration';
 const randomFace = () => renderDecorativePepeSvg();
 const pepe = (n, cls) => `<img class="${cls}" src="data:image/svg+xml,${encodeURIComponent(n)}" alt=""/>`;
 export function supportDiagram(kind) {
@@ -7,10 +8,10 @@ export function supportDiagram(kind) {
   if (kind === 'predeposit') drawing = `<svg viewBox="0 0 160 112"><text x="80" y="16" text-anchor="middle">public predeposit</text>${[28,72,116].map((x,i)=>`<g><rect x="${x}" y="27" width="16" height="12" rx="2" fill="var(--raised)" stroke="var(--muted)"/><path d="M${x+8} 42 V71 H80" fill="none" stroke="var(--line)"/><rect x="${x+5}" y="36" width="6" height="6" rx="1" fill="var(--green)" class="xd-deposit xd-deposit-${i}"/></g>`).join('')}<rect x="34" y="75" width="92" height="23" rx="4" fill="var(--raised)" stroke="var(--green)"/><text x="80" y="90" text-anchor="middle" class="xd-label">one pooled buy</text></svg>`;
   if (kind === 'nft') drawing = `${pepe(randomFace(),'xd-nft-pepe')}<svg viewBox="0 0 160 112"><text x="15" y="15">PSP → pepe → fees</text><path d="M93 81 H147" stroke="var(--line)"/><g class="xd-nft-rewards" fill="var(--green)"><rect x="99" y="63" width="9" height="18" rx="2"/><rect x="116" y="49" width="9" height="32" rx="2"/><rect x="133" y="35" width="9" height="46" rx="2"/></g><text x="98" y="97">earned</text></svg>`;
   if (kind === 'curve') {
-    const point=t=>({x:28+182*t,y:210-90*(t-Math.sin(2*Math.PI*t)/(2*Math.PI))});
+    const point=illustrationPoint;
     const path=(from,to)=>Array.from({length:65},(_,i)=>{const p=point(from+(to-from)*i/64);return `${i?'L':'M'}${p.x.toFixed(2)},${p.y.toFixed(2)}`}).join(' ');
     const zones=[[0,.25,true],[.25,.75,false],[.75,1.25,true],[1.25,1.75,false],[1.75,2,true]];
-    drawing=`<svg viewBox="0 0 420 240"><path d="M28 15V225H400" fill="none" stroke="var(--line)"/>${zones.map(([a,b,calm])=>`<path d="${path(a,b)}" fill="none" stroke="${calm?'var(--green)':'var(--diagram-steep)'}" stroke-width="7"/>`).join('')}<g class="xd-curve-dot"><circle r="20" fill="var(--ink)" opacity=".12"/><circle r="9" fill="var(--ink)"/></g></svg>`;
+    drawing=`<style>.xd-stage .xd-curve-dot{transform:translate(210px,104.21px);animation-name:xd-cuberoot-travel}@keyframes xd-cuberoot-travel{${illustrationFrames}}</style><svg viewBox="0 0 420 240"><path d="M28 15V225H400" fill="none" stroke="var(--line)"/>${zones.map(([a,b,calm])=>`<path d="${path(a,b)}" fill="none" stroke="${calm?'var(--green)':'var(--diagram-steep)'}" stroke-width="7"/>`).join('')}<g class="xd-curve-dot"><circle r="20" fill="var(--ink)" opacity=".12"/><circle r="9" fill="var(--ink)"/></g></svg>`;
   }
   if (kind === 'stake') drawing=`<svg viewBox="0 0 160 112"><text x="16" y="19">trading fees</text><path d="M18 35H140" stroke="var(--line)"/><rect x="40" y="31" width="8" height="8" rx="2" fill="var(--green)" class="xd-fee"/><rect x="16" y="49" width="72" height="22" rx="3" fill="var(--green)"/><rect x="91" y="49" width="42" height="22" rx="2" fill="var(--diagram-pot)"/><rect x="136" y="49" width="6" height="22" rx="1" fill="var(--muted)"/><text x="16" y="94" class="xd-label">60% to stakers</text></svg>`;
   if (kind === 'jackpot') drawing=`<svg viewBox="0 0 160 112"><text x="80" y="21" text-anchor="middle" class="xd-clock-add" style="font-family:Segment; font-size:16px;fill:var(--time-text)">+1:09</text><text x="80" y="36" text-anchor="middle">per ladder ticket</text>${[48,62,76].map(y=>`<rect x="19" y="${y}" width="122" height="9" rx="2" fill="var(--raised)" stroke="var(--line)"/>`).join('')}<rect x="20" y="48" width="40" height="9" rx="2" fill="var(--diagram-pot)" class="xd-ticket"/><text x="80" y="102" text-anchor="middle">last 10 tickets</text></svg>`;

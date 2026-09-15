@@ -1,12 +1,7 @@
 import { useId } from 'react'
+import { illustrationPoint as point, illustrationFrames } from './curveIllustration'
 
-// Two normalized post-launch waves from SineMath at the default full amplitude:
-// log(p/B)/(s*lambda) = t - sin(2*pi*t)/(2*pi). Illustration only, no quotes.
-// Equal animation time steps cover equal reserve increments; steep sections
-// visibly produce larger percentage price moves. CSS owns the animation.
-function point(t: number) {
-  return { x: 28 + 182 * t, y: 210 - 90 * (t - Math.sin(2 * Math.PI * t) / (2 * Math.PI)) }
-}
+// Equal animation time steps cover equal reserve increments. CSS owns motion.
 
 function path(from: number, to: number) {
   return Array.from({ length: 65 }, (_, i) => {
@@ -23,15 +18,12 @@ const ZONES = [
   { from: 1.75, to: 2, calm: true },
 ].map(zone => ({ ...zone, d: path(zone.from, zone.to) }))
 
-const FRAMES = Array.from({ length: 81 }, (_, i) => {
-  const { x, y } = point(i / 40)
-  return `${i * 1.25}% { transform: translate(${x.toFixed(2)}px, ${y.toFixed(2)}px); }`
-}).join('\n')
+const FRAMES = illustrationFrames
 
 function CurveMotionStyles() {
   return (
     <style>{`
-        .xd-curve-dot { transform: translate(210px, 120px); animation: xd-curve-travel 8s linear infinite alternate; }
+        .xd-curve-dot { transform: translate(210px, 104.21px); animation: xd-curve-travel 8s linear infinite alternate; }
         @keyframes xd-curve-travel { ${FRAMES} }
         @media (prefers-reduced-motion: reduce) {
           .xd-curve-dot { animation: none; }
@@ -72,16 +64,16 @@ export default function CurveExplainer() {
       <p className="mt-3 max-w-2xl leading-relaxed text-text-lo">
         buying PSP adds mixETH to the reserves and raises the price. selling takes mixETH
         out and lowers it. the S-shaped bonding curve alternates between flatter and steeper
-        sections as reserves grow.
+        sections as reserves grow. one formula covers the IBCO and active trading.
       </p>
 
       <div className="mt-7 grid items-center gap-8 lg:grid-cols-2">
         <figure className="min-w-0 rounded-xl border border-line bg-bg-0 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-lo">
-            <span>PSP price · log scale</span>
+            <span>first two waves · PSP price · log scale</span>
           </div>
           <svg viewBox="0 0 420 240" className="mt-3 block w-full" role="img" aria-labelledby={descId}>
-            <title id={descId}>Two S-shaped sections. Green marks flatter stretches with smaller percentage price moves. Amber marks steeper stretches with larger moves. The dot follows buys to the right and sells to the left.</title>
+            <title id={descId}>The first two softened cube-root sine waves reach 4.34 and 12.13 times the launch price. Green marks flatter stretches. Amber marks steeper stretches. The dot follows buys to the right and sells to the left.</title>
             {ZONES.map(zone => (
               <rect key={zone.from} x={point(zone.from).x} y="15" width={182 * (zone.to - zone.from)} height="210"
                 fill={zone.calm ? 'var(--phase-calm)' : 'var(--phase-heat)'} opacity="0.07" />
@@ -98,7 +90,7 @@ export default function CurveExplainer() {
           </svg>
           <p className="text-right text-xs text-text-lo">mixETH reserves →</p>
           <figcaption className="mt-4 flex flex-wrap justify-between gap-2 border-t border-line pt-3 text-xs text-text-lo">
-            <span>example curve</span>
+            <span>launch 1× → wave two 12.13×</span>
             <span>← sells · buys →</span>
           </figcaption>
         </figure>
@@ -118,7 +110,7 @@ export default function CurveExplainer() {
             </p>
           </div>
           <p className="mt-6 text-sm leading-relaxed text-text-lo">
-            the IBCO sets the scale. the amount of mixETH behind PSP determines where you are on the curve.
+            ten waves reach 1,000 times the launch price. each wave adds a smaller percentage gain than the last. a 500 mixETH IBCO starts with 450 backing. each wave adds 955 backing, reaching 10,000 at wave ten. the wave width scales with the square root of launch backing.
           </p>
         </div>
       </div>

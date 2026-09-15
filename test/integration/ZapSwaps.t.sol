@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {Test, console} from "forge-std/Test.sol";
 import {SineV3Math} from "../../src/SineV3Math.sol";
+import {SineV3TestData as SineV3Data} from "../helpers/SineV3TestData.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
@@ -57,7 +58,7 @@ contract ZapSwapsTest is Test {
 
         factory = new PSPFactory(
             poolManager, IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer()
-        , address(new SineV3Math()), 0,
+        , address(new SineV3Math(SineV3Data.deploy())), 0,
             address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );
         zapIn = new PSPZapIn(IMixETH(address(mixETH)), poolManager);

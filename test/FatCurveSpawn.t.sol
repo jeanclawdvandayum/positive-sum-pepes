@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {SineV3Math} from "src/SineV3Math.sol";
+import {SineV3Data} from "src/SineV3Data.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
@@ -37,7 +38,7 @@ contract FatCurveSpawn is Test {
             new HookDeployer(),
             new ControllerDeployer(),
             new StakerDeployer(),
-            address(new SineV3Math()),
+            address(new SineV3Math(SineV3Data.deploy())),
             0,
             address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );

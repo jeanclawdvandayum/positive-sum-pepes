@@ -23,7 +23,16 @@ for artifact in sorted(Path('out').glob('*.sol/*.json')):
         print(f'{artifact.stem}: runtime {n}, initcode {i}')
     elif artifact.stem == 'SineV3Math':
         assert n < 24076, f'{artifact.stem}: less than 500 bytes runtime headroom'
+        assert i + 4 * 32 <= 49152, 'SineV3Math: initcode plus shard constructor arguments exceeds EIP-3860'
         print(f'{artifact.stem}: runtime {n}, initcode {i}')
     checked += 1
 assert checked > 0, 'No production artifacts; run forge build first'
 print(f'Size gate: {checked} production artifacts passed (constructor arguments require deployment checks).')
+
+# Data contracts return a packed runtime from their constructors. The compiler's
+# default deployedBytecode is unreachable and cannot establish their true size.
+data_manifest = json.loads(Path('scripts/sine_v3_data.json').read_text())
+assert len(data_manifest['shards']) == 4, 'Unexpected sine data shard count'
+for shard in data_manifest['shards']:
+    assert 1 < shard['bytes'] <= 24576, f"{shard['contract']}: returned runtime exceeds EIP-170"
+    print(f"{shard['contract']}: returned data runtime {shard['bytes']} bytes")

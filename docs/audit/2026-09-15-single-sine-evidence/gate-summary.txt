@@ -1,0 +1,57 @@
+Contract gate
+[PASS] test_NK_SplitBuysNeverBeatSingle_prod() (gas: 5750733)
+[PASS] test_NK_SplitSellsAreNeutral(uint256) (runs: 256, μ: 1325673, ~: 1365999)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 16.13s (32.55s CPU time)
+
+Ran 81 test suites in 16.14s (66.89s CPU time): 607 tests passed, 3 failed, 0 skipped (610 total tests)
+
+Failing tests:
+Encountered 3 failing tests in test/SineV3ReviewRegression.t.sol:SineV3ReviewRegressionTest
+[FAIL: v3 price decreases after one reserve wei: 613048911149785681 < 613048911149785684] test_BaselinePriceNeverDecreasesAtAdjacentReserveWei() (gas: 20416)
+[FAIL: v3 baseline supply decreases after one reserve wei: 17671194694734242660133333 < 17671194694734242672866666] test_BaselineSupplyNeverDecreasesAtAdjacentReserveWei() (gas: 182947)
+[FAIL: v3 large-launch supply decreases after one reserve wei: 97770880328780142869043408449 < 97770880328780142869233225775] test_LargeLaunchSupplyNeverDecreasesAtAdjacentReserveWei() (gas: 184062)
+
+Encountered a total of 3 failing tests, 607 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 3 failed tests
+
+Sizes
+CurveHook: runtime 20261, initcode 21840
+HookDeployer: runtime 2183, initcode 25467
+HookInitCode: runtime 876, initcode 23157
+PSPFactory: runtime 19795, initcode 26845
+SineV3Math: runtime 12162, initcode 12188
+Excluded prototype VectorPepeDescriptor: 181095 bytes; NOT DEPLOYABLE, not used by DeployPSP
+Size gate: 42 production artifacts passed (constructor arguments require deployment checks).
+
+ABI
+ABI gate: 172 functions/events match Foundry artifacts; PoolKey encoding exact.
+
+Frontend
+1..207
+# tests 207
+# suites 0
+# pass 207
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1924.415583
+
+Names
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 409.7175
+
+V3 generator
+sine v3 generated files match.
+
+Legacy oracle
+Independent sine vectors match.
+

@@ -1,0 +1,28 @@
+{
+  "scale": "1000000000000000000000000000000000000",
+  "knots": 4938,
+  "minimumPhase": "-580.5",
+  "maximumPhase": "4096",
+  "shards": [
+    {
+      "contract": "SineV3Data0",
+      "hash": "0x569f621f0f1d60c6da1926faca56be9747e40f91af9e7d4b826c0fc034c4fc8c",
+      "bytes": 21993
+    },
+    {
+      "contract": "SineV3Data1",
+      "hash": "0x9157089079151d496cf7449c803566c75b27ffe098015a6debe34087ea4a08a6",
+      "bytes": 22001
+    },
+    {
+      "contract": "SineV3Data2",
+      "hash": "0x2a902a55e1fb1624104585ee0e048ea21a3d8a57b76abe0341eb498aadd51103",
+      "bytes": 22001
+    },
+    {
+      "contract": "SineV3Data3",
+      "hash": "0x59c803ae3f53dc0e9cabdbf01e07ca40b11526c4ae28b2fe65c0b786824d0e42",
+      "bytes": 18705
+    }
+  ]
+}

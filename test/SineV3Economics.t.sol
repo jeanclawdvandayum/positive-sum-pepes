@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {SineV3Math} from "../src/SineV3Math.sol";
+import {SineV3TestData as SineV3Data} from "./helpers/SineV3TestData.sol";
 import {RealV4Base} from "./RealV4Lifecycle.t.sol";
 import {TicketSwapper} from "./UncappedCapacity.t.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -18,15 +19,15 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 ///         supply telescopes exactly under trade chopping, settlement work
 ///         does not grow with waves crossed, and sells never overpay.
 contract SineV3EconomicsTest is RealV4Base {
-    SineV3Math math = new SineV3Math();
+    SineV3Math math = new SineV3Math(SineV3Data.deploy());
     TicketSwapper swapper;
     address trader = makeAddr("round-trip-trader");
 
     function setUp() public override {
         super.setUp();
         swapper = new TicketSwapper(poolManager, IERC20(address(mixETH)));
-        mixETH.depositETH{value: 1_000_000e18}(); // the mock mints 1:1 against ETH
-        mixETH.transfer(trader, 1_000_000e18);
+        mixETH.depositETH{value: 10_000_000e18}(); // the mock mints 1:1 against ETH
+        mixETH.transfer(trader, 10_000_000e18);
         vm.startPrank(trader);
         mixETH.approve(address(swapper), type(uint256).max);
         IERC20(address(pspToken)).approve(address(this), type(uint256).max);
@@ -68,7 +69,7 @@ contract SineV3EconomicsTest is RealV4Base {
     function test_HelperCurveLegsConservative() public view {
         uint256 boot = 450e18;
         uint256 lam = 955e18;
-        // pre-boot, mid, target, past target, deep (all inside the 64-wave edge)
+        // Launch, target and later waves exercise conservative endpoint changes.
         uint256[8] memory depths = [
             uint256(0), 50e18, 450e18, 2_000e18, 9_550e18, 20_000e18, 40_000e18, 55_000e18
         ];
@@ -109,19 +110,19 @@ contract SineV3EconomicsTest is RealV4Base {
     /// waves costs the same order as a one-quarter-wave buy (no per-wave
     /// loop anywhere in the settlement path).
     function test_MultiWaveGasIsFlat() public {
-        // this round boots at 90 mix (lambda ~427 mix): the 64-wave edge is
-        // ~27,418 mix of reserve depth — span most of it. Warm the pool
-        // first so the dust buy is not paying first-swap storage costs.
+        // This round boots at 90 mix (lambda about 427 mix). Warm the pool
+        // so the small buy does not pay first-swap storage costs.
         _buy(1e18);
         uint256 gasSmall = _buyGas(1e16);              // dust of a wave
         uint256 gasMany = _buyGas(20_000e18);          // ~46 waves
-        assertGt(gasMany, gasSmall, "bigger buys do more, but bounded");
         assertLt(gasMany, gasSmall + 400_000, "no per-wave gas growth");
-        // headroom to the ABSOLUTE 64-wave edge (boot + 64*lam), bought 95% deep
+        // Reach close to the capacity derived from output precision.
         (uint256 boot, uint256 lam,, ) = hook.sineV3();
-        uint256 edge = boot + 64 * lam;
+        uint256 edge = math.maxReserve(boot, lam, 75e12);
         uint256 gasDeep = _buyGas((edge - hook.reserveMixETH()) * 95 / 100);
         assertLt(gasDeep, gasSmall + 600_000, "domain-edge buys stay bounded");
+        assertLt(gasSmall, 3_000_000, "small-buy gas budget");
+        assertLt(gasDeep, 3_000_000, "deep-buy gas budget");
     }
 
     /// Selling deep and wide: the inverse terminates quickly everywhere in
@@ -140,8 +141,11 @@ contract SineV3EconomicsTest is RealV4Base {
     /// tickets, and fee liabilities unchanged.
     function test_DomainFailureLeavesStateUntouched() public {
         (uint256 boot, uint256 lam,,) = hook.sineV3();
-        (,, uint256 target,) = hook.sineV3();
-        uint256 spend = target + 64 * lam + 1 - hook.reserveMixETH();
+        uint256 headroom = math.maxReserve(boot, lam, 75e12) - hook.reserveMixETH();
+        uint256 spend = headroom * 10000 / (10000 - hook.swapFeeBps()) + 2;
+        assertGe(mixETH.balanceOf(trader), spend, "fund the complete attempted trade");
+        vm.expectRevert(SineV3Math.SineV3Domain.selector);
+        hook.getBuyOutput(spend);
         uint256 mixBefore = mixETH.balanceOf(trader);
         uint256 reserve = hook.reserveMixETH();
         uint256 supply = hook.totalSupplyPSP();

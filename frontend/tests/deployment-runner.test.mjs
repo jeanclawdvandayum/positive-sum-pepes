@@ -13,6 +13,8 @@ test('deployment runner defaults to a local rehearsal with the current uncapped 
   assert.equal(opt.settings.PSP_PREDEPOSIT_SEC, '259200')
   assert.equal(opt.settings.PSP_VEST_SEC, '2419200')
   assert.equal(opt.settings.PSP_DET_SEC, '248660')
+  assert.equal(opt.settings.PSP_SINE_PL, '75000000000000')
+  assert.equal(Object.keys(opt.settings).filter(key => key.startsWith('PSP_SINE_')).length, 1)
 })
 
 test('live deployment needs an explicit keystore and sender and refuses private-key CLI input', () => {
@@ -31,6 +33,19 @@ test('invalid timing and narrowed sine inputs fail before connecting or writing'
     { PSP_WALLET_CAP_MIX: '-1' }, { PSP_SINE_P0: '1e13' },
   ]) assert.throws(() => options([], env))
   assert.equal(options([], { PSP_WALLET_CAP_MIX: '10' }).settings.PSP_WALLET_CAP_MIX, '10')
+})
+
+test('v3 deployment accepts bounded launch prices and rejects every retired curve override', () => {
+  for (const value of ['1000000000', '75000000000000', '1000000000000000000']) {
+    assert.equal(options([], { PSP_SINE_PL: value }).settings.PSP_SINE_PL, value)
+  }
+  for (const value of ['0', '999999999', '1000000000000000001', '-1', '7.5e13']) {
+    assert.throws(() => options([], { PSP_SINE_PL: value }), /PSP_SINE_PL/)
+  }
+  for (const key of ['PSP_SINE_P0', 'PSP_SINE_PREK', 'PSP_SINE_PTARGET', 'PSP_SINE_TARGET_RESERVE', 'PSP_SINE_AMPBPS']) {
+    assert.throws(() => options([], { [key]: '0' }), /retired/)
+    assert.throws(() => options([], { [key]: '10000' }), /retired/)
+  }
 })
 
 test('network preflight rejects wrong chain, missing pool manager and non-Anvil rehearsal endpoints', async () => {

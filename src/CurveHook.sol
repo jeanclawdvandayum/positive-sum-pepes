@@ -1021,12 +1021,17 @@ contract CurveHook is BaseHook {
         if (mode == Mode.Flat) revert BuyingDisabled();
         if (mode != Mode.Active) revert NotActive();
         if (block.timestamp >= detonationAt) revert TradingHalted();
+        if (mixETHInput > uint256(uint128(type(int128).max))) revert SwapTooLarge();
         if (mixETHInput < MIN_BUY_INPUT()) revert SwapTooSmall();
         uint256 fee = FPML.fullMulDiv(mixETHInput, swapFeeBps(), 10000);
         uint256 curveMix = mixETHInput - fee;
-        return sineActive
+        uint256 pspOut = sineActive
             ? ISineV3Math(sineV3Table).buyOut(reserveMixETH, sineV3.boot, sineV3.lam, sinePL, curveMix)
             : CurveMath.computeBuyOutput(curveMix, totalSupplyPSP, curveConfig);
+        // V3-INT-3: quotes obey the same output limits as execution.
+        if (pspOut == 0) revert ZeroOutput();
+        if (pspOut > uint256(uint128(type(int128).max))) revert SwapTooLarge();
+        return pspOut;
     }
 
     /// @return mixETH output for a PSP sell (curve unit of account)
@@ -1035,13 +1040,25 @@ contract CurveHook is BaseHook {
         // mixETHOut MINUS the fee slice; sine-aware since 2026-08-30. Flat
         // exits are fee-free pro-rata (F-9) and stay open forever. Curve
         // sells halt at zero exactly like the swap path (CLOCK-REDESIGN §1).
+        // V3-INT-5: preserve the same guard order as beforeSwap/_handleSell.
+        // This quotes the V4 sell route; redeemBacking has separate flat-exit
+        // rules and can accept the complete remaining supply.
+        if (mode != Mode.Active && mode != Mode.Flat) revert NotActive();
+        if (mode == Mode.Active && block.timestamp >= detonationAt) revert TradingHalted();
+        if (pspInput > uint256(uint128(type(int128).max))) revert SwapTooLarge();
+        if (pspInput < MIN_SWAP_INPUT) revert SwapTooSmall();
+        if (pspInput >= totalSupplyPSP) revert SellExceedsSupply();
+        uint256 out;
         if (mode == Mode.Flat) {
-            return FPML.fullMulDiv(pspInput, reserveMixETH, totalSupplyPSP);
+            out = FPML.fullMulDiv(pspInput, reserveMixETH, totalSupplyPSP);
+        } else {
+            out = sineActive
+                ? ISineV3Math(sineV3Table).sellOut(reserveMixETH, sineV3.boot, sineV3.lam, sinePL, pspInput)
+                : CurveMath.computeSellOutput(pspInput, totalSupplyPSP, curveConfig);
+            out -= FPML.fullMulDiv(out, swapFeeBps(), 10000);
         }
-        if (block.timestamp >= detonationAt) revert TradingHalted();
-        uint256 out = sineActive
-            ? ISineV3Math(sineV3Table).sellOut(reserveMixETH, sineV3.boot, sineV3.lam, sinePL, pspInput)
-            : CurveMath.computeSellOutput(pspInput, totalSupplyPSP, curveConfig);
-        return out - FPML.fullMulDiv(out, swapFeeBps(), 10000);
+        if (out == 0) revert ZeroOutput();
+        if (out > uint256(uint128(type(int128).max))) revert SwapTooLarge();
+        return out;
     }
 }

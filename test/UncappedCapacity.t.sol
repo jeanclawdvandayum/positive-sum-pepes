@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {SineV3Math} from "src/SineV3Math.sol";
+import {SineV3Data} from "src/SineV3Data.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IPoolManager, SwapParams} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
@@ -37,7 +38,7 @@ contract UncappedCapacityTest is Test {
         manager = new MockPoolManager();
         factory = new PSPFactory(IPoolManager(address(manager)), IERC20(address(mix)),
             new HookDeployer(), new ControllerDeployer(), new StakerDeployer(),
-            address(new SineV3Math()),
+            address(new SineV3Math(SineV3Data.deploy())),
             CurveMath.packTimingsCapped(60, 120, 180, 0), address(this));
         factory.configureSineV3(75_000_000_000_000);
         factory.deployRound(PSPFactory.RoundParams("PSP", "PSP", CurveMath.singleCurve(
@@ -79,9 +80,8 @@ contract UncappedCapacityTest is Test {
     }
 
     function test_LargeIBCOLaunchClaimsAndDirectRedemption() public {
-        // v3 supported ceiling: ~576k mix gross (net boot <= ~518,841 mix —
-        // the helper's 16-wave prelaunch table edge). The old 1e37-scale
-        // boots are arithmetic capacity errors by design now.
+        // A large launch keeps proportional allocations and indefinite exits.
+        // The price-derived upper-capacity cases have their own lifecycle suite.
         _deposit(round.controller, alice, 150_000e18);
         _deposit(round.controller, bob, 300_000e18);
         _launch();
@@ -141,6 +141,8 @@ contract UncappedCapacityTest is Test {
         _deposit(round.controller, alice, 450_000e18); // top of the supported band
         _launch();
         uint256 oversized = uint256(uint128(type(int128).max)) + 1;
+        vm.expectRevert(CurveHook.SwapTooLarge.selector);
+        round.hook.getBuyOutput(oversized);
         _expectSwapTooLarge(true, oversized);
         _expectSwapTooLarge(false, oversized);
         skip(180);
@@ -149,9 +151,8 @@ contract UncappedCapacityTest is Test {
     }
 
     function test_V4RejectsBuyBeyondTheWaveDomain() public {
-        // v3 fixed-shape curves cap Q at ~5e29 PSP-wei — a buy output can no
-        // longer approach int128. The equivalent protection is the explicit
-        // domain capacity error, raised BEFORE any state change.
+        // An input far past the remaining-output capacity must fail before
+        // it changes reserves or mints PSP. Signed delta guards also apply.
         _deposit(round.controller, alice, 450_000e18);
         _launch();
         PoolKey memory key = _key();
@@ -166,9 +167,8 @@ contract UncappedCapacityTest is Test {
     }
 
     function test_V4RejectsOversizedActiveAndFlatSellOutputs() public {
-        // v3 fixed curve tops at ~1,927 mix/PSP: no in-range input can push a
-        // mixETH OUTPUT past int128. A sell larger than the minted supply
-        // reverts SellExceedsSupply in BOTH live and flat modes, state intact.
+        // A sell larger than the minted supply fails in both live and flat
+        // modes, with reserve and supply accounting intact.
         _useHighPriceCurve();
         _deposit(round.controller, alice, 450_000e18);
         _launch();
@@ -201,20 +201,19 @@ contract UncappedCapacityTest is Test {
 
     function test_LargeRepresentablePotRemainsClaimable() public {
         _useHighPriceCurve();
-        _deposit(round.controller, alice, 500_000e18); // gross at the cap
+        _deposit(round.controller, alice, 500_000e18);
         _launch();
         TicketSwapper swapper = new TicketSwapper(IPoolManager(address(manager)), IERC20(address(mix)));
-        // boot 450k mix + 64 waves of headroom (~1.93M mix): a 1M-mix buy
-        // stays in-domain, buys ~200k tickets (bounded seat writes), and
-        // leaves a claimable pot an order of magnitude above the genesis pot.
+        // A one-million-mix buy earns about 200k tickets with bounded seat
+        // writes and leaves a pot well above its genesis balance.
         mix.mint(alice, 1e24);
         vm.startPrank(alice);
         mix.approve(address(swapper), 1e24);
         swapper.buy(_key(), 1e24, alice, alice);
         vm.stopPrank();
         assertGt(round.hook.ticketCount(), 100_000);
-        (, uint256 lam, uint256 target,) = round.hook.sineV3();
-        assertLe(round.hook.reserveMixETH(), target + 64 * lam);
+        (uint256 boot, uint256 lam,,) = round.hook.sineV3();
+        assertLe(round.hook.reserveMixETH(), SineV3Math(factory.sineV3Table()).maxReserve(boot, lam, 75e12));
         uint256 pot = round.hook.potBalance();
         skip(180);
         round.controller.detonate{gas: 1_000_000}();

@@ -1,5 +1,11 @@
 # Sine rules v3 — implementation and numerical validation note
 
+**Superseded in part by the September 15 review.** The earlier gate passed,
+but additional tests disproved the monotonicity claim and found an incomplete
+sell inverse. The inverse has a local repair; price and supply monotonicity
+remain open. The table limits are implementation choices. This note does not
+authorize release. See [the review](2026-09-15-single-sine-review.md).
+
 **Date:** 2026-09-14/15 · **Branch:** `single-sine-spec` (base `deployment-spec`)
 **Change:** one continuous tilted-sine curve (IBCO + active), softened cube-root
 growth to 1,000× launch price at wave ten, square-root wavelength scaling,
@@ -46,11 +52,12 @@ Supply is `Q(R) = (λ/P_L)·(F(x(R)) − F(x(0)))`. `F` is evaluated from the
 knot table plus ONE 8-point Gauss-Legendre partial cell at each interval end
 — O(1) work per evaluation regardless of waves crossed (measured: buys
 spanning ~60 waves cost the same order as quarter-wave buys). Partial cells
-are clamped inside their knot bracket (the AUD-6 pattern), so the rounded `F`
-never steps down: supply is monotone by construction. Sells invert `Q` with
-a bracketed Newton/bisection hybrid on [0, R] (Q strictly increasing
-guarantees termination; proportional seed; 128-iteration bound; upper
-endpoint returned, never overpaying), plus the independent sell spot clamp.
+are clamped inside their knot bracket. This keeps values inside each cell's
+range but does not make the rounded function monotone. The September 15
+tests show decreases both at baseline and larger launches. Sells use a
+bracketed inverse plus a spot clamp. The local repair limits Newton steps,
+forces bisection, and rejects an unresolved bracket. Safe inversion still
+requires a monotone cumulative function, which remains an open issue.
 
 **Accuracy (independent Decimal reference):**
 - Prices match the specification to ≤ 1e-11 relative on all fixture rows
@@ -72,7 +79,7 @@ method — with level-doubling convergence; milestone prices are closed-form.
 Nothing is derived from Solidity output. `scripts/sine_v3.py --check`
 regenerates both files byte-for-byte (~66 s, in the deterministic gate).
 
-## Notable fixes found by the machine proofs during migration
+## Fixes found by tests during migration
 
 - **Inverted inverse seed (Critical-class, caught by the custody fuzz):**
   the sell-inverter's proportional seed was subtracted from R instead of
@@ -118,10 +125,12 @@ working through explicitly-marked legacy-only ABI entries.
 ## Known limitations
 
 - The knot table and domain edges (−16 / +64 waves) are fixed constants of
-  the helper: net backing above ~518,841 mixETH or price above ~1,927
-  mixETH/PSP cannot be represented. Both revert loudly before state changes.
-- expWad precision in the deep prelaunch tail (> ~8 waves below launch,
-  i.e. raises above ~500k mixETH) degrades toward 1e-12 — inside the price
-  goal but documented.
+  the helper. They reject larger launches and deeper buys, even though the
+  intended formula has representable values beyond them. These limits need
+  a new design or explicit approval as economic constraints.
+- The original oracle price assertion used a relative tolerance of 1e-7,
+  despite its comment claiming 1e-11. The September 15 review corrects this
+  test and its excessive absolute supply allowance. Historical accuracy
+  claims above describe sampled values, not a proof over the full domain.
 - Deployment manifests record v3 after the next authorized deployment; the
   historical manifests in `docs/audit/deployments/` are untouched.

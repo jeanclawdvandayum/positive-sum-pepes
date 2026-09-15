@@ -15,12 +15,15 @@ export const curveErrorSignatures = [
   // v3 (2026-09-14): a guarded purchase route sampled a live ticket price
   // above the caller's quoted maxTicketPrice — nothing moved, refresh.
   'error TicketPriceMoved()',
+  'error SineV3Domain()',
+  'error SineV3InverseDidNotConverge()',
+  'error InvalidRoundHook()',
   'error WrappedError(address target, bytes4 selector, bytes reason, bytes details)',
 ] as const
 const abi = parseAbi(curveErrorSignatures)
 const arithmetic = 'This amount exceeds the contract’s arithmetic capacity. Try a smaller amount.'
 const messages: Record<string, string> = {
-  PredepositCapacityExceeded: 'This deposit exceeds the curve’s supported arithmetic capacity. Try a smaller amount.',
+  PredepositCapacityExceeded: 'This deposit exceeds the curve’s supported launch capacity. Try a smaller amount.',
   SwapTooLarge: 'This trade exceeds the maximum input or output for one transaction. Try a smaller amount.',
   SwapTooSmall: 'This trade is below the minimum supported amount. Increase the amount.',
   ZeroOutput: 'This trade would return zero tokens. Check the amount and quote.',
@@ -31,6 +34,9 @@ const messages: Record<string, string> = {
   MulWadFailed: arithmetic,
   DivWadFailed: arithmetic,
   TicketPriceMoved: 'The ticket price rose past your quoted maximum before the trade landed. Nothing was spent — refresh for a new quote.',
+  SineV3Domain: 'This trade exceeds the curve’s supported reserve range. Try a smaller amount.',
+  SineV3InverseDidNotConverge: 'The curve could not calculate a complete sell quote. The transaction reverted. Report this quote failure before retrying.',
+  InvalidRoundHook: 'This reinvestment targets a different round. Refresh the selected position before retrying.',
 }
 const selectors = new Map(Object.keys(messages).map(name => [toFunctionSelector(`${name}()`), name]))
 

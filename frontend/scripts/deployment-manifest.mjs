@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { createPublicClient, http, isAddress, keccak256, parseAbi } from 'viem'
 import { factoryAbi, controllerAbi, hookAbi, stakerAbi } from '../src/lib/abi.ts'
-import { BASE_SEPOLIA_POOL_MANAGER, releaseContext, assertRuntimeMatches, verifyFactoryCreation, assertTimingProfile, renderFrontendEnv, discoverRegistryInitCode } from './deployment-manifest-lib.mjs'
+import { BASE_SEPOLIA_POOL_MANAGER, releaseContext, assertRuntimeMatches, verifyFactoryCreation, assertTimingProfile, renderFrontendEnv, discoverRegistryInitCode, readSineDeploymentState, assertSineDataMatches } from './deployment-manifest-lib.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const addressGetter = name => parseAbi([`function ${name}() view returns(address)`])
@@ -53,7 +53,12 @@ async function main() {
   const staker = await read(controller, controllerAbi, 'staker')
   const mix = await read(factory, factoryAbi, 'mixETH')
   const registry = await read(factory, factoryAbi, 'referralRegistryOf', [roundId])
+  const sine = await readSineDeploymentState(read, factory, hook)
   const addresses = { factory, token, controller, hook, staker, mix, registry }
+  if (sine.curve) {
+    addresses.sineV3Math = sine.curve.helper
+    sine.curve.dataShards.forEach((address, index) => { addresses[`sineV3Data${index}`] = address })
+  }
   for (const [name, variable] of Object.entries({ zapIn: 'PSP_ZAPIN', zapOut: 'PSP_ZAPOUT', faucet: 'PSP_FAUCET', reinvestor: 'PSP_REINVESTOR' })) {
     const value = process.env[variable]
     if (value) {
@@ -86,12 +91,21 @@ async function main() {
   // executable bytes and metadata distinguish fresh source from legacy APIs
   // with unchanged version numbers (including block-hash genesis art).
   const artifacts = {}
-  const runtimeContracts = { factory: 'PSPFactory', token: 'PSPToken', controller: 'RoundController', hook: 'CurveHook', staker: 'PSPStaker', registry: 'PSPReferralRegistry', mix: 'SepoliaMixETH', descriptor: 'PepeExpandedDescriptor', hookDeployer: 'HookDeployer', controllerDeployer: 'ControllerDeployer', stakerDeployer: 'StakerDeployer', tokenDeployer: 'TokenDeployer', hookInitCode: 'HookInitCode', registryInitCode: 'ReferralRegistryInitCode', zapIn: 'PSPZapIn', zapOut: 'PSPZapOut', faucet: 'MixETHFaucet', reinvestor: 'PSPReinvestor' }
+  const runtimeContracts = { sineV3Math: 'SineV3Math', factory: 'PSPFactory', token: 'PSPToken', controller: 'RoundController', hook: 'CurveHook', staker: 'PSPStaker', registry: 'PSPReferralRegistry', mix: 'SepoliaMixETH', descriptor: 'PepeExpandedDescriptor', hookDeployer: 'HookDeployer', controllerDeployer: 'ControllerDeployer', stakerDeployer: 'StakerDeployer', tokenDeployer: 'TokenDeployer', hookInitCode: 'HookInitCode', registryInitCode: 'ReferralRegistryInitCode', zapIn: 'PSPZapIn', zapOut: 'PSPZapOut', faucet: 'MixETHFaucet', reinvestor: 'PSPReinvestor' }
   for (const [key, contract] of Object.entries(runtimeContracts)) {
     if (!addresses[key]) continue
     const artifact = loadArtifact(contract, contract === 'TokenDeployer' ? 'ControllerDeployer' : contract)
     assertRuntimeMatches(codes[key], artifact, key)
     artifacts[key] = { contract, runtimeMatchesIgnoringImmutables: true, artifactRuntimeHash: keccak256(artifact.deployedBytecode.object) }
+  }
+  if (sine.curve) {
+    const generated = JSON.parse(fs.readFileSync(path.join(root, 'scripts/sine_v3_data.json')))
+    if (generated.shards.length !== 4) throw Error('Generated sine data count mismatch')
+    for (let i = 0; i < 4; i++) {
+      const key = `sineV3Data${i}`, expected = generated.shards[i]
+      assertSineDataMatches(codes[key], expected, key)
+      artifacts[key] = { contract: expected.contract, generatedDataMatches: true, runtimeHash: expected.hash }
+    }
   }
   const artHex = fs.readFileSync(path.join(root, 'src/art/ExpandedPepeArt.sol'), 'utf8').match(/DATA = hex"([0-9a-fA-F]+)"/)[1]
   if (codes.artData.toLowerCase() !== ('0x00' + artHex).toLowerCase()) throw Error('Expanded art storage differs from release source')
@@ -114,6 +128,7 @@ async function main() {
     ['registry', 'staker', staker],
   ]) await wire(role, getter, expected)
   if (addresses.registryInitCode) await wire('controllerDeployer', 'registryInitOracle', addresses.registryInitCode)
+  if (addresses.sineV3Math) await wire('hook', 'sineV3Table', addresses.sineV3Math)
   const deployerCutTo = await read(factory, addressGetter('deployerCutTo'), 'deployerCutTo')
   await wire('hook', 'deployerCutTo', deployerCutTo)
   if (await read(controller, uintGetter('factoryRoundId'), 'factoryRoundId') !== roundId) throw Error('Controller round ID wiring mismatch')
@@ -126,14 +141,11 @@ async function main() {
   if (addresses.faucet) await wire('faucet', 'mixETH', mix)
   if (addresses.reinvestor) for (const [getter, target] of [['staker', staker], ['psp', token], ['mix', mix], ['zapIn', addresses.zapIn]]) await wire('reinvestor', getter, target)
 
-  const params = await read(hook, parseAbi(['function sineParams() view returns(uint256 p0,uint256 preK,uint256 pTarget,uint256 targetReserve,uint24 ampBps)']), 'sineParams')
-  const minimumBuy = await read(hook, hookAbi, 'MIN_BUY_INPUT')
-  const timePerUnit = await read(hook, hookAbi, 'TIME_PER_UNIT')
-  if (minimumBuy !== 5_000_000_000_000_000n || timePerUnit !== 69n) throw Error('Deployment does not match approved game rules')
-  const features = {}
-  for (const [role, getter] of [['controller', 'PREDEPOSIT_RULES_VERSION'], ['controller', 'PREDEPOSIT_ART_VERSION'], ['hook', 'TICKET_RULES_VERSION'], ['hook', 'SINE_RULES_VERSION'], ['registry', 'PURCHASE_REFERRAL_VERSION'], ['staker', 'NFT_INTERFACE_VERSION'], ['staker', 'PEPE_DNA_VERSION'], ...(addresses.reinvestor ? [['reinvestor', 'ATTRIBUTION_VERSION']] : [])]) {
+  const { params, curve, minimumBuy, timePerUnit, ticketPrice, potBalance } = sine
+  const features = { SINE_RULES_VERSION: sine.sineVersion, TICKET_RULES_VERSION: sine.ticketVersion }
+  for (const [role, getter] of [['controller', 'PREDEPOSIT_RULES_VERSION'], ['controller', 'PREDEPOSIT_ART_VERSION'], ['registry', 'PURCHASE_REFERRAL_VERSION'], ['registry', 'REFERRAL_REWARDS_VERSION'], ['staker', 'NFT_INTERFACE_VERSION'], ['staker', 'PEPE_DNA_VERSION'], ...(addresses.reinvestor ? [['reinvestor', 'ATTRIBUTION_VERSION']] : [])]) {
     const version = await read(addresses[role], uintGetter(getter), getter)
-    if (version !== (['PEPE_DNA_VERSION', 'PREDEPOSIT_RULES_VERSION', 'PREDEPOSIT_ART_VERSION', 'TICKET_RULES_VERSION', 'SINE_RULES_VERSION'].includes(getter) ? 2n : 1n)) throw Error(`Unsupported ${getter}`)
+    if (version !== (['PEPE_DNA_VERSION', 'PREDEPOSIT_RULES_VERSION', 'PREDEPOSIT_ART_VERSION'].includes(getter) ? 2n : 1n)) throw Error(`Unsupported ${getter}`)
     features[getter] = version
   }
   const supportsAbi = parseAbi(['function supportsInterface(bytes4) view returns(bool)'])
@@ -169,7 +181,7 @@ async function main() {
   // Detect a reorganization while collecting reads at the pinned block.
   const finalBlock = await checked('snapshot recheck', () => client.getBlock({ blockNumber: block.number }))
   if (finalBlock.hash !== block.hash) throw Error('Snapshot block changed during inspection; retry')
-  const manifest = { schema: 3, chainId, block: block.number, blockHash: block.hash, revision, sourceDirty, rehearsal, owner, deployerCutTo, addresses, codeHashes, artifacts, hookCreationCodeMatchesArtifact: true, deployment, round: { roundId, name, symbol, destroyed, mode }, params, timings, rules: { minimumBuy, minimumPredeposit: 1n, timePerUnit, feeBps }, features, wiring, sourceVerification: 'Runtime matches local artifacts except immutable slots; see companion explorer verification record' }
+  const manifest = { schema: sine.sineVersion === 3n ? 4 : 3, chainId, block: block.number, blockHash: block.hash, revision, sourceDirty, rehearsal, owner, deployerCutTo, addresses, codeHashes, artifacts, hookCreationCodeMatchesArtifact: true, deployment, round: { roundId, name, symbol, destroyed, mode }, params, ...(curve ? { curve } : {}), timings, rules: { minimumBuy, ticketPrice, potBalance, minimumPredeposit: 1n, timePerUnit, feeBps }, features, wiring, sourceVerification: 'Runtime matches local artifacts except immutable slots; see companion explorer verification record' }
   const frontendEnv = frontendOutput ? renderFrontendEnv(manifest, rehearsalRpc) : undefined
   for (const target of [output, frontendOutput].filter(Boolean)) fs.mkdirSync(path.dirname(target), { recursive: true })
   fs.writeFileSync(output, JSON.stringify(manifest, (_, value) => typeof value === 'bigint' ? value.toString() : value, 2) + '\n', { flag: 'wx' })

@@ -6,22 +6,38 @@ import assert from 'node:assert/strict'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { createPublicClient, createWalletClient, http, maxUint256, parseEther, decodeEventLog } from 'viem'
 import { anvil } from 'viem/chains'
+import { assertRuntimeMatches, assertSineDataMatches } from './deployment-manifest-lib.mjs'
 const url = 'http://127.0.0.1:18545'
 const client = createPublicClient({ chain: anvil, transport: http(url) })
 const wallet = createWalletClient({ chain: anvil, transport: http(url) })
 assert.equal(await client.getChainId(), 31337)
 assert.match(await client.request({method:'web3_clientVersion'}), /anvil/i)
 const [owner, alice, bob, trader] = await wallet.getAddresses()
-const artifact = name => JSON.parse(readFileSync(new URL(`../../out/${name}.sol/${name}.json`, import.meta.url)))
-const broadcast = JSON.parse(readFileSync(new URL('../../broadcast/DeployPSP.s.sol/31337/run-latest.json', import.meta.url)))
+const artifact = name => JSON.parse(readFileSync(new URL(`../../out/${/^SineV3Data[0-3]$/.test(name) ? 'SineV3Data' : name}.sol/${name}.json`, import.meta.url)))
+const broadcastPath = process.env.PSP_ANVIL_BROADCAST || new URL('../../broadcast/DeployPSP.s.sol/31337/run-latest.json', import.meta.url)
+const receiptsPath = process.env.PSP_ANVIL_RECEIPTS || '/tmp/psp-ticket-anvil-receipts.json'
+const curvesPath = process.env.PSP_ANVIL_CURVES || '/tmp/psp-spec-anvil-curves-v3.json'
+const broadcast = JSON.parse(readFileSync(broadcastPath))
 const deployed = name => broadcast.transactions.find(t => t.contractName === name && t.transactionType === 'CREATE').contractAddress
 const factory = deployed('PSPFactory'), mix = deployed('MockMixETH'), zap = deployed('PSPZapIn'), zapOut = deployed('PSPZapOut')
 const read = (address, name, functionName, args=[]) => client.readContract({ address, abi:artifact(name).abi, functionName, args })
-const receipts=[]
+const receipts=[], deploymentReceipts=[], runtimeChecks=[]
+const transactionGasCap = 16_777_216n
+async function runtime(address, name) {
+ const code=await client.getCode({address})
+ if (/^SineV3Data[0-3]$/.test(name)) {
+  const data=JSON.parse(readFileSync(new URL('../../scripts/sine_v3_data.json',import.meta.url)))
+  assertSineDataMatches(code,data.shards[Number(name.at(-1))],name)
+ } else assertRuntimeMatches(code,artifact(name),name)
+ const bytes=(code.length-2)/2
+ assert(bytes<=24576,`${name}: EIP-170 runtime limit`)
+ runtimeChecks.push({address,name,bytes})
+}
 async function tx(account,address,name,functionName,args=[],expected='success') {
  const hash=await wallet.writeContract({account,address,abi:artifact(name).abi,functionName,args,gas:30_000_000n})
  const receipt=await client.waitForTransactionReceipt({hash})
  assert.equal(receipt.status,expected,`${functionName}: ${hash}`)
+ assert(receipt.gasUsed < transactionGasCap, `${functionName}: transaction gas budget`)
  receipts.push({functionName,hash,status:receipt.status,gas:receipt.gasUsed.toString()})
  console.log(`${expected}: ${functionName} ${hash}`)
  return receipt
@@ -40,8 +56,21 @@ eq(await read(ctrl,'RoundController','PREDEPOSIT_CAP'),0n)
 eq(await read(ctrl,'RoundController','PREDEPOSIT_RULES_VERSION'),2n)
 eq(await read(ctrl,'RoundController','PREDEPOSIT_DURATION'),259200n)
 eq(await read(ctrl,'RoundController','VEST_DURATION'),2419200n)
-// Check every deployment receipt, not simulation addresses or console output.
-for(const t of broadcast.transactions) eq((await client.getTransactionReceipt({hash:t.hash})).status,'success')
+// Check every deployment receipt and creation runtime from the local chain.
+for(const t of broadcast.transactions) {
+ const receipt=await client.getTransactionReceipt({hash:t.hash})
+ eq(receipt.status,'success')
+ assert(receipt.gasUsed < transactionGasCap, `${t.contractName}: deployment gas budget`)
+ deploymentReceipts.push({hash:t.hash,status:receipt.status,gas:receipt.gasUsed.toString(),contract: t.contractName})
+ if(t.transactionType==='CREATE') {
+  eq(receipt.contractAddress?.toLowerCase(),t.contractAddress.toLowerCase())
+  await runtime(receipt.contractAddress,t.contractName)
+ }
+}
+for(const [address,name] of [[token,'PSPToken'],[ctrl,'RoundController'],[hook,'CurveHook'],[staker,'PSPStaker'],
+ [await read(factory,'PSPFactory','referralRegistryOf',[1n]),'PSPReferralRegistry']]) await runtime(address,name)
+eq((await read(factory,'PSPFactory','sineV3Table')).toLowerCase(),deployed('SineV3Math').toLowerCase())
+eq((await read(hook,'CurveHook','sineV3Table')).toLowerCase(),deployed('SineV3Math').toLowerCase())
 for(const a of [alice,bob,trader]) {
  await tx(a,mix,'MockMixETH','faucet',[eth('11000000')])
  await tx(a,mix,'MockMixETH','approve',[ctrl,maxUint256])
@@ -71,7 +100,7 @@ async function buy(amount, expectedTickets, capped=false) {
  const price=await read(hook,'CurveHook','ticketPrice'), count=await read(hook,'CurveHook','ticketCount'), deadline=await read(hook,'CurveHook','detonationAt')
  const quote=await read(hook,'CurveHook','getBuyOutput',[amount])
  const before=await read(token,'PSPToken','balanceOf',[trader])
- const r=await tx(trader,zap,'PSPZapIn','buyWithMix',[pool,amount,quote,await now()+100n])
+ const r=await tx(trader,zap,'PSPZapIn','buyWithMixGuarded',[pool,amount,quote,await now()+100n,price])
  eq(await read(token,'PSPToken','balanceOf',[trader]),before+quote)
  eq(amount/price,expectedTickets)
  eq(await read(hook,'CurveHook','ticketCount'),count+expectedTickets)
@@ -85,6 +114,15 @@ async function buy(amount, expectedTickets, capped=false) {
  const added=r.logs.flatMap(log=>{try{return [decodeEventLog({abi:artifact('CurveHook').abi,...log})]}catch{return []}}).find(e=>e.eventName==='TimeAdded')
  assert(added,'TimeAdded emitted')
 }
+const openingTicket=await read(hook,'CurveHook','ticketPrice')
+await buy(openingTicket,1n)
+// A stale price guard cannot silently lose tickets after pot growth.
+{ const price=await read(hook,'CurveHook','ticketPrice'), count=await read(hook,'CurveHook','ticketCount')
+  const balance=await read(mix,'MockMixETH','balanceOf',[trader])
+  assert(price>openingTicket)
+  await tx(trader,zap,'PSPZapIn','buyWithMixGuarded',[pool,price*2n,1n,await now()+100n,openingTicket],'reverted')
+  eq(await read(hook,'CurveHook','ticketCount'),count)
+  eq(await read(mix,'MockMixETH','balanceOf',[trader]),balance) }
 await buy(eth('.05'),eth('.05')/await read(hook,'CurveHook','ticketPrice'))
 // v3: below one current spot, buys REVERT (the minimum is exactly one spot)
 { const bal=await read(mix,'MockMixETH','balanceOf',[trader])
@@ -99,14 +137,15 @@ await tx(trader,zapOut,'PSPZapOut','sellToMix',[pool,sellAmount,1n,await now()+1
 eq(await read(hook,'CurveHook','ticketCount'),beforeSellCount)
 eq(await read(hook,'CurveHook','detonationAt'),beforeSellTime)
 assert(await read(hook,'CurveHook','ticketPrice')>beforeSellPrice)
-// Large buy regression: bounded ten-slot writes and capped clock. v3 caps the
-// reserve domain at target + 64 waves (= boot + 74 waves; ~143k mix here).
-// Below the tenth-wave target buys skim 10% to fees, so only 90% of gross
-// reaches the curve — overspend GROSS by the fee ratio to pierce the edge.
-// (The old 10M-mix stress buy is an explicit capacity error now.)
+// Large buys retain bounded seat writes and clock growth. Read the helper
+// capacity derived from price and remaining-output precision. Overspend by
+// the current fee ratio to cross it, and check complete transaction rollback.
 const beforeWhale=await client.request({method:'evm_snapshot'})
-{ const [,lam,target]=await read(hook,'CurveHook','sineV3')
-  const edge=target+64n*lam, headroom=edge-await read(hook,'CurveHook','reserveMixETH')
+{ const [boot,lam]=await read(hook,'CurveHook','sineV3')
+  const helper=await read(hook,'CurveHook','sineV3Table')
+  const info=await read(hook,'CurveHook','sineV3Info')
+  const edge=await read(helper,'SineV3Math','maxReserve',[boot,lam,info[1]])
+  const headroom=edge-await read(hook,'CurveHook','reserveMixETH')
   const overspend=headroom*10n/9n+1n
   const extremeBalance=await read(mix,'MockMixETH','balanceOf',[trader])
   await tx(trader,zap,'PSPZapIn','buyWithMix',[pool,overspend,1n,await now()+100n],'reverted')
@@ -119,7 +158,10 @@ await buy(eth('100'),eth('100')/await read(hook,'CurveHook','ticketPrice'),true)
 const riArtifact=artifact('PSPReinvestor')
 const riHash=await wallet.deployContract({account:owner,abi:riArtifact.abi,bytecode:riArtifact.bytecode.object,args:[staker,zap,mix,token],gas:10_000_000n})
 const riReceipt=await client.waitForTransactionReceipt({hash:riHash});eq(riReceipt.status,'success')
+assert(riReceipt.gasUsed < transactionGasCap, 'reinvestor deployment gas budget')
 const reinvestor=riReceipt.contractAddress
+deploymentReceipts.push({hash:riHash,status:riReceipt.status,gas:riReceipt.gasUsed.toString(),contract:'PSPReinvestor'})
+await runtime(reinvestor,'PSPReinvestor')
 await tx(alice,staker,'PSPStaker','setApprovalForAll',[reinvestor,true])
 assert(await read(staker,'PSPStaker','pendingFeesOf',[1n])>eth('.005'))
 const beforeStake=(await read(staker,'PSPStaker','positions',[1n]))
@@ -152,6 +194,10 @@ await warp(43200)
 await tx(trader,factory,'PSPFactory','reserveSpawn',[1n])
 for(let i=0;i<3;i++) await tx(trader,factory,'PSPFactory','birthStep')
 const [token2,ctrl2,hook2]=await read(factory,'PSPFactory','rounds',[2n])
+for(const [address,name] of [[token2,'PSPToken'],[ctrl2,'RoundController'],[hook2,'CurveHook'],
+ [await read(ctrl2,'RoundController','stakerAddress'),'PSPStaker'],
+ [await read(factory,'PSPFactory','referralRegistryOf',[2n]),'PSPReferralRegistry']]) await runtime(address,name)
+eq((await read(hook2,'CurveHook','sineV3Table')).toLowerCase(),deployed('SineV3Math').toLowerCase())
 const state=await read(ctrl2,'RoundController','predepositState')
 eq(state[5],false)
 assert(await now()-state[2]<60n)
@@ -178,6 +224,6 @@ eq(curve2[0],eth('4500'))                       // boot = 90% of 5000 gross
 assert(curve2[1]*curve2[1]/10n<=eth('3820')*eth('3820')/10n) // sqrt scaling sanity
 eq(curve2[2],eth('4500')+10n*curve2[1])
 eq(curve1[3]>0n && curve2[3]>curve1[3],true)    // genesis supply grows with boot
-writeFileSync('/tmp/psp-spec-anvil-curves-v3.json',JSON.stringify({curve1,curve2},(_,v)=>typeof v==='bigint'?v.toString():v,2))
-writeFileSync('/tmp/psp-ticket-anvil-receipts.json',JSON.stringify({factory,receipts},null,2))
-console.log(`PASS: ${receipts.length} checked action receipts, deployment receipts verified, two rounds exercised.`)
+writeFileSync(curvesPath,JSON.stringify({curve1,curve2},(_,v)=>typeof v==='bigint'?v.toString():v,2))
+writeFileSync(receiptsPath,JSON.stringify({factory,receipts,deploymentReceipts,runtimeChecks},null,2))
+console.log(`PASS: ${receipts.length} checked action receipts, ${deploymentReceipts.length} deployment receipts, ${runtimeChecks.length} runtime checks, two rounds exercised.`)

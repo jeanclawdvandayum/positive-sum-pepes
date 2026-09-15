@@ -1,12 +1,83 @@
 import test from 'node:test'
+import { keccak256 } from 'viem'
 import assert from 'node:assert/strict'
-import { BASE_SEPOLIA_ID, releaseContext, assertRuntimeMatches, verifyFactoryCreation, assertTimingProfile, renderFrontendEnv, discoverRegistryInitCode } from '../scripts/deployment-manifest-lib.mjs'
+import { BASE_SEPOLIA_ID, releaseContext, assertRuntimeMatches, verifyFactoryCreation, assertTimingProfile, renderFrontendEnv, discoverRegistryInitCode, readSineDeploymentState, assertSineDataMatches } from '../scripts/deployment-manifest-lib.mjs'
 
 const address = digit => `0x${digit.repeat(40)}`
 const factory = address('1')
 const context = { rpcUrl: 'https://provider.example/private-key', chainId: BASE_SEPOLIA_ID, clientVersion: '', rehearsalRequested: false, sourceDirty: false }
 
 const oracleArtifact = { abi: [{ type: 'function', name: 'registryInitOracle', inputs: [], outputs: [{ type: 'address' }] }] }
+
+function sineReader(changes = {}) {
+  const values = { SINE_RULES_VERSION: 3n, TICKET_RULES_VERSION: 3n, MIN_BUY_INPUT: 5_000_000_000_000_000n,
+    TIME_PER_UNIT: 69n, ticketPrice: 5_000_000_000_000_000n, potBalance: 50n * 10n ** 18n,
+    sineV3Info: [3n, 75_000_000_000_000n, 450n * 10n ** 18n, 955n * 10n ** 18n, 10_000n * 10n ** 18n, 10n ** 25n, address('7')],
+    sineV3Table: address('7'), sineConfigured: true, sineActive: true, gameSinePL: 75_000_000_000_000n,
+    dataShardCount: 4n, dataShard: [address('a'),address('b'),address('c'),address('d')],
+    lamAt: 955n * 10n ** 18n, genesisQ: 10n ** 25n, ...changes }
+  const calls = []
+  const read = async (target, abi, name, args) => {
+    calls.push({ target, name, args })
+    assert.equal(abi[0].name, name)
+    if (!(name in values)) throw Error(`Unexpected getter: ${name}`)
+    if (values[name] instanceof Error) throw values[name]
+    return name === 'dataShard' ? values[name][Number(args[0])] : values[name]
+  }
+  return { read, calls, values }
+}
+
+test('v3 manifest reads the versioned curve, pins its helper and checks materialization', async () => {
+  const { read, calls } = sineReader()
+  const result = await readSineDeploymentState(read, factory, address('2'))
+  assert.equal(result.curve.helper, address('7'))
+  assert.equal(result.curve.target, 10_000n * 10n ** 18n)
+  assert.equal(result.params.launchPrice, 75_000_000_000_000n)
+  assert.equal(result.ticketPrice, result.minimumBuy)
+  assert.deepEqual(calls.slice(0, 2).map(call => call.name), ['SINE_RULES_VERSION', 'TICKET_RULES_VERSION'])
+  assert.equal(calls.some(call => call.name === 'sineParams'), false)
+  assert.deepEqual(calls.find(call => call.name === 'genesisQ').args,
+    [450n * 10n ** 18n, 955n * 10n ** 18n, 75_000_000_000_000n])
+})
+
+test('unlaunched v3 manifest accepts the live one-wei minimum and no materialized curve', async () => {
+  const { read, calls } = sineReader({ MIN_BUY_INPUT: 1n, ticketPrice: 1n, potBalance: 0n, sineActive: false,
+    sineV3Info: [3n, 75_000_000_000_000n, 0n, 0n, 0n, 0n, address('7')] })
+  const result = await readSineDeploymentState(read, factory, address('2'))
+  assert.equal(result.minimumBuy, 1n)
+  assert.equal(result.curve.active, false)
+  assert.equal(calls.some(call => call.name === 'genesisQ'), false)
+})
+
+test('v3 manifest rejects stale minima, helper substitution and invalid materialized values', async () => {
+  const base = sineReader().values
+  const alteredTuple = (index, value) => ({ sineV3Info: base.sineV3Info.map((entry, i) => i === index ? value : entry) })
+  for (const changes of [
+    { MIN_BUY_INPUT: 1n }, { ticketPrice: 0n }, { potBalance: base.potBalance + 1n }, { TIME_PER_UNIT: 260n },
+    { dataShardCount: 3n }, { dataShard: Array(4).fill(address('a')) },
+    { dataShard: [address('a'),address('b'),address('c'),address('0')] },
+    { sineV3Table: address('8') }, { sineConfigured: false }, { gameSinePL: 1n },
+    alteredTuple(0, 2n), alteredTuple(2, 0n), alteredTuple(3, 1n), alteredTuple(4, 1n), alteredTuple(5, 1n),
+  ]) await assert.rejects(readSineDeploymentState(sineReader(changes).read, factory, address('2')), /mismatch|clock rules/)
+})
+
+test('legacy manifest keeps the original parameter tuple and static minimum', async () => {
+  const params = [1n, 2n, 3n, 4n, 10000]
+  const { read, calls } = sineReader({ SINE_RULES_VERSION: 2n, TICKET_RULES_VERSION: 2n,
+    sineParams: params, genesisPotBalance: 50n * 10n ** 18n })
+  const result = await readSineDeploymentState(read, factory, address('2'))
+  assert.deepEqual(result.params, params)
+  assert.equal(result.curve, undefined)
+  assert.equal(calls.some(call => call.name === 'sineV3Info' || call.name === 'sineV3Table'), false)
+})
+
+test('unknown versions and failed version reads never fall back to legacy curve decoding', async () => {
+  for (const change of [{ SINE_RULES_VERSION: 4n }, { TICKET_RULES_VERSION: 2n }, { SINE_RULES_VERSION: Error('RPC unavailable') }]) {
+    const { read, calls } = sineReader(change)
+    await assert.rejects(readSineDeploymentState(read, factory, address('2')), /version|RPC unavailable/)
+    assert.equal(calls.some(call => call.name === 'sineParams' || call.name === 'sineV3Info'), false)
+  }
+})
 
 test('registry helper discovery requires the current getter and rejects failed or invalid reads', async () => {
   let reads = 0
@@ -128,4 +199,14 @@ test('rehearsal frontend reads stay local and cannot fall back to the real testn
   assert.match(env, /^VITE_RPC_URL=http:\/\/127\.0\.0\.1:18545$/m)
   assert.match(env, /^VITE_RPC_FALLBACK_URL=$/m)
   assert.doesNotMatch(env, /sepolia\.base|publicnode/)
+})
+
+test('sine data authentication checks the full STOP-prefixed runtime and exact length', () => {
+  const code = '0x000102030405'
+  const expected = { bytes: 6, hash: keccak256(code) }
+  assertSineDataMatches(code, expected, 'shard')
+  for (const altered of ['0x010102030405', '0x000102030406', '0x0001020304', '0x']) {
+    assert.throws(() => assertSineDataMatches(altered, expected, 'shard'), /differs/)
+  }
+  assert.throws(() => assertSineDataMatches(code, {...expected, bytes: 24577}, 'shard'), /differs/)
 })

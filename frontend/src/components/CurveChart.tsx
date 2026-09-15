@@ -179,7 +179,7 @@ export function CurveChartView({ round, hasTrades = true, entryPrice }: ChartPro
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-display text-lg text-text-hi">the curve</h2>
-          {round.sine?.truncated && <p role="status" className="text-xs text-phase-heat">The theoretical curve exceeds the chart range. Live balances below come from the contract.</p>}
+          {round.sine?.truncated && <p role="status" className="text-xs text-phase-heat">The chart has reached its supported range. Live balances below come from the contract.</p>}
           <p className="text-xs text-text-lo">
             x: mixETH reserve ({lin ? 'linear' : 'log'}) · y:{' '}
             {yMode === 'price' ? ` price (${lin ? 'linear' : 'log'})` : ' supply (linear)'}

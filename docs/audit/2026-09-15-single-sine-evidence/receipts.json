@@ -1,0 +1,537 @@
+{
+  "factory": "0x0165878a594ca255338adfa4d48449f69242eb8f",
+  "receipts": [
+    {
+      "functionName": "faucet",
+      "hash": "0x1983ee939153be0be95e6826f0abc950b5fda3405a4fbd2d0327c09889374429",
+      "status": "success",
+      "gas": "67791"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0xae7b640b953d0673fa3aa11b95a427c8a757060337cfb0f80a5aaee8cb9ccbfb",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x532fdde2d6461e51620525e04003b2889f57677150bfebcfd18b1a517a8b36b0",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "faucet",
+      "hash": "0x30d973ea59f2b8beab6f141b9b549fd40d5fce691fc44a909beed246aa1d2f37",
+      "status": "success",
+      "gas": "50691"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0xd66ad25298f9b19c11ec3da184e59df8ae9edca063441d1db2e35c6455e31dba",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x7bdbc781b1d67b1858085a5fe63219be2d1efa84645f2071cc21b88e34393646",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "faucet",
+      "hash": "0x12a2565342064715909e1b41730b9217c482a1d3a5833d1a892d25d0f3bc8a66",
+      "status": "success",
+      "gas": "50691"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x691d33c86b9552aac6f2030cce46156805211d8e7c496b9bdfb97d6696eb7864",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x8d836d219ee71d2f92c250df0b01718101f4603d0437e9729ba66c60e4ef5258",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "predepositWithPepe",
+      "hash": "0x5bd58b75c31b67db3f1aa804a79718e5423e7e3ff093fc554fa67821c3d8ca27",
+      "status": "success",
+      "gas": "341813"
+    },
+    {
+      "functionName": "predepositWithPepe",
+      "hash": "0x72d933a9998783a2eaaf451d54e4d833ca51f3c96276e4b816b37a11505e7e1f",
+      "status": "reverted",
+      "gas": "164313"
+    },
+    {
+      "functionName": "predepositWithPepe",
+      "hash": "0x8547493c25cf102ea5252ee0f1d9135c661502083f5a59f33df0b93273a9d744",
+      "status": "success",
+      "gas": "297840"
+    },
+    {
+      "functionName": "predepositWithPepe",
+      "hash": "0x1ba7d682eec933a5c064cb58bc789fd2914560a412f08f21095e14fd318fe3d2",
+      "status": "success",
+      "gas": "299326"
+    },
+    {
+      "functionName": "launchPooledBuy",
+      "hash": "0xd08b57af6580c4f13829f65677060717be7d08f12e572c39c0fe8db66e87d2a5",
+      "status": "reverted",
+      "gas": "35316"
+    },
+    {
+      "functionName": "launchPooledBuy",
+      "hash": "0xb58951a2bc11587e1ec64d10b41fb13ad8b07479ff79834ab8ffac914694114c",
+      "status": "success",
+      "gas": "714344"
+    },
+    {
+      "functionName": "claimPredepositPSP",
+      "hash": "0x7f974ebe7247011497566d7870c852076dbfd5dac10331d4a3cc0154b1c1ec12",
+      "status": "success",
+      "gas": "255116"
+    },
+    {
+      "functionName": "buyWithMixGuarded",
+      "hash": "0xbcd6aeaa4ba1b085db8b8f156392bd65f7f1fdfc0bae9f7a8d6182a3a3c84142",
+      "status": "success",
+      "gas": "557324"
+    },
+    {
+      "functionName": "buyWithMixGuarded",
+      "hash": "0xac0c412be2cdec66d7b31a4cd6921ae90e027382fbbc5225919860471a95d470",
+      "status": "reverted",
+      "gas": "162202"
+    },
+    {
+      "functionName": "buyWithMixGuarded",
+      "hash": "0xd7e8a2e9ec7de03ab8ff0a6bbbbb775f820f39d51bdb051a2178545dbbb29335",
+      "status": "success",
+      "gas": "521855"
+    },
+    {
+      "functionName": "buyWithMix",
+      "hash": "0x52cfec6d6742f2a3635ab8604e2f94057c312e1953b3dec24a1a86821a0f9af4",
+      "status": "reverted",
+      "gas": "161863"
+    },
+    {
+      "functionName": "buyWithMixGuarded",
+      "hash": "0x0b4eb4c7f46c44a1fe343ef2576c2585dde245e59a18f5168fe61da99dcb775a",
+      "status": "success",
+      "gas": "739511"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x5c5b95c0922fff8919355c4e928747b4d92a8db2d6043b921440da9585687d05",
+      "status": "success",
+      "gas": "46316"
+    },
+    {
+      "functionName": "sellToMix",
+      "hash": "0x685154611552a6b1fd7e7622b7c0c7b0a26c45579fd8b8eb960651cb9b350998",
+      "status": "success",
+      "gas": "1692486"
+    },
+    {
+      "functionName": "buyWithMix",
+      "hash": "0xf54c142af13db2fa288d643609c7f19a3b2e1fccc33e5ed692bd45f59e1f408a",
+      "status": "reverted",
+      "gas": "259901"
+    },
+    {
+      "functionName": "buyWithMixGuarded",
+      "hash": "0xf6e6876707a6a4769fd652d66445a9ff5db7c2fdb621d5307a0f1ee642b59785",
+      "status": "success",
+      "gas": "516377"
+    },
+    {
+      "functionName": "buyWithMixGuarded",
+      "hash": "0xb9f30c785059d759df7966af7412faf4cfd9c68d1e5ab3af8743eca40d95b912",
+      "status": "success",
+      "gas": "514144"
+    },
+    {
+      "functionName": "setApprovalForAll",
+      "hash": "0x9299c237520ba5d2a4915f57aaee8f49f230f230d0e0a9e08451396035b754f2",
+      "status": "success",
+      "gas": "46863"
+    },
+    {
+      "functionName": "reinvestAll",
+      "hash": "0x2f6c8139870310e8862f8e0113f98fd7eb14844ef2e377151b0737cd0a0bcf2a",
+      "status": "success",
+      "gas": "776011"
+    },
+    {
+      "functionName": "requestWithdraw",
+      "hash": "0xabff717ab37da4427aeadc342095ed0b353bb2c47634b0a818fde28f2076e7a0",
+      "status": "success",
+      "gas": "167982"
+    },
+    {
+      "functionName": "cancelWithdraw",
+      "hash": "0x66f0cdb662dd5fc996603c1ddad7a29b29e6af85926bb166f2771db857e98a92",
+      "status": "success",
+      "gas": "81745"
+    },
+    {
+      "functionName": "buyWithMix",
+      "hash": "0x42eb6d62e496c0e4f0323a9cf8272f31d4883ec96ce62fa870ca9d541431bdca",
+      "status": "reverted",
+      "gas": "152414"
+    },
+    {
+      "functionName": "detonate",
+      "hash": "0xc93b51c076fa329c1313981286d2eb1fa9550ddf83bb14d100e0700b762a926a",
+      "status": "success",
+      "gas": "82719"
+    },
+    {
+      "functionName": "claimPot",
+      "hash": "0xf16a2bfcfc273426a03a5f7261ea57cd33a0736d56f97a183a9c82abe632daa9",
+      "status": "success",
+      "gas": "327173"
+    },
+    {
+      "functionName": "claimPredepositPSP",
+      "hash": "0x0890d685720b1e8ac55c7d95913ad719ab987bc4e90b73c07b3cbc0545967a90",
+      "status": "success",
+      "gas": "421480"
+    },
+    {
+      "functionName": "withdraw",
+      "hash": "0x37d7dcf146c19ede9a0cfaa14e34fe396382d05ad9daed9c587beae2ca7fa0c8",
+      "status": "success",
+      "gas": "158624"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x9086b5dcfa5015c29fa20a2f4b9879411adc36c08f62062cce879c80f909429c",
+      "status": "success",
+      "gas": "46064"
+    },
+    {
+      "functionName": "redeemBacking",
+      "hash": "0x37e165a8dd8b289428c46b25ae5bdf0700988ea1bced80fd0fc8163c21a91f9e",
+      "status": "success",
+      "gas": "87011"
+    },
+    {
+      "functionName": "reserveSpawn",
+      "hash": "0x1a830d81663c7e2141a09dcce6a4c961d8775217d0824e0de9f3a628e7928bc9",
+      "status": "success",
+      "gas": "667530"
+    },
+    {
+      "functionName": "birthStep",
+      "hash": "0xdb6c9f340c146e73f8e448296e20e0e58af25437ea17994854a07a7c1472bc47",
+      "status": "success",
+      "gas": "9797172"
+    },
+    {
+      "functionName": "birthStep",
+      "hash": "0x6e6af465ff7d75d52424485e3994f034b549788b56f62ddf8cfde17ab157c743",
+      "status": "success",
+      "gas": "8899132"
+    },
+    {
+      "functionName": "birthStep",
+      "hash": "0xc758a1d80cd74b354d0e72e4d3aeb24e4dde215676aca765276d767aa8e6b0b2",
+      "status": "success",
+      "gas": "531603"
+    },
+    {
+      "functionName": "approve",
+      "hash": "0x30d9b8f4a9307e719763b268c63935485fc32ac7bb7a736f3b82223be1100278",
+      "status": "success",
+      "gas": "46283"
+    },
+    {
+      "functionName": "predepositWithPepe",
+      "hash": "0x0c3b89b777b101255a4091b18fd476e20f1ce547194dda0a0506e3c9b4812418",
+      "status": "success",
+      "gas": "341849"
+    },
+    {
+      "functionName": "launchPooledBuy",
+      "hash": "0xf74f02b14c4b374fe7aff8a6c877138778b4e785618793ad1dbcaddbdcf1ed00",
+      "status": "reverted",
+      "gas": "35316"
+    },
+    {
+      "functionName": "launchPooledBuy",
+      "hash": "0x1ef0554e36ccc1b68e289750d8898b59e87859641777bca0fd6d8443f71fc67c",
+      "status": "success",
+      "gas": "719928"
+    },
+    {
+      "functionName": "buyWithMix",
+      "hash": "0x446f0de3b22aef6749eda179343c0d054322ae6e9de8158bc11cdd4302d373df",
+      "status": "success",
+      "gas": "561469"
+    }
+  ],
+  "deploymentReceipts": [
+    {
+      "hash": "0x5ecf5c40b2f7d6c0c0c3b0db8ce5bcbac537d27da806ee101e7112e4a6b85c61",
+      "status": "success",
+      "gas": "849993",
+      "contract": "MockPoolManager"
+    },
+    {
+      "hash": "0x2e3442fd1eac83ba9117852fcd24a0eba81e4eac41530857b7657d7a3758c290",
+      "status": "success",
+      "gas": "760291",
+      "contract": "MockMixETH"
+    },
+    {
+      "hash": "0xf839ab25473e0b87d9b68f483dde29c08694509c8baf5b9d201c8b67fd6d945f",
+      "status": "success",
+      "gas": "2681594",
+      "contract": "SineV3Math"
+    },
+    {
+      "hash": "0x4b2b8a3bb0c6918be6a01098706219c82339c022d180408901a4ae9c98dd689e",
+      "status": "success",
+      "gas": "5594298",
+      "contract": "HookDeployer"
+    },
+    {
+      "hash": "0x68a6410ff28a7e016608ab3dc95b4ad9058f12bd5b9792a32eebb96089212773",
+      "status": "success",
+      "gas": "5956375",
+      "contract": "ControllerDeployer"
+    },
+    {
+      "hash": "0x221af0dc633015b83f6f034be8f556c3862dbf0a20f5fb49ec45e372e7b305e6",
+      "status": "success",
+      "gas": "4113095",
+      "contract": "StakerDeployer"
+    },
+    {
+      "hash": "0x117e9b86834bd7ecce9dd18cab69a301097dd4f5a4986e6dbeb22963438a1f99",
+      "status": "success",
+      "gas": "5696318",
+      "contract": "PSPFactory"
+    },
+    {
+      "hash": "0x5e64834e39dc51d58bb0b79532838c019283e18c9e57cce20a515f8ccf54db4c",
+      "status": "success",
+      "gas": "4678045",
+      "contract": "PepeExpandedDescriptor"
+    },
+    {
+      "hash": "0x648f3d6c97a5b5bcc9e892398c183c27be2ae54d82727af51544579fbcaf0e04",
+      "status": "success",
+      "gas": "45906",
+      "contract": "PSPFactory"
+    },
+    {
+      "hash": "0xc6fe587bca8f535dc29fd01331c6d6f23d0bd734a6775b76252b4050ff18fb7d",
+      "status": "success",
+      "gas": "46537",
+      "contract": "PSPFactory"
+    },
+    {
+      "hash": "0x568664ef79c8625ad93a4f8a69cf3c1fdbb28d5d9e46a5a2782ff49939c9adab",
+      "status": "success",
+      "gas": "3611000",
+      "contract": "PSPFactory"
+    },
+    {
+      "hash": "0xa22fc838e839fcce687454aa94767ec85b0ded2488bd08664a9a863a0d85ee6a",
+      "status": "success",
+      "gas": "9797169",
+      "contract": "PSPFactory"
+    },
+    {
+      "hash": "0x8503b810429af8a9cc5753ed8ec5dfaa161e9b9a7987ebcab6048d7e96303b51",
+      "status": "success",
+      "gas": "8899132",
+      "contract": "PSPFactory"
+    },
+    {
+      "hash": "0xa8c87667478f1e3514cf5ad45602810e1de7bc4e578de6942a36f39af861c32a",
+      "status": "success",
+      "gas": "541342",
+      "contract": "PSPFactory"
+    },
+    {
+      "hash": "0x045a4d7a4cf760bae4f71f28237db840d15dcfc68754c5997d0a2019724728dd",
+      "status": "success",
+      "gas": "932320",
+      "contract": "PSPFactory"
+    },
+    {
+      "hash": "0xb63fcc668dfb5ff558d5b833df4c602963f62a7f3b0e8bd7019b67768a67e937",
+      "status": "success",
+      "gas": "1053897",
+      "contract": "PSPZapIn"
+    },
+    {
+      "hash": "0x783f6e7ee2abf74cb279f1032df79bd48035cdf40b9d8ced6d4e152ac16480f8",
+      "status": "success",
+      "gas": "751754",
+      "contract": "PSPZapOut"
+    },
+    {
+      "hash": "0x2993998b81521c3de6b792471732e6a6232aad063636b97e52814c129f4865fe",
+      "status": "success",
+      "gas": "1283014",
+      "contract": "PSPReinvestor"
+    }
+  ],
+  "runtimeChecks": [
+    {
+      "address": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+      "name": "MockPoolManager",
+      "bytes": 3684
+    },
+    {
+      "address": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+      "name": "MockMixETH",
+      "bytes": 2902
+    },
+    {
+      "address": "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0",
+      "name": "SineV3Math",
+      "bytes": 12162
+    },
+    {
+      "address": "0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9",
+      "name": "HookDeployer",
+      "bytes": 2183
+    },
+    {
+      "address": "0xdc64a140aa3e981100a9beca4e685f962f0cf6c9",
+      "name": "ControllerDeployer",
+      "bytes": 17847
+    },
+    {
+      "address": "0x5fc8d32690cc91d4c39d9d3abcbd16989f875707",
+      "name": "StakerDeployer",
+      "bytes": 18821
+    },
+    {
+      "address": "0x0165878a594ca255338adfa4d48449f69242eb8f",
+      "name": "PSPFactory",
+      "bytes": 19795
+    },
+    {
+      "address": "0xa513e6e4b8f2a923d98304ec87f64353c4d5c853",
+      "name": "PepeExpandedDescriptor",
+      "bytes": 9470
+    },
+    {
+      "address": "0x0b306bf915c4d645ff596e518faf3f9669b97016",
+      "name": "PSPZapIn",
+      "bytes": 4627
+    },
+    {
+      "address": "0x959922be3caee4b8cd9a407cc3ac1c251c2007b1",
+      "name": "PSPZapOut",
+      "bytes": 3226
+    },
+    {
+      "address": "0x69800432d64889fa8bfB4Fe766af5e9f3410e119",
+      "name": "PSPToken",
+      "bytes": 3554
+    },
+    {
+      "address": "0xD59f8207f3d008e73A6d5A0eB7bD2b19A8DDA162",
+      "name": "RoundController",
+      "bytes": 12817
+    },
+    {
+      "address": "0x7a0acE5bD897B41CC46abeAB9D2f05A45516aA88",
+      "name": "CurveHook",
+      "bytes": 20261
+    },
+    {
+      "address": "0xAC3f52C3688b69496F2Fd4e675EfE86408e3A80A",
+      "name": "PSPStaker",
+      "bytes": 16914
+    },
+    {
+      "address": "0x4662F94e59787B7e221b213b67E84606525D93B6",
+      "name": "PSPReferralRegistry",
+      "bytes": 8660
+    },
+    {
+      "address": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
+      "name": "PSPReinvestor",
+      "bytes": 5297
+    },
+    {
+      "address": "0x123417900BC31A8F2C821dbe91BA6dDece866531",
+      "name": "PSPToken",
+      "bytes": 3554
+    },
+    {
+      "address": "0x72D65a29E0A33ff740903243c986d533456007EE",
+      "name": "RoundController",
+      "bytes": 12817
+    },
+    {
+      "address": "0x6ED3FcAF9FB3e4E94adDA4B037320b4bB18AEa88",
+      "name": "CurveHook",
+      "bytes": 20261
+    },
+    {
+      "address": "0x66ea45C11A0A41D58bcACE7dC09E5dD34d46AB48",
+      "name": "PSPStaker",
+      "bytes": 16914
+    },
+    {
+      "address": "0xdc2D55ead32f19Cc98CE8753e2cF0D7A3b93b6e6",
+      "name": "PSPReferralRegistry",
+      "bytes": 8660
+    },
+    {
+      "address": "0xd8058efe0198ae9dD7D563e1b4938Dcbc86A1F81",
+      "name": "HookInitCode",
+      "bytes": 876,
+      "codeHash": "0xa8ab54eae5f8e9138c96c049fa65468426e9d284caaac14e19bc3802e19ff1d5"
+    },
+    {
+      "address": "0x856e4424f806D16E8CBC702B3c0F2ede5468eae5",
+      "name": "ReferralRegistryInitCode",
+      "bytes": 9364,
+      "codeHash": "0xc5a3b0251179bfb4f2da14b698847ccf7b9793377c0e51f9bda1bcf1073332af"
+    },
+    {
+      "address": "0x3B02fF1e626Ed7a8fd6eC5299e2C54e1421B626B",
+      "name": "TokenDeployer",
+      "bytes": 5806,
+      "codeHash": "0xab720b835ad9b09610dbe90086b180fb49a9af5124ae15cca812705bfc38f6e6"
+    },
+    {
+      "address": "0x79F970a8456725f1CFB263a899522b629319C680",
+      "name": "HookCreationFirst",
+      "bytes": 10921,
+      "codeHash": "0x890bf5da88f3f5cf6640d78538eb3b31a45bacf63dfe7dbaf8e1b59c392b2287",
+      "dataMatchesArtifact": true
+    },
+    {
+      "address": "0xBeb9c0E2832cdA91a2eD0ef0bE49C6fBE76862BA",
+      "name": "HookCreationSecond",
+      "bytes": 10921,
+      "codeHash": "0xdf1afbd6357d0275e6666fe7d1741a95029c6ffa1fb623c9eb04bb3706bd19ad",
+      "dataMatchesArtifact": true
+    },
+    {
+      "address": "0x9bd03768a7DCc129555dE410FF8E85528A4F88b5",
+      "name": "ExpandedPepeArtData",
+      "bytes": 11731,
+      "codeHash": "0x1cb925751a6f9dde4fab64cd19d3d402c15fa7fd96bf17d810fad8ec364ec94f",
+      "dataMatchesSource": true
+    }
+  ]
+}

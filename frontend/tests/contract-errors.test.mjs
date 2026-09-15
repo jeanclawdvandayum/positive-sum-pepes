@@ -32,9 +32,10 @@ test('oversized swaps decode across the hook, routers, and nested V4 errors', ()
 })
 
 test('capacity and curve errors give useful feedback without changing unknown errors', () => {
-  for (const errorName of ['PredepositCapacityExceeded', 'FullMulDivFailed', 'MulWadFailed', 'DivWadFailed']) {
+  for (const errorName of ['FullMulDivFailed', 'MulWadFailed', 'DivWadFailed']) {
     assert.match(userFacingContractError(rpcFailure(encodeErrorResult({ abi: controllerAbi, errorName }))).message, /arithmetic capacity/)
   }
+  assert.match(userFacingContractError(rpcFailure(encodeErrorResult({ abi: controllerAbi, errorName: 'PredepositCapacityExceeded' }))).message, /supported launch capacity/)
   assert.match(userFacingContractError(rpcFailure(encodeErrorResult({ abi: hookAbi, errorName: 'ExpPriceArg' }))).message, /supported price range/)
   assert.match(userFacingContractError(rpcFailure(encodeErrorResult({ abi: hookAbi, errorName: 'InvalidParams' }))).message, /valid curve/)
   for (const error of [new Error('User rejected request'), new Error('RPC timeout'), new Error('Unknown revert 0x12345678'), 'unknown']) {
@@ -43,6 +44,19 @@ test('capacity and curve errors give useful feedback without changing unknown er
   const cyclic = new Error('Unknown failure')
   cyclic.cause = cyclic
   assert.equal(userFacingContractError(cyclic), cyclic)
+})
+
+test('v3 helper and round errors remain readable through V4 wrappers', () => {
+  for (const [errorName, message] of [
+    ['SineV3Domain', /supported reserve range/],
+    ['SineV3InverseDidNotConverge', /complete sell quote/],
+    ['InvalidRoundHook', /different round/],
+  ]) {
+    const reason = encodeErrorResult({ abi: hookAbi, errorName })
+    const data = encodeErrorResult({ abi: hookAbi, errorName: 'WrappedError',
+      args: ['0x0000000000000000000000000000000000000001', '0x12345678', reason, '0x'] })
+    assert.match(userFacingContractError(rpcFailure(data)).message, message)
+  }
 })
 
 test('capacity simulation failure never submits and shows a readable toast', async () => {

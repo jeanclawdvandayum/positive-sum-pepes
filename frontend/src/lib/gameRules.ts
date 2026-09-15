@@ -36,7 +36,7 @@ export function minimumBuyInput(
   ticketRules: bigint | undefined, ticketPrice: bigint | undefined,
 ): bigint | undefined {
   if (ticketRules === 3n) return ticketPrice !== undefined && ticketPrice > 0n ? ticketPrice : undefined
-  return MIN_BUY_INPUT
+  return ticketRules === 1n || ticketRules === 2n ? MIN_BUY_INPUT : undefined
 }
 
 /** A guarded v3 purchase carries the quoted ticket intent; a price move past

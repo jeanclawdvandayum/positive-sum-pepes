@@ -99,7 +99,7 @@ contract B6_GraveZap is BBase {
 
         vm.startPrank(carol);
         psp.approve(address(zap), type(uint256).max);
-        bytes memory reason = abi.encodeWithSelector(PSPStaker.NotNftOwner.selector);
+        bytes memory reason = abi.encodeWithSelector(PSPGraveZap.NotNftOwner.selector);
         vm.expectRevert(reason);
         zap.exit(address(hook), address(stakerV), _single(pepeId), amount, 0, 0);
         vm.stopPrank();
@@ -174,6 +174,49 @@ contract B6_GraveZap is BBase {
         vm.prank(alice);
         vm.expectRevert(PSPGraveZap.Expired.selector);
         zap.exit(address(hook), address(stakerV), _single(pepeId), 0, 0, block.timestamp - 1);
+    }
+
+    /// @notice Zap approval must not let a stranger redirect the owner's fees.
+    function test_B6h_ApprovedZapRejectsStrangerWithEarnedFees() public {
+        uint256 pepeId = _aliceStakes();
+        _bobBuysAndLocks(5e18);
+        _bomb();
+        uint256 fees = stakerV.pendingFeesOf(pepeId);
+        uint256 principal = _staked(pepeId);
+        assertGt(fees, 0, "victim has earned fees");
+        vm.prank(alice);
+        stakerV.setApprovalForAll(address(zap), true);
+
+        uint256 carolMix = mixETH.balanceOf(carol);
+        uint256 aliceMix = mixETH.balanceOf(alice);
+        uint256 alicePsp = psp.balanceOf(alice);
+        vm.prank(carol);
+        vm.expectRevert(PSPGraveZap.NotNftOwner.selector);
+        zap.exit(address(hook), address(stakerV), _single(pepeId), 0, 0, 0);
+
+        assertEq(stakerV.pendingFeesOf(pepeId), fees, "fees remain on the owner's position");
+        assertEq(_staked(pepeId), principal, "no forced withdrawal");
+        assertEq(mixETH.balanceOf(carol), carolMix, "stranger receives no fees");
+        assertEq(mixETH.balanceOf(alice), aliceMix, "owner fees remain unclaimed");
+        assertEq(psp.balanceOf(alice), alicePsp, "principal remains locked");
+    }
+
+    /// @notice Individual zap approval also cannot authorize a foreign caller.
+    function test_B6i_IndividualApprovalRejectsStrangerWithoutFees() public {
+        uint256 pepeId = _aliceStakes();
+        _bomb();
+        uint256 principal = _staked(pepeId);
+        vm.prank(alice);
+        stakerV.approve(address(zap), pepeId);
+
+        vm.prank(carol);
+        vm.expectRevert(PSPGraveZap.NotNftOwner.selector);
+        zap.exit(address(hook), address(stakerV), _single(pepeId), 0, 0, 0);
+        assertEq(_staked(pepeId), principal, "zero fees do not bypass the owner check");
+
+        vm.prank(alice);
+        zap.exit(address(hook), address(stakerV), _single(pepeId), 0, 0, 0);
+        assertEq(_staked(pepeId), 0, "the owner can still use individual approval");
     }
 
     function _single(uint256 id) internal pure returns (uint256[] memory ids) {

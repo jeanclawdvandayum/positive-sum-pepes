@@ -4,11 +4,14 @@ pragma solidity 0.8.26;
 import {RealV4Base} from "./RealV4Lifecycle.t.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {PSPReinvestor} from "../src/PSPReinvestor.sol";
 import {PSPStaker} from "../src/PSPStaker.sol";
 import {PSPZapIn} from "../src/PSPZapIn.sol";
 import {IPSPStaker} from "../src/interfaces/IPSPStaker.sol";
 import {IPSPZapIn} from "../src/interfaces/IPSPZapIn.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 
 /// @title ReinvestAttributionTest
 /// @notice AUD-14: real-V4 reinvestment keeps economic and event ownership.
@@ -17,6 +20,7 @@ contract ReinvestAttributionTest is RealV4Base {
     PSPStaker staking;
     address operator = makeAddr("reinvest-operator");
     uint256 ownerId;
+    bool requireRoundingRemainder;
 
     function setUp() public override {
         super.setUp();
@@ -45,6 +49,37 @@ contract ReinvestAttributionTest is RealV4Base {
     function test_OperatorReinvestCreditsOwnerNotCallerOrOrigin() public { _exercise(false, true); }
     function test_OwnerBatchReinvestCreditsSeatsEventsReferralsAndPot() public { _exercise(true, false); }
     function test_OperatorBatchReinvestCreditsOwnerNotCallerOrOrigin() public { _exercise(true, true); }
+
+    function test_DonatedPspCannotBlockRealV4BatchReinvestment() public {
+        zapIn.buyWithMix(poolKey, 1e18, 1, block.timestamp);
+        pspToken.transfer(address(reinvestor), 1001);
+        requireRoundingRemainder = true;
+        _exercise(true, false);
+    }
+
+    /// @notice A caller-selected hook cannot supply the reinvestment minimum.
+    function test_ForeignHookRejectedBeforeSingleOrBatchFeeClaim() public {
+        zapIn.buyWithMix(poolKey, 2e18, 1, block.timestamp);
+        uint256 fees = staking.pendingFeesOf(ownerId);
+        uint256 mixBefore = mixETH.balanceOf(address(reinvestor));
+        uint256 tickets = hook.ticketCount();
+        assertGt(fees, 0);
+        PoolKey memory wrongKey = poolKey;
+        wrongKey.hooks = IHooks(makeAddr("foreign-reinvest-hook"));
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = ownerId;
+
+        vm.startPrank(bob);
+        vm.expectRevert(PSPReinvestor.InvalidRoundHook.selector);
+        reinvestor.reinvest(ownerId, wrongKey, 1, block.timestamp);
+        vm.expectRevert(PSPReinvestor.InvalidRoundHook.selector);
+        reinvestor.reinvestAll(ids, wrongKey, 1, block.timestamp);
+        vm.stopPrank();
+
+        assertEq(staking.pendingFeesOf(ownerId), fees);
+        assertEq(mixETH.balanceOf(address(reinvestor)), mixBefore);
+        assertEq(hook.ticketCount(), tickets);
+    }
 
     function test_IndividualWrapperApprovalReinvestsOnlyItsPepe() public {
         vm.startPrank(bob);
@@ -133,6 +168,12 @@ contract ReinvestAttributionTest is RealV4Base {
         }
         assertGe(fees, 0.05e18, "test replaces all ten seats");
         uint256 quote = hook.getBuyOutput(fees);
+        uint256 pspBeforeReinvest = pspToken.balanceOf(address(reinvestor));
+        if (requireRoundingRemainder) {
+            uint256 total = amounts[0] + amounts[1];
+            uint256 rounded = Math.mulDiv(quote, amounts[0], total) + Math.mulDiv(quote, amounts[1], total);
+            assertLt(rounded, quote, "fixture must exercise the old dust failure");
+        }
         uint256 fee = fees * hook.swapFeeBps() / 10000;
         uint256 referral = (fee - fee * 6000 / 10000 - fee * 3500 / 10000) * 8000 / 10000;
         uint256 refBefore = hook.referralRegistry().claimableReferral(alice);
@@ -171,7 +212,7 @@ contract ReinvestAttributionTest is RealV4Base {
         }
         assertEq(staking.balanceOf(bob), nftsBefore);
         assertEq(pspToken.balanceOf(operator), 0);
-        assertLe(pspToken.balanceOf(address(reinvestor)), ids.length - 1);
+        assertEq(pspToken.balanceOf(address(reinvestor)), pspBeforeReinvest, "all newly bought PSP staked");
         assertEq(mixETH.balanceOf(address(reinvestor)), 0);
         vm.warp(hook.detonationAt());
         controller.detonate{gas: 1_000_000}();

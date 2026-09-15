@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { assertGameRules, MIN_BUY_INPUT, TIME_PER_UNIT, purchaseUnits, minimumOutput } from '../src/lib/gameRules.ts'
+import { assertGameRules, MIN_BUY_INPUT, TIME_PER_UNIT, purchaseUnits, minimumOutput,
+  potTicketPrice, minimumBuyInput, assertTicketGuard } from '../src/lib/gameRules.ts'
 
 test('minimum ladder threshold, multiple seats, and 69-second increments',()=>{
  assert.equal(purchaseUnits(MIN_BUY_INPUT-1n),0n)
@@ -44,4 +45,39 @@ test('linear tickets rise smoothly from the genesis pot and floor only whole tic
  assert.equal(TIME_PER_UNIT * 10n, 690n)
  assert.equal(purchaseUnits(wad, 0n), 0n)
  assert.throws(() => assertGameRules(MIN_BUY_INPUT, 69n, 0n), /different game rules/)
+})
+
+test('v3 tickets cover the whole pot with exact ceiling division through uint256 max', () => {
+ const max = 2n ** 256n - 1n
+ for (const pot of [0n, 1n, 9999n, 10000n, 10001n, 50n * 10n ** 18n, max]) {
+  const price = potTicketPrice(pot)
+  assert.ok(price >= 1n)
+  assert.ok(price * 10000n >= pot)
+  assert.ok(pot === 0n || (price - 1n) * 10000n < pot)
+  assert.equal(purchaseUnits(price, price), 1n)
+  assert.equal(purchaseUnits(price - 1n, price), 0n)
+  assert.equal(purchaseUnits(2n * price - 1n, price), 1n)
+ }
+ assert.equal(potTicketPrice(50n * 10n ** 18n), MIN_BUY_INPUT)
+ assert.throws(() => potTicketPrice(-1n))
+})
+
+test('v3 minimum is one exact current ticket and missing rules fail closed', () => {
+ for (const price of [1n, 999n, MIN_BUY_INPUT / 2n, MIN_BUY_INPUT * 2n]) {
+  assert.equal(minimumBuyInput(3n, price), price)
+  assert.doesNotThrow(() => assertGameRules(price, TIME_PER_UNIT, 3n))
+ }
+ for (const price of [undefined, 0n, -1n]) assert.equal(minimumBuyInput(3n, price), undefined)
+ for (const version of [undefined, 0n, 4n]) assert.equal(minimumBuyInput(version, 1n), undefined)
+ assert.equal(minimumBuyInput(2n, 1n), MIN_BUY_INPUT)
+})
+
+test('ticket guards reject missing and stale quotes without losing bigint precision', () => {
+ const price = 9007199254740993001n
+ assert.doesNotThrow(() => assertTicketGuard(price, price))
+ assert.doesNotThrow(() => assertTicketGuard(price, price - 1n))
+ assert.throws(() => assertTicketGuard(price, price + 1n), /price moved/)
+ assert.throws(() => assertTicketGuard(undefined, price), /no ticket price guard/)
+ assert.throws(() => assertTicketGuard(0n, price), /no ticket price guard/)
+ assert.throws(() => assertTicketGuard(price, undefined), /unavailable/)
 })

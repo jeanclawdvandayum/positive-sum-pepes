@@ -1,6 +1,7 @@
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
-import { sampleSineChart, sineChartHeadroom } from '../src/lib/sineChart.ts'
+import { SINE_V3, sampleSineChart, sineChartHeadroom } from '../src/lib/sineChart.ts'
 import { logTicks } from '../src/lib/chartTicks.ts'
 // Materialized coefficients read from deployed Base Sepolia round 1 after its
 // 500 mixETH genesis: price/supply at launch and wave seams come from the hook.
@@ -113,3 +114,39 @@ test('scaled rounds use wavelength headroom instead of a fixed 1000 mixETH jump'
  assert.equal(sineChartHeadroom(4.5,31.833333,1),1004.5);
  assert.equal(sineChartHeadroom(50000,1000,2),55000);
 });
+
+const v3 = [3n, 75000000000000n, 450n * 10n ** 18n, 955n * 10n ** 18n,
+  10000n * 10n ** 18n, 7711482365186207164818799n, '0x0000000000000000000000000000000000000001']
+
+test('v3 chart covers real reserves from zero with ten correct postlaunch milestones', () => {
+ const chart = sampleSineChart(v3, 450, 3)
+ assert.equal(chart.points[0].reserve, 0)
+ assert.equal(chart.points[0].supply, 0)
+ assert.equal(chart.markers.length, 11)
+ close(chart.markers[0].price, 0.000075, 1e-12)
+ close(chart.markers[10].price, 0.075, 1e-12)
+ assert.equal(chart.markers[10].reserve, 10000)
+ assert.ok(chart.points.every(p => p.reserve >= 0 && Number.isFinite(p.price) && p.supply >= 0))
+})
+
+test('v3 live chart stops at the current helper domain instead of quoting impossible states', () => {
+ for (const reserve of [4e6, 1e7, 1e59]) {
+  const chart = sampleSineChart(v3, reserve, 3)
+  assert.equal(chart.truncated, true)
+  assert.equal(chart.points.at(-1).reserve, 450 + 4096 * 955)
+  assert.ok(chart.points.every(p => p.reserve <= 450 + 4096 * 955))
+ }
+})
+
+test('v3 expands through wave 64 while preserving detail around the launch', () => {
+ const chart = sampleSineChart(v3, 150000, 3)
+ assert.equal(chart.truncated, false)
+ assert.ok(chart.points.at(-1).reserve > 150000)
+ assert.ok(chart.points.filter(p => p.reserve >= 450 && p.reserve <= 10000).length > 1000)
+ assert.ok(chart.points.length < 8300)
+})
+
+test('v3 chart capacity matches the generated settlement data', () => {
+ const generated = JSON.parse(readFileSync(new URL('../../scripts/sine_v3_data.json', import.meta.url)))
+ assert.equal(SINE_V3.maxWaves, Number(generated.maximumPhase))
+})

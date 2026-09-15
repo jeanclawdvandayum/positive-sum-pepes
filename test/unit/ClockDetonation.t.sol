@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SineV3Math} from "../../src/SineV3Math.sol";
+import {SineV3TestData as SineV3Data} from "../helpers/SineV3TestData.sol";
 import {IPoolManager, SwapParams} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
@@ -756,7 +757,7 @@ contract DetWindowTunable is CBase {
             new HookDeployer(),
             new ControllerDeployer(),
             new StakerDeployer(),
-            address(new SineV3Math()),
+            address(new SineV3Math(SineV3Data.deploy())),
             CurveMath.packTimingsCapped(2 hours, 1 hours, 30 minutes, 10),
             address(this)
         );

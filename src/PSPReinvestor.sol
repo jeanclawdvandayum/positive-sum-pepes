@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
@@ -40,6 +41,7 @@ contract PSPReinvestor is ReentrancyGuard {
     error DustStranded(uint256 pspLeft);
     error Unauthorized();
     error InvalidBatch();
+    error InvalidRoundHook();
 
     event Reinvested(address indexed owner, uint256 indexed pepeId, uint256 mixIn, uint256 pspStaked);
     event ReinvestedAll(address indexed owner, uint256 count, uint256 mixIn, uint256 pspStaked);
@@ -61,6 +63,7 @@ contract PSPReinvestor is ReentrancyGuard {
         // AUD-9: approving this contract does not authorize strangers to
         // choose a victim's trade timing or slippage (or mix owners in a batch).
         _requireAuthorized(owner, pepeId);
+        _requireRoundHook(key);
         // fail fast: stakeFor reverts on a decaying position (RequestActive) —
         // surface that BEFORE the claim+buy legs run
         if (staker.isWithdrawing(pepeId)) revert NothingToReinvest();
@@ -100,6 +103,7 @@ contract PSPReinvestor is ReentrancyGuard {
             _requireAuthorized(owner, pepeIds[i]);
             for (uint256 j; j < i; ++j) if (pepeIds[i] == pepeIds[j]) revert InvalidBatch();
         }
+        _requireRoundHook(key);
         uint256 mixBefore = mix.balanceOf(address(this));
         staker.claimAllTo(pepeIds, address(this));
         uint256 mixIn = mix.balanceOf(address(this)) - mixBefore;
@@ -108,9 +112,13 @@ contract PSPReinvestor is ReentrancyGuard {
         // fail fast on any decaying pepe (stakeFor would revert post-buy)
         // and size the proportional split basis
         uint256 totalShare;
+        uint256 lastWeightedIndex;
+        uint256[] memory amounts = new uint256[](pepeIds.length);
         for (uint256 i; i < pepeIds.length; ++i) {
             IPSPStaker.PositionView memory pos = staker.positions(pepeIds[i]);
             if (staker.isWithdrawing(pepeIds[i])) revert NothingToReinvest();
+            amounts[i] = pos.amount;
+            if (pos.amount != 0) lastWeightedIndex = i;
             totalShare += pos.amount;
         }
         if (totalShare == 0) revert NothingToReinvest();
@@ -119,16 +127,26 @@ contract PSPReinvestor is ReentrancyGuard {
         zapIn.buyWithMixFor(key, mixIn, minPspOut, deadline, owner);
         uint256 bought = psp.balanceOf(address(this)) - pspBefore;
 
-        // spread the buy proportionally across the claimed pepes
+        // V3-INT-4: fullMulDiv avoids overflow for large valid positions.
+        // Assign the exact remainder to the final funded position, so batch
+        // rounding cannot accumulate dust or let a donation block reinvestment.
+        uint256 allocated;
         for (uint256 i; i < pepeIds.length; ++i) {
-            uint256 share = (bought * staker.positions(pepeIds[i]).amount) / totalShare;
+            if (amounts[i] == 0) continue;
+            uint256 share = i == lastWeightedIndex ? bought - allocated : Math.mulDiv(bought, amounts[i], totalShare);
+            allocated += share;
             if (share != 0) staker.stakeFor(owner, pepeIds[i], share);
         }
 
         uint256 left = psp.balanceOf(address(this));
-        if (left > pspBefore && left > 1e3) revert DustStranded(left);
+        if (left != pspBefore) revert DustStranded(left);
 
         emit ReinvestedAll(owner, pepeIds.length, mixIn, bought);
+    }
+
+    /// @dev Read the minimum only from the NFT's own round (AUD-V3-8).
+    function _requireRoundHook(PoolKey calldata key) private view {
+        if (address(key.hooks) != staker.controller().hookAddress()) revert InvalidRoundHook();
     }
 
     /// @dev Approving the wrapper never authorizes an unrelated caller. An

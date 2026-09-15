@@ -12,12 +12,12 @@ import CurveExplainer from './explainer/CurveExplainer'
 const BEATS: { name: string; copy: string; kind: BeatKind }[] = [
   {
     name: 'crash the opening party.',
-    copy: 'three days. uncapped IBCO. pick your pepe and join the pooled opening buy. your deposit reserves that face and determines your share. the opening belongs to the people who show up.',
+    copy: 'three days. public IBCO. pick your pepe and join the pooled opening buy. your deposit reserves that face and determines your share. the opening belongs to the people who show up.',
     kind: 'predeposit',
   },
   {
     name: 'give the chart a pulse.',
-    copy: 'the IBCO sets the scale of the sine curve. smaller openings reach the third wave at lower reserves. larger openings need more. the default third-wave price is about 800 times the launch price. room to accumulate, room for chaos.',
+    copy: 'one sine curve runs through the IBCO and trading. ten waves reach 1,000 times the launch price. softened cube-root growth gives earlier waves larger percentage gains. wave width scales with the square root of the opening backing.',
     kind: 'curve',
   },
   {
@@ -53,12 +53,12 @@ const BEATS: { name: string; copy: string; kind: BeatKind }[] = [
 ]
 
 const RULES: [string, string][] = [
-  ['buying in', 'the minimum buy is 0.005 mixETH, including fees. ladder tickets start at 0.005 mixETH. their price rises smoothly by 0.42% of that starting price per mixETH added to the pot after genesis. one wallet can hold several spots.'],
+  ['buying in', 'the minimum gross buy equals one current ladder spot. each spot costs the whole accounted pot divided by 10,000, rounded up to wei, with a one-wei floor. the initial pot counts. one wallet can hold several spots.'],
   ['feeding the clock', 'each whole ticket adds up to 69 seconds, capped at the round’s starting duration. the default maximum is 69 hours, 4 minutes and 20 seconds. test rounds can use shorter clocks. ten tickets add up to 11 minutes and 30 seconds. each buy uses the ticket price before its fees enter the pot.'],
   ['hitting zero', 'the countdown starts at launch. trading stops at zero. anyone can detonate the round to settle the ladder and open the staking locks.'],
   ['ladder payouts', 'with ten tickets, the pot splits 25/18/14/10/8/7/6/5/4/3% from newest to oldest.'],
   ['smaller ladders', 'one ticket gets the whole pot. with two to nine tickets, each gets a larger share using the same relative weights.'],
-  ['trading fees', '60% of each trading fee goes to stakers and 35% goes to the pot.'],
+  ['trading fees', 'the fee starts at 10% and decreases with reserves to 2.5% at wave ten. 60% of each fee goes to stakers and 35% goes to the pot.'],
   ['referrals', 'with a recorded referral, the final 5% goes to the referral chain. for everyone else, 4% goes to the pot and 1% goes to the deployer.'],
   ['cashing out', 'ladder winnings stay claimable after detonation. PSP redeems for its proportional share of that round’s remaining mixETH, with payouts rounded down.'],
   ['what’s immutable', 'each round’s deployed contract code stays fixed. the factory owner retains controls for future curves and artwork, the stored UI and pending round reservations.'],
@@ -69,6 +69,7 @@ export default function Landing() {
 
   return (
     <div className="xd-page font-body text-text-hi">
+      <p className="pt-4 text-xs text-text-lo">new deployment rules · existing rounds keep their original curve and ticket rules.</p>
       <DiagramStyles />
 
       <section className="grid items-center gap-10 pt-10 pb-4 sm:pt-14 lg:grid-cols-[minmax(0,1fr)_17.25rem] lg:gap-12">
