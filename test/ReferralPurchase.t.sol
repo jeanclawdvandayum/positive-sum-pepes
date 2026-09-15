@@ -229,7 +229,7 @@ contract ReferralPurchaseTest is RealV4Base {
 
     function test_CallbackCannotSpendStandingAllowance() public {
         bytes memory payload = abi.encode(PSPReferralRegistry.Purchase(poolKey, 1e18, 1, alice,
-            Currency.unwrap(poolKey.currency0) == address(mixETH)));
+            Currency.unwrap(poolKey.currency0) == address(mixETH), 0));
         vm.expectRevert(PSPReferralRegistry.UnauthorizedCallback.selector);
         reg.unlockCallback(payload);
         vm.prank(address(poolManager));

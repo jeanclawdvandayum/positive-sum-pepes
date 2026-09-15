@@ -40,6 +40,7 @@ contract PSPZapIn {
         uint256 minPspOut;
         address to;
         address trader;   // ladder/event beneficiary and recorded referral identity
+        uint256 maxTicketPrice; // v3 ticket-intent guard; 0 = unguarded
     }
 
     constructor(IMixETH _mixETH, IPoolManager _poolManager) {
@@ -94,7 +95,7 @@ contract PSPZapIn {
         bytes memory result = poolManager.unlock(
             abi.encode(BuyData({
                 key: key, mixIn: mixIn, minPspOut: minPspOut, to: msg.sender,
-                trader: msg.sender
+                trader: msg.sender, maxTicketPrice: 0
             }))
         );
         pspOut = abi.decode(result, (uint256));
@@ -128,7 +129,34 @@ contract PSPZapIn {
         return _buyWithMix(key, mixIn, minPspOut, deadline, trader);
     }
 
+    /// @notice Guarded spend: additionally reverts (TicketPriceMoved,
+    ///         wrapped by V4) when the round's ticket price rose past the
+    ///         quoted `maxTicketPrice` before execution — protecting the
+    ///         TICKET COUNT a quote showed, which PSP slippage cannot.
+    function buyWithMixGuarded(PoolKey calldata key, uint256 mixIn, uint256 minPspOut, uint256 deadline, uint256 maxTicketPrice)
+        external
+        returns (uint256 pspOut)
+    {
+        return _buyWithMix(key, mixIn, minPspOut, deadline, msg.sender, maxTicketPrice);
+    }
+
+    /// @notice Guarded beneficiary variant (compounders / owners).
+    function buyWithMixForGuarded(PoolKey calldata key, uint256 mixIn, uint256 minPspOut, uint256 deadline, address trader, uint256 maxTicketPrice)
+        external
+        returns (uint256 pspOut)
+    {
+        if (trader == address(0)) revert ZeroTrader();
+        return _buyWithMix(key, mixIn, minPspOut, deadline, trader, maxTicketPrice);
+    }
+
     function _buyWithMix(PoolKey calldata key, uint256 mixIn, uint256 minPspOut, uint256 deadline, address trader)
+        internal
+        returns (uint256 pspOut)
+    {
+        return _buyWithMix(key, mixIn, minPspOut, deadline, trader, 0);
+    }
+
+    function _buyWithMix(PoolKey calldata key, uint256 mixIn, uint256 minPspOut, uint256 deadline, address trader, uint256 maxTicketPrice)
         internal
         returns (uint256 pspOut)
     {
@@ -144,7 +172,7 @@ contract PSPZapIn {
         bytes memory result = poolManager.unlock(
             abi.encode(BuyData({
                 key: key, mixIn: mixIn, minPspOut: minPspOut, to: msg.sender,
-                trader: trader
+                trader: trader, maxTicketPrice: maxTicketPrice
             }))
         );
         pspOut = abi.decode(result, (uint256));
@@ -188,8 +216,9 @@ contract PSPZapIn {
             // ALWAYS carry the trader — an attributed trader must keep
             // paying their chain on every trade, including plain ones
             // (empty hookData made the hook see trader == 0 and skip
-            // payouts entirely; fixed 2026-08-19)
-            abi.encode(d.trader)
+            // payouts entirely; fixed 2026-08-19). Guarded routes append
+            // the quoted ticket-price bound as a second word.
+            d.maxTicketPrice != 0 ? abi.encode(d.trader, d.maxTicketPrice) : abi.encode(d.trader)
         );
 
         // PSP delta is positive (owed to us); take it for the caller.

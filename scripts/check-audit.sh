@@ -8,6 +8,7 @@ node script/expanded-art-fixtures.mjs --check
 bash scripts/check-no-governance.sh
 python3 scripts/check-sizes.py
 python3 scripts/sine_oracle.py --check
+python3 scripts/sine_v3.py --check
 node --experimental-strip-types frontend/scripts/check-abi.mjs
 node --experimental-strip-types --test frontend/tests/*.test.mjs
 node --experimental-strip-types --test scripts/names/*.test.mjs

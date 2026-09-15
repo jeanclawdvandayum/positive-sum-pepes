@@ -53,6 +53,7 @@ contract CurveHook is BaseHook {
     error ZeroDeployerCut(); // CLOCK-REDESIGN §3: deployerCutTo must be a real address
     error ZeroTable(); // v3: the sine helper address must be real
     error InvalidSineParams(); // v3: launch spot price out of bounds
+    error TicketPriceMoved(); // v3: guarded route quoted a lower ticket price
     error TradingHalted(); // CLOCK-REDESIGN §1: block.timestamp >= detonationAt — the round is dead
     error NotDetonated(); // claims open only once the clock struck zero and detonate() ran
     error BadSeatIndex(); // board(i) out of the seated window
@@ -419,12 +420,15 @@ contract CurveHook is BaseHook {
         // (router-direct swaps, empty) trades unattributed — the 5%-of-fee
         // referral leg then re-splits 4% pot / 1% deployerCredit (§3 REVISED).
         address refTrader;
+        uint256 maxTicketPrice; // v3 ticket-intent guard; 0 = unguarded
         if (hookData.length == 32) {
             refTrader = abi.decode(hookData, (address));
+        } else if (hookData.length == 64) {
+            (refTrader, maxTicketPrice) = abi.decode(hookData, (address, uint256));
         }
 
         if (isBuy) {
-            return _handleBuy(sender, key, params, inputAmount, mixETH, psp, refTrader);
+            return _handleBuy(sender, key, params, inputAmount, mixETH, psp, refTrader, maxTicketPrice);
         } else {
             return _handleSell(key, params, inputAmount, mixETH, psp, refTrader);
         }
@@ -499,7 +503,7 @@ contract CurveHook is BaseHook {
     // ─────────────── Buy Logic ───────────────
 
     function _handleBuy(address sender, PoolKey calldata key, SwapParams calldata params, uint256 mixETHInput,
-        Currency mixETH, Currency psp, address refTrader)
+        Currency mixETH, Currency psp, address refTrader, uint256 maxTicketPrice)
         internal returns (bytes4, BeforeSwapDelta, uint24)
     {
         if (mode == Mode.Flat) {
@@ -517,6 +521,9 @@ contract CurveHook is BaseHook {
         // the historical 0.005 floor and zero-ticket trades.
         uint256 tp = ticketPrice();
         if (mixETHInput < (sineConfigured ? tp : GameRules.MIN_BUY)) revert SwapTooSmall();
+        // Ticket-intent guard (v3 §4.5): a guarded route pins the price it
+        // quoted — PSP slippage alone cannot protect the ticket COUNT.
+        if (maxTicketPrice != 0 && tp > maxTicketPrice) revert TicketPriceMoved();
 
         // NK24 fix: mixETH is the unit of account — the curve is solved
         // directly in mixETH. No vault-rate read anywhere in this path.

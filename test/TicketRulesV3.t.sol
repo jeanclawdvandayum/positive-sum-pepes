@@ -170,6 +170,29 @@ contract TicketRulesV3Test is RealV4Base {
         assertEq(hook.sinePriceAt(rBefore), pBefore, "same reserve, same price");
     }
 
+    /// Ticket-intent guard: a guarded route reverts TicketPriceMoved when
+    /// the pot grew past the quoted bound between quote and execution;
+    /// PSP-output slippage alone cannot protect the ticket count.
+    function test_GuardedRoutePinsTheQuotedTicketPrice() public {
+        uint256 quoted = hook.ticketPrice();
+        // a stranger's buy reprices tickets before alice's guarded buy lands
+        _buyAs(bob, quoted * 50);
+        uint256 grown = hook.ticketPrice();
+        assertGt(grown, quoted, "pot grew");
+        mixETH.transfer(alice, 100e18);
+        vm.startPrank(alice);
+        mixETH.approve(address(zapIn), type(uint256).max);
+        vm.expectRevert(); // V4 wraps TicketPriceMoved
+        zapIn.buyWithMixGuarded(poolKey, quoted * 10, 1, block.timestamp, quoted);
+        vm.stopPrank();
+        // price back inside the bound: passes, earns at the LIVE price
+        uint256 tickets = hook.ticketCount();
+        uint256 tp = hook.ticketPrice();
+        vm.prank(alice);
+        zapIn.buyWithMixGuarded(poolKey, tp * 10, 1, block.timestamp, grown * 2);
+        assertEq(hook.ticketCount(), tickets + 10, "ten tickets at the live price");
+    }
+
     /// The price base is the ACCOUNTED pot, never the raw balance: a direct
     /// ERC-20 donation to the hook cannot reprice tickets.
     function test_RawDonationDoesNotReprice() public {

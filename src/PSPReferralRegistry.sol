@@ -84,6 +84,7 @@ contract PSPReferralRegistry is ReentrancyGuard {
         uint256 minPspOut;
         address buyer;
         bool mixIsZero;
+        uint256 maxTicketPrice; // v3 ticket-intent guard; 0 = unguarded
     }
     address private activeManager;
     bytes32 private activePurchase;
@@ -180,6 +181,23 @@ contract PSPReferralRegistry is ReentrancyGuard {
         PoolKey calldata key, uint256 mixIn, uint256 minPspOut,
         uint256 deadline, uint256 referrerNftId
     ) external nonReentrant returns (uint256 pspOut) {
+        return _buyWithMix(key, mixIn, minPspOut, deadline, referrerNftId, 0);
+    }
+
+    /// @notice Guarded referral purchase: also reverts (TicketPriceMoved,
+    ///         wrapped by V4) if the round's ticket price rose past the
+    ///         quoted bound — the ticket count a quote showed stays honest.
+    function buyWithMixGuarded(
+        PoolKey calldata key, uint256 mixIn, uint256 minPspOut,
+        uint256 deadline, uint256 referrerNftId, uint256 maxTicketPrice
+    ) external nonReentrant returns (uint256 pspOut) {
+        return _buyWithMix(key, mixIn, minPspOut, deadline, referrerNftId, maxTicketPrice);
+    }
+
+    function _buyWithMix(
+        PoolKey calldata key, uint256 mixIn, uint256 minPspOut,
+        uint256 deadline, uint256 referrerNftId, uint256 maxTicketPrice
+    ) internal returns (uint256 pspOut) {
         if (mixIn == 0 || mixIn > uint256(uint128(type(int128).max))) revert BadAmount();
         if (deadline != 0 && block.timestamp > deadline) revert Expired();
         IRoundController ctl = IReferralStaker(address(staker)).controller();
@@ -198,7 +216,7 @@ contract PSPReferralRegistry is ReentrancyGuard {
             else emit ReferralSkipped(msg.sender, referrerNftId, reason);
         }
         IPoolManager manager = IReferralHook(address(key.hooks)).poolManager();
-        bytes memory data = abi.encode(Purchase(key, mixIn, minPspOut, msg.sender, mixIsZero));
+        bytes memory data = abi.encode(Purchase(key, mixIn, minPspOut, msg.sender, mixIsZero, maxTicketPrice));
         activeManager = address(manager);
         activePurchase = keccak256(data);
         pspOut = abi.decode(manager.unlock(data), (uint256));
@@ -221,7 +239,7 @@ contract PSPReferralRegistry is ReentrancyGuard {
             amountSpecified: -int256(p.mixIn),
             sqrtPriceLimitX96: p.mixIsZero ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1,
             zeroForOne: p.mixIsZero
-        }), abi.encode(p.buyer));
+        }), p.maxTicketPrice != 0 ? abi.encode(p.buyer, p.maxTicketPrice) : abi.encode(p.buyer));
         int256 output = p.mixIsZero ? delta.amount1() : delta.amount0();
         if (output <= 0 || uint256(output) < p.minPspOut) revert InsufficientOutput();
         manager.take(p.mixIsZero ? p.key.currency1 : p.key.currency0, p.buyer, uint256(output));
