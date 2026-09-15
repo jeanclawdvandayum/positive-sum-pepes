@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { encodeErrorResult, toFunctionSelector } from 'viem'
+import { encodeErrorResult, parseAbi, toFunctionSelector } from 'viem'
 import { controllerAbi, hookAbi, zapInAbi, zapOutAbi, registryAbi, reinvestorAbi } from '../src/lib/abi.ts'
 import { userFacingContractError } from '../src/lib/contractErrors.ts'
 import { userFacingRpcError } from '../src/lib/rpcErrors.ts'
@@ -35,7 +35,7 @@ test('capacity and curve errors give useful feedback without changing unknown er
   for (const errorName of ['FullMulDivFailed', 'MulWadFailed', 'DivWadFailed']) {
     assert.match(userFacingContractError(rpcFailure(encodeErrorResult({ abi: controllerAbi, errorName }))).message, /arithmetic capacity/)
   }
-  assert.match(userFacingContractError(rpcFailure(encodeErrorResult({ abi: controllerAbi, errorName: 'PredepositCapacityExceeded' }))).message, /supported launch capacity/)
+  assert.match(userFacingContractError(rpcFailure(encodeErrorResult({ abi: controllerAbi, errorName: 'PredepositCapacityExceeded' }))).message, /too small at its launch price/)
   assert.match(userFacingContractError(rpcFailure(encodeErrorResult({ abi: hookAbi, errorName: 'ExpPriceArg' }))).message, /supported price range/)
   assert.match(userFacingContractError(rpcFailure(encodeErrorResult({ abi: hookAbi, errorName: 'InvalidParams' }))).message, /valid curve/)
   for (const error of [new Error('User rejected request'), new Error('RPC timeout'), new Error('Unknown revert 0x12345678'), 'unknown']) {
@@ -56,6 +56,31 @@ test('v3 helper and round errors remain readable through V4 wrappers', () => {
     const data = encodeErrorResult({ abi: hookAbi, errorName: 'WrappedError',
       args: ['0x0000000000000000000000000000000000000001', '0x12345678', reason, '0x'] })
     assert.match(userFacingContractError(rpcFailure(data)).message, message)
+  }
+})
+
+test('monotone-core errors decode from bare selectors and wrapped data', () => {
+  // The new primitive/price errors are declared in contractErrors' own ABI,
+  // not in the per-contract ABIs — encode from the bare signature.
+  const coreAbi = parseAbi([
+    'error SineV3PriceDomain()', 'error SineV3PriceOverflow()', 'error SineV3PrimitiveDomain()',
+    'error SineV3Coefficient()', 'error SineV3DataMismatch()',
+  ])
+  for (const [errorName, message] of [
+    ['SineV3PriceDomain', /cannot represent/],
+    ['SineV3PriceOverflow', /cannot represent/],
+    ['SineV3PrimitiveDomain', /supported reserve range/],
+    ['SineV3Coefficient', /consistency check/],
+    ['SineV3DataMismatch', /deployment record/],
+  ]) {
+    const reason = encodeErrorResult({ abi: coreAbi, errorName })
+    assert.match(userFacingContractError(rpcFailure(reason)).message, message)
+    const wrappedData = encodeErrorResult({ abi: hookAbi, errorName: 'WrappedError',
+      args: ['0x0000000000000000000000000000000000000001', '0x12345678', reason, '0x'] })
+    assert.match(userFacingContractError(rpcFailure(wrappedData)).message, message)
+    // Bare four-byte selector in a message string also resolves.
+    const bare = new Error(`Unable to decode signature "${toFunctionSelector(`${errorName}()`)}"`)
+    assert.match(userFacingContractError(bare).message, message)
   }
 })
 
