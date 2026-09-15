@@ -57,6 +57,10 @@ eq(await read(ctrl,'RoundController','PREDEPOSIT_RULES_VERSION'),2n)
 eq(await read(ctrl,'RoundController','PREDEPOSIT_DURATION'),259200n)
 eq(await read(ctrl,'RoundController','VEST_DURATION'),2419200n)
 // Check every deployment receipt and creation runtime from the local chain.
+// The four data shards deploy from inside the SineV3Data library, so the
+// broadcast records them as CREATEs without artifact names — name them by
+// deploy order; the shard byte-identity check below proves the mapping.
+let unnamedShard = 0
 for(const t of broadcast.transactions) {
  const receipt=await client.getTransactionReceipt({hash:t.hash})
  eq(receipt.status,'success')
@@ -64,7 +68,8 @@ for(const t of broadcast.transactions) {
  deploymentReceipts.push({hash:t.hash,status:receipt.status,gas:receipt.gasUsed.toString(),contract: t.contractName})
  if(t.transactionType==='CREATE') {
   eq(receipt.contractAddress?.toLowerCase(),t.contractAddress.toLowerCase())
-  await runtime(receipt.contractAddress,t.contractName)
+  const name = t.contractName ?? `SineV3Data${unnamedShard++}`
+  await runtime(receipt.contractAddress,name)
  }
 }
 for(const [address,name] of [[token,'PSPToken'],[ctrl,'RoundController'],[hook,'CurveHook'],[staker,'PSPStaker'],
