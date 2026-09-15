@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {SineV3Math} from "src/SineV3Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IPoolManager, SwapParams} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
@@ -36,8 +37,9 @@ contract UncappedCapacityTest is Test {
         manager = new MockPoolManager();
         factory = new PSPFactory(IPoolManager(address(manager)), IERC20(address(mix)),
             new HookDeployer(), new ControllerDeployer(), new StakerDeployer(),
+            address(new SineV3Math()),
             CurveMath.packTimingsCapped(60, 120, 180, 0), address(this));
-        factory.configureSine(SineMath.Params(1e13, 4_477_562_267_871_699, 0.06e18, 10_000e18, 10000));
+        factory.configureSineV3(75_000_000_000_000);
         factory.deployRound(PSPFactory.RoundParams("PSP", "PSP", CurveMath.singleCurve(
             0.001e18, 1_000_000e18, 0.0000000046e18, 0.05e18)));
         round = factory.getRound(1);
@@ -77,11 +79,14 @@ contract UncappedCapacityTest is Test {
     }
 
     function test_LargeIBCOLaunchClaimsAndDirectRedemption() public {
-        _deposit(round.controller, alice, 1e37);
-        _deposit(round.controller, bob, 2e37);
+        // v3 supported ceiling: ~576k mix gross (net boot <= ~518,841 mix —
+        // the helper's 16-wave prelaunch table edge). The old 1e37-scale
+        // boots are arithmetic capacity errors by design now.
+        _deposit(round.controller, alice, 150_000e18);
+        _deposit(round.controller, bob, 300_000e18);
         _launch();
         uint256 snapshot = round.controller.genesisPSPSnapshot();
-        uint256 expected = Math.mulDiv(snapshot, 1e37, 3e37);
+        uint256 expected = Math.mulDiv(snapshot, 150_000e18, 450_000e18);
         vm.prank(alice);
         round.controller.claimPredepositPSP();
         PSPStaker staker = round.controller.staker();
@@ -95,7 +100,7 @@ contract UncappedCapacityTest is Test {
         round.token.approve(address(round.hook), principal);
         uint256 paid = round.hook.redeemBacking(principal);
         vm.stopPrank();
-        assertApproxEqAbs(paid, 1e37, 1);
+        assertApproxEqAbs(paid, 150_000e18, 1);
     }
 
     function test_UnrepresentableDepositRollsBackBeforeItCanPoisonLaunch() public {
@@ -133,7 +138,7 @@ contract UncappedCapacityTest is Test {
     }
 
     function test_V4RejectsInputsBeyondSigned128Bits() public {
-        _deposit(round.controller, alice, 1e37);
+        _deposit(round.controller, alice, 450_000e18); // top of the supported band
         _launch();
         uint256 oversized = uint256(uint128(type(int128).max)) + 1;
         _expectSwapTooLarge(true, oversized);
@@ -143,28 +148,52 @@ contract UncappedCapacityTest is Test {
         _expectSwapTooLarge(false, oversized);
     }
 
-    function test_V4RejectsBuyOutputBeyondSigned128Bits() public {
-        _deposit(round.controller, alice, 1e37);
+    function test_V4RejectsBuyBeyondTheWaveDomain() public {
+        // v3 fixed-shape curves cap Q at ~5e29 PSP-wei — a buy output can no
+        // longer approach int128. The equivalent protection is the explicit
+        // domain capacity error, raised BEFORE any state change.
+        _deposit(round.controller, alice, 450_000e18);
         _launch();
-        _expectSwapTooLarge(true, 1e35);
+        PoolKey memory key = _key();
+        bool buyZeroForOne = Currency.unwrap(key.currency0) == address(mix);
+        uint256 reserves = round.hook.reserveMixETH();
+        uint256 supply = round.hook.totalSupplyPSP();
+        vm.prank(address(manager));
+        vm.expectRevert(SineV3Math.SineV3Domain.selector);
+        round.hook.beforeSwap(alice, key, SwapParams(buyZeroForOne, -int256(1e35), 0), "");
+        assertEq(round.hook.reserveMixETH(), reserves);
+        assertEq(round.hook.totalSupplyPSP(), supply);
     }
 
     function test_V4RejectsOversizedActiveAndFlatSellOutputs() public {
-        // A supported high-price custom curve makes an in-range PSP input
-        // produce an out-of-range mixETH output.
+        // v3 fixed curve tops at ~1,927 mix/PSP: no in-range input can push a
+        // mixETH OUTPUT past int128. A sell larger than the minted supply
+        // reverts SellExceedsSupply in BOTH live and flat modes, state intact.
         _useHighPriceCurve();
-        _deposit(round.controller, alice, 1e40);
+        _deposit(round.controller, alice, 450_000e18);
         _launch();
-        _expectSwapTooLarge(false, 1e38);
+        _expectSellExceedsSupply(1e38);
         skip(180);
         round.controller.detonate{gas: 1_000_000}();
-        _expectSwapTooLarge(false, 1e38);
+        _expectSellExceedsSupply(1e38);
+    }
+
+    function _expectSellExceedsSupply(uint256 amount) private {
+        PoolKey memory key = _key();
+        bool buyZeroForOne = Currency.unwrap(key.currency0) == address(mix);
+        uint256 reserves = round.hook.reserveMixETH();
+        uint256 supply = round.hook.totalSupplyPSP();
+        vm.prank(address(manager));
+        vm.expectRevert(CurveHook.SellExceedsSupply.selector);
+        round.hook.beforeSwap(alice, key, SwapParams(!buyZeroForOne, -int256(amount), 0), "");
+        assertEq(round.hook.reserveMixETH(), reserves);
+        assertEq(round.hook.totalSupplyPSP(), supply);
     }
     function _useHighPriceCurve() private {
         factory = new PSPFactory(IPoolManager(address(manager)), IERC20(address(mix)),
             factory.hookDeployer(), factory.controllerDeployer(), factory.stakerDeployer(),
-            CurveMath.packTimingsCapped(60, 120, 180, 0), address(this));
-        factory.configureSine(SineMath.Params(1e18, 1e16, 1000e18, 451e18, 10000));
+            factory.sineV3Table(), CurveMath.packTimingsCapped(60, 120, 180, 0), address(this));
+        factory.configureSineV3(75_000_000_000_000);
         factory.deployRound(PSPFactory.RoundParams("PSP", "PSP", CurveMath.singleCurve(
             0.001e18, 1_000_000e18, 0.0000000046e18, 0.05e18)));
         round = factory.getRound(1);
@@ -172,14 +201,20 @@ contract UncappedCapacityTest is Test {
 
     function test_LargeRepresentablePotRemainsClaimable() public {
         _useHighPriceCurve();
-        _deposit(round.controller, alice, type(uint256).max / 4);
+        _deposit(round.controller, alice, 500_000e18); // gross at the cap
         _launch();
         TicketSwapper swapper = new TicketSwapper(IPoolManager(address(manager)), IERC20(address(mix)));
-        mix.mint(alice, 1e36);
+        // boot 450k mix + 64 waves of headroom (~1.93M mix): a 1M-mix buy
+        // stays in-domain, buys ~200k tickets (bounded seat writes), and
+        // leaves a claimable pot an order of magnitude above the genesis pot.
+        mix.mint(alice, 1e24);
         vm.startPrank(alice);
-        mix.approve(address(swapper), 1e36);
-        swapper.buy(_key(), 1e36, alice, alice);
+        mix.approve(address(swapper), 1e24);
+        swapper.buy(_key(), 1e24, alice, alice);
         vm.stopPrank();
+        assertGt(round.hook.ticketCount(), 100_000);
+        (, uint256 lam, uint256 target,) = round.hook.sineV3();
+        assertLe(round.hook.reserveMixETH(), target + 64 * lam);
         uint256 pot = round.hook.potBalance();
         skip(180);
         round.controller.detonate{gas: 1_000_000}();

@@ -11,7 +11,7 @@ import {PepeDescriptor} from "../../src/PepeDescriptor.sol";
 import {PSPZapIn} from "../../src/PSPZapIn.sol";
 import {PSPZapOut} from "../../src/PSPZapOut.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
-import {SineMath} from "../../src/libraries/SineMath.sol";
+import {SineV3Math} from "../../src/SineV3Math.sol";
 import {IMixETH} from "../../src/interfaces/IMixETH.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -21,7 +21,7 @@ import {MockPoolManager} from "../mocks/MockPoolManager.sol";
 contract DeploymentScriptHarness is DeploymentSupport {
     function checkModes(bool anvil, bool testnet) external view { _validateModes(anvil, testnet); }
     function checkManager(address manager, bool testnet) external view { _validatePoolManager(manager, testnet); }
-    function sine() external view returns (SineMath.Params memory) { return _sineParams(); }
+    function sinePL() external view returns (uint128) { return _sinePL(); }
     function timings() external view returns (uint256) { return _testnetTimings(); }
     function complete(PSPFactory factory) external { _completeGenesis(factory); }
     function checkRound(PSPFactory factory, uint256 id) external view { _validateCurrentRound(factory, id); }
@@ -70,12 +70,16 @@ contract DeploymentScriptsTest is Test {
         harness.checkModes(true, false);
     }
 
-    function test_AmplitudeRejectsValuesThatPreviouslyTruncatedToValidUint24() public {
-        vm.setEnv("PSP_SINE_AMPBPS", vm.toString(uint256(1 << 24) + 10000));
-        vm.expectRevert("PSP_SINE_AMPBPS must be at most 10000");
-        harness.sine();
-        vm.setEnv("PSP_SINE_AMPBPS", "10000");
-        assertEq(harness.sine().ampBps, 10000);
+    function test_RetiredSineEnvFailsLoudlyAndPLBoundsEnforced() public {
+        vm.setEnv("PSP_SINE_PTARGET", "60000000000000000");
+        vm.expectRevert("PSP_SINE_PTARGET is retired under sine rules v3");
+        harness.sinePL();
+        vm.setEnv("PSP_SINE_PTARGET", "");
+        vm.setEnv("PSP_SINE_PL", "1");
+        vm.expectRevert("PSP_SINE_PL out of bounds");
+        harness.sinePL();
+        vm.setEnv("PSP_SINE_PL", "75000000000000");
+        assertEq(harness.sinePL(), 75_000_000_000_000);
     }
 
     function test_TimingOverridesUseCanonicalPackingAndRejectInvalidVest() public {
@@ -93,10 +97,11 @@ contract DeploymentScriptsTest is Test {
         factory = new PSPFactory(
             IPoolManager(address(new MockPoolManager())), IERC20(address(new MockMixETH())),
             new HookDeployer(), new ControllerDeployer(), new StakerDeployer(),
+            address(new SineV3Math()),
             CurveMath.packTimingsCapped(7200, 3600, 7200, 0), address(this)
         );
         factory.setDescriptor(address(new PepeDescriptor()));
-        factory.configureSine(SineMath.Params(1e13, 4_605_170_185_988_092, 0.06e18, 10_000e18, 10_000));
+        factory.configureSineV3(75_000_000_000_000);
     }
 
     function test_ResumeEveryReservedPhaseAndCompletedGenesisWithoutRepeatingSteps() public {

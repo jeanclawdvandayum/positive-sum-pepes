@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test, console2} from "forge-std/Test.sol";
+import {SineV3Math} from "src/SineV3Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPoolManager, SwapParams} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -62,6 +63,7 @@ contract SineFee is Test {
             new HookDeployer(),
             new ControllerDeployer(),
             new StakerDeployer(),
+            address(new SineV3Math()),
             0,
             address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );
@@ -69,13 +71,7 @@ contract SineFee is Test {
         aSwapper = new AttributedSwapper(IPoolManager(address(poolManager)), IERC20(address(mixETH)));
 
         // DeployPSP's default arm (tilted sine, dial-lab verified shape)
-        factory.configureSine(SineMath.Params({
-            p0: 1e13,
-            preK: 4_605_170_185_988_092,
-            pTarget: 0.06e18,
-            targetReserve: 10_000e18,
-            ampBps: 10_000
-        }));
+        factory.configureSineV3(75_000_000_000_000);
 
         PSPFactory.RoundParams memory p = PSPFactory.RoundParams({
             name: "Positive Sum Pepes",
@@ -135,11 +131,11 @@ contract SineFee is Test {
     /// indefinite), not a magM-derived span.
     function test_FeeRegions() public {
         _launch(100e18); // boot = 90 mix (post genesis pot fee)
-        // auto-getter: (p0, preK, boot, targetReserve, lam, B, slope, amp,
-        // g, W, q0)
-        (,, uint256 boot, uint256 target,,,,,,,) = hook1.sineCurve();
+        // v3 getter: (boot, lam, target, q0)
+        (uint256 boot, uint256 lam, uint256 target,) = hook1.sineV3();
         assertEq(boot, 90e18, "boot = actual raise minus the genesis pot fee");
-        assertApproxEqAbs(target, 2_000e18, 3, "target scales to the 100-mix gross IBCO");
+        assertEq(lam, 427_088_983_702_459_832_014, "lambda = 955*sqrt(90/450) floored");
+        assertEq(target, 90e18 + 10 * lam, "tenth-wave target, exact");
         assertEq(hook1.detWindow() != 0, true, "hook live");
 
         // launch seam: R == boot → pre-wave fee (r <= boot)
@@ -158,10 +154,10 @@ contract SineFee is Test {
             "mid-wave: linear in reserve depth"
         );
 
-        // past the target reserve: R >= target -> 2.5% (buy past the 10k
-        // target; the fee itself is mid-wave-priced, so leave headroom —
-        // this is a ~20,000-mix buy on a 90-mix boot: deep dust, wave top)
-        _buy(2_000e18); // Cross the scaled third-wave target.
+        // past the target reserve: R >= target -> 2.5% (v3 target = boot +
+        // 10*lambda = 90 + 10*427.09 ~= 4,361 mix for a 90-mix boot; buy
+        // past it — the fee itself is mid-wave-priced, so leave headroom)
+        _buy(4_400e18); // cross the tenth-wave target
         assertGe(hook1.reserveMixETH(), target, "past the target reserve");
         assertEq(hook1.swapFeeBps(), 250, "2.5% above the sine");
     }

@@ -138,6 +138,7 @@ contract ReinvestAttributionTest is RealV4Base {
         uint256 refBefore = hook.referralRegistry().claimableReferral(alice);
         uint256 ticketsBefore = hook.ticketCount();
         uint256 nftsBefore = staking.balanceOf(bob);
+        uint256 tpAtBuy = hook.ticketPrice(); // v3: pot-priced spots, stable until this buy's own fees
         vm.recordLogs();
         vm.prank(viaOperator ? operator : bob, makeAddr("unrelated-tx-origin"));
         if (batch) reinvestor.reinvestAll(ids, poolKey, quote, block.timestamp);
@@ -162,7 +163,7 @@ contract ReinvestAttributionTest is RealV4Base {
         }
         assertEq(buys, 1, "one Buy event"); assertEq(times, 1, "one TimeAdded event"); assertEq(referrals, 1, "one ReferralRewardsCredited event");
         assertEq(hook.referralRegistry().claimableReferral(alice) - refBefore, referral, "owner's recorded referral chain credited");
-        assertEq(hook.ticketCount() - ticketsBefore, fees / 0.005e18);
+        assertEq(hook.ticketCount() - ticketsBefore, fees / tpAtBuy);
         for (uint256 i; i < 10; ++i) { (address buyer,,,) = hook.board(i); assertEq(buyer, bob); }
         for (uint256 i; i < ids.length; ++i) {
             (uint256 amount,,,,) = staking.positions(ids[i]);

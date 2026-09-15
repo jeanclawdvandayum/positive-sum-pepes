@@ -97,9 +97,10 @@ contract ReferralPurchaseTest is RealV4Base {
         vm.expectRevert(PSPReferralRegistry.Expired.selector);
         reg.buyWithMix(poolKey, 0.005e18, 1, block.timestamp - 1, bobNft);
         assertFalse(reg.attributed(alice));
+        uint256 tp = hook.ticketPrice(); // hoist: argument calls consume pranks/expectReverts
         vm.prank(alice);
-        vm.expectRevert(); // V4 wraps the hook's minimum-input revert
-        reg.buyWithMix(poolKey, 0.005e18 - 1, 1, 0, bobNft);
+        vm.expectRevert(); // V4 wraps the hook's minimum-input revert (v3: one spot)
+        reg.buyWithMix(poolKey, tp - 1, 1, 0, bobNft);
         assertFalse(reg.attributed(alice));
     }
 

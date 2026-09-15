@@ -267,9 +267,10 @@ contract SineV3Math {
         pure
         returns (uint256)
     {
-        // tangent seed: R - pspIn * P(R), clamped into the bracket
+        // proportional seed: reserve scales with the remaining supply
+        // fraction (seed IS the candidate estimate, not a delta to subtract)
         uint256 seed = FPML.fullMulDiv(R, qTarget, supplyWad(R, boot, lam, pL));
-        uint256 cand = seed < R ? R - seed : 0;
+        uint256 cand = seed < R ? seed : R;
         uint256 lo;
         uint256 hi = R;
         for (uint256 i; i < 128 && hi > lo + 1; ++i) {

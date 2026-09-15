@@ -24,6 +24,7 @@ import {SineMath} from "../src/libraries/SineMath.sol";
 import {PSPReinvestor} from "../src/PSPReinvestor.sol";
 import {IPSPStaker} from "../src/interfaces/IPSPStaker.sol";
 import {IPSPZapIn} from "../src/interfaces/IPSPZapIn.sol";
+import {SineV3Math} from "../src/SineV3Math.sol";
 import {MockMixETH} from "./mocks/MockMixETH.sol";
 import {StakerDeployer} from "src/StakerDeployer.sol";
 
@@ -56,13 +57,13 @@ abstract contract RealV4Base is Test {
 
         factory = new PSPFactory(
             poolManager, IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer()
-        , testTimings(),
+        , address(new SineV3Math()), testTimings(),
             address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );
         zapIn = new PSPZapIn(IMixETH(address(mixETH)), poolManager);
         zapOut = new PSPZapOut(IMixETH(address(mixETH)), poolManager);
 
-        factory.configureSine(SineMath.Params(1e13, 4_605_170_185_988_092, 0.06e18, 10_000e18, 10000));
+        factory.configureSineV3(75_000_000_000_000);
         // Deploy a round
         PSPFactory.RoundParams memory params = PSPFactory.RoundParams({
             name: "Positive Sum Pepes",
@@ -260,15 +261,16 @@ contract RealV4LifecycleTest is RealV4Base {
     function test_LocalV4_MinimumAndSeatsAtDifferentPrices() public {
         vm.deal(alice, 100e18);
         uint256 reserveBefore = hook.reserveMixETH();
+        uint256 tp = hook.ticketPrice(); // v3: the minimum is exactly one spot
         vm.prank(alice);
         vm.expectRevert(); // real V4 wraps the hook's SwapTooSmall error
-        zapIn.zapInBuy{value: 0.005e18 - 1}(poolKey, 1, 0);
+        zapIn.zapInBuy{value: tp - 1}(poolKey, 1, 0);
         assertEq(hook.reserveMixETH(), reserveBefore);
         uint256 t0 = block.timestamp;
         vm.warp(t0 + 1 hours);
         uint256 deadline = hook.detonationAt();
         vm.prank(alice);
-        zapIn.zapInBuy{value: 0.005e18}(poolKey, 1, 0);
+        zapIn.zapInBuy{value: tp}(poolKey, 1, 0);
         assertEq(hook.ticketCount(), 1);
         assertEq(hook.detonationAt(), deadline + 69);
         uint256 tenTickets = hook.ticketPrice() * 10;
@@ -303,7 +305,7 @@ contract RealV4LifecycleTest is RealV4Base {
         if(c0>c1)(c0,c1)=(c1,c0);
         PoolKey memory nextKey=PoolKey(c0,c1,0x800000,60,next.hook);
         vm.prank(alice);
-        zapIn.zapInBuy{value: 0.005e18}(nextKey,1,0);
+        zapIn.zapInBuy{value: next.hook.ticketPrice()}(nextKey,1,0); // exact v3 one-spot minimum
         assertEq(next.hook.ticketCount(),1);
         vm.startPrank(alice);
         hook.claimPot();
@@ -385,8 +387,10 @@ contract RealV4LifecycleTest is RealV4Base {
         next.launchPooledBuy();
         assertEq(uint256(factory.getRound(2).hook.mode()),1);
         assertEq(mixETH.balanceOf(address(factory)),0);
-        (,,, uint256 target,,,,,,,) = factory.getRound(2).hook.sineCurve();
-        assertApproxEqAbs(target, 1_000_000e18, 3);
+        (uint256 boot, uint256 lam, uint256 target,) = factory.getRound(2).hook.sineV3();
+        assertEq(boot, 45_000e18);        // 90% of the 50k carry rounds forward
+        assertEq(lam, 9_550e18);          // lambda scales: sqrt(45000/450) = 10
+        assertEq(target, 140_500e18);     // boot + 10*lam, exact
     }
 }
 

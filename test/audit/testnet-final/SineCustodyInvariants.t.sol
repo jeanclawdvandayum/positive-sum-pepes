@@ -14,15 +14,15 @@ import {CurveHook} from "../../../src/CurveHook.sol";
 import {RoundController} from "../../../src/RoundController.sol";
 import {PSPFactory} from "../../../src/PSPFactory.sol";
 import {CurveMath} from "../../../src/libraries/CurveMath.sol";
-import {SineMath} from "../../../src/libraries/SineMath.sol";
+import {ISineV3Math} from "../../../src/interfaces/ISineV3Math.sol";
 
 /// @title 2026-09-08 testnet-final audit — sine-path machine proofs
 /// @notice Two properties the wave2 matrix pins for ZONE rounds but not for
 ///         the sine flavor (the flavor actually deployed to Base Sepolia):
 ///
-///         P1 (supply bound): hook.totalSupplyPSP <= supplyAt(sineCurve,
-///             reserveMixETH) at ALL times. This is what makes SineMath
-///             .sellOut()'s `pspIn >= qNow -> return R` defensive floor
+///         P1 (supply bound): hook.totalSupplyPSP <= supplyWad(reserve) of
+///             the round's own SineV3 curve at ALL times. This is what makes
+///             SineV3Math.sellOut()'s `pspIn >= qNow -> return R` defensive floor
 ///             UNREACHABLE — if it were ever reachable, one sell could drain
 ///             the entire reserve (all other holders lose their backing).
 ///
@@ -97,7 +97,7 @@ contract SineCustodyInvariants is CBase {
 
         // Deploy a SINE round (the live Base-Sepolia flavor) as round 2.
         vm.prank(address(this));
-        factory.configureSine(SineMath.Params(1e13, 4_605_170_185_988_092, 0.06e18, 10_000e18, 10_000));
+        factory.configureSineV3(75_000_000_000_000);
         vm.prank(address(this));
         (uint256 roundId,) = factory.deployRound(
             PSPFactory.RoundParams({
@@ -163,31 +163,14 @@ contract SineCustodyInvariants is CBase {
         return seller.sell(_key(), amt, who);
     }
 
-    /// P1: hook supply never exceeds the pure sine supply at the same reserve.
+    /// P1: hook supply never exceeds the pure v3 curve supply at the same
+    /// reserve (evaluated on the round's own immutable helper).
     function _assertSupplyBound(string memory where) internal view {
-        SineMath.Curve memory c = _curveState();
-        uint256 pureSupply = SineMath.supplyAt(c, sineHook.reserveMixETH());
+        (uint256 boot, uint256 lam,,) = sineHook.sineV3();
+        uint256 pureSupply = ISineV3Math(sineHook.sineV3Table()).supplyWad(
+            sineHook.reserveMixETH(), boot, lam, sineHook.sinePL()
+        );
         assertLe(sineHook.totalSupplyPSP(), pureSupply, string.concat("P1 supply>pure @ ", where));
-    }
-
-    /// @dev auto-getter returns a flat tuple; rebuild the struct.
-    ///      AUDIT MIGRATION 2026-09-13 (deployment-spec): sine rules v2 renamed
-    ///      preK -> preGrowth and slope -> waveTrend (same positions, same
-    ///      count). Field order unchanged, so only the names move.
-    function _curveState() private view returns (SineMath.Curve memory c) {
-        (
-            c.p0,
-            c.preGrowth,
-            c.boot,
-            c.targetReserve,
-            c.lam,
-            c.B,
-            c.waveTrend,
-            c.amp,
-            c.g,
-            c.W,
-            c.q0
-        ) = sineHook.sineCurve();
     }
 
     /// P2: custody covers reserve + pot + deployer escrows at all times.
@@ -208,8 +191,9 @@ contract SineCustodyInvariants is CBase {
         for (uint256 i; i < steps; ++i) {
             uint256 roll = uint256(keccak256(abi.encode(seed, i)));
             if (roll % 3 == 0) {
-                // buy: 0.005..2 mixETH (MIN_BUY=0.005 — AUD-1 gate is live)
-                uint256 amt = bound(roll, 5e15, 2e18);
+                // buy: one current ticket .. 2 mixETH (v3 minimum is the
+                // live ticket price — dynamic bound keeps the gate live)
+                uint256 amt = bound(roll, sineHook.ticketPrice(), 2e18);
                 if (mix.balanceOf(trader1) < amt) mix.transfer(trader1, 10e18);
                 _buyAs(trader1, amt);
             } else if (roll % 3 == 1) {
@@ -220,7 +204,7 @@ contract SineCustodyInvariants is CBase {
             } else {
                 // chop: buy then immediately sell 90% (B4j shape on sine)
                 if (mix.balanceOf(trader2) < 1e18) mix.transfer(trader2, 10e18);
-                uint256 out = _buyAs(trader2, bound(roll, 5e15, 1e18));
+                uint256 out = _buyAs(trader2, bound(roll, sineHook.ticketPrice(), 1e18));
                 if (out > 1e15) _sellAs(trader2, out * 9 / 10);
             }
             _assertSupplyBound("chop");

@@ -27,9 +27,10 @@ contract SineStatefulTest is RealV4Base {
 
     function buy(uint64 seed) external {
         if(hook.mode()!=CurveHook.Mode.Active || block.timestamp>=hook.detonationAt())return;
+        uint256 tp=hook.ticketPrice(); // v3: the live one-spot minimum, not a constant
         uint256 balance=mixETH.balanceOf(address(this));
-        if(balance<0.005e18)return;
-        uint256 amount=bound(seed,0.005e18,balance<100e18?balance:100e18);
+        if(balance<tp)return;
+        uint256 amount=bound(seed,tp,balance<100e18?balance:100e18);
         uint256 quote=hook.getBuyOutput(amount);
         uint256 before=hook.ticketCount();
         uint256 price=hook.ticketPrice();

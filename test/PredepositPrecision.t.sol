@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {BBase} from "./wave2/auditorB/BBase.sol";
 import {SineMath} from "../src/libraries/SineMath.sol";
+import {SineV3Math} from "../src/SineV3Math.sol";
 
 /// @title PredepositPrecisionTest
 /// @notice Tiny individual deposits join a pooled launch and claim against the production sine
@@ -10,13 +11,17 @@ import {SineMath} from "../src/libraries/SineMath.sol";
 contract PredepositPrecisionTest is BBase {
     function setUp() public override {
         super.setUp();
+        address table = factory.sineV3Table();
         vm.prank(address(factory));
-        hook.configureSine(SineMath.Params(1e13, 4_605_170_185_988_092, 0.06e18, 10_000e18, 10000));
+        hook.configureSineV3(75_000_000_000_000, table);
     }
 
     function testOneWeiDepositJoinsAndClaimsPooledLaunch() public {
         _tinyDepositorLaunch(1);
-        assertEq(hook.MIN_BUY_INPUT(), 0.005e18);
+        // v3: the minimum IS the live ticket price — the whole pot prices
+        // 10,000 spots. The 100-mix gross launch pots 10 mix -> 0.001.
+        assertEq(hook.MIN_BUY_INPUT(), hook.ticketPrice());
+        assertEq(hook.MIN_BUY_INPUT(), 1e15);
     }
 
     function testFuzzSubMinimumDepositJoinsAndClaimsPooledLaunch(uint64 raw) public {
