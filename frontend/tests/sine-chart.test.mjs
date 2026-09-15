@@ -104,7 +104,8 @@ test('dimensionless v2 charts preserve legacy geometry and scale with the IBCO',
       Number(raw[10] * scale) / 1e18, 1e-12)
     assert.ok(chart.points.every(p => [p.price, p.reserve, p.supply].every(Number.isFinite)))
   }
-  assert.throws(() => sampleSineChart(normalized, 0, 3), /Unsupported sine/)
+  assert.throws(() => sampleSineChart(normalized, 0, 4), /Unsupported sine/)
+  assert.throws(() => sampleSineChart(normalized, 0, 3), /Invalid sine curve response/)
 })
 
 test('scaled rounds use wavelength headroom instead of a fixed 1000 mixETH jump',()=>{

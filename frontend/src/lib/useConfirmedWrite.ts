@@ -8,7 +8,7 @@ import { ensureWalletChain } from './ensureWalletChain'
 import { CHAIN_ID, ADDRESSES, wagmiConfig } from './config'
 import { factoryAbi, hookAbi, controllerAbi, reinvestorAbi, registryAbi, stakerAbi } from './abi'
 import { assertNftManagement } from './nftPermissions'
-import { assertGameRules } from './gameRules'
+import { assertGameRules, assertTicketGuard } from './gameRules'
 import { verifyRoundExit } from './exitRules'
 import { confirmTransaction } from './transactions'
 import { userFacingRpcError } from './rpcErrors'
@@ -60,9 +60,18 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
           client.readContract({ address: round[2], abi: hookAbi, functionName: 'TICKET_RULES_VERSION', blockNumber }),
         ])
         assertGameRules(minimum, seconds, ticketRules)
+        // v3 ticket-intent guard: a guarded purchase carries its quoted
+        // maxTicketPrice; it must still cover the live price at THIS pinned
+        // block, or the wallet never opens and the caller refreshes.
+        const guardedArgs = parameters.args as readonly unknown[] | undefined
+        if (parameters.functionName === 'buyWithMixGuarded' && guardedArgs?.length) {
+          assertTicketGuard(guardedArgs[guardedArgs.length - 1] as bigint | undefined,
+            await client.readContract({ address: round[2], abi: hookAbi, functionName: 'ticketPrice', blockNumber }))
+        }
         if (options && 'referralPurchase' in options) {
           const intent = options.referralPurchase
-          const atomicBuy = parameters.functionName === 'buyWithMix' && parameters.args?.length === 5
+          const atomicBuy = (parameters.functionName === 'buyWithMix' && parameters.args?.length === 5) ||
+            (parameters.functionName === 'buyWithMixGuarded' && parameters.args?.length === 6)
           const registryApproval = parameters.functionName === 'approve' && intent.registry &&
             String(parameters.args?.[0]).toLowerCase() === intent.registry.toLowerCase()
           if (atomicBuy || registryApproval) {

@@ -12,6 +12,9 @@ export const curveErrorSignatures = [
   'error FullMulDivFailed()',
   'error MulWadFailed()',
   'error DivWadFailed()',
+  // v3 (2026-09-14): a guarded purchase route sampled a live ticket price
+  // above the caller's quoted maxTicketPrice — nothing moved, refresh.
+  'error TicketPriceMoved()',
   'error WrappedError(address target, bytes4 selector, bytes reason, bytes details)',
 ] as const
 const abi = parseAbi(curveErrorSignatures)
@@ -27,6 +30,7 @@ const messages: Record<string, string> = {
   FullMulDivFailed: arithmetic,
   MulWadFailed: arithmetic,
   DivWadFailed: arithmetic,
+  TicketPriceMoved: 'The ticket price rose past your quoted maximum before the trade landed. Nothing was spent — refresh for a new quote.',
 }
 const selectors = new Map(Object.keys(messages).map(name => [toFunctionSelector(`${name}()`), name]))
 

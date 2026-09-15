@@ -1,10 +1,11 @@
 import type { CurvePoint } from './curve'
+import type { SineRulesVersion } from './sineVersion'
 
 export interface SineMarker {
   reserve: number // mixETH, human units
   price: number // mixETH per PSP, human units
-  kind: 'boot' | 'anchor' | 'top'
-  k: number // quarter-wave index (0..12; treads at 0/4/8/12)
+  kind: 'boot' | 'anchor' | 'top' | 'milestone'
+  k: number // quarter-wave index (v1/v2: 0..12; v3: n*4 for wave n=0..10)
 }
 
 export interface SineCurveData {
@@ -13,17 +14,33 @@ export interface SineCurveData {
   configured: boolean
   boot: number // human units
   span: number // seam→target distance
-  top: number // the reserve endpoint of the third wave
+  top: number // v1/v2: third-wave reserve · v3: boot + 10*lam target
   q0: bigint // launch mint (wei PSP) — supply baked in at boot
   checkpoints: bigint[] // retired — empty for the indefinite curve
   points: CurvePoint[]
   markers: SineMarker[]
 }
 
+/// v3 softened cube-root growth (2026-09-14). One price formula across
+/// prelaunch and active reserves; display-only floats, never amounts.
+export const SINE_V3 = {
+  /** K = ln(1000) / (∛11 − 1): ten waves reach 1,000× the launch price. */
+  K: Math.log(1000) / (Math.cbrt(11) - 1),
+  /** s(x) = x − sin(2πx)/(2π) — the monotone signed phase. */
+  s: (x: number) => x - Math.sin(2 * Math.PI * x) / (2 * Math.PI),
+  /** H(z) = sign(z)·(∛(1+|z|) − 1) — the softened cube-root shape. */
+  H: (z: number) => Math.sign(z) * (Math.cbrt(1 + Math.abs(z)) - 1),
+  /** Wave-n milestone multiple: 1000^(∛(1+n)−1)/(∛11−1), n = 0..10. */
+  milestone: (n: number) => Math.pow(1000, (Math.cbrt(1 + n) - 1) / (Math.cbrt(11) - 1)),
+}
+
 /** Display-only sampling from the hook's immutable, materialized coefficients.
- * Quotes/minOut always come from the contract. Numbers here use human units. */
-export function sampleSineChart(raw: readonly bigint[], liveReserve = 0, version: 1 | 2 = 1): SineCurveData {
-  if (version !== 1 && version !== 2) throw new Error('Unsupported sine curve version')
+ * Quotes/minOut always come from the contract. Numbers here use human units.
+ * raw is the version-matched read: v1/v2 `sineCurve` (11 fields), v3
+ * `sineV3Info` (7 fields: version, pL, boot, lam, target, q0, table). */
+export function sampleSineChart(raw: readonly bigint[], liveReserve = 0, version: SineRulesVersion = 1): SineCurveData {
+  if (version !== 1 && version !== 2 && version !== 3) throw new Error('Unsupported sine curve version')
+  if (version === 3) return sampleSineV3Chart(raw, liveReserve)
   if (raw.length !== 11) throw new Error('Invalid sine curve response')
   const [p0, preK, boot, target, lam, B, slope, amp, , , q0] = raw.map(v => Number(v) / 1e18)
   if (![p0, preK, boot, target, lam, B, slope, q0].every(v => Number.isFinite(v) && v > 0)) {
@@ -75,6 +92,61 @@ export function sampleSineChart(raw: readonly bigint[], liveReserve = 0, version
     q0: raw[10], checkpoints: [], points, markers }
 }
 
-export function sineChartHeadroom(liveReserve: number, wavelength: number, version: 1 | 2 = 1): number {
+/// v3: one continuous curve, softened cube-root growth. Chart x-domain spans
+/// waves −1..+12 (launch price is P(R=boot); the signed extension prices the
+/// prelaunch window down to one wave below boot). Supply is anchored at the
+/// materialized genesis mint and integrated outward along the same curve.
+export function sampleSineV3Chart(raw: readonly bigint[], liveReserve = 0): SineCurveData {
+  if (raw.length !== 7) throw new Error('Invalid sine curve response')
+  const [pL, boot, lam, target] = [raw[1], raw[2], raw[3], raw[4]].map(v => Number(v) / 1e18)
+  const q0 = raw[5]
+  if (![pL, boot, lam, target].every(v => Number.isFinite(v) && v > 0) || q0 <= 0n) {
+    throw new Error('Curve has not been materialized')
+  }
+  if (!Number.isFinite(liveReserve) || liveReserve < 0) throw new Error('Invalid live reserve')
+  const price = (r: number) => pL * Math.exp(SINE_V3.K * SINE_V3.H(SINE_V3.s((r - boot) / lam)))
+  // Bounded domain: waves −1..+12, extended in whole waves only when the live
+  // reserve (or an extreme extrapolation) genuinely needs the room.
+  const waves = Math.max(12, Math.ceil((Math.max(target, sineChartHeadroom(liveReserve, lam, 3)) - boot) / lam))
+  // exp() overflows past ~709; keep K·H(s(x)) inside numeric range.
+  const maxArg = SINE_V3.K * SINE_V3.H(SINE_V3.s(Math.pow(690 / SINE_V3.K, 3)))
+  const numericEnd = boot + Math.pow(maxArg / SINE_V3.K, 3) * lam
+  const requestedEnd = boot + waves * lam
+  const end = Math.min(requestedEnd, numericEnd)
+  const truncated = end < requestedEnd
+  const start = boot - lam
+  const reserves = new Set<number>([start, 0, boot, Math.min(target, end)])
+  for (let i = 1; i <= 64; i++) reserves.add(boot * i / 64) // prelaunch ramp
+  const steps = Math.min(8192, Math.ceil((end - start) / lam) * 128)
+  for (let i = 1; i <= steps; i++) reserves.add(start + (end - start) * i / steps)
+  const grid = [...reserves].sort((a, b) => a - b)
+  const bootIndex = grid.findIndex(r => r >= boot)
+  const humanQ0 = Number(q0) / 1e18
+  const supplies = new Array<number>(grid.length).fill(0)
+  supplies[bootIndex] = humanQ0
+  // Simpson per grid segment, anchored at boot and walked both directions.
+  const step = (i: number, j: number) => {
+    const a = grid[i], b = grid[j], d = b - a
+    return d * (1 / price(a) + 4 / price(a + d / 2) + 1 / price(b)) / 6
+  }
+  for (let j = bootIndex + 1; j < grid.length; j++) supplies[j] = supplies[j - 1] + step(j - 1, j)
+  for (let i = bootIndex - 1; i >= 0; i--) {
+    supplies[i] = Math.max(0, supplies[i + 1] - step(i, i + 1))
+    if (grid[i] <= 0) supplies[i] = 0 // Q(0) = 0; below-zero reserve is display-only
+  }
+  const points: CurvePoint[] = grid.map((r, i) => ({ reserve: r, price: price(r), supply: supplies[i] }))
+  // Ten postlaunch wave milestones plus the launch: multiples 1 → 1000.
+  // Do NOT label each wave a fixed doubling — cube-root growth shapes log price.
+  const markers: SineMarker[] = []
+  for (let n = 0; n <= 10; n++) {
+    const r = boot + lam * n
+    if (r > end) break
+    markers.push({ reserve: r, price: price(r), kind: n === 0 ? 'boot' : n === 10 ? 'milestone' : 'top', k: n * 4 })
+  }
+  return { truncated, active: true, configured: true, boot, span: target - boot, top: target,
+    q0, checkpoints: [], points, markers }
+}
+
+export function sineChartHeadroom(liveReserve: number, wavelength: number, version: SineRulesVersion = 1): number {
   return liveReserve + Math.max(version === 1 ? 1000 : 0, wavelength, liveReserve * 0.1)
 }

@@ -34,7 +34,9 @@ test('all positive sub-buy-minimum deposits qualify, beyond just a final-cap-fil
 })
 test('legacy and unreadable deployments retain their actual old minimum', () => {
   assert.equal(predepositMinimum(1n), 1n)
-  for (const version of [undefined, null, 0n, 3n, '1', 1]) {
+  assert.equal(predepositMinimum(2n), 1n)
+  assert.equal(predepositMinimum(3n), 1n) // v3 predeposits stay any-positive
+  for (const version of [undefined, null, 0n, 4n, '1', 1]) {
     const minimum = predepositMinimum(version)
     assert.equal(minimum, MIN_BUY_INPUT)
     assert(!predepositAmountAllowed(1n, minimum, cap))

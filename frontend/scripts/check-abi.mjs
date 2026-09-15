@@ -13,11 +13,16 @@ const allDeclared = { ...declared, expandedDescriptorAbi: declared.descriptorAbi
 // Static tuples and flat outputs encode identically. Preserve dynamic tuple
 // boundaries while normalizing static struct return shapes (positions).
 function types(params=[]) { return params.flatMap(p=>p.type==='tuple' && p.components.every(c=>!['string','bytes','tuple'].includes(c.type)&&!c.type.includes('[')) ? types(p.components) : [p.type==='tuple'?`(${types(p.components)})`:p.type]) }
+// Selectors that intentionally target LEGACY deployed bytecode (sine rules
+// v1/v2 auto-getters removed from the v3 CurveHook but still served by every
+// old hook). They cannot exist in current artifacts; decode-only usage.
+const legacyOnly=new Set(['sineParams','sineCurve'])
 let checked=0
 for(const [key,name] of Object.entries(sources)) {
  const abi=JSON.parse(fs.readFileSync(path.join(root,'out',name+'.sol',name+'.json'))).abi
  for(const item of allDeclared[key]) {
   if(!['function','event'].includes(item.type))continue
+  if(legacyOnly.has(item.name))continue
   const selector=item.type==='function'?toFunctionSelector:toEventSelector
   const actual=abi.find(a=>a.type===item.type&&selector(a)===selector(item))
   assert(actual,`${key}: missing ${item.type} ${item.name}`)

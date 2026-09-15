@@ -56,7 +56,10 @@ eq(await read(ctrl,'RoundController','totalPredepositMixETH'),eth('2000'))
 await tx(trader,ctrl,'RoundController','launchPooledBuy',[],'reverted')
 await warp(259200)
 await tx(trader,ctrl,'RoundController','launchPooledBuy')
-eq(await read(hook,'CurveHook','ticketPrice'),eth('.005'))
+// v3: the whole genesis pot prices 10,000 spots. 2000 gross -> 200 pot -> 0.02
+eq(await read(hook,'CurveHook','ticketPrice'),eth('.02'))
+eq(await read(hook,'CurveHook','SINE_RULES_VERSION'),3n)
+eq(await read(hook,'CurveHook','TICKET_RULES_VERSION'),3n)
 const baseline=await read(hook,'CurveHook','potBalance')
 eq(await read(hook,'CurveHook','genesisPotBalance'),baseline)
 await tx(alice,ctrl,'RoundController','claimPredepositPSP')
@@ -77,12 +80,16 @@ async function buy(amount, expectedTickets, capped=false) {
  eq(await read(hook,'CurveHook','detonationAt'),uncapped>cap?cap:uncapped)
  if(capped) eq(await read(hook,'CurveHook','detonationAt'),cap)
  const pot=await read(hook,'CurveHook','potBalance')
- eq(await read(hook,'CurveHook','ticketPrice'),eth('.005')+(pot-baseline)*21n/1_000_000n)
+ const q=pot/10000n
+ eq(await read(hook,'CurveHook','ticketPrice'),pot%10000n?q+1n:(q||1n))
  const added=r.logs.flatMap(log=>{try{return [decodeEventLog({abi:artifact('CurveHook').abi,...log})]}catch{return []}}).find(e=>e.eventName==='TimeAdded')
  assert(added,'TimeAdded emitted')
 }
-await buy(eth('.05'),10n)
-await buy(eth('.005'),0n)
+await buy(eth('.05'),eth('.05')/await read(hook,'CurveHook','ticketPrice'))
+// v3: below one current spot, buys REVERT (the minimum is exactly one spot)
+{ const bal=await read(mix,'MockMixETH','balanceOf',[trader])
+  await tx(trader,zap,'PSPZapIn','buyWithMix',[pool,(await read(hook,'CurveHook','ticketPrice'))-1n,1n,await now()+100n],'reverted')
+  eq(await read(mix,'MockMixETH','balanceOf',[trader]),bal) }
 await buy((await read(hook,'CurveHook','ticketPrice'))*10n,10n)
 // Sells fund the pot and raise ticket prices, but add no seats or time.
 const sellAmount=(await read(token,'PSPToken','balanceOf',[trader]))/3n
@@ -92,15 +99,20 @@ await tx(trader,zapOut,'PSPZapOut','sellToMix',[pool,sellAmount,1n,await now()+1
 eq(await read(hook,'CurveHook','ticketCount'),beforeSellCount)
 eq(await read(hook,'CurveHook','detonationAt'),beforeSellTime)
 assert(await read(hook,'CurveHook','ticketPrice')>beforeSellPrice)
-// Large buy regression: bounded ten-slot writes and capped clock.
+// Large buy regression: bounded ten-slot writes and capped clock. v3 caps the
+// reserve domain at target + 64 waves (= boot + 74 waves; ~143k mix here).
+// Below the tenth-wave target buys skim 10% to fees, so only 90% of gross
+// reaches the curve — overspend GROSS by the fee ratio to pierce the edge.
+// (The old 10M-mix stress buy is an explicit capacity error now.)
 const beforeWhale=await client.request({method:'evm_snapshot'})
-await buy(eth('10000000'),eth('10000000')/await read(hook,'CurveHook','ticketPrice'),true)
+{ const [,lam,target]=await read(hook,'CurveHook','sineV3')
+  const edge=target+64n*lam, headroom=edge-await read(hook,'CurveHook','reserveMixETH')
+  const overspend=headroom*10n/9n+1n
+  const extremeBalance=await read(mix,'MockMixETH','balanceOf',[trader])
+  await tx(trader,zap,'PSPZapIn','buyWithMix',[pool,overspend,1n,await now()+100n],'reverted')
+  eq(await read(mix,'MockMixETH','balanceOf',[trader]),extremeBalance)
+  await buy(headroom*95n/100n,headroom*95n/100n/await read(hook,'CurveHook','ticketPrice'),true) }
 eq(await read(hook,'CurveHook','seatedCount'),10n)
-// At this extreme the curve rounds further output to zero. Fail closed.
-eq(await read(hook,'CurveHook','getBuyOutput',[eth('1')]),0n)
-const extremeBalance=await read(mix,'MockMixETH','balanceOf',[trader])
-await tx(trader,zap,'PSPZapIn','buyWithMix',[pool,eth('1'),1n,await now()+100n],'reverted')
-eq(await read(mix,'MockMixETH','balanceOf',[trader]),extremeBalance)
 await client.request({method:'evm_revert',params:[beforeWhale]})
 await buy(eth('100'),eth('100')/await read(hook,'CurveHook','ticketPrice'),true)
 // Compound earned fees through the production reinvestor.
@@ -148,17 +160,24 @@ await tx(alice,ctrl2,'RoundController','predepositWithPepe',[eth('5000'),1n])
 await tx(trader,ctrl2,'RoundController','launchPooledBuy',[],'reverted')
 await warp(259200)
 await tx(trader,ctrl2,'RoundController','launchPooledBuy')
-eq(await read(hook2,'CurveHook','ticketPrice'),eth('.005'))
+// v3: 5000 gross -> 500 pot -> 0.05 per spot
+eq(await read(hook2,'CurveHook','ticketPrice'),eth('.05'))
 eq(await read(hook2,'CurveHook','ticketCount'),0n)
 await warp(100)
 const deadline2=await read(hook2,'CurveHook','detonationAt')
-await tx(trader,zap,'PSPZapIn','buyWithMix',[key(token2,hook2),eth('.005'),1n,await now()+100n])
+const tp2=await read(hook2,'CurveHook','ticketPrice')
+await tx(trader,zap,'PSPZapIn','buyWithMix',[key(token2,hook2),tp2,1n,await now()+100n])
 eq(await read(hook2,'CurveHook','ticketCount'),1n)
 eq(await read(hook2,'CurveHook','detonationAt'),deadline2+69n)
-const curve1=await read(hook,'CurveHook','sineCurve'), curve2=await read(hook2,'CurveHook','sineCurve')
-assert(curve1[3]>=eth('40000')-3n&&curve1[3]<=eth('40000'))
-assert(curve2[3]>=eth('100000')-3n&&curve2[3]<=eth('100000'))
-eq(curve1[5],curve2[5])
-writeFileSync('/tmp/psp-spec-anvil-curves.json',JSON.stringify({curve1,curve2},(_,v)=>typeof v==='bigint'?v.toString():v,2))
+// v3 curves: lam = 955*sqrt(boot/450); target = boot + 10*lam (exact ints)
+const curve1=await read(hook,'CurveHook','sineV3'), curve2=await read(hook2,'CurveHook','sineV3')
+eq(curve1[0],eth('1800'))                       // boot = 90% of 2000 gross
+eq(curve1[1],eth('1910'))                       // 955*sqrt(1800/450) = 955*2
+eq(curve1[2],eth('1800')+10n*curve1[1])
+eq(curve2[0],eth('4500'))                       // boot = 90% of 5000 gross
+assert(curve2[1]*curve2[1]/10n<=eth('3820')*eth('3820')/10n) // sqrt scaling sanity
+eq(curve2[2],eth('4500')+10n*curve2[1])
+eq(curve1[3]>0n && curve2[3]>curve1[3],true)    // genesis supply grows with boot
+writeFileSync('/tmp/psp-spec-anvil-curves-v3.json',JSON.stringify({curve1,curve2},(_,v)=>typeof v==='bigint'?v.toString():v,2))
 writeFileSync('/tmp/psp-ticket-anvil-receipts.json',JSON.stringify({factory,receipts},null,2))
 console.log(`PASS: ${receipts.length} checked action receipts, deployment receipts verified, two rounds exercised.`)

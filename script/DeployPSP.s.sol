@@ -81,6 +81,14 @@ contract DeployPSP is DeploymentSupport {
             _validatePoolManager(pm, false);
             require(address(mix).code.length != 0, "mixETH has no code");
         }
+        // The v3 settlement helper — ONE shared read-only SineV3Math per
+        // factory. Born before the factory so its address is pinned in the
+        // factory constructor and every round's hook from genesis on. Its
+        // own broadcast: one deploy per tx, per the gas-cap convention below.
+        vm.startBroadcast();
+        SineV3Math sineV3Table = new SineV3Math();
+        vm.stopBroadcast();
+
         // Each deployment/call is a separate broadcast transaction. Genesis
         // uses three birthStep calls to stay within Base Sepolia's gas cap.
         vm.startBroadcast();
@@ -92,14 +100,6 @@ contract DeployPSP is DeploymentSupport {
         // the documented mainnet value — scoopy's wallet. (If a different
         // broadcaster ever runs mainnet, pass PSP_DEPLOYER_CUT_TO
         // explicitly or the rake lands on the wrong wallet.)
-        vm.startBroadcast();
-        // The v3 settlement helper — ONE shared read-only SineV3Math per
-        // factory. Born before the factory so its address is pinned in the
-        // factory constructor and every round's hook from genesis on.
-        SineV3Math sineV3Table = new SineV3Math();
-        vm.stopBroadcast();
-
-        vm.startBroadcast();
         PSPFactory factory = new PSPFactory(
             IPoolManager(pm),
             mix,

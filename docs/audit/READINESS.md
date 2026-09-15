@@ -1,5 +1,19 @@
 # Audit preparation — September 2026
 
+## September 14 — sine rules v3 (source only, branch `single-sine-spec`)
+
+Fresh deployments use ONE continuous tilted-sine curve through the IBCO and
+the active market (softened cube-root growth to 1,000x launch price at wave
+ten, square-root wavelength scaling), genesis supply from the same cumulative
+integral, and pot-priced ladder tickets: `ceil(pot/10,000)` floored at one
+wei, with the active gross-buy minimum equal to exactly one current spot.
+Interface purchase routes carry opt-in ticket-intent guards. Settlement runs
+on a shared read-only `SineV3Math` helper (canonical knot table in code)
+pinned to each factory. `MIN_BUY_INPUT()` is dynamic on new rounds. v1/v2
+rounds and their exits are unaffected. See
+[single-sine-v3](2026-09-14-single-sine-v3.md); the binding rules live in
+`docs/FINAL-SPEC.md`. No public deployment is part of this change.
+
 ## September 13 — claimable referral rewards (source only)
 
 Fresh registries expose `REFERRAL_REWARDS_VERSION() == 1`. Eligible referral

@@ -3,7 +3,7 @@ import type { BoardState } from '../pages/play/useLadderBoard'
 import { Link } from 'react-router-dom'
 import { usePurchaseReferral, useReferral } from './ReferralCard'
 import { purchaseReferral } from '../lib/referrals'
-import { MIN_BUY_INPUT, purchaseUnits, TIME_PER_UNIT, minimumOutput } from '../lib/gameRules'
+import { purchaseUnits, TIME_PER_UNIT, minimumOutput, minimumBuyInput, assertTicketGuard } from '../lib/gameRules'
 import { usePredepositRules } from '../lib/usePredepositMinimum'
 import { capHeadroom, predepositUncapped, predepositLimit, predepositAmountAllowed, predepositProgress, predepositRemainder } from '../lib/predeposit'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
@@ -62,6 +62,14 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
   const amountWad = parseAmountToWad(amount)
   const live = round.mode === 1 || round.mode === 2
   const predepositPhase = round.mode === 0
+  /// v3 prices tickets from the live pot: the minimum IS one current ladder
+  /// spot. undefined = unavailable — exposure-increasing actions stay
+  /// disabled (never a 0.005 fallback); legacy rounds keep their constant.
+  const minimum = minimumBuyInput(round.ticketRules, round.ticketPrice)
+  /// v3 purchase routes carry the quoted ticket intent (TicketPriceMoved is
+  /// the hook-side backstop). Version-gated: legacy rounds keep the old
+  /// selectors and their authoritative static minimum.
+  const guarded = round.ticketRules === 3n
   /// CLOCK-REDESIGN §1/§6.2: at zero the hook reverts every trade
   /// (TradingHalted) — the tabs hard-disable and the card goes deadpan.
   /// Mode stays Active until someone presses detonate, so this is the
@@ -94,25 +102,30 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
   const pspIn = side === 'sell' ? amountWad : 0n
 
   // Quote, fee rate and mode must describe the same input and chain snapshot.
+  // The ticket price is sampled in the same batch: that exact bigint becomes
+  // the guarded route's maxTicketPrice at submit.
   const quoteKey = `${round.hook}:${side}:${amountWad}:${round.mode}:${halted}`
-  const [quoteState, setQuoteState] = useState<{ key: string; quote?: TradeQuote; failed?: boolean }>()
+  const [quoteState, setQuoteState] = useState<{ key: string; quote?: TradeQuote; failed?: boolean; ticketPrice?: bigint }>()
   const quote = quoteState?.key === quoteKey ? quoteState.quote : undefined
   const quoteFailed = quoteState?.key === quoteKey && quoteState.failed
+  const quotedTicketPrice = quoteState?.key === quoteKey ? quoteState.ticketPrice : undefined
   const quoteRaw = quote?.output
   useEffect(() => {
-    if (!round.hook || !live || halted || amountWad <= 0n || (side === 'buy' && (round.mode === 2 || mixIn < MIN_BUY_INPUT))) return
+    if (!round.hook || !live || halted || amountWad <= 0n ||
+      (side === 'buy' && (round.mode === 2 || minimum === undefined || mixIn < minimum))) return
     let dead = false
     let timer: ReturnType<typeof setTimeout> | undefined
     let backoff = 0
     async function tick() {
       try {
-        const [output, rate, mode] = await rpcBatchCall(round.hook!, hookAbi, [
+        const [output, rate, mode, ticketPrice] = await rpcBatchCall(round.hook!, hookAbi, [
           { functionName: side === 'buy' ? 'getBuyOutput' : 'getSellOutput', args: [amountWad] },
           { functionName: 'swapFeeBps' },
           { functionName: 'mode' },
+          { functionName: 'ticketPrice' },
         ])
         const quoted = quoteWithFee(side, amountWad, output as bigint, BigInt(rate as number), Number(mode))
-        if (!dead) { setQuoteState({ key: quoteKey, quote: quoted }); backoff = 0 }
+        if (!dead) { setQuoteState({ key: quoteKey, quote: quoted, ticketPrice: ticketPrice as bigint }); backoff = 0 }
       } catch {
         if (!dead) {
           setQuoteState({ key: quoteKey, failed: true })
@@ -123,7 +136,7 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
     }
     tick()
     return () => { dead = true; if (timer) clearTimeout(timer) }
-  }, [quoteKey, round.hook, side, amountWad, mixIn, round.mode, live, halted])
+  }, [quoteKey, round.hook, side, amountWad, mixIn, round.mode, live, halted, minimum])
   const quoteMixOut = side === 'sell' ? quoteRaw : undefined
 
   const poolKey = useMemo(
@@ -180,7 +193,14 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
     if (!address || !poolKey || busy || predepositPhase) return
     if (side === 'buy' && !predepositPhase && referralBlocked) { setError('Referral purchases require the updated round contracts.'); return }
     if (predepositPhase && !pdAllowed) { setError('Check the exact remaining cap and this round’s deposit rules.'); return }
-    if (side === 'buy' && !predepositPhase && mixIn < MIN_BUY_INPUT) { setError('Minimum purchase is 0.005 mixETH.'); return }
+    if (side === 'buy' && !predepositPhase && minimum === undefined) {
+      setError('The current ticket price is unavailable. Refresh and try again.')
+      return
+    }
+    if (side === 'buy' && !predepositPhase && minimum !== undefined && mixIn < minimum) {
+      setError(`Minimum purchase is ${wadToExact(minimum)} mixETH.`)
+      return
+    }
     setStep('waiting') // lock the action before the fresh allowance RPC
     const approvals: Parameters<typeof writeWithApprovals>[1] = []
     try {
@@ -201,10 +221,26 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
         setStep('swap')
         const output = await freshMinOut()
         const deadline = BigInt(Math.floor(Date.now() / 1000) + 600)
+        // The quoted ticket price travels with the guarded purchase; a price
+        // rise past it reverts (TicketPriceMoved) before any mixETH moves.
+        const maxTicketPrice = guarded ? quotedTicketPrice : undefined
+        if (guarded) assertTicketGuard(maxTicketPrice, round.ticketPrice)
         if (atomicPurchase) {
+          if (guarded) {
+            await writeWithApprovals({
+              address: buyTarget, abi: registryAbi, functionName: 'buyWithMixGuarded',
+              args: [poolKey, mixIn, output, deadline, referrerNftId, maxTicketPrice!],
+            }, approvals)
+          } else {
+            await writeWithApprovals({
+              address: buyTarget, abi: registryAbi, functionName: 'buyWithMix',
+              args: [poolKey, mixIn, output, deadline, referrerNftId],
+            }, approvals)
+          }
+        } else if (guarded) {
           await writeWithApprovals({
-            address: buyTarget, abi: registryAbi, functionName: 'buyWithMix',
-            args: [poolKey, mixIn, output, deadline, referrerNftId],
+            address: buyTarget, abi: zapInAbi, functionName: 'buyWithMixGuarded',
+            args: [poolKey, mixIn, output, deadline, maxTicketPrice!],
           }, approvals)
         } else {
           await writeWithApprovals({
@@ -280,7 +316,11 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
   }
 
   const canSubmit =
-    isConnected && !!poolKey && !(side === 'buy' && !predepositPhase && referralBlocked) && amountWad > 0n && (predepositPhase ? pdAllowed : (side !== 'buy' || mixIn >= MIN_BUY_INPUT) && (quoteRaw ?? 0n) > 0n) && payBalanceOk && !busy && !halted && (live || predepositPhase)
+    isConnected && !!poolKey && !(side === 'buy' && !predepositPhase && referralBlocked) && amountWad > 0n &&
+    (predepositPhase
+      ? pdAllowed
+      : side !== 'buy' || (minimum !== undefined && mixIn >= minimum)) &&
+    (predepositPhase || (quoteRaw ?? 0n) > 0n) && payBalanceOk && !busy && !halted && (live || predepositPhase)
 
   const cta = !isConnected
     ? 'connect wallet'
@@ -288,7 +328,9 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
       ? 'enter an amount'
       : !payBalanceOk
         ? `insufficient ${side === 'buy' ? 'mixETH' : 'PSP'}`
-        : predepositPhase
+        : side === 'buy' && !predepositPhase && minimum === undefined
+          ? 'ticket price unavailable — refresh'
+          : predepositPhase
           ? amountWad < pdMinimum ? `this round requires ${wadToExact(pdMinimum)} mixETH`
             : pdMax !== undefined && amountWad > pdMax ? 'over the remaining cap'
             : hasAllowance
@@ -483,7 +525,7 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
         </div>
       </div>
 
-      {live && amountWad > 0n && (side === 'sell' || mixIn >= MIN_BUY_INPUT) && (
+      {live && amountWad > 0n && (side === 'sell' || (minimum !== undefined && mixIn >= minimum)) && (
         <div className="mt-3 rounded-lg border border-line px-3 py-2 text-xs">
           <div className="flex flex-wrap items-center justify-between gap-1 text-text-lo">
             <span>trade fee (est.){quote && ` · ${(Number(quote.feeBps) / 100).toFixed(2)}%`}</span>

@@ -1,7 +1,7 @@
 import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 import { ensureWalletChain } from '../lib/ensureWalletChain'
 import { rpcCall } from '../lib/rpc'
-import { minimumOutput, MIN_BUY_INPUT } from '../lib/gameRules'
+import { minimumOutput } from '../lib/gameRules'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
@@ -118,7 +118,7 @@ export function PepeCard({
   const canCancel = decaying && amount > 0n
   const canRequest = entry.withdrawing === false && amount > 0n && !isFlat
   const canClaim = isConnected && pending !== undefined && pending > 0n
-  const canReinvest = nftVersion !== undefined && canClaim && entry.withdrawing === false && round.reinvestorReady && !isFlat
+  const canReinvest = nftVersion !== undefined && canClaim && entry.withdrawing === false && round.reinvestorReady && !isFlat && round.ticketPrice !== undefined
   const topUpBlocked = isFlat || (round.mode !== undefined && round.mode >= 2)
     ? 'This round has ended; top-ups are closed.'
     : decaying ? 'Choose “keep staking” to cancel withdrawal before adding PSP.'
@@ -205,7 +205,9 @@ export function PepeCard({
       setNftRefresh(key => key + 1)
       const key = buildPoolKey(round.mix!, round.token!, round.hook!)
       const fees = await rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as bigint
-      if (fees < MIN_BUY_INPUT) throw new Error('Reinvest requires at least 0.005 mixETH in accrued fees.')
+      if (round.ticketPrice === undefined || fees < round.ticketPrice) {
+        throw new Error(`Reinvest requires at least one current ticket price (${round.ticketPrice === undefined ? 'unavailable' : `${(Number(round.ticketPrice) / 1e18).toFixed(6)} mixETH`}) in accrued fees.`)
+      }
       const quote = await rpcCall(round.hook!, hookAbi, 'getBuyOutput', [fees]) as bigint
       nftReinvestment.assertSession()
       await writeWithApprovals({

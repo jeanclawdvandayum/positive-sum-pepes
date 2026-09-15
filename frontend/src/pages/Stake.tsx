@@ -1,6 +1,6 @@
 import AmountSlider from '../components/AmountSlider'
 import { positionFeesEarned } from '../lib/positionFees'
-import { minimumOutput, MIN_BUY_INPUT } from '../lib/gameRules'
+import { minimumOutput } from '../lib/gameRules'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { predepositResult } from '../lib/chainResults'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -277,10 +277,14 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
       setMultiStep('tx')
       const key = buildPoolKey(round.mix!, round.token!, round.hook!)
       let fees = (await Promise.all(stakeableIds.map(id => rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as Promise<bigint>))).reduce((sum, fee) => sum + fee, 0n)
-      if (fees < MIN_BUY_INPUT) throw new Error('Eligible positions need a combined 0.005 mixETH in fees. Withdrawing positions can be claimed separately.')
+      if (round.ticketPrice === undefined || fees < round.ticketPrice) {
+        throw new Error('Eligible positions need one current ticket price of combined fees. Withdrawing positions can be claimed separately.')
+      }
       const approvals = await nftReinvestment.prepare(stakeableIds, true)
       fees = (await Promise.all(stakeableIds.map(id => rpcCall(round.staker!, stakerAbi, 'pendingFeesOf', [id]) as Promise<bigint>))).reduce((sum, fee) => sum + fee, 0n)
-      if (fees < MIN_BUY_INPUT) throw new Error('Eligible fees changed during approval. At least 0.005 mixETH combined is needed.')
+      if (round.ticketPrice === undefined || fees < round.ticketPrice) {
+        throw new Error('Eligible fees changed during approval. At least one current ticket price combined is needed.')
+      }
       const quote = await rpcCall(round.hook!, hookAbi, 'getBuyOutput', [fees]) as bigint
       nftReinvestment.assertSession()
       await writeWithApprovals({
@@ -416,12 +420,12 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
         <button
           type="button"
           className="st-btn min-w-0 flex-col"
-          disabled={!isConnected || reinvestPending < MIN_BUY_INPUT || stakeableIds.length === 0 || multiBusy || nftVersion === undefined}
+          disabled={!isConnected || round.ticketPrice === undefined || reinvestPending < round.ticketPrice || stakeableIds.length === 0 || multiBusy || nftVersion === undefined}
           onClick={reinvestAll}
         >
           {multiStep === 'done' ? '✓' : reinvestApproved ? '↻ reinvest all' : 'approve & reinvest all'}
           <span className="text-xs">{fmtAmount(reinvestPending, 4)} mixETH combined · {stakeableIds.length} positions</span>
-          {reinvestPending < MIN_BUY_INPUT && <span className="text-[10px] font-normal">0.005 mixETH combined minimum · withdrawing positions are claim-only</span>}
+          {round.ticketPrice !== undefined && reinvestPending < round.ticketPrice && <span className="text-[10px] font-normal">one current ticket price of combined fees needed · withdrawing positions are claim-only</span>}
           {!reinvestApproved && <span className="mt-1 block text-[10px] font-normal">
             collection approval + batch reinvest · combined when your wallet supports it · permits transfers and fee claims for all Pepes in this round
           </span>}

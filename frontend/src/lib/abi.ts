@@ -130,6 +130,12 @@ export const hookAbi = parseAbi([
   'function sineParams() view returns (uint256 p0, uint256 preK, uint256 pTarget, uint256 targetReserve, uint24 ampBps)',
   'function sineCurve() view returns (uint256 p0, uint256 preGrowth, uint256 boot, uint256 targetReserve, uint256 lam, uint256 B, uint256 waveTrend, uint256 amp, uint256 g, uint256 W, uint256 q0)',
   'function sinePriceAt(uint256 R) view returns (uint256)',
+  // sine v3 (2026-09-14): one continuous curve, softened cube-root growth.
+  // sineV3Info is the version-aware decode: everything pricing/display need
+  // in one read. sineV3/sinePL are the raw materialized auto-getters.
+  'function sineV3Info() view returns (uint256 version, uint256 pL, uint256 boot, uint256 lam, uint256 target, uint256 q0, address table)',
+  'function sineV3() view returns (uint256 boot, uint256 lam, uint256 target, uint256 q0)',
+  'function sinePL() view returns (uint128)',
   'event Buy(address indexed buyer, uint256 mixETHIn, uint256 pspOut, uint256 newSupply, uint256 newReserveMixETH)',
   'event Sell(address indexed seller, uint256 pspIn, uint256 mixETHOut, uint256 newSupply, uint256 newReserveMixETH)',
   // CLOCK-REDESIGN §1/§2/§4/§5 — BINDING read/write surface (scoopy, 2026-08-31).
@@ -171,6 +177,10 @@ export const zapInAbi = parseAbi([
   ...curveErrorSignatures,
   'function zapInBuy((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 minPspOut, uint256 deadline) payable returns (uint256 pspOut)',
   'function buyWithMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 mixIn, uint256 minPspOut, uint256 deadline) returns (uint256 pspOut)',
+  // v3 ticket-intent guard: reverts TicketPriceMoved when the live
+  // ticketPrice() exceeded maxTicketPrice at execution (0 = unguarded).
+  'function buyWithMixGuarded((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 mixIn, uint256 minPspOut, uint256 deadline, uint256 maxTicketPrice) returns (uint256 pspOut)',
+  'function buyWithMixForGuarded((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 mixIn, uint256 minPspOut, uint256 deadline, address trader, uint256 maxTicketPrice) returns (uint256 pspOut)',
   'function zapInPredeposit(address controller, uint256 minSharesMinted) payable returns (uint256 shares)',
 ])
 
@@ -198,6 +208,9 @@ export const registryAbi = parseAbi([
   'function claimableReferral(address) view returns (uint256)',
   'function claimReferralRewards()',
   'function buyWithMix((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 mixIn, uint256 minPspOut, uint256 deadline, uint256 referrerNftId) returns (uint256 pspOut)',
+  // v3 ticket-intent guard: reverts TicketPriceMoved when the live
+  // ticketPrice() exceeded maxTicketPrice at execution (0 = unguarded).
+  'function buyWithMixGuarded((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint256 mixIn, uint256 minPspOut, uint256 deadline, uint256 referrerNftId, uint256 maxTicketPrice) returns (uint256 pspOut)',
   'event Referred(address indexed trader, uint256 indexed traderNftId, uint256 indexed referrerNftId)',
   'event ReferralSkipped(address indexed trader, uint256 indexed referrerNftId, bytes4 reason)',
   'function record(uint256 referrerNftId)',

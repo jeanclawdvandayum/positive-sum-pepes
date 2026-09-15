@@ -41,6 +41,9 @@ export interface RoundInfo {
   /// tilted-sine flavor: cached geometry extends locally with the live reserve;
   /// null when the hook runs the legacy zone curve or the RPC failed.
   sine: SineCurveData | null
+  /// TICKET_RULES_VERSION of the round's hook (3n = pot-priced dynamic
+  /// tickets; legacy constants otherwise). undefined = read pending/failed.
+  ticketRules: bigint | undefined
   /// the sliding sine fee at the live reserve (bips of the trade) — the
   /// "average fee" a trader pays right now. undefined = read failed.
   swapFeeBps: bigint | undefined
@@ -53,6 +56,7 @@ const EMPTY: RoundInfo = {
   id: 0n, token: undefined, controller: undefined, staker: undefined, hook: undefined, mix: undefined,
   mode: undefined, reserve: undefined, supply: undefined, marginalPrice: undefined,
   potBalance: undefined,
+  ticketRules: undefined,
   swapFeeBps: undefined,
   totalLocked: undefined, predepositClosed: undefined, predepositStartTime: undefined, totalPredeposit: undefined,
   predepositCap: undefined, curve: undefined, flatTime: undefined, sine: null,
@@ -87,7 +91,7 @@ function startRoundLoop() {
     try {
       const id = await rpcCall(F, factoryAbi, 'currentRoundId') as bigint
       const { token: rToken, controller: rController, hook: rHook, staker: rStaker,
-        mix, cfg, zones, detWindow, rulesCompatible } = await readMetadata(id)
+        mix, cfg, zones, detWindow, rulesCompatible, ticketRules } = await readMetadata(id)
       let wrapperStaker = wrapperStakers.get(ADDRESSES.reinvestor)
       if (REINVEST_ENABLED && !wrapperStaker) {
         wrapperStaker = await Promise.all([
@@ -99,6 +103,10 @@ function startRoundLoop() {
       const reinvestorReady = wrapperStaker?.toLowerCase() === rStaker.toLowerCase()
       // Immutable sine coefficients are cached per hook. Geometry extends
       // locally when the live reserve approaches the sampled window's edge.
+      // One batch = one consistent snapshot: pot, the current ticket price
+      // (the v3 minimum) and mode move together. A failed price read stays
+      // undefined — exposure-increasing actions disable, never fall back —
+      // and the next tick retries the transport.
       const [mode, reserve, supply, totalLocked, pd, flatTime, potBalance, sineActive, swapFeeBps, ticketPrice] = await Promise.all([
         rpcCall(rHook, hookAbi, 'mode') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'reserveMixETH') as Promise<bigint>,
@@ -141,6 +149,7 @@ function startRoundLoop() {
         id, token: rToken, controller: rController, staker: rStaker, hook: rHook, mix,
         mode: Number(mode), reserve, supply, marginalPrice: livePrice,
         potBalance, ticketPrice,
+        ticketRules,
         swapFeeBps,
         totalLocked,
         predepositClosed: pd[3], predepositStartTime: pd[2], totalPredeposit: pd[0], predepositCap: pd[1],

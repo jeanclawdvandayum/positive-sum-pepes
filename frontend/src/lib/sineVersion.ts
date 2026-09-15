@@ -1,5 +1,10 @@
 /** Legacy hooks have no version selector. Transport failures must retry. */
-export async function readSineRulesVersion(read: () => Promise<unknown>): Promise<1 | 2> {
+export type SineRulesVersion = 1 | 2 | 3
+
+/** v3 (2026-09-14): one continuous curve, softened cube-root growth. */
+export const LATEST_SINE_RULES_VERSION = 3
+
+export async function readSineRulesVersion(read: () => Promise<unknown>): Promise<SineRulesVersion> {
   let version: unknown
   try { version = await read() }
   catch (error) {
@@ -12,6 +17,6 @@ export async function readSineRulesVersion(read: () => Promise<unknown>): Promis
     }
     throw error
   }
-  if (version === 1n || version === 2n) return Number(version) as 1 | 2
+  if (version === 1n || version === 2n || version === 3n) return Number(version) as SineRulesVersion
   throw new Error('Unsupported sine curve version')
 }
