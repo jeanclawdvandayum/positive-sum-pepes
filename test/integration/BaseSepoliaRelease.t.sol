@@ -96,7 +96,7 @@ contract BaseSepoliaReleaseTest is Test {
         assertEq(c.registry.traderRefNftOf(address(this)), c.idB);
         assertEq(c.mix.balanceOf(c.b), beforeB, "first buy escrows its referral");
         assertGt(c.registry.claimableReferral(c.b), 0);
-        assertEq(c.r.hook.ticketCount(), 400);
+        assertEq(c.r.hook.ticketCount(), 2000, "100-mix pool pots 10 mix; 2-mix buy = 2000 spots at 0.001");
         (address leader,,,) = c.r.hook.board(0);
         assertEq(leader, address(this), "registry buy credits the purchaser");
         c.registry.buyWithMix(c.key, 0.005e18, 1, block.timestamp, c.idA);
@@ -317,7 +317,7 @@ contract BaseSepoliaReleaseTest is Test {
         uint256 bought = zapIn.buyWithMix(key, 2e18, r.hook.getBuyOutput(2e18), block.timestamp);
         r.token.approve(address(zapOut), bought);
         zapOut.sellToMix(key, bought / 2, 1, block.timestamp);
-        assertEq(r.hook.ticketCount(), 400);
+        assertEq(r.hook.ticketCount(), 2000, "100-mix pool pots 10 mix; 2-mix buy = 2000 spots at 0.001");
         assertGt(staker.pendingFeesOf(0), 0, "unclaimed genesis share keeps fees");
         vm.prank(b); r.controller.claimPredepositPSP();
         uint256 idB = staker.primaryOf(b);

@@ -40,11 +40,12 @@ test('v3 manifest reads the versioned curve, pins its helper and checks material
     [450n * 10n ** 18n, 955n * 10n ** 18n, 75_000_000_000_000n])
 })
 
-test('unlaunched v3 manifest accepts the live one-wei minimum and no materialized curve', async () => {
-  const { read, calls } = sineReader({ MIN_BUY_INPUT: 1n, ticketPrice: 1n, potBalance: 0n, sineActive: false,
+test('unlaunched v3 manifest accepts the fixed 0.005 floor with no materialized curve', async () => {
+  const { read, calls } = sineReader({ MIN_BUY_INPUT: 5_000_000_000_000_000n, ticketPrice: 5_000_000_000_000_000n,
+    potBalance: 0n, sineActive: false,
     sineV3Info: [3n, 75_000_000_000_000n, 0n, 0n, 0n, 0n, address('7')] })
   const result = await readSineDeploymentState(read, factory, address('2'))
-  assert.equal(result.minimumBuy, 1n)
+  assert.equal(result.minimumBuy, 5_000_000_000_000_000n)
   assert.equal(result.curve.active, false)
   assert.equal(calls.some(call => call.name === 'genesisQ'), false)
 })

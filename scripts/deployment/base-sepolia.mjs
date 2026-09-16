@@ -87,8 +87,12 @@ export async function confirmedDeployment(record, client) {
     if (receipt.gasUsed > 16_777_216n) throw Error('Deployment transaction exceeds the supported per-transaction gas budget')
     if (tx.transactionType === 'CREATE') {
       if (!receipt.contractAddress || receipt.contractAddress.toLowerCase() !== tx.contractAddress?.toLowerCase()) throw Error('Creation receipt address mismatch')
-      if (addresses[tx.contractName]) throw Error(`Duplicate deployment role ${tx.contractName}`)
-      addresses[tx.contractName] = { address: receipt.contractAddress, transactionHash: tx.hash }
+      // Helper-deployed artifacts (SineV3Data table shards) carry no role
+      // name in the broadcast record; only named roles reserve an address.
+      if (tx.contractName) {
+        if (addresses[tx.contractName]) throw Error(`Duplicate deployment role ${tx.contractName}`)
+        addresses[tx.contractName] = { address: receipt.contractAddress, transactionHash: tx.hash }
+      }
     }
     receipts.push({ hash: tx.hash, block: receipt.blockNumber, blockHash: receipt.blockHash,
       gasUsed: receipt.gasUsed, status: receipt.status, contractAddress: receipt.contractAddress })

@@ -220,7 +220,10 @@ contract CurveHook is BaseHook {
     ///         an exact one-ticket buy can never lose its ticket to its own
     ///         fee. v2/zone legacy rounds keep the linear 0.42% growth rule.
     function ticketPrice() public view returns (uint256) {
-        if (sineConfigured) {
+        // v3 pot pricing needs a SEED — the genesis launch fee. Before the
+        // pool exists the pot is empty and the minimum is the fixed 0.005
+        // legacy floor (release spec: "tickets start at 0.005 mixETH").
+        if (poolInitialized && sineConfigured) {
             // overflow-safe ceiling division (q < potBalance always)
             uint256 q = potBalance / 10_000;
             if (potBalance % 10_000 != 0) ++q;

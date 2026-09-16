@@ -43,7 +43,9 @@ export async function readSineDeploymentState(read, factory, hook) {
     throw Error('Sine v3 launch price or configuration mismatch')
   }
   const ceiling = potBalance / 10_000n + (potBalance % 10_000n === 0n ? 0n : 1n)
-  const expectedTicket = ceiling === 0n ? 1n : ceiling
+  // Pre-launch the pot is unseeded and the minimum is the fixed 0.005
+  // legacy floor; once the genesis fee seeds the pot, tickets price from it.
+  const expectedTicket = active ? (ceiling === 0n ? 1n : ceiling) : 5_000_000_000_000_000n
   if (ticketPrice !== expectedTicket || minimumBuy !== ticketPrice) throw Error('Sine v3 pot price or minimum mismatch')
   const shardCount = await uint(helper, 'dataShardCount')
   if (shardCount !== 4n) throw Error('Sine v3 data shard count mismatch')
