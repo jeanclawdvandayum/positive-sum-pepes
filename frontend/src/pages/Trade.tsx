@@ -14,6 +14,7 @@ import PotBoard from './play/PotBoard'
 import { useTradeTape } from './play/useTradeTape'
 import { useLadderBoard } from './play/useLadderBoard'
 import SpawnRoundPanel from './play/SpawnRoundPanel'
+import YourSeats from './play/YourSeats'
 import { ADDRESSES } from '../lib/config'
 import { useDeadRound } from './play/useDeadRound'
 import { playRoundState } from '../lib/playRoundState'
@@ -68,6 +69,11 @@ export default function Trade() {
       <div className="mt-4">
         <Tape entries={tape.entries} loading={!tape.complete} error={tape.error} />
       </div>
+      {round.mode === 1 && (
+        <div className="mt-4">
+          <YourSeats round={round} board={board} />
+        </div>
+      )}
       {settled && (
         <div className="mt-4 flex items-center gap-3 rounded-xl border border-line bg-bg-1 p-5 text-sm text-text-lo">
           <span>

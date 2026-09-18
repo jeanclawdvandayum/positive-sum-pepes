@@ -13,6 +13,7 @@ import { groupRoundWinners } from '../../lib/roundWinners'
 import type { BoardState } from './useLadderBoard'
 import type { LastTimeAdded } from './useTradeTape'
 import DetonateButton from './DetonateButton'
+import NotifyToggle from './NotifyToggle'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ClockPanel — the play page's command strip (REDESIGN-B2 §1, spec §6 play).
@@ -143,6 +144,7 @@ export default function ClockPanel({
             </span>
           </p>
         )}
+        <NotifyToggle round={round} />
         <DetonateButton key={round.controller} round={round} onDetonated={onDetonated} />
     </ClockBand>
   )
