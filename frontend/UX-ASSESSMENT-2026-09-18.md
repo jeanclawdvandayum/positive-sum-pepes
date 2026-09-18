@@ -149,6 +149,39 @@ Proposed canon (use everywhere, gloss once per page on first use):
     arcade screen; the light theme is the system default in a fresh browser and
     it is the weaker first impression.
 
+## What shipped (2026-09-18, commits c52fd191 → 4905a0ca on this branch)
+
+All five phases of the prompt below were implemented, except the carpet-bomb
+headline, which stays by decision. Gate after every phase: 211 frontend tests,
+`tsc -b`, `vite build`. No new RPC reads, no cadence changes, transaction paths
+untouched, `alt/` UI untouched.
+
+- **Phase 1** — canon vocabulary across pages (ticket / seat / opening buy / over /
+  prize pot / backing / cooldown; lePSP glossed); clock band gained the zero
+  gloss, the phase word, a USD estimate on the pot and an in-band
+  "reconnecting" state; ladder copy now uses the live ticket price (the
+  hardcoded 0.005 is gone) and explains the seats once; fee line sits under the
+  swap; header clock shows state words; no scientific notation anywhere.
+- **Phase 2** — the swap card leads with the move: tickets · seat · +time on the
+  clock (cap-aware, same arithmetic as the hook) · payout if it ends now; slippage
+  lives behind "advanced".
+- **Phase 3** — `YourSeats` strip for connected wallets (seats held, payout if it
+  ends now, tickets until bumped, post-to-X) and `NotifyToggle` (opt-in browser
+  notification under five minutes, one-second listener, re-arms after a buy
+  pushes the clock back).
+- **Phase 4** — landing teaches the loop first: loop sentence under the hero, two
+  CTAs, loop-first single-column beats, five plain rules, ticket cost on the
+  payout slider, exact rules after.
+- **Phase 5** — predeposit page on the redesign tokens with a "what you get" card
+  and the 10% pot-seed fact; stake payoff line and canon words; .wei card
+  collapsed; referral fee framing; dark theme on first visit.
+
+Verification caveat: headless screenshots ran without a wallet and with the
+public RPC partially unreachable, so the connected-wallet strip, the move block
+with a live ticket price and the notification were verified by type-check,
+tests and code review rather than on screen. Check them on the next testnet
+round with a real wallet.
+
 ## What not to touch
 - PhaseEngine as the one rAF loop, HashRouter with `?ref=` capture, no invented
   chain reads, ABI shapes from `CLOCK-REDESIGN.md` §6 (red lines).

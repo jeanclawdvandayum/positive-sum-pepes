@@ -226,10 +226,12 @@ export default function PotBoard({
                     {nominal % 1 === 0 ? nominal : nominal.toFixed(1)}%
                   </span>
                 )}
-                <span className="tabular ml-auto shrink-0 font-data text-text-hi">
-                  {payout === undefined ? (s ? '…' : '—') : fmtAmount(payout)}{' '}
-                  <span className="text-xs text-text-lo">mixETH</span>
-                </span>
+                {s && (
+                  <span className="tabular ml-auto shrink-0 font-data text-text-hi">
+                    {payout === undefined ? '…' : fmtAmount(payout)}{' '}
+                    <span className="text-xs text-text-lo">mixETH</span>
+                  </span>
+                )}
               </div>
             </li>
           )
