@@ -64,6 +64,41 @@ const RULES: [string, string][] = [
   ['what’s immutable', 'each round’s deployed contract code stays fixed. the factory owner retains controls for future curves and artwork, the stored UI and pending round reservations.'],
 ]
 
+const CORE: BeatKind[] = ['predeposit', 'jackpot', 'stake', 'settle']
+const LOOP = BEATS.filter(b => CORE.includes(b.kind)).sort((a, b) => CORE.indexOf(a.kind) - CORE.indexOf(b.kind))
+const REST = BEATS.filter(b => !CORE.includes(b.kind))
+
+const PLAIN: [string, string][] = [
+  ['buy in', 'every buy of at least one ticket puts you at seat #1 on a ten-seat ladder.'],
+  ['the clock', 'every ticket adds up to 69 seconds. the clock never goes above where it started.'],
+  ['zero', 'trading stops. anyone can detonate. the ten seats split the prize pot, 25% for #1 down to 3% for #10.'],
+  ['the pot', 'seeded by 10% of the opening buy, fed by 35% of every trading fee. it only grows.'],
+  ['cash out', 'ladder winnings stay claimable forever. every PSP redeems for its share of the backing.'],
+]
+
+function Beat({ b }: { b: (typeof BEATS)[number] }) {
+  return (
+    <section aria-labelledby={`story-${b.kind}`}
+      className="flex min-w-0 flex-col items-start gap-5 border-t border-line py-8 sm:flex-row">
+      <BeatDiagram kind={b.kind} />
+      <div className="min-w-0">
+        <h2 id={`story-${b.kind}`} className="font-display text-2xl leading-tight">{b.name}</h2>
+        <p className="mt-3 max-w-2xl leading-relaxed text-text-lo">{b.copy}</p>
+        {b.kind === 'reserve' && (
+          <div className="mt-4 border-l-2 border-line pl-3 text-xs leading-relaxed text-text-lo">
+            <p>Alchemix’s mixETH is an ETH vault token (ERC-4626). trades and rewards are counted in mixETH.</p>
+            {targetChain.testnet && <p className="mt-2">this testnet uses free practice mixETH with 0% yield.</p>}
+            <a href="https://docs.alchemix.fi/" target="_blank" rel="noopener noreferrer"
+              className="mt-2 inline-block underline underline-offset-4 hover:text-text-hi">
+              more about mixETH ↗
+            </a>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 export default function Landing() {
   const greeter = useMemo(() => renderDecorativePepeSvg(), [])
 
@@ -77,8 +112,12 @@ export default function Landing() {
             the anti memecoin,<br />
             <span className="text-accent">memecoin.</span>
           </h1>
-          <p className="mt-6 text-xl leading-snug sm:text-2xl">
-            new ticker. same insiders. same bullshit.
+          <p className="mt-6 max-w-2xl text-xl leading-snug sm:text-2xl">
+            every buy takes a ticket and feeds the clock. when it hits zero, the last ten
+            buyers split the pot. then every PSP redeems for its backing.
+          </p>
+          <p className="mt-4 text-lg text-text-lo">
+            new ticker. same insiders. same bullshit. not here.
           </p>
           <p className="mt-5 max-w-xl leading-relaxed text-text-lo">
             too much of crypto runs on disposable tokens. insiders get the head start.
@@ -89,12 +128,20 @@ export default function Landing() {
             passive yield, and NFTs, and turbocharging them with human greed as fellow degens
             fight for the pot.
           </p>
-          <Link
-            to="/play"
-            className="mt-8 inline-flex items-center justify-center rounded-xl bg-accent px-7 py-3 text-base font-semibold text-bg-0 transition hover:brightness-110 active:translate-y-[1px]"
-          >
-            buy psp
-          </Link>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link
+              to="/play"
+              className="inline-flex items-center justify-center rounded-xl bg-accent px-7 py-3 text-base font-semibold text-bg-0 transition hover:brightness-110 active:translate-y-[1px]"
+            >
+              buy psp
+            </Link>
+            <a
+              href="#how-it-works"
+              className="inline-flex items-center justify-center rounded-xl border border-line px-6 py-3 text-base text-text-hi transition hover:border-accent"
+            >
+              how it works · 30 seconds
+            </a>
+          </div>
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center gap-6 lg:flex-col lg:items-start">
@@ -112,34 +159,31 @@ export default function Landing() {
         </div>
       </section>
 
-      <p className="mt-14 font-data text-sm text-text-lo sm:mt-20">every piece has a job.</p>
+      <p id="how-it-works" className="mt-14 scroll-mt-24 font-data text-sm text-text-lo sm:mt-20">the loop. four beats.</p>
 
-      <div className="mt-5 grid gap-x-10 lg:grid-cols-2">
-        {BEATS.map(b => (
-          <section key={b.kind} aria-labelledby={`story-${b.kind}`}
-            className="flex min-w-0 flex-col items-start gap-5 border-t border-line py-8 sm:flex-row">
-            <BeatDiagram kind={b.kind} />
-            <div className="min-w-0">
-              <h2 id={`story-${b.kind}`} className="font-display text-2xl leading-tight">{b.name}</h2>
-              <p className="mt-3 leading-relaxed text-text-lo">{b.copy}</p>
-              {b.kind === 'reserve' && (
-                <div className="mt-4 border-l-2 border-line pl-3 text-xs leading-relaxed text-text-lo">
-                  <p>Alchemix’s mixETH is an ETH vault token (ERC-4626). trades and rewards are counted in mixETH.</p>
-                  {targetChain.testnet && <p className="mt-2">this testnet uses free practice mixETH with 0% yield.</p>}
-                  <a href="https://docs.alchemix.fi/" target="_blank" rel="noopener noreferrer"
-                    className="mt-2 inline-block underline underline-offset-4 hover:text-text-hi">
-                    more about mixETH ↗
-                  </a>
-                </div>
-              )}
-            </div>
-          </section>
-        ))}
+      <div className="mt-5 max-w-4xl">
+        {LOOP.map(b => <Beat key={b.kind} b={b} />)}
+      </div>
+
+      <p className="mt-12 font-data text-sm text-text-lo">the rest of the machine.</p>
+
+      <div className="mt-5 max-w-4xl">
+        {REST.map(b => <Beat key={b.kind} b={b} />)}
       </div>
 
       <section className="mt-12 rounded-2xl border border-line bg-bg-1 p-6 sm:p-10" aria-labelledby="landing-rules">
         <h2 id="landing-rules" className="font-display text-2xl sm:text-3xl">where the money goes</h2>
-        <dl className="mt-8">
+        <dl className="mt-6">
+          {PLAIN.map(([term, def]) => (
+            <div key={term} className="grid gap-1 border-t border-line py-3 sm:grid-cols-[12rem_1fr] sm:gap-6">
+              <dt className="font-data text-sm text-text-lo">{term}</dt>
+              <dd className="max-w-2xl leading-relaxed">{def}</dd>
+            </div>
+          ))}
+        </dl>
+        <PayoutSlider />
+        <h3 className="mt-10 font-display text-xl">the exact rules</h3>
+        <dl className="mt-4">
           {RULES.map(([term, def]) => (
             <div key={term} className="grid gap-1 border-t border-line py-4 sm:grid-cols-[12rem_1fr] sm:gap-6">
               <dt className="font-data text-sm text-text-lo">{term}</dt>
@@ -147,7 +191,6 @@ export default function Landing() {
             </div>
           ))}
         </dl>
-        <PayoutSlider />
         <details className="xd-curve-detail mt-8 border-t border-line pt-5">
           <summary className="cursor-pointer text-text-lo hover:text-text-hi">take a closer look at the curve</summary>
           <CurveExplainer />

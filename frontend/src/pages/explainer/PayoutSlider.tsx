@@ -25,6 +25,13 @@ export default function PayoutSlider() {
         </output>
       </div>
 
+      <p className="mt-2 text-sm text-text-lo">
+        a ticket costs the pot ÷ 10,000 ={' '}
+        <span className="tabular font-data text-text-hi">{(pot / 10_000).toLocaleString('en-US', { maximumFractionDigits: 6 })} mixETH</span>
+        {' '}· seat #1 pays{' '}
+        <span className="tabular font-data" style={{ color: 'var(--pot-gold)' }}>{(pot * 0.25).toLocaleString('en-US', { maximumFractionDigits: 2 })} mixETH</span>
+        {' '}if the clock hits zero with that ticket on top.
+      </p>
       <input
         id={id}
         type="range"
