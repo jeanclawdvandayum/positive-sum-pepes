@@ -18,6 +18,6 @@ export function predepositProgress(total: bigint, cap: bigint, version?: unknown
     : `${wadToExact(total)} / ${wadToExact(cap)} mixETH`
 }
 export function predepositRemainder(total: bigint, cap: bigint, version?: unknown) {
-  return predepositUncapped(version, cap) ? 'uncapped IBCO'
+  return predepositUncapped(version, cap) ? 'uncapped opening buy'
     : `${wadToExact(capHeadroom(total, cap))} mixETH remaining`
 }

@@ -23,6 +23,7 @@ import PepePicker from '../components/PepePicker'
 import { useQuery } from '@tanstack/react-query'
 import { renderPepeSvg } from '../lib/pepeRender'
 import { dnaOfId } from '../components/PepePicker'
+import StakeStyles from './stake/StakeStyles'
 
 type Step = 'idle' | 'approve' | 'tx' | 'done'
 
@@ -283,6 +284,7 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
 
   return (
     <div className={`pd-page space-y-4 ${variant === "alt" ? "alt-predeposit" : ""}`}>
+      <StakeStyles />
       <RefBanner />
       <style>{`
         .pd-picker > div { height: 100%; }
@@ -305,8 +307,8 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
           .pd-clock > div { padding-block: 8px; }
           .pd-clock h1 { font-size: 24px; margin-bottom: 6px; }
           .pd-clock .clock { transform: scale(.76); margin-block: -18px; }
-          .pd-deposit .input-amount { padding: 8px 12px; font-size: 24px; }
-          .pd-deposit .btn-primary { padding-block: 10px; }
+          .pd-deposit .st-input { padding: 8px 12px; font-size: 24px; }
+          .pd-deposit .st-btn { padding-block: 10px; }
         }
       `}</style>
 
@@ -321,40 +323,40 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
       {/* a. header */}
       <div className="px-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-2xl font-black text-slate-900">predeposit</h2>
+          <h2 className="text-2xl font-semibold text-text-hi">predeposit</h2>
         </div>
-        <p className="mt-1 font-body text-sm leading-relaxed text-slate-500">
-          get your frog in the door. deposit mixETH before launch to join the pooled first buy. after launch, claim your share as lePSP, locked earning PSP held in a pepe NFT.
+        <p className="mt-1 font-body text-sm leading-relaxed text-text-lo">
+          get your frog in the door. deposit mixETH before launch to join the opening buy. everyone in it pays the same price and nobody can front-run it. when the round launches, your share arrives already staked as lePSP (locked PSP that earns fees) inside a pepe NFT. 10% of the pool seeds the prize pot; the other 90% buys the PSP.
         </p>
       </div>
 
       <div className="pd-grid grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
           {/* b. progress */}
           <div className="pd-progress card p-4 lg:col-start-2 lg:row-start-1">
-            <div className="mb-1 flex justify-between text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            <div className="mb-1 flex justify-between text-[11px] font-semibold text-text-lo">
               <span>{uncapped ? 'pooled buy-in' : 'window fill'}</span>
               <span className="min-w-0 break-all text-right">{pd ? predepositProgress(pd.total, pd.cap, predepositVersion) : '…'}</span>
             </div>
-            {!uncapped && <div className="h-2 overflow-hidden rounded-full bg-sky-100">
+            {!uncapped && <div className="h-2 overflow-hidden rounded-full bg-bg-2">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400"
+                className="h-full rounded-full bg-accent"
                 style={{ width: `${pct}%` }}
               />
             </div>}
-            {pd && <p className="mt-2 break-all text-xs text-slate-500">{predepositRemainder(pd.total, pd.cap, predepositVersion)}</p>}
+            {pd && <p className="mt-2 break-all text-xs text-text-lo">{predepositRemainder(pd.total, pd.cap, predepositVersion)}</p>}
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="pd-stat rounded-2xl bg-white/80 shadow-sm">
-                <div className="text-lg font-black text-slate-900">
+              <div className="pd-stat rounded-xl bg-bg-2">
+                <div className="text-lg font-semibold text-text-hi">
                   {depositors !== undefined ? depositors.toString() : '…'}
                 </div>
-                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">depositors</div>
+                <div className="text-[11px] font-semibold text-text-lo">depositors</div>
               </div>
-              <div className="pd-stat rounded-2xl bg-white/80 shadow-sm">
-                <div className="flex flex-wrap items-center gap-2 break-all text-lg font-black text-slate-900">
+              <div className="pd-stat rounded-xl bg-bg-2">
+                <div className="flex flex-wrap items-center gap-2 break-all text-lg font-semibold text-text-hi">
                   {!isConnected ? '—' : myDep === undefined ? '…' : wadToExact(myDep.mixETHAmount)}
-                  {myDep?.claimed && <span className="text-xs font-bold text-emerald-600">claimed ✓</span>}
+                  {myDep?.claimed && <span className="text-xs font-bold text-pepe">claimed ✓</span>}
                 </div>
-                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">your predeposit (mix)</div>
+                <div className="text-[11px] font-semibold text-text-lo">your predeposit (mix)</div>
               </div>
             </div>
           </div>
@@ -362,7 +364,7 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
           <div className="pd-picker min-w-0 lg:col-start-1 lg:row-start-1 lg:row-span-2">
           {artVersion === 2n && !pd?.closed && (
             reservedPepe && reservedPepe > 0n ? (
-              <div className="card flex flex-col items-center gap-5 p-5 text-center" aria-label="your reserved pepe">
+              <div className="rounded-2xl border border-line bg-bg-1 flex flex-col items-center gap-5 p-5 text-center" aria-label="your reserved pepe">
                 <div>
                   <h2 className="font-display text-2xl leading-tight">reserved position</h2>
                   <p className="mt-1 font-body text-xs text-text-lo">your pepe is reserved. every top-up goes into this position.</p>
@@ -378,35 +380,46 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
                   seed={pickerSeed} onReroll={() => { setSelectedPepe(null); setPickerSeed(s => s + 1) }}
                   disabled={busy} actionLabel="deposit" />
           )}
+          {!(artVersion === 2n && !pd?.closed) && (
+            <div className="flex h-full flex-col rounded-2xl border border-line bg-bg-1 p-5">
+              <h2 className="font-display text-2xl leading-tight">what you get</h2>
+              <ul className="mt-4 space-y-3 text-sm leading-relaxed text-text-lo">
+                <li><span className="text-text-hi">the opening price, same for everyone.</span> the whole pool buys in one transaction at launch. no head start, no sales pitch.</li>
+                <li><span className="text-text-hi">a pepe holding your PSP.</span> your share lands staked as lePSP the moment the round launches and earns 60% of every trading fee from the first trade.</li>
+                <li><span className="text-text-hi">a seed for the pot.</span> 10% of the pool opens the prize pot; that pot prices every ticket in the round.</li>
+                <li><span className="text-text-hi">your money back if nothing happens.</span> {pd?.closed ? 'deposits are closed for this round.' : 'until launch, deposits stay in the round contract. anyone can launch once the window ends.'}</li>
+              </ul>
+            </div>
+          )}
 
           </div>
           {/* c. deposit */}
           <div className="pd-deposit card p-4 lg:col-start-2 lg:row-start-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-black text-slate-900">deposit</h2>
-              <div className="flex shrink-0 items-center gap-1 rounded-2xl bg-white px-4 py-2 shadow-sm">
-                <MixLogo px={18} /> <span className="text-sm font-black text-slate-700">mixETH</span>
+              <h2 className="text-lg font-semibold text-text-hi">deposit</h2>
+              <div className="flex shrink-0 items-center gap-1 rounded-xl border border-line bg-bg-2 px-4 py-2">
+                <MixLogo px={18} /> <span className="text-sm font-semibold text-text-hi">mixETH</span>
               </div>
             </div>
 
-            <div className="mt-3 rounded-2xl border border-sky-100 bg-sky-50/60 p-3">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+            <div className="mt-3 rounded-xl border border-line bg-bg-2 p-3">
+              <div className="flex items-center justify-between text-xs font-bold text-text-lo">
                 <span>commit</span>
                 <button
                   type="button"
                   title="fill the most you can deposit"
                   onClick={() => setAmount(wadToExact(maxDeposit))}
                   disabled={busy || maxDeposit === undefined || maxDeposit <= 0n}
-                  className="rounded-md px-1.5 py-0.5 transition hover:bg-sky-100 hover:text-sky-600 disabled:opacity-40"
+                  className="rounded-md px-1.5 py-0.5 transition hover:bg-bg-1 hover:text-text-hi disabled:opacity-40"
                 >
                   balance {fmtAmount(mixBal)}
                   {maxDeposit !== undefined && maxDeposit > 0n && (
-                    <span className="ml-1 text-[10px] text-sky-500">MAX</span>
+                    <span className="ml-1 text-[10px] text-accent">MAX</span>
                   )}
                 </button>
               </div>
               <input
-                className="input-amount mt-2"
+                className="st-input mt-2"
                 placeholder="0.0"
                 value={amount}
                 inputMode="decimal"
@@ -414,23 +427,23 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
               />
               <AmountSlider amount={amount} maximum={maxDeposit} onChange={setAmount} disabled={busy || !!pd?.closed} label="share of your available deposit" />
               {walletCap !== undefined && walletCap > 0n && myDep !== undefined && (
-                <div className="mt-1 break-words text-[11px] font-bold text-slate-400">
+                <div className="mt-1 break-words text-[11px] font-bold text-text-lo">
                   per-wallet cap {wadToExact(walletCap)} mix · yours {wadToExact(myDep.mixETHAmount)} ·{' '}
                   {wadToExact(capHeadroom(myDep.mixETHAmount, walletCap))} left
                 </div>
               )}
-              {globalCapExceeded && <p className="mt-1 break-words text-xs font-bold text-rose-500">
+              {globalCapExceeded && <p className="mt-1 break-words text-xs font-bold text-phase-critical">
                 {wadToExact(globalRemaining)} mixETH remaining in this round
               </p>}
-              {legacyDust && <p className="mt-2 text-xs text-slate-500">
+              {legacyDust && <p className="mt-2 text-xs text-text-lo">
                 This deployed round requires at least {wadToExact(minimum)} mixETH per deposit.
                 The remainder is smaller than that; launch opens when the window ends.
               </p>}
               {amountWad > 0n && !balanceOk && (
-                <div className="mt-1 text-xs font-bold text-rose-500">insufficient balance</div>
+                <div className="mt-1 text-xs font-bold text-phase-critical">insufficient balance</div>
               )}
               {amountWad > 0n && walletCapExceeded && (
-                <div className="mt-1 text-xs font-bold text-rose-500">
+                <div className="mt-1 text-xs font-bold text-phase-critical">
                   over the per-wallet cap — {wadToExact(walletCap === undefined ? undefined : capHeadroom(myDepAmount, walletCap))} mixETH remaining
                 </div>
               )}
@@ -452,52 +465,52 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
               </div>
             )}
 
-            <button className="btn-primary mt-4 w-full break-words" disabled={!canSubmit} onClick={runDeposit}>
+            <button className="st-btn st-btn-primary mt-4 w-full break-words" disabled={!canSubmit} onClick={runDeposit}>
               {step === 'done' ? '✅ deposited' : cta}
             </button>
             {pd?.closed && (
-              <div className="mt-2 text-xs font-bold text-slate-400">predeposits are closed for this round.</div>
+              <div className="mt-2 text-xs font-bold text-text-lo">predeposits are closed for this round.</div>
             )}
           </div>
 
           {/* d. launch / claim */}
           {(pd?.launchable || launched) && (
-            <div className="card p-4 lg:col-span-2">
-              <h2 className="text-lg font-black text-slate-900">{launched ? 'round launched' : 'launch'}</h2>
+            <div className="rounded-2xl border border-line bg-bg-1 p-4 lg:col-span-2">
+              <h2 className="text-lg font-semibold text-text-hi">{launched ? 'round launched' : 'launch'}</h2>
               {launched ? (
                 <>
                   {myDep && myDep.claimed ? (
                     <>
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="mt-1 text-sm text-text-lo">
                         ✅ claimed. your pepe is holding your first bag on the stake page.
                         your lePSP earns fees. request withdrawal to start its exit schedule.
                       </p>
-                      <Link to="/stake" className="btn-primary mt-3 block w-full text-center">
+                      <Link to="/stake" className="st-btn st-btn-primary mt-3 block w-full text-center">
                         see your pepe →
                       </Link>
                     </>
                   ) : myDep && myDep.mixETHAmount > 0n ? (
                     <>
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="mt-1 text-sm text-text-lo">
                         your first bag is waiting. claim your share of the launch PSP into a pepe NFT,
                         with lePSP earning fees inside.
                       </p>
-                      <Link to="/stake" className="btn-primary mt-3 block w-full text-center">
+                      <Link to="/stake" className="st-btn st-btn-primary mt-3 block w-full text-center">
                         claim your PSP on the stake page →
                       </Link>
                     </>
                   ) : (
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-text-lo">
                       the round is live. buy PSP on the play page to join the ladder.
                     </p>
                   )}
                 </>
               ) : (
                 <>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-sm text-text-lo">
                     {uncapped ? 'the window is over. anyone may launch the pooled genesis buy.' : 'cap reached or window over. anyone may launch the pooled genesis buy.'}
                   </p>
-                  <button className="btn-primary mt-3 w-full" disabled={launchStep === 'tx'} onClick={launch}>
+                  <button className="st-btn st-btn-primary mt-3 w-full" disabled={launchStep === 'tx'} onClick={launch}>
                     {launchStep === 'done' ? '✅ launched' : launchStep === 'tx' ? 'confirm in wallet…' : 'launch pooled buy'}
                   </button>
                 </>
@@ -508,7 +521,7 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
           {isConnected && artVersion === 2n && reservedPepe === 0n && selectedPepe === null && !pd?.closed && (
             <p role="alert" className="mt-3 font-body text-sm text-phase-critical">Choose your Pepe above before depositing.</p>
           )}
-          {error && <div className="break-words rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-500">{error}</div>}
+          {error && <div className="break-words rounded-xl border border-phase-critical/40 p-3 text-xs font-bold text-phase-critical">{error}</div>}
       </div>
     </div>
   )

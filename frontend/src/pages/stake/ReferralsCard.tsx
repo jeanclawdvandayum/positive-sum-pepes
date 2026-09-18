@@ -50,7 +50,7 @@ export default function ReferralsCard() {
       {version === 0n && <p className="mt-3 text-xs text-text-lo">referral links open with the next testnet deployment.</p>}
       {!isConnected ? (
         <p className="mt-3 text-sm leading-relaxed text-text-lo">
-          invite the usual suspects. connect your wallet to share your pepe’s referral link. referral chains share 5% of trading fees from referred wallets. an eligible referral is included in their purchase and stays locked for the round.
+          invite the usual suspects. connect your wallet to share your pepe’s referral link. referral chains share 5% of the fee on referred trades (about 0.1–0.5% of what they trade). an eligible referral is included in their purchase and stays locked for the round.
         </p>
       ) : ids.length === 0 ? (
         <p className="mt-3 text-sm leading-relaxed text-text-lo">stake a pepe to unlock referral links</p>

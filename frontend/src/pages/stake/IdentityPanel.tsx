@@ -56,6 +56,9 @@ export default function IdentityPanel({
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-2xl leading-tight">{nameLine}</h1>
           <p className="mt-1 text-xs text-text-lo">{subLine}</p>
+          <p className="mt-3 text-sm leading-relaxed text-text-hi">
+            lock PSP → earn 60% of every trade’s fee, pro-rata, paid in mixETH, claim any time. leaving takes a cooldown unless the round ends first.
+          </p>
 
           <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-2 border-t border-line pt-4 text-sm sm:grid-cols-2">
             <div className="flex items-baseline justify-between gap-3 sm:block">
@@ -82,10 +85,10 @@ export default function IdentityPanel({
               </dd>
             </div>
             <div className="flex items-baseline justify-between gap-3 sm:block">
-              <dt className="text-xs text-text-lo">stream share</dt>
+              <dt className="text-xs text-text-lo">your share of staker fees</dt>
               <dd className="tabular font-data text-text-hi">
                 {sharePct !== undefined ? `${sharePct.toFixed(sharePct < 0.01 ? 4 : 2)}%` : '…'}{' '}
-                <span className="text-xs text-text-lo">of the 60%</span>
+                <span className="text-xs text-text-lo">of the staker stream</span>
               </dd>
             </div>
           </dl>

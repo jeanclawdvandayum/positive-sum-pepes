@@ -74,7 +74,7 @@ test('version two zero-cap IBCOs take exact wallet balance, including tiny and v
     assert.equal(predepositLimit(100n, total, 0n, 50n, 50n, 2n), 0n)
   }
   assert.equal(predepositProgress(cap, 0n, 2n), '500 mixETH pooled')
-  assert.equal(predepositRemainder(cap, 0n, 2n), 'uncapped IBCO')
+  assert.equal(predepositRemainder(cap, 0n, 2n), 'uncapped opening buy')
 })
 test('zero means unlimited only with the exact on-chain version capability', () => {
   for (const version of [undefined, null, 0n, 1n, 3n, '2', 2]) {

@@ -24,7 +24,8 @@ function systemPrefersDark(): boolean {
 function readStoredMode(): ThemeMode {
   if (typeof window === 'undefined') return 'system'
   const saved = window.localStorage.getItem(STORAGE_KEY)
-  return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system'
+  // first visit: the arcade screen is the product (REDESIGN-SPEC §0) — dark until the visitor picks otherwise
+  return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'dark'
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

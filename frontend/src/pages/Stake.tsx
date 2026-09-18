@@ -508,7 +508,7 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
               <div className="flex items-center justify-between gap-2 text-xs text-text-lo">
                 <span>stake amount {hasPepes ? (pickedId !== null ? '(picked pepe)' : '(fresh pepe)') : ''}</span>
                 <span className="flex items-center gap-2">
-                  {!hasPepes && amountWad === 0n && <span className="text-pepe">0 = pepe only</span>}
+                  {!hasPepes && amountWad === 0n && <span className="text-pepe">0 = just the NFT</span>}
                   <button type="button" className="tabular font-data hover:underline" title="Use full PSP balance" disabled={busy || pspBal === undefined} onClick={() => setAmount(wadToExact(pspBal))}>balance {fmtAmount(pspBal)} · max</button>
                 </span>
               </div>
@@ -535,7 +535,7 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
               </button>
               {hasPepes && (
                 <button type="button" className="st-btn mt-2 w-full" disabled={!isConnected || busy} onClick={hatch}>
-                  {step === 'tx' ? 'confirm…' : 'hatch another pepe (stake 0)'}
+                  {step === 'tx' ? 'confirm…' : 'hatch another pepe — mint the NFT with nothing in it'}
                 </button>
               )}
               {!hasPepes && pickedId === null && !busy && step !== 'done' && (
@@ -570,7 +570,10 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
         <div className="alt-identity-row flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
           <ReferralsCard />
 
-          <NameRegistrationCard />
+          <details className="rounded-2xl border border-line bg-bg-1 p-5">
+            <summary className="cursor-pointer select-none text-sm text-text-lo hover:text-text-hi">put a name on that face (.wei) — optional</summary>
+            <div className="mt-4"><NameRegistrationCard /></div>
+          </details>
 
         </div>
       </div>
