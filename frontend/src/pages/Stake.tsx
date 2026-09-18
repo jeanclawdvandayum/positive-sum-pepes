@@ -501,7 +501,7 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
               <PspIcon px={20} /> stake psp
             </h2>
             <p className="mt-1 text-xs text-text-lo">
-              lock PSP with your pepe as lePSP, locked earning PSP. it earns trading fees. requesting withdrawal starts this round’s six-epoch exit{vest !== undefined ? `, up to ${fmtCountdown(Number(vest))}` : ''}.
+              lock PSP with your pepe as lePSP (locked PSP that earns fees). it earns 60% of every trade's fee, pro-rata, paid in mixETH. leaving starts a cooldown{vest !== undefined ? ` of up to ${fmtCountdown(Number(vest))}` : ''} in six steps — unless the round ends first, which opens every lock.
             </p>
 
             <div className="mt-4">

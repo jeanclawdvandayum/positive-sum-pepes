@@ -3,7 +3,8 @@ import { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { renderDecorativePepeSvg } from '../../lib/pepeRender'
 import { dnaOfId } from '../../components/PepePicker'
-import { fmtAmount } from '../../lib/format'
+import { fmtAmount, wadToExact } from '../../lib/format'
+import { LADDER_SHARES } from '../../lib/gameRules'
 import { hookAbi } from '../../lib/abi'
 import type { BoardTicket } from './useLadderBoard'
 import WalletPepeArt from '../../components/WalletPepeArt'
@@ -31,7 +32,7 @@ import WalletName from '../../components/WalletName'
 
 // ladder shares, newest → oldest — mirrors the contract split 25/18/14/…
 // ("the math, straight"; renormalizes under 10 seated tickets)
-const LADDER = [25, 18, 14, 10, 8, 7, 6, 5, 4, 3]
+const LADDER: readonly number[] = LADDER_SHARES
 
 // sleeping faces — one deterministic LOCAL pepe per seat (same art data the
 // contract renders; dimmed + zzz). No chain reads.
@@ -60,7 +61,10 @@ export default function PotBoard({
   claimHook,
   staker,
   roundId,
+  ticketPrice,
 }: {
+  /** live one-ticket price (v3: pot ÷ 10,000) — undefined while loading */
+  ticketPrice?: bigint
   pot: bigint | undefined
   /** board(0..9), newest first; undefined = empty seat (§8) */
   tickets: (BoardTicket | undefined)[]
@@ -131,9 +135,7 @@ export default function PotBoard({
             ? seated === 0
               ? 'empty ladder. the pot joined the reserves for PSP redemption.'
               : 'the seats are settled. collect your cut whenever you’re ready.'
-            : seated === 0
-              ? 'the latest 10 tickets hold the ladder — each 0.005 mixETH purchased earns one ticket'
-              : 'your cut if it blows now. everyone wants your seat.'}
+            : `the last 10 tickets bought hold the seats${ticketPrice !== undefined ? ` · a ticket costs ${wadToExact(ticketPrice)} mixETH right now` : ''}${seated === 0 ? '' : ' · your cut if it blows now'}`}
         </p>
       </div>
 
@@ -161,6 +163,11 @@ export default function PotBoard({
         <p className="mt-2 text-xs text-text-lo">✓ claimed — all your winning seats paid together.</p>
       )}
 
+      {!settled && (
+        <p className="mt-2 text-xs text-text-lo">
+          seats pay 25 / 18 / 14 / 10 / 8 / 7 / 6 / 5 / 4 / 3% of the pot, newest first. fewer seats share it all. a new ticket takes #1 and pushes everyone down.
+        </p>
+      )}
       <ol className="mt-4 flex flex-1 flex-col gap-1.5">
         {seats.map((s, i) => {
           const rank = i + 1
@@ -207,8 +214,7 @@ export default function PotBoard({
                         className={`tabular font-data ${isTop ? 'text-pot-gold' : 'text-text-hi'}`}
                       >
                         {LADDER[i] ?? 0}%
-                      </span>{' '}
-                      with a full ladder. prime frog real estate.
+                      </span>
                     </>
                   )}
                 </p>

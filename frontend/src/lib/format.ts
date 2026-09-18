@@ -21,7 +21,7 @@ export function fmtPrice(wadPerPsp: bigint | undefined): string {
   if (wadPerPsp === undefined) return '…'
   const n = Number(formatUnits(wadPerPsp, 18))
   if (n === 0) return '0'
-  if (n < 0.0001) return n.toExponential(2)
+  if (n < 0.0001) return n.toLocaleString('en-US', { maximumSignificantDigits: 3, maximumFractionDigits: 14 })
   return n.toLocaleString('en-US', { maximumFractionDigits: n < 1 ? 8 : 4 })
 }
 

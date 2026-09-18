@@ -148,7 +148,7 @@ export default function Clock({
       </span>
       {!hasDeadline && (
         <span className="clock-word clock-word--armed">
-          {round.mode === 0 ? 'at launch' : (round.mode ?? 0) >= 2 ? 'settled' : 'loading'}
+          {round.readError ? 'reconnecting…' : round.mode === undefined ? 'connecting…' : round.mode === 0 ? 'opening buy open' : round.mode >= 2 ? 'settled' : 'no live round'}
         </span>
       )}
     </div>

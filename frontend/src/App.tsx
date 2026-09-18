@@ -62,6 +62,8 @@ function Footer() {
           className="underline decoration-pepe/50 underline-offset-4 transition-colors hover:text-pepe">whitepaper ↗</a>
         <span aria-hidden="true">·</span>
         <span>made of pixels and math</span>
+        <span aria-hidden="true">·</span>
+        <span>new deployment rules · existing rounds keep their original curve and ticket rules</span>
       </div>
     </footer>
   )

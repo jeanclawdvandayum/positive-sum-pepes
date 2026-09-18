@@ -35,7 +35,7 @@ Proposed canon (use everywhere, gloss once per page on first use):
 |---|---|
 | ticket (a buy of ≥ 1 ticket takes seat #1) | spot, unit |
 | seat #1…#10 (positions on the ladder) | rung, slot |
-| the clock hits zero → **detonate** | carpet bomb, boom (keep "boom" as flavor only) |
+| **carpet bombing** stays (it is the meme lampooning the rug pull); gloss it once per page: "holding the top seats when the clock hits zero" | — |
 | the round is **over** / **settled** | flat |
 | **opening buy** (the pooled predeposit) | IBCO |
 | lePSP = *locked PSP that earns fees* (gloss every first use) | bare lePSP |
@@ -68,9 +68,9 @@ Proposed canon (use everywhere, gloss once per page on first use):
    curve and ticket rules." is the first text on the page. Move to the footer.
 
 ### C. Play page (`/play`) — the machine is loud, the rules are silent
-8. Headline: "*X* is carpet bombing for *Y* mixETH in: 00:00:00". This is the most
-   important sentence in the app and it uses slang. The causal statement is:
-   "**X wins Y mixETH if nobody buys before** 00:00:00". Say that.
+8. Headline: "*X* is carpet bombing for *Y* mixETH in: 00:00:00". Decision (scoopy,
+   2026-09-18): the phrase stays, it is the meme. Add the causal gloss under the
+   clock instead: "the carpet bombers on the ladder split the pot at zero."
 9. Nothing under the clock says what zero means for *me*. One line: "at zero,
    trading stops · the last 10 buyers split the pot · every PSP redeems for its
    backing."
@@ -177,15 +177,14 @@ soft shadows, no scroll-triggered motion.
 
 Phase 1 — vocabulary and copy (no layout changes).
 1. Apply the canon table from the assessment across src/pages and src/components:
-   ticket (never spot/unit), seat #n, detonate (never carpet bomb in UI copy),
+   ticket (never spot/unit), seat #n, carpet bombing kept as the meme,
    over/settled (never flat in UI copy), opening buy (never IBCO in UI copy),
    prize pot / backing (never total pot / curve reserves), cooldown (never
    six-epoch exit). lePSP stays but the first use on every page reads
    "lePSP (locked PSP that earns fees)". Grep for each banned word and fix every
    user-visible string; leave code identifiers and comments alone.
-2. ClockPanel headline: "{name} wins {prize} mixETH if nobody buys before" above
-   the clock; when no leader, "the next ticket takes seat #1". Add one line under
-   the pot: "at zero: trading stops · the last 10 buyers split the pot · every PSP
+2. ClockPanel headline stays ("{name} is carpet bombing for {prize} mixETH in:").
+   Add one line under the pot: "at zero: trading stops · the last 10 buyers split the pot · every PSP
    redeems for its backing." Add the phase word (calm / heating up / critical)
    beside the full clock, driven by usePhase().
 3. PotBoard: replace the hardcoded "each 0.005 mixETH purchased earns one

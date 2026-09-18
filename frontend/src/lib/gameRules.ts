@@ -1,6 +1,8 @@
 /** Gross mixETH input; checked against deployed getters before wallet writes. */
 export const MIN_BUY_INPUT = 5_000_000_000_000_000n
 export const TIME_PER_UNIT = 69n
+/// ladder shares, newest seat → oldest (CLOCK-REDESIGN §2); renormalized over the seats actually taken.
+export const LADDER_SHARES = [25, 18, 14, 10, 8, 7, 6, 5, 4, 3] as const
 /// sine v3 (TICKET_RULES_VERSION 3): the entire accounted pot prices 10,000
 /// tickets — ceil(potBalance / 10_000), floored at one wei.
 export const TICKETS_PER_POT = 10_000n

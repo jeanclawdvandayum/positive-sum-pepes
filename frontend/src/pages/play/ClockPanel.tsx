@@ -3,7 +3,9 @@ import ClockBand from '../../components/ClockBand'
 import PotOdometer from '../../components/PotOdometer'
 import Skeleton from '../../components/Skeleton'
 import WalletPepeArt from '../../components/WalletPepeArt'
-import { useNow } from '../../phase/PhaseEngine'
+import { useNow, usePhase } from '../../phase/PhaseEngine'
+import { useEthUsd } from '../../lib/useEthUsd'
+import { wadToExact } from '../../lib/format'
 import type { RoundInfo } from '../../lib/useRound'
 import { useDisplayName } from '../../lib/useDisplayName'
 import { fmtAmount } from '../../lib/format'
@@ -60,6 +62,8 @@ export default function ClockPanel({
   onDetonated: () => void
 }) {
   const now = useNow()
+  const { phase, hasDeadline } = usePhase()
+  const ethUsd = useEthUsd()
   const when = lastTime ? ago(lastTime.atSec, now) : undefined
   const leadingBuyer = board.seats[0]?.addr
   const pot = board.pot ?? round.potBalance
@@ -79,26 +83,36 @@ export default function ClockPanel({
             <>
               {leadingBuyer ? <BombingBuyer address={leadingBuyer} /> : <span className="pl-bombing-buyer">anon pepe</span>}
               {' '}is <em>carpet bombing</em> for{' '}
-              <span className="pl-bombing-prize" title="estimated payout across all their current ladder spots if the round detonated with this pot and ladder">
+              <span className="pl-bombing-prize" title="carpet bombing = holding the top seats. estimated payout across all their current seats if the round detonated with this pot and ladder">
                 {fmtAmount(leadingPrize, 4)} mixETH
               </span>{' '}in:
             </>
           ) : 'awaiting arming of carpet bomb'}
         </h1>
         <Clock />
-        <div className="mt-5 flex max-w-full flex-wrap items-baseline justify-center gap-x-3 gap-y-1 text-2xl sm:text-3xl" title="the pot gets the launch fee and at least 35% of each trading fee. the last ten tickets split it at detonation; an empty ladder sends it to redemption backing.">
-          <span className="font-display text-xl text-[#c9d7e4] sm:text-2xl">total pot:</span>
+        {round.mode === 1 && hasDeadline && (
+          <p className="clock-word mt-3 font-data text-xs" aria-live="polite">
+            {phase === 'calm' ? 'calm' : phase === 'heat' ? 'heating up' : 'critical'}
+          </p>
+        )}
+        <div className="mt-5 flex max-w-full flex-wrap items-baseline justify-center gap-x-3 gap-y-1 text-2xl sm:text-3xl" title="the prize. seeded by the opening buy's 10% fee, fed by at least 35% of every trading fee. the last ten tickets split it at detonation; an empty ladder sends it to the backing.">
+          <span className="font-display text-xl text-[#c9d7e4] sm:text-2xl">prize pot:</span>
           {pot === undefined ? (
             <Skeleton className="h-8 w-44" aria-label="loading the pot" />
           ) : (
             <PotOdometer value={pot} unit="mixETH" />
           )}
+          {pot !== undefined && ethUsd !== null && (
+            <span className="tabular font-data text-sm text-[#8fa3b8]" title="display estimate at the current ETH price">
+              ≈ ${(Number(pot) / 1e18 * ethUsd).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+            </span>
+          )}
         </div>
         <div
           className="mt-2 font-data text-xs text-[#8fa3b8]"
-          title="the mixETH held by the curve to back PSP."
+          title="the mixETH backing PSP — what every PSP redeems for once the round is over."
         >
-          curve reserves:{' '}
+          backing:{' '}
           {round.reserve === undefined ? (
             <Skeleton className="inline-block h-3 w-24 align-middle" aria-label="loading reserves" />
           ) : (
@@ -107,9 +121,16 @@ export default function ClockPanel({
             </span>
           )}
         </div>
-        {lastTime === undefined ? (
+        {round.mode === 1 && (
+          <p className="pl-context mt-3 max-w-2xl font-data text-xs leading-relaxed">
+            at zero: trading stops · the carpet bombers on the ladder split the pot · every PSP redeems for its backing.
+          </p>
+        )}
+        {round.readError ? (
+          <p className="pl-context mt-3 font-data text-xs text-phase-heat" role="status">reconnecting to the chain…</p>
+        ) : lastTime === undefined ? (
           <p className="pl-context mt-3 font-data text-xs">
-            feed the clock. each whole ladder ticket adds up to 69 seconds. ticket prices rise with the pot.
+            feed the clock. every ticket adds up to 69 seconds{round.ticketPrice !== undefined && ` · a ticket costs ${wadToExact(round.ticketPrice)} mixETH right now (prize pot ÷ 10,000)`}.
           </p>
         ) : (
           <p className="pl-context mt-3 flex items-center gap-1.5 font-data text-xs">

@@ -64,7 +64,7 @@ export default function CurveExplainer() {
       <p className="mt-3 max-w-2xl leading-relaxed text-text-lo">
         buying PSP adds mixETH to the reserves and raises the price. selling takes mixETH
         out and lowers it. the S-shaped bonding curve alternates between flatter and steeper
-        sections as reserves grow. one formula covers the IBCO and active trading.
+        sections as reserves grow. one formula covers the opening buy and active trading.
       </p>
 
       <div className="mt-7 grid items-center gap-8 lg:grid-cols-2">
@@ -110,7 +110,7 @@ export default function CurveExplainer() {
             </p>
           </div>
           <p className="mt-6 text-sm leading-relaxed text-text-lo">
-            ten waves reach 1,000 times the launch price. each wave adds a smaller percentage gain than the last. a 500 mixETH IBCO starts with 450 backing. each wave adds 955 backing, reaching 10,000 at wave ten. the wave width scales with the square root of launch backing.
+            ten waves reach 1,000 times the launch price. each wave adds a smaller percentage gain than the last. a 500 mixETH opening buy starts with 450 backing. each wave adds 955 backing, reaching 10,000 at wave ten. the wave width scales with the square root of launch backing.
           </p>
         </div>
       </div>

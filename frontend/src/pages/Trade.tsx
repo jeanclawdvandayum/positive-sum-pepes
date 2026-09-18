@@ -54,7 +54,7 @@ export default function Trade() {
   const tickerItems = [
     { label: 'volume', value: `${fmtAmount(tape.volumeWad)} mixETH` },
     { label: 'fees to stakers', value: `${fmtAmount(tape.feesWad)} mixETH` },
-    { label: 'reserves', value: `${fmtAmount(round.reserve)} mixETH` },
+    { label: 'backing', value: `${fmtAmount(round.reserve)} mixETH` },
     { label: 'price', value: `${fmtPrice(round.marginalPrice)} mix / psp` },
   ]
 
@@ -71,7 +71,7 @@ export default function Trade() {
       {settled && (
         <div className="mt-4 flex items-center gap-3 rounded-xl border border-line bg-bg-1 p-5 text-sm text-text-lo">
           <span>
-            round {round.id.toString()} is flat — redeem your psp from the{' '}
+            round {round.id.toString()} is over — collect winnings and redeem PSP in the{' '}
             <Link to="/graveyard" className="text-accent underline">graveyard</Link>.
           </span>
         </div>
@@ -82,7 +82,12 @@ export default function Trade() {
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-5">
         {/* Stretch both cards to the shared row height on wide screens. */}
         <div className="min-w-0 lg:col-span-2">
-          <SwapCard />
+          <SwapCard board={board} />
+          {round.mode === 1 && round.swapFeeBps !== undefined && (
+            <p className="mt-2 text-xs font-data text-text-lo" title="the sliding sine fee at the current backing — 10% at launch → 2.5% at the reserve target">
+              trade fee right now: {(Number(round.swapFeeBps) / 100).toFixed(2)}% of every buy and sell — 60% to stakers · 35% to the prize pot · the rest to referrals or the deployer
+            </p>
+          )}
         </div>
         <div className="min-w-0 lg:col-span-3">
           <PotBoard
@@ -96,16 +101,12 @@ export default function Trade() {
             roundLabel={`round ${round.id}`}
             claimable={claimable}
             claimHook={settled ? round.hook : undefined}
+            ticketPrice={round.ticketPrice}
           />
         </div>
       </div>
       <div className="mt-4">
         <CurveChart hasTrades={tape.count > 0 || (ticketCount ?? 0n) > 0n} entryPrice={entryPrice} />
-        {round.mode === 1 && round.swapFeeBps !== undefined && (
-          <p className="mt-2 text-xs font-data text-text-lo" title="the sliding sine fee at the current reserve — 10% at launch → 2.5% at the reserve target">
-            trade fee: {(Number(round.swapFeeBps) / 100).toFixed(2)}% of every buy and sell — 60% to stakers · the rest to the pot and referral/deployer rewards
-          </p>
-        )}
       </div>
       <div className="mt-4">
         <TickerBar items={tickerItems} />

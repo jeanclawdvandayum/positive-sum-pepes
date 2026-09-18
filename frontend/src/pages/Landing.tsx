@@ -12,12 +12,12 @@ import CurveExplainer from './explainer/CurveExplainer'
 const BEATS: { name: string; copy: string; kind: BeatKind }[] = [
   {
     name: 'crash the opening party.',
-    copy: 'three days. public IBCO. pick your pepe and join the pooled opening buy. your deposit reserves that face and determines your share. the opening belongs to the people who show up.',
+    copy: 'three days. a public opening buy. pick your pepe and join the pool. your deposit reserves that face and determines your share. the opening belongs to the people who show up.',
     kind: 'predeposit',
   },
   {
     name: 'give the chart a pulse.',
-    copy: 'one sine curve runs through the IBCO and trading. ten waves reach 1,000 times the launch price. softened cube-root growth gives earlier waves larger percentage gains. wave width scales with the square root of the opening backing.',
+    copy: 'one sine curve runs through the opening buy and trading. ten waves reach 1,000 times the launch price. softened cube-root growth gives earlier waves larger percentage gains. wave width scales with the square root of the opening backing.',
     kind: 'curve',
   },
   {
@@ -27,7 +27,7 @@ const BEATS: { name: string; copy: string; kind: BeatKind }[] = [
   },
   {
     name: 'fight over something.',
-    copy: 'buys feed the clock and take ladder spots. when someone detonates the expired round, the tickets still on the ladder split the jackpot. attention has somewhere to go. so does the money.',
+    copy: 'every buy takes a ticket, adds time to the clock and sits at seat #1. when the clock hits zero, whoever detonates settles it: the last ten tickets split the prize pot. attention has somewhere to go. so does the money.',
     kind: 'jackpot',
   },
   {
@@ -42,7 +42,7 @@ const BEATS: { name: string; copy: string; kind: BeatKind }[] = [
   },
   {
     name: 'settle the wreckage.',
-    copy: 'detonation opens every lock and flattens the curve. redeem PSP for its proportional share of the remaining backing whenever you’re ready.',
+    copy: 'detonation opens every lock and ends trading. redeem PSP for its proportional share of the remaining backing whenever you’re ready.',
     kind: 'settle',
   },
   {
@@ -53,7 +53,7 @@ const BEATS: { name: string; copy: string; kind: BeatKind }[] = [
 ]
 
 const RULES: [string, string][] = [
-  ['buying in', 'the minimum gross buy equals one current ladder spot. each spot costs the whole accounted pot divided by 10,000, rounded up to wei, with a one-wei floor. the initial pot counts. one wallet can hold several spots.'],
+  ['buying in', 'the minimum buy is one ticket. a ticket costs the whole prize pot divided by 10,000, rounded up to wei, with a one-wei floor. the opening pot counts. one wallet can hold several tickets.'],
   ['feeding the clock', 'each whole ticket adds up to 69 seconds, capped at the round’s starting duration. the default maximum is 69 hours, 4 minutes and 20 seconds. test rounds can use shorter clocks. ten tickets add up to 11 minutes and 30 seconds. each buy uses the ticket price before its fees enter the pot.'],
   ['hitting zero', 'the countdown starts at launch. trading stops at zero. anyone can detonate the round to settle the ladder and open the staking locks.'],
   ['ladder payouts', 'with ten tickets, the pot splits 25/18/14/10/8/7/6/5/4/3% from newest to oldest.'],
@@ -69,7 +69,6 @@ export default function Landing() {
 
   return (
     <div className="xd-page font-body text-text-hi">
-      <p className="pt-4 text-xs text-text-lo">new deployment rules · existing rounds keep their original curve and ticket rules.</p>
       <DiagramStyles />
 
       <section className="grid items-center gap-10 pt-10 pb-4 sm:pt-14 lg:grid-cols-[minmax(0,1fr)_17.25rem] lg:gap-12">

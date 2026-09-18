@@ -375,7 +375,7 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
               halted
                 ? 'the clock is at zero. trading has stopped.'
                 : round.mode === 2
-                  ? 'buying is disabled while the round is flat'
+                  ? 'the round is over — buying is closed, selling and redemption stay open'
                   : undefined
             }
             className={`rounded-full px-4 py-1 text-sm font-semibold transition disabled:opacity-30 ${
@@ -485,7 +485,7 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
             disabled={busy || !round.ticketPrice}
             className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg border border-line bg-bg-1 px-3 py-2 text-xs transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <span className="font-semibold text-accent">buy 1 ladder spot</span>
+            <span className="font-semibold text-accent">buy 1 ticket · takes seat #1</span>
             <span className="tabular font-data text-text-lo">{wadToExact(round.ticketPrice)} mixETH</span>
           </button>
         )}
