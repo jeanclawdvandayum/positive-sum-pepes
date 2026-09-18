@@ -1587,6 +1587,26 @@ LOCAL LIFECYCLE: fresh disposable Anvil on chain31337 — 18/18 deployment recei
   static result claimed (only src diff since the Sept-16 run is 471b0443's
   one-line `ticketPrice()` gate). Nothing deployed or published.
 
+## 2026-09-18 — Fable 5.1 adversarial campaign (report addendum, no src changes)
+
+- `test/FableBreakAttempts.t.sol` (+14 tests, 14/14 pass): A) 4-wallet random
+  lifecycle (buys/sells/locks/top-ups/requests/cancels/vested withdraws/fee
+  claims/NFT transfers/referral binds/time skips, solvency asserted every
+  step) then detonation and a FULL exit by every wallet — PSP supply 0,
+  reserve 0, staker 0 PSP, referral escrow 0, hook ≤ 1,000 wei dust; 49 runs
+  in the gate, 401 runs once for the report, zero reverts. B) brick attempts:
+  pending owner reservation at detonation + permissionless recovery, deep
+  sells far below boot (257 runs, inverse always converges), withdraw at flat
+  from every decay phase (257 runs), ladder claims vs pot across evictions,
+  capacity edge (700k mixETH absorbed, buys fail closed, exits work), exact
+  clock boundary, empty successor recoverable by anyone, vault-rate move
+  invisible to settlement. T) theft attempts: double claims, 12 privileged
+  entry points vs strangers, flat-sell vs redeem parity, spoofed hookData
+  trader, late genesis claim after rebirth — all held.
+- Verdict unchanged: no Critical/High/Medium; nothing in src/ touched. Gate
+  forge count now 721 + 20 audit tests = 741. Report section added to
+  `docs/audit/2026-09-18-single-sine-fable.md`.
+
 ## 2026-09-20 — DinoSAT gate entry for `0f08c032` (background run completed)
 
 - Symbolic suite landed Sept-18 as `0f08c032` (fast-forward over `e9a70d44`):

@@ -32,6 +32,29 @@
 | F-6 | Info | **Dust-size buys (v3 exemption from `MIN_SWAP_INPUT`).** On a 0.05 mixETH round the ladder spot is ~5e11 wei, below the 1e12 dust guard. Fuzzed multi-leg buy-then-sell round trips from the spot up to 1e14 wei always lose, and both custody invariants hold after every run. | `testFuzz_F6_TinyRoundDustRoundTripNeverWins` (256 runs) |
 | F-7 | Info | **Degenerate launches.** The spec supports one-wei launches. A boot below ~1e6 wei gives a reserve capacity (`boot + 4096·λ`) of well under 1e-3 mixETH and a 1-wei ticket, so a round launched from dust is unplayable until it detonates. Since any real depositor makes the boot real, this only bites when nobody else deposited during the window, in which case the round had no audience anyway. No change recommended; mention in the operator runbook. | analytical (`lamAt`, `POST_WAVES`) |
 
+## Adversarial campaign (`test/FableBreakAttempts.t.sol`, 14/14 pass)
+
+Requested after the read-through ("probe to see if you can break anything"). Real local V4 `PoolManager`, short timings (1h predeposit, 6h vest with 1h epochs, 12h clock) so the vest engine is actually exercised.
+
+**A — Everyone can fully exit after chaos (fuzz).** Four wallets run 24–48 random actions each sequence: buys, sells, fresh locks, top-ups, withdrawal requests, cancels, vested withdrawals, fee claims, NFT transfers, referral binds, and time skips, with the hook-solvency and registry-backing invariants asserted after every step. Then the clock strikes, anyone detonates, and *every* participant claims their pot seats, claims fees, withdraws every pepe (flat bypass), redeems every PSP, claims referral rewards, and the deployer claims the rake. After that: PSP total supply is exactly zero, the reserve is exactly zero, the staker holds no PSP, the referral escrow is zero, the frozen pot has at most 10 wei of rounding left, and the hook holds at most 1,000 wei. No call reverted in any sequence. Run at 48 sequences in the gate and 401 sequences once for this report (a first long run surfaced only a harness issue: the random referral step tripped the registry's own `WouldCreateCycle` guard, which is the protection working).
+
+**B — Brick attempts.**
+- B1 an owner reservation pending at detonation: the round still flattens; `voidReservation` + permissionless `reserveSpawn`/`birthRound` recover the loop; round-1 exits unaffected.
+- B2 (fuzz, 257 runs) repeated large sells drive the reserve far below the launch backing (observed ~14 mixETH from 90), interleaved with buys, then trade back up and out. The sell inverse never failed to converge.
+- B3 (fuzz over every decay phase k = 0..9) a position in any vest phase leaves at flat and the global weight equals the remaining live weight, then zero.
+- B4 seat evictions with three buyers: claims sum to the frozen pot within 10 wei, `potPaid` matches, and a second claim reverts.
+- B5 capacity edge: the curve absorbed 700,000 mixETH (reserve 678,840) before a buy failed closed (`ZeroOutput` at astronomical price, well before the 4,096-wave domain edge). Sells, detonation and redemption all worked from that state.
+- B6 the clock boundary is exact: a buy at `detonationAt − 1` lands and extends; at `detonationAt` both directions halt and `detonate()` succeeds.
+- B7 a successor with no deposits is not a dead end: after the window a 1-wei deposit from anyone lets anyone launch.
+- B8 a mixETH vault-rate move mid-round leaves buy quotes, sell quotes and the ticket price bit-identical, and exits stay solvent (NK24 stays fixed).
+
+**T — Theft attempts.**
+- T1 double fee claims, duplicate ids in `claimAllTo`, and a second genesis claim all yield nothing.
+- T2 every privileged entry point (`creditReferralRewards`, `setMode`, `initializeCurve`, `configureSineV3`, `sendFees`, `mintPSPForSwap`, `seedCarry`, `lockGenesis`, `claimGenesisShare`, `markDestroyed`, `reserveGenesis`, factory `configureSineV3`) rejects a stranger.
+- T3 after death the V4 flat sell and `redeemBacking` pay the same per-PSP rate (within 2 wei per unit); neither skims the other.
+- T4 a direct pool-manager swap that names a victim in `hookData` (with a ticket bound) can only credit the victim's seats; the attacker pays and receives only their own PSP; nothing moves from the victim.
+- T5 a genesis claim made after the successor round is born still pays the full share plus accrued fees, and a non-depositor cannot claim.
+
 ## Things checked and found clean
 
 - Reentrancy: hook swap paths are CEI with plain ERC-20s on both sides; `redeemBacking`, `claimPot*`, `claimDeployerCredit` update books before transfer; staker, controller, registry, reinvestor use `nonReentrant`; ERC-721 receiver callbacks run after all effects with the guard held.
