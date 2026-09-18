@@ -3,7 +3,7 @@ import type { BoardState } from '../pages/play/useLadderBoard'
 import { Link } from 'react-router-dom'
 import { usePurchaseReferral, useReferral } from './ReferralCard'
 import { purchaseReferral } from '../lib/referrals'
-import { purchaseUnits, TIME_PER_UNIT, minimumOutput, minimumBuyInput, assertTicketGuard } from '../lib/gameRules'
+import { purchaseUnits, TIME_PER_UNIT, LADDER_SHARES, minimumOutput, minimumBuyInput, assertTicketGuard } from '../lib/gameRules'
 import { usePredepositRules } from '../lib/usePredepositMinimum'
 import { capHeadroom, predepositUncapped, predepositLimit, predepositAmountAllowed, predepositProgress, predepositRemainder } from '../lib/predeposit'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
@@ -15,7 +15,7 @@ import { rpcCall, rpcBatchCall } from '../lib/rpc'
 import { ADDRESSES } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
 import { fmtAmount, parseAmountToWad, wadToExact } from '../lib/format'
-import { injectTime, usePhase } from '../phase/PhaseEngine'
+import { injectTime, usePhase, useNow } from '../phase/PhaseEngine'
 import MixLogo from './MixLogo'
 import { PspIcon } from './TokenIcon'
 import { PixelIcon } from './PixelIcon'
@@ -138,6 +138,33 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
     return () => { dead = true; if (timer) clearTimeout(timer) }
   }, [quoteKey, round.hook, side, amountWad, mixIn, round.mode, live, halted, minimum])
   const quoteMixOut = side === 'sell' ? quoteRaw : undefined
+
+  /// the move this buy makes (v3 rounds): tickets, seats, clock time (capped
+  /// exactly like the hook: never past now + detWindow) and the payout the new
+  /// seats would take if the round ended right after. All from reads that
+  /// already exist — ticketPrice (quoted, else live), the ladder board, the pot.
+  const nowSec = useNow()
+  const move = useMemo(() => {
+    if (side !== 'buy' || round.mode !== 1 || !board) return undefined
+    const tp = quotedTicketPrice ?? round.ticketPrice
+    if (tp === undefined || tp === 0n) return undefined
+    const units = purchaseUnits(mixIn, tp)
+    const seatsTaken = units > 10n ? 10n : units
+    let addedSec = units * TIME_PER_UNIT
+    if (round.detonationAt !== undefined && round.detWindow !== undefined) {
+      const cap = BigInt(nowSec) + round.detWindow
+      const headroom = cap > round.detonationAt ? cap - round.detonationAt : 0n
+      if (addedSec > headroom) addedSec = headroom
+    }
+    const seated = board.seats.filter(s => s !== undefined).length
+    const after = Math.min(10, seated + Number(seatsTaken))
+    const mine = LADDER_SHARES.slice(0, Number(seatsTaken)).reduce((a, b) => a + b, 0)
+    const all = LADDER_SHARES.slice(0, after).reduce((a, b) => a + b, 0)
+    const pct = all > 0 ? (mine / all) * 100 : 0
+    const payout = board.pot !== undefined && all > 0 ? (board.pot * BigInt(mine)) / BigInt(all) : undefined
+    return { tp, units, seatsTaken, addedSec, pct, payout }
+  }, [side, round.mode, round.ticketPrice, round.detonationAt, round.detWindow, quotedTicketPrice, mixIn, board, nowSec])
+  const fmtSec = (s: bigint) => `${s / 60n}:${String(s % 60n).padStart(2, '0')}`
 
   const poolKey = useMemo(
     () =>
@@ -540,14 +567,39 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
         </div>
       )}
 
-      {side === 'buy' && (
+      {side === 'buy' && !predepositPhase && move !== undefined && (
+        <div className="mt-3 rounded-lg border border-accent/40 bg-bg-2 px-3 py-2.5 text-sm" aria-live="polite">
+          {move.units === 0n ? (
+            <p className="text-text-lo">
+              1 ticket minimum = <span className="tabular font-data text-text-hi">{wadToExact(move.tp)} mixETH</span> · takes seat #1 · +{fmtSec(TIME_PER_UNIT)} on the clock
+            </p>
+          ) : (
+            <p className="text-text-hi">
+              this buy → <span className="tabular font-data">{move.units.toString()}</span> {move.units === 1n ? 'ticket' : 'tickets'} ·{' '}
+              {move.seatsTaken === 1n ? 'seat #1' : `seats #1–#${move.seatsTaken.toString()}`} ·{' '}
+              <span className="tabular font-data text-accent">+{fmtSec(move.addedSec)}</span> on the clock ·{' '}
+              pays <span className="tabular font-data text-pot-gold">{move.pct % 1 === 0 ? move.pct : move.pct.toFixed(1)}%</span>
+              {move.payout !== undefined && <> (<span className="tabular font-data">{fmtAmount(move.payout, 4)} mixETH</span>)</>} if it ends now
+            </p>
+          )}
+          <p className="mt-1 text-[11px] text-text-lo">
+            {move.addedSec === 0n && move.units > 0n ? 'the clock is at its cap — this buy adds no time. ' : ''}
+            a ticket costs the prize pot ÷ 10,000; other trades can move it before yours lands.
+          </p>
+        </div>
+      )}
+      {side === 'buy' && predepositPhase && (
         <p className="mt-3 text-xs text-text-lo">
-          {predepositPhase ? pdMinimum === 1n ? 'any positive mixETH amount' : `this round’s minimum: ${wadToExact(pdMinimum)} mixETH` : minimum === undefined ? 'minimum unavailable' : `minimum ${wadToExact(minimum)} mixETH`}{!predepositPhase && ` · ${purchaseUnits(mixIn, quotedTicketPrice ?? 0n) > 10n ? 10n : purchaseUnits(mixIn, quotedTicketPrice ?? 0n)} ${purchaseUnits(mixIn, quotedTicketPrice ?? 0n) === 1n ? 'seat' : 'seats'} · +${purchaseUnits(mixIn, quotedTicketPrice ?? 0n) * TIME_PER_UNIT / 60n}m ${purchaseUnits(mixIn, quotedTicketPrice ?? 0n) * TIME_PER_UNIT % 60n}s before the clock cap`}
-          {!predepositPhase && ' · estimated at the current ticket price. Other trades can change it before yours lands.'}
+          {pdMinimum === 1n ? 'any positive mixETH amount' : `this round’s minimum: ${wadToExact(pdMinimum)} mixETH`}
         </p>
       )}
-      {/* slippage */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+      {side === 'buy' && !predepositPhase && move === undefined && (
+        <p className="mt-3 text-xs text-text-lo">{minimum === undefined ? 'ticket price unavailable' : `minimum ${wadToExact(minimum)} mixETH (one ticket)`}</p>
+      )}
+      {/* slippage — behind "advanced": the ticket guard protects the thing people care about */}
+      <details className="mt-3 text-xs">
+        <summary className="cursor-pointer select-none text-text-lo hover:text-text-hi">advanced · slippage {customSlip !== '' ? `${customSlip}%` : `${slippage * 100}%`}</summary>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="font-semibold text-text-lo">slippage</span>
         <div className="flex min-w-0 flex-wrap items-center gap-1">
           {[0.005, 0.01, 0.03, 0.05, 0.1].map((s) => (
@@ -577,6 +629,7 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
           />
         </div>
       </div>
+      </details>
 
       {live && quoteRaw !== undefined && quoteRaw > 0n && (
         <div className="mt-2 space-y-1">
