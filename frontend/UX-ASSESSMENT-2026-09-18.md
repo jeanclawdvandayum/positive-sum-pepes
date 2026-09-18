@@ -182,6 +182,55 @@ with a live ticket price and the notification were verified by type-check,
 tests and code review rather than on screen. Check them on the next testnet
 round with a real wallet.
 
+## The alt UI (`VITE_ALT_UI=1`, `npm run dev:alt`) — evaluation and revisions (2026-09-19)
+
+scoopy's shipped interface is the alt UI, so this pass moved there. It is
+noticeably stronger than the main UI on comprehension: the hero already
+carries a loop sentence and a live "instrument" (clock, pot, next ticket, clock
+cap); the trade box already leads with "here's what changes" (seats taken, time
+added, your cut, and a displacement slider); the ladder already highlights your
+rows; the landing has the payout slider and an editorial rules table. What was
+left is the same vocabulary drift plus a handful of missing glosses.
+
+Findings and what changed (commit after 87ea7bf5):
+- **"IBCO" everywhere** (nav label, instrument, six places on the landing, the
+  fee table) → "opening buy". "ladder spots" / "one spot costs" → tickets and
+  seats. "the round is flat" → "the round is over". "unstaking schedule" /
+  "six-step exit" → cooldown. "total pot" → "prize pot", "reserves" →
+  "backing" (clock band and instrument).
+- **Hero** now states the loop in bold as the first intro line ("every buy takes
+  a ticket and feeds the clock. when it hits zero, the last ten buyers split the
+  pot.") before the launchpad grievance. The existing "see what your buy does"
+  CTA stays; it is the right one.
+- **Payout section** gained the ticket-cost line under the slider ("a ticket
+  costs the pot ÷ 10,000 = 0.01 mixETH · seat #1 pays 25 mixETH…"), live with
+  the slider.
+- **Play clock band** gained the phase word (calm / heating up / critical), the
+  zero gloss ("at zero: trading stops · the carpet bombers on the ladder split
+  the pot · every PSP redeems for its backing"), and the opt-in "notify me under
+  5 minutes" button in the alt button style. "carpet bombing" stays.
+- **Ladder** gained a personal line for connected wallets ("you hold seat #3 ·
+  pays 14% = 0.83 mixETH if it blows now · 2 more tickets bump you off · post to
+  X"), the seat percentages stated once in the note, and "seat" instead of
+  "ladder spot" on rows.
+- **Trade box** quick amounts read "1 ticket / 3 tickets / 10 tickets" (they
+  are ticket multiples of the current price).
+- The dev-facing "new deployment rules" line moved from under the hero to the
+  footer.
+- The shared Stake and Predeposit pages (rendered inside the alt shell with
+  `variant="alt"`) carry the Phase 5 changes from the main pass: payoff line,
+  canon words, collapsed .wei card, predeposit on tokens with the "what you get"
+  card and the 10% pot-seed fact.
+
+Not changed in the alt UI: its slippage row (three compact options, fine as
+is), its own consequence block (already better than the one I built for the
+main UI), and its graveyard (shared with the main UI, already clear).
+
+Verification: headless Chrome renders the alt landing but hangs on the alt
+play/stake/predeposit routes (no console output, so a tooling artifact, not an
+app error); those were verified by type-check, tests and both Vite builds.
+Check them locally at http://localhost:5173/ in alt mode with a wallet.
+
 ## What not to touch
 - PhaseEngine as the one rAF loop, HashRouter with `?ref=` capture, no invented
   chain reads, ABI shapes from `CLOCK-REDESIGN.md` §6 (red lines).

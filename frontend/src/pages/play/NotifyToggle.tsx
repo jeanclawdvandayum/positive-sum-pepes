@@ -17,7 +17,9 @@ function granted(): boolean {
   return typeof Notification !== 'undefined' && Notification.permission === 'granted'
 }
 
-export default function NotifyToggle({ round }: { round: RoundInfo }) {
+const DEFAULT_CLASS = 'pl-context mt-3 rounded-md border border-[#22344f] px-2.5 py-1 font-data text-[11px] transition hover:border-[#8ba3bd] focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60'
+
+export default function NotifyToggle({ round, className = DEFAULT_CLASS }: { round: RoundInfo; className?: string }) {
   const supported = typeof window !== 'undefined' && typeof Notification !== 'undefined'
   const [on, setOn] = useState<boolean>(() => {
     try { return supported && granted() && window.localStorage.getItem(KEY) === '1' } catch { return false }
@@ -71,7 +73,7 @@ export default function NotifyToggle({ round }: { round: RoundInfo }) {
       onClick={() => { void toggle() }}
       disabled={busy}
       aria-pressed={on}
-      className="pl-context mt-3 rounded-md border border-[#22344f] px-2.5 py-1 font-data text-[11px] transition hover:border-[#8ba3bd] focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60"
+      className={className}
     >
       {on ? 'notifying under 5 minutes ✓' : 'notify me under 5 minutes'}
     </button>
