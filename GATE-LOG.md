@@ -1567,6 +1567,26 @@ LOCAL LIFECYCLE: fresh disposable Anvil on chain31337 — 18/18 deployment recei
   tsc + vite build. The 6 PoCs were re-verified against `471b0443` before
   push (post-launch behavior unchanged by the pre-launch minimum fix).
 
+## 2026-09-18 — Fable 5.1 audit pass (report + PoCs, no src changes)
+
+- Third fresh-eyes review of `single-sine-spec` @ `e9a70d44` after Codex
+  Astra and GLM 5.3. Full read of every live-path contract, deploy scripts and
+  the Base Sepolia driver, plus the pre-launch window the Sept-16 report left
+  uncovered. **No Critical/High/Medium.** Seven residual notes (1 Low: generic
+  routers with empty hookData strand their pot seats — documentation item;
+  6 Info), each pinned by a passing PoC. Report:
+  `docs/audit/2026-09-18-single-sine-fable.md`.
+- Adds `test/FableAuditPoC.t.sol` (+6 tests: router-seat stranding, referral
+  self-rebate via NFT custody, owner genesis over a live round, rebirth
+  pre-launch minimum + predeposit gas ~0.77–0.87M, stranger stakeFor,
+  tiny-round dust round-trip fuzz @256 with custody invariants).
+- GATES: full `forge test` **721 pass / 0 fail** on the pushed tree (+6 → 727
+  with the PoCs; the two `test/integration` fork suites fail only on missing
+  RPC credentials here); no-governance clean; sizes 50 artifacts pass
+  (SineV3Math 14,182 B). Slither not installed on this machine — no new
+  static result claimed (only src diff since the Sept-16 run is 471b0443's
+  one-line `ticketPrice()` gate). Nothing deployed or published.
+
 ## 2026-09-20 — DinoSAT gate entry for `0f08c032` (background run completed)
 
 - Symbolic suite landed Sept-18 as `0f08c032` (fast-forward over `e9a70d44`):
