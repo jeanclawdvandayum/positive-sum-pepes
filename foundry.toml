@@ -24,6 +24,17 @@ runs = 64
 depth = 32
 fail_on_revert = true
 
+[profile.halmos]
+src = "src"
+test = "test/dinosat"
+out = "out-halmos"
+libs = ["lib"]
+solc = "0.8.26"
+optimizer = false
+via_ir = true
+evm_version = "cancun"
+ast = true
+
 [profile.fork]
 via_ir = true
 evm_version = "cancun"

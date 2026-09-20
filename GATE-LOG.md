@@ -1566,3 +1566,21 @@ LOCAL LIFECYCLE: fresh disposable Anvil on chain31337 — 18/18 deployment recei
   art/ABI/sizes gates, all four sine generator checks, no-governance grep,
   tsc + vite build. The 6 PoCs were re-verified against `471b0443` before
   push (post-launch behavior unchanged by the pre-launch minimum fix).
+
+## 2026-09-20 — DinoSAT gate entry for `0f08c032` (background run completed)
+
+- Symbolic suite landed Sept-18 as `0f08c032` (fast-forward over `e9a70d44`):
+  `test/dinosat/` — SineV3PriceSymbolic 16, SineV3MathSymbolic 10,
+  SineV3PrimitiveSymbolic 11 (= 37) — plus `audits/DINOSAT-REPORT.md`.
+  The 4 fuzz-tier falsifications were adjudicated wrapper-side before push
+  (uint112 literal-typing inside an assert; two one-sided phase-displacement
+  bounds restated two-sided; scaledExp clamp narrowed to the probed
+  overflow-free domain) — zero `src/` changes; adjudication is report §4.
+- `bash scripts/check-audit.sh` (PATH-corrected, background; stderr clean;
+  log /tmp/psp-gate-final.log): **PASS** — **758 Solidity tests / 93 suites**
+  (721 + 37 DinoSAT over the Sept-16 baseline), **211 frontend tests**,
+  names 11/11, size gate 49 production artifacts, no-governance grep,
+  tsc + both vite builds green. No gate weakened; no pin touched.
+- Companion commit adds the `[profile.halmos]` foundry table (halmos run
+  config for `test/dinosat`, inert for the default gate profile) that failed
+  to ride with `0f08c032`.
