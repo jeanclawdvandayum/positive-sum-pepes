@@ -1,0 +1,9 @@
+{
+  "src/CurveHook.sol": "0806016a5246032d6fd4dc8867178de8eb6e0e4ed7ca44fb2b98f73b4326edfc",
+  "src/SineV3Primitive.sol": "d2f4ba46758f18efb3546dd0022dadd728158e60b06c8d04316f273d3d3d8213",
+  "src/SineV3Price.sol": "7a071d5e16aa1627d75a622bbce5808e04920073abc49a97ac9141346ac66b43",
+  "src/SineV3Math.sol": "151c973eed985ce47db7b7926884268ef0636ec1fafc8e174cb6c00db144355b",
+  "src/RoundController.sol": "73700f748a7911d386043aad8b1aefa70be300d2082ead18ffae03fc3851ec0b",
+  "lib/solady/src/utils/FixedPointMathLib.sol": "bb0c06fe117d69df9bff7baf442255aa114e1c01d1ebe077213e2eb4e06ae2d6",
+  "lib/openzeppelin-contracts/contracts/utils/math/Math.sol": "bdfdbe133991c0c78042957ff5cd97167926fcaf6d15664f3835a076cb066457"
+}

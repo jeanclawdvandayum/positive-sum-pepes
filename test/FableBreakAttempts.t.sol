@@ -14,6 +14,9 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {CustomRevert} from "@uniswap/v4-core/src/libraries/CustomRevert.sol";
 
 /// @dev Adversarial campaign (2026-09-18). Three families:
 ///        A  random multi-actor lifecycle, then EVERYONE exits EVERYTHING —
@@ -88,9 +91,38 @@ contract FableBreakAttempts is RealV4Base {
     }
 
     function _assertHookInvariants() internal view {
+        // Keep the entire unpaid fee budget reserved, including allocated
+        // fractional credit and rounding dust. pendingFeesMixETH alone omits
+        // credit already earned by positions but not yet paid.
+        uint256 unpaidFees = staker.totalFeesReceived() - staker.totalFeesPaid();
         uint256 liabilities = hook.reserveMixETH() + (hook.potBalance() - hook.potPaid())
-            + (hook.deployerCredit() - hook.deployerCreditPaid()) + staker.pendingFeesMixETH();
-        assertGe(mixETH.balanceOf(address(hook)), liabilities, "hook solvent");
+            + (hook.deployerCredit() - hook.deployerCreditPaid()) + unpaidFees;
+        // This campaign never donates directly to the hook: every mixETH wei
+        // must belong to one of these four budgets, without a dust tolerance.
+        assertEq(mixETH.balanceOf(address(hook)), liabilities, "all hook budgets conserved");
+
+        uint256 owed = staker.pendingFeesMixETH() + staker.pendingFeesOf(0);
+        (uint256 principal,,,,) = staker.positions(0);
+        uint256 epoch = block.timestamp / staker.epochSize();
+        uint256 weight = staker.weightAt(0, epoch);
+        for (uint256 i; i < actors.length; ++i) {
+            uint256[] memory ids = _pepesOf(actors[i]);
+            uint256 ownedPrincipal;
+            for (uint256 j; j < ids.length; ++j) {
+                (uint256 amount,,,,) = staker.positions(ids[j]);
+                ownedPrincipal += amount;
+                weight += staker.weightAt(ids[j], epoch);
+                owed += staker.pendingFeesOf(ids[j]);
+            }
+            principal += ownedPrincipal;
+            assertEq(staker.stakedTotalOf(actors[i]), ownedPrincipal, "owner principal cache");
+        }
+        // Claimable whole fees are floored per position; fractional credit
+        // and allocation dust remain in unpaidFees, so equality is not owed.
+        assertLe(owed, unpaidFees, "position entitlements fit the unpaid fee budget");
+        assertEq(principal, staker.totalLocked(), "all locked principal tracked");
+        assertEq(principal, pspToken.balanceOf(address(staker)), "staker principal backed");
+        assertEq(weight, staker.totalWeight(), "position weights match global weight");
         assertEq(hook.totalSupplyPSP(), pspToken.totalSupply(), "supply mirrors token");
         assertGe(mixETH.balanceOf(address(registry)), registry.totalReferralOutstanding(), "registry backed");
     }
@@ -176,6 +208,7 @@ contract FableBreakAttempts is RealV4Base {
         if (block.timestamp < hook.detonationAt()) vm.warp(hook.detonationAt());
         controller.detonate();
         assertEq(uint8(hook.mode()), uint8(CurveHook.Mode.Flat), "flat after detonation");
+        _assertHookInvariants();
 
         // ── everyone exits everything ──
         (bool claimed,) = _dep(bob);
@@ -188,12 +221,15 @@ contract FableBreakAttempts is RealV4Base {
                 (uint256 amt,,,,) = staker.positions(ids[j]);
                 if (amt > 0) { vm.prank(a); staker.withdraw(ids[j]); }
                 if (staker.pendingFeesOf(ids[j]) > 0) { vm.prank(a); staker.claimFees(ids[j]); }
+                _assertHookInvariants();
             }
             uint256 psp = pspToken.balanceOf(a);
             if (psp > 0) { vm.prank(a); hook.redeemBacking(psp); }
             if (registry.claimableReferral(a) > 0) { vm.prank(a); registry.claimReferralRewards(); }
+            _assertHookInvariants();
         }
         if (hook.deployerCredit() > hook.deployerCreditPaid()) hook.claimDeployerCredit();
+        _assertHookInvariants();
 
         // ── nothing left behind ──
         assertEq(pspToken.totalSupply(), 0, "every PSP redeemed");
@@ -335,7 +371,17 @@ contract FableBreakAttempts is RealV4Base {
         }
         emit log_named_uint("B5: mixETH absorbed before the curve refused (1e18)", spent / 1e18);
         emit log_named_uint("B5: reserve (1e18)", hook.reserveMixETH() / 1e18);
-        assertGt(lastErr.length, 0, "a buy eventually fails closed");
+        assertEq(
+            lastErr,
+            abi.encodeWithSelector(
+                CustomRevert.WrappedError.selector,
+                address(hook),
+                IHooks.beforeSwap.selector,
+                abi.encodeWithSelector(CurveHook.ZeroOutput.selector),
+                abi.encodeWithSelector(Hooks.HookCallFailed.selector)
+            ),
+            "capacity exhaustion must fail with the expected V4-wrapped ZeroOutput"
+        );
         // sells keep working from the accepted state
         uint256 half = pspToken.balanceOf(alice) / 2;
         if (half >= 1e12) { vm.prank(alice); zapOut.sellToMix(poolKey, half, 0, 0); }

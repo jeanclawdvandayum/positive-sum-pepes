@@ -1,0 +1,127 @@
+{
+  "scope": "unbounded integer lemmas; no EVM refinement claim",
+  "z3": "4.12.6",
+  "source_sha256": {
+    "src/CurveHook.sol": "0806016a5246032d6fd4dc8867178de8eb6e0e4ed7ca44fb2b98f73b4326edfc",
+    "src/SineV3Primitive.sol": "d2f4ba46758f18efb3546dd0022dadd728158e60b06c8d04316f273d3d3d8213",
+    "src/SineV3Price.sol": "7a071d5e16aa1627d75a622bbce5808e04920073abc49a97ac9141346ac66b43",
+    "src/SineV3Math.sol": "151c973eed985ce47db7b7926884268ef0636ec1fafc8e174cb6c00db144355b",
+    "src/RoundController.sol": "73700f748a7911d386043aad8b1aefa70be300d2082ead18ffae03fc3851ec0b",
+    "lib/solady/src/utils/FixedPointMathLib.sol": "bb0c06fe117d69df9bff7baf442255aa114e1c01d1ebe077213e2eb4e06ae2d6",
+    "lib/openzeppelin-contracts/contracts/utils/math/Math.sol": "bdfdbe133991c0c78042957ff5cd97167926fcaf6d15664f3835a076cb066457",
+    "scripts/formal/prove_arithmetic.py": "21d51ee77388dc5dc059f1b27cc5c4f53bf731ac8fe4e578460d2fb2dbe232fc",
+    "scripts/formal/model-bindings.json": "a2194fa419e179f4be9c117ace6d6137f3661a4f678431b1237ad3bb5a0f90f3"
+  },
+  "results": [
+    {
+      "name": "ordered_interpolation",
+      "assumptions": "sat",
+      "witness": "[b = 0, d = 1, c = 0, e = 0, t = 0, u = 0, a = 0]",
+      "negated_property": "unsat",
+      "pass": true,
+      "seconds": 0.1035
+    },
+    {
+      "name": "interpolation_range",
+      "assumptions": "sat",
+      "witness": "[b = 0, a = 0, d = 1, t = 0]",
+      "negated_property": "unsat",
+      "pass": true,
+      "seconds": 0.0164
+    },
+    {
+      "name": "interpolation_endpoints",
+      "assumptions": "sat",
+      "witness": "[d = 1, a = 0, b = 0]",
+      "negated_property": "unsat",
+      "pass": true,
+      "seconds": 0.0126
+    },
+    {
+      "name": "ordered_next_row",
+      "assumptions": "sat",
+      "witness": "[a = 0, d = 1, t = 0, c = 0, b = 0]",
+      "negated_property": "unsat",
+      "pass": true,
+      "seconds": 0.024
+    },
+    {
+      "name": "interpolation_uint256_range",
+      "assumptions": "sat",
+      "witness": "[d = 1, t = 0, b = 0, a = 0]",
+      "negated_property": "unsat",
+      "pass": true,
+      "seconds": 0.0186
+    },
+    {
+      "name": "supply_scaling_order",
+      "assumptions": "sat",
+      "witness": "[price = 1, lam = 1, n = 0, m = 0]",
+      "negated_property": "unsat",
+      "pass": true,
+      "seconds": 0.0138
+    },
+    {
+      "name": "inverse_ceil_equivalence",
+      "assumptions": "sat",
+      "witness": "[n = 0, price = 1, lam = 1, q = 0]",
+      "negated_property": "unsat",
+      "pass": true,
+      "seconds": 0.0124
+    },
+    {
+      "name": "positive_genesis_allocation",
+      "assumptions": "sat",
+      "witness": "[deposit = 1, shares = 1, supply = 1]",
+      "negated_property": "unsat",
+      "pass": true,
+      "seconds": 0.0166
+    },
+    {
+      "name": "split_allocation_budget",
+      "assumptions": "sat",
+      "witness": "[supply = 0, shares = 1, deposit = 0]",
+      "negated_property": "unsat",
+      "pass": true,
+      "seconds": 0.0113
+    },
+    {
+      "name": "bisection_contracts",
+      "assumptions": "sat",
+      "witness": "[hi = 2, lo = 0]",
+      "negated_property": "unsat",
+      "pass": true,
+      "seconds": 0.0113
+    },
+    {
+      "name": "ticket_interval_and_range",
+      "assumptions": "sat",
+      "witness": "[pot = 0]",
+      "negated_property": "unsat",
+      "pass": true,
+      "seconds": 0.0116
+    },
+    {
+      "name": "ticket_adjacent_order",
+      "assumptions": "sat",
+      "witness": "[pot = 0]",
+      "negated_property": "unsat",
+      "pass": true,
+      "seconds": 0.0123
+    },
+    {
+      "name": "subtract_interpolation",
+      "kind": "negative-control",
+      "counterexample_search": "sat",
+      "pass": true,
+      "counterexample": "[d = 1,\n a = 0,\n t = 0,\n u = 1,\n b = 1,\n div0 = [(1, 1) -> 1, else -> 0],\n mod0 = [else -> 0]]"
+    },
+    {
+      "name": "floor_inverse_target",
+      "kind": "negative-control",
+      "counterexample_search": "sat",
+      "pass": true,
+      "counterexample": "[n = 0,\n price = 2,\n lam = 3,\n q = 1,\n div0 = [else -> 0],\n mod0 = [else -> 0]]"
+    }
+  ]
+}

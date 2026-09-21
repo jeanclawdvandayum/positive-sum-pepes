@@ -1,0 +1,2866 @@
+No files changed, compilation skipped
+
+Ran 1 test for test/DebugMaterialize.t.sol:MaterializeDirect
+[PASS] test_MaterializeDirect() (gas: 154681)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 742.63µs (476.67µs CPU time)
+
+Ran 1 test for test/DebugMaterialize.t.sol:TargetTreadProbe
+[PASS] test_Probe() (gas: 166995)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.57ms (1.14ms CPU time)
+
+Ran 1 test for test/unit/NameStakeGate.t.sol:NameStakeGateTest
+[PASS] testQualificationTracksPrincipalOwnershipAndRoundRegistry() (gas: 1526359)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 6.70ms (706.75µs CPU time)
+
+Ran 21 tests for test/unit/FeeImmediacy.t.sol:FeeImmediacyTest
+[PASS] test_CancelAfterYearsRestoresWeightWithoutRetiredSlopeUnderflow() (gas: 531910)
+[PASS] test_CancelRestoresWeightImmediately() (gas: 356160)
+[PASS] test_ClaimCheckpointsNoDoublePay() (gas: 289876)
+[PASS] test_ClaimFrequencyDoesNotChangeVestingEarnings() (gas: 1154108)
+[PASS] test_DecayerLateClaimPreservesEarnedFees() (gas: 608047)
+[PASS] test_DeferredFeesStayClaimableOnWithdrawnHusk() (gas: 669491)
+[PASS] test_DustWeiAccumulatesAcrossFeeds() (gas: 278765)
+[PASS] test_FeePayoutCallbackCannotMovePositionMidSettlement() (gas: 682819)
+[PASS] test_FeesVisibleAndClaimableSameEpoch() (gas: 281369)
+[PASS] test_FlatWithdrawUnschedulesOnlyWithdrawingPosition() (gas: 532709)
+[PASS] test_FractionalCreditIsNotRecycledAsPendingFees() (gas: 818517)
+[PASS] test_FreshStakeEarnsOnSubsequentTrade() (gas: 662900)
+[PASS] test_FullyDecayedUnclaimedFeesSurvive() (gas: 564889)
+[PASS] test_GenesisLiveOnFirstTrade() (gas: 275097)
+[PASS] test_GenesisPartialClaimsPreserveRemainingOwnersFees() (gas: 988633)
+[PASS] test_MultipleFeedsSameEpochStack() (gas: 291130)
+[PASS] test_PermissionlessTopupCannotForfeitOwnersFees() (gas: 223935)
+[PASS] test_PermissionlessTopupCannotStealOwnersFees() (gas: 383228)
+[PASS] test_RequestAtEpochZeroUsesExplicitFlag() (gas: 4007689)
+[PASS] test_TopUpEarnsOnSubsequentTrade() (gas: 389610)
+[PASS] test_TotalWeightMatchesPositionSumInstantly() (gas: 425503)
+Suite result: ok. 21 passed; 0 failed; 0 skipped; finished in 8.73ms (6.11ms CPU time)
+
+Ran 2 tests for test/audit/AdjudicateB7b.t.sol:AdjudicateB7b
+[PASS] test_adjudicate_foreignCurrencyRevertData() (gas: 1670407)
+[PASS] test_adjudicate_quoteVsExecution() (gas: 2387470)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 8.88ms (2.59ms CPU time)
+
+Ran 8 tests for test/unit/DeploymentScripts.t.sol:DeploymentScriptsTest
+[PASS] test_MockModeCannotRunOnPublicChainOrAlongsideTestnet() (gas: 12953)
+[PASS] test_ReinvestorCannotTargetAnUnfinishedRound() (gas: 58670869)
+[PASS] test_ReserveMissingGenesisWithFactoryTimings() (gas: 67494148)
+[PASS] test_ResumeEveryReservedPhaseAndCompletedGenesisWithoutRepeatingSteps() (gas: 273364507)
+[PASS] test_RetiredSineEnvFailsLoudlyAndPLBoundsEnforced() (gas: 38934)
+[PASS] test_RouterChecksRejectLegacyAndMismatchedImmutableCounterparties() (gas: 49439188)
+[PASS] test_TestnetRejectsWrongChainManagerAndMissingCode() (gas: 16015)
+[PASS] test_TimingOverridesUseCanonicalPackingAndRejectInvalidVest() (gas: 16701)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 54.68ms (53.05ms CPU time)
+
+Ran 1 test for test/local/PixelDump.t.sol:PixelDumpTest
+[PASS] test_dumpPixel() (gas: 129498288)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 56.94ms (56.65ms CPU time)
+
+Ran 9 tests for test/wave2/auditorC/C3_Lifecycle.t.sol:C3_Lifecycle
+[PASS] test_C3_CurveInheritanceExact() (gas: 22048950)
+[PASS] test_C3_DeployRoundOwnerOnly() (gas: 17528)
+[PASS] test_C3_EIP170_Sizes() (gas: 58171)
+[PASS] test_C3_ParallelRoundBricksOldChain() (gas: 16986764)
+[PASS] test_C3_RejectsSubEpochalVest() (gas: 12662135)
+[PASS] test_C3_SelectorConstants() (gas: 716)
+[PASS] test_C3_SpawnNaming() (gas: 22020673)
+[PASS] test_C3_TokenAuthority() (gas: 30934)
+[PASS] test_C3_VesselsPermissionlessButInert() (gas: 12211627)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 114.82ms (92.25ms CPU time)
+
+Ran 1 test for test/wave2/auditorC/C4_Probe.t.sol:C4_Probe
+[PASS] test_C4_VesselNonceMechanics() (gas: 15499406)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 17.12ms (3.14ms CPU time)
+
+Ran 1 test for test/wave2/auditorC/C5b_CollideProbe.t.sol:CollideProbe
+[PASS] test_collisionCost() (gas: 145992)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 94.00µs (32.92µs CPU time)
+
+Ran 7 tests for test/unit/PlaytestFixes2.t.sol:PlaytestFixes2
+[PASS] testDustCompletesBeneficiaryWalletCapWithoutExceedingIt() (gas: 55343413)
+[PASS] test_FactoryViews_Round1() (gas: 49858)
+[PASS] test_FactoryViews_UnknownRoundReverts() (gas: 21846)
+[PASS] test_PerWalletCapIsPerBeneficiary() (gas: 55324333)
+[PASS] test_PerWalletPredepositCap() (gas: 55405413)
+[PASS] test_Rebirth_Round2IsPSP2_FromPredeposit() (gas: 15656020)
+[PASS] test_UncappedProfileHasNoWalletCap() (gas: 167553)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 61.94ms (32.85ms CPU time)
+
+Ran 3 tests for test/DeployGasSpread.t.sol:DeployGasSpread
+[PASS] test_deployHook_gas_spread() (gas: 101753659)
+[PASS] test_deployRound_gas_spread() (gas: 182070697)
+[PASS] test_step_attribution() (gas: 212511429)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 338.85ms (331.85ms CPU time)
+
+Ran 1 test for test/HookInitCodeIdentity.t.sol:HookInitCodeIdentityTest
+[PASS] test_ShardedCreationCodeIsByteIdentical() (gas: 4830246)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 814.67µs (428.63µs CPU time)
+
+Ran 6 tests for test/ExpandedPepeArt.t.sol:ExpandedPepeArtTest
+[PASS] testFuzz_CodecRoundTripAndRendererAgree(uint256,uint32) (runs: 256, μ: 57754, ~: 57716)
+[PASS] test_LegacyAliasCanBeDistinctExpandedArt() (gas: 3875919)
+[PASS] test_RenderMatchesClientFixtures() (gas: 124688904)
+[PASS] test_ReservationAndMintShareExpandedCollisionSpaceForever() (gas: 22113341)
+[PASS] test_StorageContainsExactReleaseBytesAndFits() (gas: 63546)
+[PASS] test_VersionFrozenPerStakerAndUnknownVersionRejected() (gas: 11724348)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 306.38ms (474.28ms CPU time)
+
+Ran 10 tests for test/dinosat/HookRulesSymbolic.t.sol:HookRulesSymbolicTest
+[PASS] testFuzz_active_minimum_positive(uint256) (runs: 256, μ: 78219, ~: 78378)
+[PASS] testFuzz_legacy_minimum(uint256,bool) (runs: 256, μ: 45377, ~: 37138)
+[PASS] testFuzz_prelaunch_minimum(bool) (runs: 256, μ: 28116, ~: 18402)
+[PASS] testFuzz_setMode_unauthorized(address,uint8,uint8) (runs: 256, μ: 29002, ~: 35532)
+[PASS] testFuzz_ticket_adjacent(uint256) (runs: 256, μ: 82619, ~: 82621)
+[PASS] testFuzz_ticket_genesis_independent(uint256,uint256,uint256) (runs: 256, μ: 99016, ~: 99642)
+[PASS] testFuzz_ticket_interval(uint256,uint256) (runs: 256, μ: 98017, ~: 98571)
+[PASS] test_export_runtime_fixture() (gas: 4313990)
+[PASS] test_fixture_matches_constructor() (gas: 4273688)
+[PASS] test_ticket_boundary_examples() (gas: 127606)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 90.08ms (140.33ms CPU time)
+
+Ran 2 tests for test/LadderEconomics.t.sol:LadderEconomicsTest
+[PASS] test_MajorityStakerRecapturesFeesAcrossBuySellBuy() (gas: 6196710)
+[PASS] test_RoundTripCanWinExistingPotWithoutHoldingPSP() (gas: 4614938)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 77.61ms (37.57ms CPU time)
+
+Ran 1 test for test/local/HeroDump.t.sol:HeroDump
+[PASS] test_Hero() (gas: 12560832)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 22.81ms (22.64ms CPU time)
+
+Ran 37 tests for test/unit/CurveMathAdversarial.t.sol:CurveMathAdversarial
+[PASS] testFuzz_MultiCurveRoundTripPerZone(uint256) (runs: 256, μ: 102549, ~: 92996)
+[PASS] testFuzz_RoundTripAtSupplyDeciles(uint256) (runs: 256, μ: 490568, ~: 465223)
+[PASS] testFuzz_SellFractionScales(uint256) (runs: 256, μ: 73075, ~: 73075)
+[PASS] test_Atom_BuyAtSupplyOne() (gas: 61734)
+[PASS] test_Atom_BuyOneWei() (gas: 60178)
+[PASS] test_Atom_MicroSwapAlternation() (gas: 104040)
+[PASS] test_Atom_SellOneWei() (gas: 106318)
+[PASS] test_Convexity_AveragePriceBounded() (gas: 89581)
+[PASS] test_Convexity_DoubleBuyGetsWorseRate() (gas: 123542)
+[PASS] test_Convexity_LargerBuyHigherAvgPrice() (gas: 107172)
+[PASS] test_Drain_RepeatedCyclesNoProfit() (gas: 308385)
+[PASS] test_Drain_SellEntireSupply() (gas: 63174)
+[PASS] test_Drain_SellMoreThanSupply() (gas: 62331)
+[PASS] test_Drain_SellSupplyMinus1() (gas: 68369)
+[PASS] test_Extreme_FlatCurveConstantPrice() (gas: 30907)
+[PASS] test_Extreme_FlatCurveExactMultiplication() (gas: 32804)
+[PASS] test_Extreme_SteepCurveRoundTrip() (gas: 67700)
+[PASS] test_GasBomb_BuyNearMaxSupply() (gas: 81466)
+[PASS] test_GasBomb_LargeBuy() (gas: 61134)
+[PASS] test_GasBomb_TenZoneCurve() (gas: 37719)
+[PASS] test_Integral_BuyOutputMatchesInput() (gas: 110953)
+[PASS] test_Integral_MonotonicInUpperBound() (gas: 30568)
+[PASS] test_Integral_SplitAtBoundaryCorrectness() (gas: 43156)
+[PASS] test_Integral_ZeroLength() (gas: 25055)
+[PASS] test_MultiCurve_ConsecutiveZonesContinuous() (gas: 11131)
+[PASS] test_MultiCurve_FirstBoundaryNotZero() (gas: 6715)
+[PASS] test_MultiCurve_MismatchedLengths() (gas: 5480)
+[PASS] test_MultiHop_MultiCurveFiveRoundTrips() (gas: 271580)
+[PASS] test_MultiHop_ThreeRoundTripsMonotonicLoss() (gas: 156895)
+[PASS] test_Precision_ManyTinyBuysVsOneBig() (gas: 17924796)
+[PASS] test_Precision_SellOneWeiAtVariousSupply() (gas: 233769)
+[PASS] test_Precision_TwoWeiBuy() (gas: 60190)
+[PASS] test_Sandwich_AttackerCannotExtractMoreThanSlippage() (gas: 135537)
+[PASS] test_Sandwich_LargeFrontrunRoundTripsCorrectly() (gas: 91468)
+[PASS] test_ZoneBoundary_CrossAndReturnRoundTrip() (gas: 66666)
+[PASS] test_ZoneBoundary_MultiCrossAllBoundaries() (gas: 125809)
+[PASS] test_ZoneBoundary_PriceContinuityAtBoundary() (gas: 40132)
+Suite result: ok. 37 passed; 0 failed; 0 skipped; finished in 951.65ms (1.18s CPU time)
+
+Ran 11 tests for test/SineV3BootstrapCapacity.t.sol:SineV3BootstrapCapacityTest
+[PASS] test_BonusCreatesNoSharesAndUsesTheExistingDenominator() (gas: 29152194)
+[PASS] test_CarrySharesCannotEraseAnEarlierOneWeiAllocation() (gas: 29118105)
+[PASS] test_CustomMaximumPriceOneWeiLaunchClaimAndRedemption() (gas: 28336305)
+[PASS] test_DefaultLargeGenesisAboveSigned128RetainsEveryExit() (gas: 7412698)
+[PASS] test_DefaultOneWeiLaunchClaimAndRedemption() (gas: 3281688)
+[PASS] test_LaterDepositCannotEraseAnEarlierOneWeiAllocation() (gas: 30219645)
+[PASS] test_LaunchBeyondTheOldSixteenWaveLimitRetainsEveryExit() (gas: 7287354)
+[PASS] test_MaximumLaunchPriceLargeGenesisRetainsEveryExit() (gas: 32533605)
+[PASS] test_MinimumLaunchPriceLargeGenesisRetainsEveryExit() (gas: 32313182)
+[PASS] test_OpeningPriceCapacityRejectsAllFactoryPriceExtremes() (gas: 72226325)
+[PASS] test_ZeroGenesisQuoteCannotAdmitFunds() (gas: 2991011)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 442.29ms (426.39ms CPU time)
+
+Ran 3 tests for test/SineV3DataSecurity.t.sol:SineV3DataSecurityTest
+[PASS] test_AllDataIsPinnedAndHasInertRuntime() (gas: 4446623)
+[PASS] test_MissingReorderedAndDuplicatedDataCannotDeploy() (gas: 136499)
+[PASS] test_OneAlteredDataByteCannotDeploy() (gas: 63831)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 5.57ms (4.58ms CPU time)
+
+Ran 11 tests for test/unit/Factory.t.sol:FactoryTest
+[PASS] test_EIP170_AllDeployablesUnderLimit() (gas: 12413485)
+[PASS] test_EIP170_ControllerDeployerHeadroom() (gas: 5541349)
+[PASS] test_EIP170_HookSideHeadroom_500B() (gas: 5218626)
+[PASS] test_EIP170_StakerDeployerHeadroom() (gas: 3806837)
+[PASS] test_Gas_ComposedContainmentAndStagedBudgets() (gas: 127939362)
+[PASS] test_GenesisLaunch_PotFee() (gas: 677590)
+[PASS] test_I4_MarkDestroyedOnlyFromRoundController() (gas: 43132)
+[PASS] test_L1_CarrySpawnsNextRoundAutomatically() (gas: 15852143)
+[PASS] test_L2_CanonicalPairPassesGateBothOrderings() (gas: 38903)
+[PASS] test_L2_DecoyPoolInitializationReverts() (gas: 41865)
+[PASS] test_L2_HookAddressCarriesBeforeInitializeFlag() (gas: 2642)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 126.64ms (109.98ms CPU time)
+
+Ran 2 tests for test/FatCurveSpawn.t.sol:FatCurveSpawn
+[PASS] test_gas_genesis34() (gas: 24373181)
+[PASS] test_gas_rebirth34() (gas: 62658172)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 37.13ms (34.15ms CPU time)
+
+Ran 1 test for test/unit/ArtDump.t.sol:ArtDump
+[PASS] test_DumpTraits() (gas: 810829230)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.12s (1.12s CPU time)
+
+Ran 1 test for test/unit/ClockDetonation.t.sol:DetWindowDefault
+[PASS] test_DetWindow_DefaultsTo69h4m20s_WhenTimingsZero() (gas: 6712)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 16.52ms (26.21µs CPU time)
+
+Ran 3 tests for test/unit/ClockDetonation.t.sol:DetWindowTunable
+[PASS] test_DetWindow_ExtensionCappedAtTunedWindow() (gas: 651171)
+[PASS] test_DetWindow_FromPackedSlot() (gas: 24363)
+[PASS] test_ShortProfilePersistsAcrossDelayedSuccessorBirth() (gas: 17483344)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 69.39ms (15.69ms CPU time)
+
+Ran 1 test for test/local/CompareDump.t.sol:CompareDumpTest
+[PASS] test_dump8bit() (gas: 19369654)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 48.41ms (48.13ms CPU time)
+
+Ran 14 tests for test/unit/ClockDetonation.t.sol:ClockDetonation
+[PASS] test_Board_12Buyers_OnlyNewest10Seated() (gas: 5134733)
+[PASS] test_Board_SameAddressTwice_TwoSeatsOneClaim() (gas: 18817451)
+[PASS] test_ClaimPot_Forever_SecondClaimantOneYearLater() (gas: 18922008)
+[PASS] test_ClaimPot_Guards() (gas: 22807989)
+[PASS] test_Clock_ArmsAt69h4m20s_AtActiveTransition() (gas: 1324387)
+[PASS] test_Clock_DetonateGates() (gas: 22023984)
+[PASS] test_Clock_ExtensionCapped_AtNowPlus69h4m20s() (gas: 2139570)
+[PASS] test_Clock_TwoUnits_AddExactly138Seconds() (gas: 1735392)
+[PASS] test_Clock_ZeroIsDead_TradingHaltedBothWays() (gas: 2291412)
+[PASS] test_Distribution_10Seat_ExactBps() (gas: 20957786)
+[PASS] test_Distribution_3Seat_Renormalized() (gas: 19175697)
+[PASS] test_DynamicTickets_GenesisBaselineAndFractionalGrowth() (gas: 2093095)
+[PASS] test_DynamicTickets_TenTicketsAtSnapshotPriceAdd690Seconds() (gas: 2236328)
+[PASS] test_DynamicTickets_ZeroTicketsStillBuys() (gas: 2218012)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 177.63ms (155.78ms CPU time)
+
+Ran 4 tests for test/unit/ClockDetonation.t.sol:ClockDetonationBoom
+[PASS] test_Detonate_OneTx() (gas: 23168548)
+[PASS] test_Ladder_SeatsPerWholePSP() (gas: 2094666)
+[PASS] test_Ladder_WhaleBuyTakesWholeBoard() (gas: 2115341)
+[PASS] test_Redemption_Frozen_NextRoundTradesDontMovePayout() (gas: 24201062)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 86.63ms (70.78ms CPU time)
+
+Ran 8 tests for test/unit/NameCustody.t.sol:NameCustodyTest
+[PASS] testCustodyRequiresExplicitActivationAndAdminCanRecover() (gas: 115856)
+[PASS] testExpiryAndReregistrationFailClosed() (gas: 87366)
+[PASS] testOnlyAdminCanRecoverManageAndRenew() (gas: 34817)
+[PASS] testParentResolutionCanBeManagedWhileCustodied() (gas: 93839)
+[PASS] testRecoveryToNonReceiverRollsBackCustodyAndPause() (gas: 106665)
+[PASS] testRejectUnexpectedNFTAndSpoofedReceiverCallback() (gas: 51109)
+[PASS] testRenewalUsesOnlyExactNewPayment() (gas: 83586)
+[PASS] testTwoStepAdminRotationKeepsRecoveryAvailable() (gas: 78085)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 1.02ms (663.96µs CPU time)
+
+Ran 13 tests for test/unit/NameRegistrar.t.sol:NameRegistrarTest
+[PASS] testCommitmentTimingAndReplay() (gas: 371852)
+[PASS] testCopiedCommitmentCannotStealRevealedName() (gas: 374824)
+[PASS] testEligibilityIsRecheckedAtReveal() (gas: 279685)
+[PASS] testFeeRevenueOnlyAdminWithdraws() (gas: 299364)
+[PASS] testFreeAndPaidRegisterDirectlyToWalletAndSelectPrimary() (gas: 485001)
+[PASS] testFuzzCommitmentSeparatesWalletChainDeploymentAndSalt(address,uint64,bytes32) (runs: 256, μ: 1895051, ~: 1895051)
+[PASS] testFuzzExactFeeOnly(uint96) (runs: 256, μ: 169723, ~: 169854)
+[PASS] testGateRotationPausesAndInvalidatesOldCommitment() (gas: 280782)
+[PASS] testInvalidLabelsRejectedBeforeCommitting() (gas: 34163)
+[PASS] testParentEpochRotationInvalidatesOldCommitment() (gas: 172586)
+[PASS] testPublicCallerCannotReclaimOccupiedChild() (gas: 382511)
+[PASS] testReceiverReentryFailsAndMintTimeTransferRevertsAtomically() (gas: 958492)
+[PASS] testTransferredNameCanBeSelectedOnlyByNewOwnerWithMatchingResolution() (gas: 342319)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 84.57ms (127.55ms CPU time)
+
+Ran 1 test for test/CurveDumpExp1.t.sol:CurveDumpExp1Test
+[PASS] test_DumpExp1Curve() (gas: 165400732)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 643.00ms (637.68ms CPU time)
+
+Ran 10 tests for test/unit/NameRemoteGate.t.sol:NameRemoteGateTest
+[PASS] testFreeRemoteRegisterAndEmptyProofPaidRegister() (gas: 485058)
+[PASS] testFuzzEverySignedWordIsAuthenticated(uint8,bytes32) (runs: 256, μ: 44287, ~: 46940)
+[PASS] testFuzzMalformedProofNeverBecomesPaid(uint16) (runs: 256, μ: 18394, ~: 18256)
+[PASS] testParentAndGateEpochChangesInvalidatePermit() (gas: 163235)
+[PASS] testPermitLifetimeBoundaries() (gas: 105460)
+[PASS] testRecoveryAdminCanRotateInTwoStepsButCannotRenounce() (gas: 50588)
+[PASS] testRepeatFundedClaimsRemainAllowedWithFreshCommitAndPermit() (gas: 402621)
+[PASS] testSameHashSameBlockReplacementInvalidatesOldPermit() (gas: 92008)
+[PASS] testSignerRevocationRotationAndReturnInvalidatesOldPermits() (gas: 101152)
+[PASS] testWrongWalletGateRegistrarChainAndSignerRejected() (gas: 1017032)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 80.22ms (92.82ms CPU time)
+
+Ran 1 test for test/CurveDumpLinLean.t.sol:CurveDumpLinLeanTest
+[PASS] test_DumpLinCurve() (gas: 10193377)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 43.01ms (41.68ms CPU time)
+
+Ran 10 tests for test/wave2/auditorB/B5_Zaps.t.sol:B5_Zaps
+[PASS] test_B5a_zapInBuyHappy() (gas: 879977)
+[PASS] test_B5b_zapInBuyMinOutRevertsCleanly() (gas: 959915)
+[PASS] test_B5c_buyWithMixHappyAndRevert() (gas: 1063631)
+[PASS] test_B5d_deadline() (gas: 25858)
+[PASS] test_B5e_zapOutHappy() (gas: 990484)
+[PASS] test_B5f_zapOutRevertingReceiver() (gas: 1051755)
+[PASS] test_B5g_zapOutReentrancyInForward() (gas: 1418978)
+[PASS] test_B5h_sellToMix() (gas: 1371069)
+[PASS] test_B5i_donationsNotStolenNotSpent() (gas: 1235297)
+[PASS] test_B5j_zapInPredeposit() (gas: 18321109)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 32.28ms (25.34ms CPU time)
+
+Ran 5 tests for test/wave2/auditorB/B6_AdminAPI.t.sol:B6_AdminAPI
+[PASS] test_B6b_initializeCurveLockedAfterLaunch() (gas: 972290)
+[PASS] test_B6c_drainSurfaceRemoved() (gas: 1738419)
+[PASS] test_B6d_flatBuyDisabled() (gas: 19933548)
+[PASS] test_B6e_modeTransitionsEnforced() (gas: 966138)
+[PASS] test_B6f_adminApisGated() (gas: 979739)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 29.02ms (22.14ms CPU time)
+
+Ran 8 tests for test/wave2/auditorB/B1_CurveRoundTrip.t.sol:B1_CurveRoundTrip
+[PASS] test_B1a_honestBuyThenSell_nettsAndBalancesHold() (gas: 1882279)
+[PASS] test_B1b_buyOutputAlwaysIntegralBounded_fuzz(uint128,uint128) (runs: 256, μ: 115917, ~: 130293)
+[PASS] test_B1c_solvencyUnderRandomFlow_fuzz(uint64) (runs: 256, μ: 2631337, ~: 2637244)
+[PASS] test_B1d_interleavedRoundTripBoundedByTopSegment() (gas: 1987266)
+[PASS] test_B1e_feeLedgerExact() (gas: 2123339)
+[PASS] test_B1f_cannotSellEntireSupply() (gas: 1916327)
+[PASS] test_B1g_dustSwapRejected() (gas: 1167187)
+[PASS] test_B1h_manySmallSellsDustProbe() (gas: 92766611)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 1.15s (1.14s CPU time)
+
+Ran 13 tests for test/wave2/auditorB/B3_V4DeltaSpoof.t.sol:B3_V4DeltaSpoof
+[PASS] test_B3a_honestFlowsNetZero() (gas: 1843365)
+[PASS] test_B3b_twoSwapsOneUnlock() (gas: 1853190)
+[PASS] test_B3d_noSettleReverts() (gas: 1537716)
+[PASS] test_B3e_halfSettleReverts() (gas: 1609060)
+[PASS] test_B3f_overSettleNoRefundReverts() (gas: 1833891)
+[PASS] test_B3g_doubleTakeReverts() (gas: 1808498)
+[PASS] test_B3h_donateToPMThenUnpaidSwapReverts() (gas: 2561068)
+[PASS] test_B3i_int256MinAmount() (gas: 1330742)
+[PASS] test_B3j_hookDataIgnored() (gas: 2223749)
+[PASS] test_B3k_exactOutRejected() (gas: 1475193)
+[PASS] test_B3l_inputOver150MCapSilentlyDonates() (gas: 1943621)
+[PASS] test_B3m_sqrtPriceLimitIgnored() (gas: 2216016)
+[PASS] test_B3n_hookCallbacksGatedToPM() (gas: 1328969)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 15.19ms (8.50ms CPU time)
+
+Ran 9 tests for test/wave2/auditorB/B6_GraveZap.t.sol:B6_GraveZap
+[PASS] test_B6a_ExitSweepsEverything() (gas: 19225086)
+[PASS] test_B6b_MinOutRevertsEverything() (gas: 19251643)
+[PASS] test_B6c_StrangerCannotExit() (gas: 18915133)
+[PASS] test_B6d_ClaimPotForPaysOwnerOnly() (gas: 19166885)
+[PASS] test_B6e_WithdrawForPaysOwner() (gas: 18881323)
+[PASS] test_B6f_CleanWalletClaimsSkip() (gas: 19442099)
+[PASS] test_B6g_Deadline() (gas: 18875968)
+[PASS] test_B6h_ApprovedZapRejectsStrangerWithEarnedFees() (gas: 19378585)
+[PASS] test_B6i_IndividualApprovalRejectsStrangerWithoutFees() (gas: 19175191)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 181.54ms (174.36ms CPU time)
+
+Ran 7 tests for test/wave2/auditorB/B7_Supplemental.t.sol:B7_Supplemental
+[PASS] test_B7a_fatP0RoundDeploysButCannotLaunch() (gas: 14709092)
+[PASS] test_B7b_multiZoneAccounting() (gas: 2585604)
+[PASS] test_B7c_zoneBoundaryPriceContinuous() (gas: 18869)
+[PASS] test_B7d_poolInitGates() (gas: 973007)
+[PASS] test_B7e_donations() (gas: 2198394)
+[PASS] test_B7f_initializeCurveBlindTrust() (gas: 151037)
+[PASS] test_B7g_exactOutRejectedBothDirections() (gas: 1567905)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 31.56ms (13.49ms CPU time)
+
+Ran 4 tests for test/wave2/auditorC/C1_HookSquatDoS.t.sol:C1_HookSquatDoS
+[PASS] test_C1_attack_PreLaunchSquatIsNowInert() (gas: 30134259)
+[PASS] test_C1_committedReservationCannotBeHijacked() (gas: 15633028)
+[PASS] test_C1_control_PredictionIsExact_CleanSpawnWorks() (gas: 15493065)
+[PASS] test_C1_orphanIsInert() (gas: 7388638)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 71.09ms (55.47ms CPU time)
+
+Ran 4 tests for test/wave2/auditorC/C2_Handoff.t.sol:C2_Handoff
+[PASS] test_C2_CarryForwardedExactly() (gas: 22825747)
+[PASS] test_C2_DestroyFlagGuards() (gas: 38161)
+[PASS] test_C2_DonationsRideTheCarry() (gas: 22139846)
+[PASS] test_C2_NoBuyBranch() (gas: 22020515)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 115.53ms (100.64ms CPU time)
+
+Ran 4 tests for test/CurveDumpRolling.t.sol:CurveDumpRollingTest
+[PASS] test_DumpCurve1() (gas: 76940278)
+[PASS] test_DumpCurve2() (gas: 14305885)
+[PASS] test_DumpCurve3() (gas: 378408515)
+[PASS] test_DumpPrototype() (gas: 114861412)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 680.95ms (675.24ms CPU time)
+
+Ran 3 tests for test/PredepositPrecision.t.sol:PredepositPrecisionTest
+[PASS] testFuzzSubMinimumDepositJoinsAndClaimsPooledLaunch(uint64) (runs: 256, μ: 4402718, ~: 4402624)
+[PASS] testOneWeiDepositJoinsAndClaimsPooledLaunch() (gas: 4407302)
+[PASS] testOneWeiWholePoolCanLaunchAndClaim() (gas: 3225645)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 3.02s (3.01s CPU time)
+
+Ran 5 tests for test/SineFee.t.sol:SineFee
+[PASS] test_DeployerCredit_PullClaim() (gas: 5156568)
+[PASS] test_FeeChargedInExecution_Unattributed60_39_1() (gas: 5126412)
+[PASS] test_FeeRegions() (gas: 6561840)
+[PASS] test_FeeSplit_Attributed60_35_5() (gas: 7003202)
+[PASS] test_QuoteParity() (gas: 6347039)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 98.79ms (72.62ms CPU time)
+
+Ran 14 tests for test/GenesisPepe.t.sol:GenesisPepeTest
+[PASS] testFuzz_BirthBlockhashChangesArtAtSameContractAddress(bytes32) (runs: 256, μ: 7329333, ~: 7329333)
+[PASS] testFuzz_CanonicalIdentityMatchesProductionDecoder(uint256,uint32) (runs: 256, μ: 40414, ~: 40350)
+[PASS] testFuzz_ClaimTimingAndOrderDoNotRerollAvailableArt(uint160,uint160) (runs: 256, μ: 1186387, ~: 1186627)
+[PASS] testFuzz_FirstFreeArtMatchesIndependentOccupiedSet(uint256) (runs: 256, μ: 11381974, ~: 11367993)
+[PASS] testFuzz_MixedMintsKeepUniqueImmutableTraits(uint256) (runs: 257, μ: 11318121, ~: 11318121)
+[PASS] test_ArtCollisionWithDifferentIdAlsoResolvesBeforeClaim() (gas: 488065)
+[PASS] test_AutomaticMintResolvesTakenArt() (gas: 392265)
+[PASS] test_BlockZeroCanStillCreateAndClaim() (gas: 3923481)
+[PASS] test_ChosenIdsWithDifferentHashesButSameTraitsRevert() (gas: 237850)
+[PASS] test_CollisionLookupSkipsAnOccupiedArtRunWithinFixedGas() (gas: 178766930)
+[PASS] test_GenesisPreviewMatchesMintInsteadOfAddressPlaceholder() (gas: 300997)
+[PASS] test_IdSquattingCannotStealOrBlockTheGenesisPosition() (gas: 501431)
+[PASS] test_RoundAddressSeparatesArtEvenWithSameBirthBlockhash() (gas: 3677600)
+[PASS] test_ZeroDnaAndModuloAliasesStayReservedAfterTransferAndWithdrawal() (gas: 4363273)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 3.90s (6.18s CPU time)
+
+Ran 8 tests for test/NftInterface.t.sol:NftInterfaceTest
+[PASS] testFuzz_ApprovalClearsAcrossTransferSequence(uint256) (runs: 256, μ: 2365473, ~: 2372413)
+[PASS] test_IndividualApprovalCannotEscalateOrAffectAnotherPepe() (gas: 167823)
+[PASS] test_InterfaceAndMissingTokenValidation() (gas: 34729)
+[PASS] test_ReceiverRejectionRollsBackApprovalEnumerationAndPrincipal() (gas: 351518)
+[PASS] test_ReplacementRevocationAndCollectionDelegation() (gas: 192734)
+[PASS] test_SafeReceiverSeesCompleteStateAndGetsExactPayload() (gas: 469631)
+[PASS] test_ThreeArgumentOverloadUsesEmptyData() (gas: 161829)
+[PASS] test_UnsafeRecipientsAndIncorrectSenderRejected() (gas: 241445)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 3.96s (3.96s CPU time)
+
+Ran 25 tests for test/unit/PSPToken.t.sol:PSPTokenTest
+[PASS] test_AC_AttackerCantBurn() (gas: 91398)
+[PASS] test_AC_AttackerCantMint() (gas: 41102)
+[PASS] test_AC_AttackerCantSetController() (gas: 11999)
+[PASS] test_AC_CantMintBeforeControllerSet() (gas: 13367)
+[PASS] test_AC_CantSetControllerTwice() (gas: 40842)
+[PASS] test_AC_CantSetZeroController() (gas: 14225)
+[PASS] test_AC_OnlyControllerCanBurn() (gas: 92358)
+[PASS] test_AC_OnlyControllerCanMint() (gas: 88078)
+[PASS] test_AC_OnlyFactoryCanSetController() (gas: 37971)
+[PASS] test_Deploy_ControllerNotSetYet() (gas: 8675)
+[PASS] test_Deploy_FactorySet() (gas: 8274)
+[PASS] test_Deploy_NameSymbol() (gas: 16293)
+[PASS] test_Deploy_ZeroFactoryFails() (gas: 83902)
+[PASS] test_ERC20_ApproveAndTransferFrom() (gas: 144694)
+[PASS] test_ERC20_Transfer() (gas: 117071)
+[PASS] test_ERC20_TransferFromInsufficientAllowance() (gas: 116846)
+[PASS] test_ERC20_TransferInsufficientBalance() (gas: 91166)
+[PASS] test_ERC20_TransferToZeroFails() (gas: 88869)
+[PASS] test_Edge_BurnMoreThanBalance() (gas: 89117)
+[PASS] test_Edge_MintToZero() (gas: 38851)
+[PASS] test_Edge_MintZero() (gas: 48338)
+[PASS] test_Edge_TotalSupplyConservation() (gas: 149707)
+[PASS] test_Edge_TransferZero() (gas: 97014)
+[PASS] test_Permit_ExpiredFails() (gas: 91741)
+[PASS] test_Permit_GrantsAllowance() (gas: 142618)
+Suite result: ok. 25 passed; 0 failed; 0 skipped; finished in 1.66ms (1.13ms CPU time)
+
+Ran 14 tests for test/unit/PredepositWindow.t.sol:PredepositWindowTest
+[PASS] testFuzzDustAtFormerCapKeepsWindowOpen(uint64) (runs: 256, μ: 284172, ~: 284127)
+[PASS] testFuzzPositiveSubMinimumPredeposit(uint64) (runs: 256, μ: 157304, ~: 157243)
+[PASS] testOneWeiAndPredepositForAreAccepted() (gas: 212302)
+[PASS] testZeroPredepositStillRejected() (gas: 32362)
+[PASS] test_UncappedDepositCanExceedFormerCapInOneCallAndTopUp() (gas: 295268)
+[PASS] test_constants() (gas: 14439)
+[PASS] test_html_OwnerSetAndRead() (gas: 45024)
+[PASS] test_seedCarry_FactoryOnlyAndKeepsTheFullWindow() (gas: 176203)
+[PASS] test_seedCarry_StillAcceptsPublicDepositsAfter() (gas: 228095)
+[PASS] test_state_ViewFields() (gas: 159841)
+[PASS] test_window_ExpiryMakesLaunchPermissionless() (gas: 630647)
+[PASS] test_window_OwnerMayLaunchEarly() (gas: 624656)
+[PASS] test_window_PredepositBlockedAfterClose() (gas: 628597)
+[PASS] test_window_RandomCannotLaunchEarly() (gas: 164330)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 123.14ms (144.78ms CPU time)
+
+Ran 12 tests for test/RollingCurves.t.sol:RollingCurvesTest
+[PASS] test_Curve1Anchors() (gas: 325387)
+[PASS] test_Curve1Monotone() (gas: 13121094)
+[PASS] test_Curve1Telescoping() (gas: 242939)
+[PASS] test_Curve1ZoneLiftsAndShape() (gas: 964302)
+[PASS] test_Curve2Anchors() (gas: 170196)
+[PASS] test_Curve2Monotone() (gas: 7528835)
+[PASS] test_Curve2Telescoping() (gas: 127004)
+[PASS] test_Curve2ZoneLiftsAndShape() (gas: 272376)
+[PASS] test_Curve3Anchors() (gas: 549369)
+[PASS] test_Curve3Monotone() (gas: 26914353)
+[PASS] test_Curve3Telescoping() (gas: 376795)
+[PASS] test_Curve3ZoneLiftsAndShape() (gas: 2527370)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 166.45ms (166.18ms CPU time)
+
+Ran 5 tests for test/SellQuoteParity.t.sol:SellQuoteParityTest
+[PASS] test_ActiveSellQuoteMatchesExactMinimumAndFundedSale() (gas: 10293427)
+[PASS] test_ClockFlatAndDestroyedQuoteStatesMatchRoute() (gas: 2351371)
+[PASS] test_InvalidSellInputsFailBeforeQuoteMath() (gas: 2160901)
+[PASS] test_PredepositQuoteUsesNotActive() (gas: 14909725)
+[PASS] test_ZeroAndOversizedOutputsRejectQuotesAndExecution() (gas: 2245027)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 76.69ms (45.81ms CPU time)
+
+Ran 16 tests for test/RealV4Lifecycle.t.sol:RealV4LifecycleTest
+[PASS] test_LocalV4_BuyWithMixAndSellToMix() (gas: 4233066)
+[PASS] test_LocalV4_DonationCannotPoisonNextLaunch() (gas: 17876290)
+[PASS] test_LocalV4_EmptyBoardReturnsGenesisPotToBacking() (gas: 83049)
+[PASS] test_LocalV4_MinimumAndSeatsAtDifferentPrices() (gas: 3665701)
+[PASS] test_LocalV4_ReinvestOwnerSucceedsStrangerFails() (gas: 5306599)
+[PASS] test_LocalV4_ReinvestRejectsDuplicateAndForeignPositions() (gas: 3687700)
+[PASS] test_LocalV4_SellToMixSlippageReverts() (gas: 4243422)
+[PASS] test_LocalV4_StagedRebirthAndOldRoundClaims() (gas: 21701820)
+[PASS] test_LocalV4_UnlockCallbackOnlyPoolManager() (gas: 19200)
+[PASS] test_LocalV4_ZapInBuyBadPoolReverts() (gas: 23893)
+[PASS] test_LocalV4_ZapInBuyDeadlineReverts() (gas: 25927)
+[PASS] test_LocalV4_ZapInBuyETHToPSP() (gas: 2073352)
+[PASS] test_LocalV4_ZapInBuySlippageReverts() (gas: 2136700)
+[PASS] test_LocalV4_ZapOutDeadlineReverts() (gas: 2097932)
+[PASS] test_LocalV4_ZapOutPSPToETH() (gas: 4257198)
+[PASS] test_LocalV4_ZapOutSlippageReverts() (gas: 4234052)
+Suite result: ok. 16 passed; 0 failed; 0 skipped; finished in 164.18ms (131.57ms CPU time)
+
+Ran 10 tests for test/audit/ProbeM2.t.sol:ProbeM2Test
+[PASS] test_A1_NoOverMint_RandomMultiZone(uint256,uint256,uint256) (runs: 256, μ: 80872, ~: 58194)
+[PASS] test_A2_RoundTripLossy_RandomMultiZone(uint256,uint256,uint256) (runs: 256, μ: 76627, ~: 58230)
+[PASS] test_A3_SellNeverOverPays(uint256,uint256,uint256) (runs: 256, μ: 19214, ~: 17438)
+[PASS] test_A4_PriceContinuousAtBoundaries(uint256) (runs: 256, μ: 37650, ~: 36265)
+[PASS] test_A5_FlatRoundTripNoProfit(uint256,uint256,uint256) (runs: 256, μ: 5223, ~: 5229)
+[PASS] test_A6_FlatBuyNeverDilutesBacking(uint256,uint256,uint256) (runs: 256, μ: 1781, ~: 1808)
+[PASS] test_A7_FlatSellNeverDilutesBacking(uint256,uint256,uint256) (runs: 256, μ: 2088, ~: 2161)
+[PASS] test_A8_GenesisBuyDeterministic() (gas: 73671)
+[PASS] test_M2_A1_Repro() (gas: 64019)
+[PASS] test_M2_A4_Repro() (gas: 82760)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 462.30ms (649.65ms CPU time)
+
+Ran 5 tests for test/RedeemIndefinite.t.sol:RedeemIndefinite
+[PASS] test_RedeemGuards() (gas: 22020271)
+[PASS] test_RedeemOneYearLate_AfterRebirth() (gas: 23162786)
+[PASS] test_RedeemWhileFlat_ExactProRata() (gas: 22814546)
+[PASS] test_StakedComeback_WithdrawThenRedeem() (gas: 23233141)
+[PASS] test_ZoneRoundsKeepFlatFee() (gas: 1321496)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 173.10ms (137.71ms CPU time)
+
+Ran 17 tests for test/ChosenPredepositPepe.t.sol:ChosenPredepositPepeTest
+[PASS] testFuzzSubMinimumDepositJoinsAndClaimsPooledLaunch(uint64) (runs: 256, μ: 4402925, ~: 4402830)
+[PASS] testFuzz_ChosenClaimMintsExactPreview(uint64) (runs: 256, μ: 4397539, ~: 4397648)
+[PASS] testOneWeiDepositJoinsAndClaimsPooledLaunch() (gas: 4407347)
+[PASS] testOneWeiWholePoolCanLaunchAndClaim() (gas: 3225810)
+[PASS] test_ChosenAndRandomClaimsPreserveSamePrincipalAndFees() (gas: 6980048)
+[PASS] test_ChosenClaimBeforeLaunchPreservesDeposit() (gas: 4392315)
+[PASS] test_ChosenClaimDefersFailedPayoutAndPaysExactlyOnceLater() (gas: 6535989)
+[PASS] test_ChosenClaimStillWorksAfterDetonation() (gas: 22063237)
+[PASS] test_ChosenMaxIdAndBothDoubleClaimRoutes() (gas: 4387326)
+[PASS] test_DepositReservesExactArtAndOldClaimMintsItAfterDetonation() (gas: 19830070)
+[PASS] test_ReservationCollisionRollsBackFundsAndDeposit() (gas: 1897156)
+[PASS] test_ReservationRequiresControllerAndSkipsSequentialId() (gas: 4425156)
+[PASS] test_ReservedChoiceSurvivesTopupsAndRejectsReplacement() (gas: 5968140)
+[PASS] test_TakenSelectionLeavesClaimRetryable() (gas: 4602274)
+[PASS] test_TraitAliasRevertsWithoutConsumingClaim() (gas: 4617092)
+[PASS] test_TraitFailureRollsBackEveryWrittenAccountingSlot() (gas: 6366958)
+[PASS] test_ZeroIdAndNonDepositorCannotClaim() (gas: 4138011)
+Suite result: ok. 17 passed; 0 failed; 0 skipped; finished in 5.86s (9.02s CPU time)
+
+Ran 5 tests for test/attack/NK24Repro.t.sol:NK24Repro
+[PASS] test_NK_LogFirstZone_RejectedByValidate() (gas: 9984)
+[PASS] test_NK_SplitSellDirection() (gas: 46558)
+[PASS] test_NK_StallConfig_RejectedByValidate() (gas: 10122)
+[PASS] test_NK_UndershootConfig_RejectedByValidate() (gas: 9990)
+[PASS] test_NK_WorstAllowedShape_ConservativeMint() (gas: 469534)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 2.37ms (2.24ms CPU time)
+
+Ran 12 tests for test/SineMath.t.sol:SineMathTest
+[PASS] testFuzz_AcceptedCustomDomainLaunchesAndTrades(uint64,uint96,uint16) (runs: 256, μ: 2996539, ~: 3637935)
+[PASS] test_BuyPartitionInvariance() (gas: 869661)
+[PASS] test_MaterializeBootBeyondReferenceTarget() (gas: 165784)
+[PASS] test_PriceMonotone() (gas: 12724245)
+[PASS] test_RejectUnrepresentableCustomCurveBeforeDeposits() (gas: 22298)
+[PASS] test_ReserveAtRoundtrip() (gas: 52602168)
+[PASS] test_ReserveAt_DeepSell() (gas: 2640882)
+[PASS] test_RoundTripLoses() (gas: 1477088)
+[PASS] test_SupplySaturation() (gas: 330263)
+[PASS] test_TargetTread() (gas: 42824)
+[PASS] test_Validate() (gas: 25807)
+[PASS] test_WaveGeometry() (gas: 6000)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 3.05s (3.05s CPU time)
+
+Ran 22 tests for test/ReferralPurchase.t.sol:ReferralPurchaseTest
+[PASS] testFuzz_RecordedEntrySurvivesEveryLaterHint(uint256) (runs: 256, μ: 3603394, ~: 3603397)
+[PASS] test_AcquiredPrimaryCannotChangeRecordedPayout() (gas: 5877564)
+[PASS] test_AcquiringAttributedNftDoesNotBindRecipient() (gas: 2485797)
+[PASS] test_BuyWithoutLinkKeepsAttributionAvailable() (gas: 3607031)
+[PASS] test_CallbackCannotSpendStandingAllowance() (gas: 39458)
+[PASS] test_ClockZeroCannotBind() (gas: 223617)
+[PASS] test_CycleIsSkippedAndPurchaseStillWorks() (gas: 3965652)
+[PASS] test_DecoyRegistryCannotRouteTheRoundPurchase() (gas: 1888962)
+[PASS] test_ExpiredAndBelowMinimumPurchasesCannotBind() (gas: 239228)
+[PASS] test_FailedTransferCannotBind() (gas: 180799)
+[PASS] test_FirstPurchaseBindsAndEscrowsRewardsAtomically() (gas: 1994879)
+[PASS] test_ForgedTraderHintCannotBindVictim() (gas: 3690024)
+[PASS] test_InvalidLinkSkipsWithoutBreakingBuy() (gas: 3615764)
+[PASS] test_LaterHintsAndDirectRecordCannotReplaceEntry() (gas: 8414283)
+[PASS] test_NewOwnerCannotRewriteNftAncestry() (gas: 5868477)
+[PASS] test_NextRoundStartsWithFreshAttribution() (gas: 16841663)
+[PASS] test_RecordedReferralSurvivesSellAndBuy() (gas: 5800650)
+[PASS] test_SelfReferralOnNonPrimaryNftIsSkipped() (gas: 4057222)
+[PASS] test_SlippageFailureRollsBackAttributionAndAllValue() (gas: 2089670)
+[PASS] test_TokenCallbackCannotReenterPurchaseOrRegistration() (gas: 2285823)
+[PASS] test_TransferReferrerNftCreditsFutureRewardsToNewOwner() (gas: 3724476)
+[PASS] test_WrongPoolCannotBindOrSpend() (gas: 68751)
+Suite result: ok. 22 passed; 0 failed; 0 skipped; finished in 2.61s (2.61s CPU time)
+
+Ran 4 tests for test/unit/ReferralRegistryInitCode.t.sol:ReferralRegistryInitCodeTest
+[PASS] test_BothDeploymentPathsBubbleInvalidConstructorArguments() (gas: 2234858)
+[PASS] test_Create2PredictionKeepsControllerDeployerAsCreator() (gas: 6791858)
+[PASS] test_HelperUsesExactRegistryCreationCodeAndConstructorArguments() (gas: 38491)
+[PASS] test_UnsaltedCreateAlsoUsesDeployerNonceAndPreservesRegistryWiring() (gas: 1837475)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 1.62ms (941.50µs CPU time)
+Warning: Failure from "/Users/deepthought/Desktop/dev/psp-sigma-testnet/cache/invariant/failures/SineStatefulTest/invariant_SupplyAndEscrowSolvent" file was ignored because test contract bytecode has changed.
+
+Ran 2 tests for test/MultiOwnerStateful.t.sol:MultiOwnerStatefulTest
+[PASS] invariant_AllPositionAndEscrowLiabilitiesAreCovered() (runs: 64, calls: 2048, reverts: 0)
+
+╭------------------------+------------------+-------+---------+----------╮
+| Contract               | Selector         | Calls | Reverts | Discards |
++========================================================================+
+| MultiOwnerStatefulTest | advance          | 197   | 0       | 0        |
+|------------------------+------------------+-------+---------+----------|
+| MultiOwnerStatefulTest | buy              | 182   | 0       | 0        |
+|------------------------+------------------+-------+---------+----------|
+| MultiOwnerStatefulTest | claim            | 228   | 0       | 0        |
+|------------------------+------------------+-------+---------+----------|
+| MultiOwnerStatefulTest | manageWithdrawal | 196   | 0       | 0        |
+|------------------------+------------------+-------+---------+----------|
+| MultiOwnerStatefulTest | movePosition     | 224   | 0       | 0        |
+|------------------------+------------------+-------+---------+----------|
+| MultiOwnerStatefulTest | reinvest         | 189   | 0       | 0        |
+|------------------------+------------------+-------+---------+----------|
+| MultiOwnerStatefulTest | sell             | 196   | 0       | 0        |
+|------------------------+------------------+-------+---------+----------|
+| MultiOwnerStatefulTest | settle           | 229   | 0       | 0        |
+|------------------------+------------------+-------+---------+----------|
+| MultiOwnerStatefulTest | stake            | 213   | 0       | 0        |
+|------------------------+------------------+-------+---------+----------|
+| MultiOwnerStatefulTest | withdraw         | 194   | 0       | 0        |
+╰------------------------+------------------+-------+---------+----------╯
+
+[PASS] test_InterleavedActionsAndCompleteExit() (gas: 14597115)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 7.46s (7.45s CPU time)
+
+Ran 6 tests for test/SineV3AuditPoC.t.sol:SineV3AuditPoC
+[PASS] test_T1_BuyQuoteMatchesExecution() (gas: 11737850)
+[PASS] test_T2_SellQuoteMatchesExecution() (gas: 6748429)
+[PASS] test_T3_TicketGuardEndToEnd() (gas: 3593814)
+[PASS] test_T4_PreFeeSamplingOneSpotOneUnit() (gas: 1649652)
+[PASS] test_T5_TicketPriceIsTheBindingMinimum() (gas: 1732400)
+[PASS] test_T6_SellsKeepTheDustGuard() (gas: 4150453)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 115.65ms (84.54ms CPU time)
+
+Ran 14 tests for test/ReinvestAttribution.t.sol:ReinvestAttributionTest
+[PASS] test_BuyForCannotSpendBeneficiaryAllowance() (gas: 84990)
+[PASS] test_BuyForRejectsZeroTraderAndPreservesSlippageDeadline() (gas: 1817002)
+[PASS] test_BuyForSpendsCallerFundsAndKeepsTokensWithCaller() (gas: 1631816)
+[PASS] test_DonatedPspCannotBlockRealV4BatchReinvestment() (gas: 8671407)
+[PASS] test_ForeignHookRejectedBeforeSingleOrBatchFeeClaim() (gas: 1775435)
+[PASS] test_IndividualApprovalCannotAuthorizeAnotherBatchEntry() (gas: 312280)
+[PASS] test_IndividualExternalOperatorCanReinvestWithoutCollectionApproval() (gas: 5353819)
+[PASS] test_IndividualFeeClaimsAreScopedAndRevocable() (gas: 3346755)
+[PASS] test_IndividualWrapperApprovalReinvestsOnlyItsPepe() (gas: 5348681)
+[PASS] test_OperatorBatchReinvestCreditsOwnerNotCallerOrOrigin() (gas: 7186508)
+[PASS] test_OperatorReinvestCreditsOwnerNotCallerOrOrigin() (gas: 5324180)
+[PASS] test_OwnerBatchReinvestCreditsSeatsEventsReferralsAndPot() (gas: 7179762)
+[PASS] test_OwnerReinvestCreditsSeatsEventsReferralsAndPot() (gas: 5319996)
+[PASS] test_TransferCarriesFeesAndRevokesOldClaimPermission() (gas: 2146235)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 187.46ms (146.35ms CPU time)
+
+Ran 4 tests for test/ReinvestAllocation.t.sol:ReinvestAllocationTest
+[PASS] testFuzz_BatchConservesEveryBoughtWeiAndPreservesDonations(uint128,uint128,uint128,uint128,uint128) (runs: 256, μ: 375369, ~: 377541)
+[PASS] test_DonationCannotBlockFractionalBatchAndAllBoughtPspIsStaked() (gas: 377988)
+[PASS] test_FinalEmptyPositionDoesNotReceiveProportionalRemainder() (gas: 354991)
+[PASS] test_LargePositionProductUsesFullPrecision() (gas: 376009)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 249.95ms (250.16ms CPU time)
+
+Ran 7 tests for test/SineScaling.t.sol:SineScalingTest
+[PASS] testFuzz_DeepReciprocalStepsCannotProfit(uint8,uint8,uint64) (runs: 256, μ: 1536918, ~: 1336967)
+[PASS] testFuzz_MinimumBuyAtLargeRaiseCannotProfit(uint8,uint64,uint16) (runs: 257, μ: 2974148, ~: 3859600)
+[PASS] testFuzz_PredepositInverseProtectsBacking(uint8,uint64) (runs: 256, μ: 199404, ~: 190422)
+[PASS] testFuzz_PricesInvariantAndSupplyScales(uint8,uint64,uint16) (runs: 256, μ: 579774, ~: 622272)
+[PASS] test_MinimumBuyAtLargeRaiseEdges() (gas: 269923058)
+[PASS] test_TenMillionBuyCanStillExitFromSaturatedReserve() (gas: 3607478)
+[PASS] test_TinyAndLargeRaisesKeepTheSamePriceTargets() (gas: 1367487)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 4.21s (9.39s CPU time)
+
+Ran 6 tests for test/SineOracle.t.sol:SineOracleTest
+[PASS] testFuzz_CellSeamMonotone(uint8,uint16) (runs: 256, μ: 471101, ~: 492208)
+[PASS] testFuzz_InverseUpperBracket(uint96,uint16) (runs: 256, μ: 2244743, ~: 2267089)
+[PASS] testFuzz_RoundtripNoProfit(uint96,uint96,uint64,uint16) (runs: 257, μ: 1745849, ~: 1663849)
+[PASS] testFuzz_WaveSeamMonotone(uint8,uint16) (runs: 256, μ: 316204, ~: 316212)
+[PASS] test_IndependentDecimalVectors() (gas: 24588907)
+[PASS] test_ShallowTrendBeyond256Waves() (gas: 160344)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 3.94s (4.38s CPU time)
+
+Ran 1 test for test/SineV3SmallReserveOracle.t.sol:SineV3SmallReserveOracleTest
+[PASS] test_SmallReserveSupplyMatchesIndependentSimpsonOracle() (gas: 127952574)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 428.99ms (427.65ms CPU time)
+
+Ran 11 tests for test/SineV3MonotonePrice.t.sol:SineV3MonotonePriceTest
+[PASS] testFuzz_AdjacentExponentValuesAreMonotone(uint256) (runs: 256, μ: 11853, ~: 11945)
+[PASS] testFuzz_AdjacentPriceAndPhaseAreMonotone(uint256,uint256) (runs: 256, μ: 378933, ~: 364921)
+[PASS] testFuzz_OrderedDistantCoordinatesAreMonotone(uint256,uint256) (runs: 256, μ: 502851, ~: 510468)
+[PASS] test_ArithmeticDomainFailsClosed() (gas: 13000)
+[PASS] test_BinaryExponentSeamsAreOrdered() (gas: 3137748)
+[PASS] test_CustomPriceRetainsPrecisionBeforeBinaryScaling() (gas: 6586)
+[PASS] test_DensityAtHighPrecisionDoesNotUnderflowAt64Waves() (gas: 119950)
+[PASS] test_ExtremeSignedAndBinaryInputsFailClosed() (gas: 377429)
+[PASS] test_IndependentPriceFixtures() (gas: 7415871)
+[PASS] test_LaunchAndNegativeReflection() (gas: 601678)
+[PASS] test_QuarterAndSignSeamsAreOrdered() (gas: 8839168)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 762.90ms (762.63ms CPU time)
+
+Ran 6 tests for test/SineV3Oracle.t.sol:SineV3OracleTest
+[PASS] test_AdjacentWeiMonotone() (gas: 114670768)
+[PASS] test_DomainEdges() (gas: 595591)
+[PASS] test_Fixtures() (gas: 19279685)
+[PASS] test_GenesisIsSameCurve() (gas: 2253549)
+[PASS] test_LamFormula() (gas: 13516)
+[PASS] test_MilestoneSchedule() (gas: 1441412)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 430.18ms (429.04ms CPU time)
+
+Ran 3 tests for test/SkillCallbackReview.t.sol:SkillCallbackReviewTest
+[PASS] testFuzz_TransferredChainCreditsEachOwnerFirstTierOnly(uint256) (runs: 256, μ: 2101075, ~: 2109556)
+[PASS] test_BuyCreditsDistinctAncestorsAfterDuplicateOwner() (gas: 1865469)
+[PASS] test_SellCreditsDistinctAncestorsAfterDuplicateOwner() (gas: 4044699)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 1.36s (1.33s CPU time)
+
+Ran 2 tests for test/SkillLifecycleReview.t.sol:SkillLifecycleReviewTest
+[PASS] test_EarlyCanonicalStakerDoesNotBlockBirth() (gas: 14334433)
+[PASS] test_OnlyFactoryCanInitializeReservedPool() (gas: 14312861)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 41.34ms (6.50ms CPU time)
+
+Ran 12 tests for test/ReferralRewards.t.sol:ReferralRewardsTest
+[PASS] testFuzz_BuyAndSellEscrowConservesEveryRewardWei(uint256) (runs: 256, μ: 11598567, ~: 13440734)
+[PASS] test_ClaimPaysExactCreditOnceAndLeavesStakingFeesAlone() (gas: 2203344)
+[PASS] test_ClaimRemainsOpenAfterDetonationWithdrawalAndNextRound() (gas: 17165219)
+[PASS] test_FailedPayoutPreservesCreditAndTradeCanStillAccrue() (gas: 3627661)
+[PASS] test_NftOperatorCannotClaimOwnersReferralRewards() (gas: 2231460)
+[PASS] test_OnlyRoundHookCanCreditEvenWhenEscrowHasSurplus() (gas: 108617)
+[PASS] test_PayoutCallbackCannotReenterClaim() (gas: 2199461)
+[PASS] test_PreviouslyAllocatedBackingCannotBeCreditedTwice() (gas: 153940)
+[PASS] test_TransferFailureToEscrowRollsBackEntirePurchase() (gas: 2083227)
+[PASS] test_TransferKeepsEarnedCreditAndMovesOnlyFutureCredit() (gas: 3776260)
+[PASS] test_UnbackedCreditRollsBackEveryRecipientAndCounter() (gas: 160269)
+[PASS] test_ZeroRecipientCannotCreateUnclaimableLiability() (gas: 98248)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 8.97s (8.94s CPU time)
+
+Ran 13 tests for test/dinosat/SineV3PriceSymbolic.t.sol:SineV3PriceSymbolicTest
+[PASS] test_check_phaseat_seam_quarters() (gas: 598538)
+[PASS] test_check_phaseat_seam_whole() (gas: 116470)
+[PASS] test_fuzz_phaseat_displacement_neg(uint256) (runs: 256, μ: 64461, ~: 62840)
+[PASS] test_fuzz_phaseat_displacement_pos(uint256) (runs: 256, μ: 64128, ~: 62527)
+[PASS] test_fuzz_phaseat_monotone_neg(uint256) (runs: 256, μ: 124639, ~: 120788)
+[PASS] test_fuzz_phaseat_monotone_pos_q1(uint256) (runs: 256, μ: 120443, ~: 120534)
+[PASS] test_fuzz_phaseat_monotone_pos_q2(uint256) (runs: 256, μ: 133620, ~: 133757)
+[PASS] test_fuzz_phaseat_monotone_pos_q3(uint256) (runs: 256, μ: 134050, ~: 134155)
+[PASS] test_fuzz_phaseat_monotone_pos_q4(uint256) (runs: 256, μ: 120242, ~: 120262)
+[PASS] test_fuzz_phaseat_odd(uint256) (runs: 256, μ: 124419, ~: 120250)
+[PASS] test_fuzz_scaledexp_monotone(int256) (runs: 256, μ: 3110, ~: 3047)
+[PASS] test_fuzz_scaledexp_reverts_huge_scale(uint256) (runs: 256, μ: 218593, ~: 218601)
+[PASS] test_quarter_domain_boundaries() (gas: 978365)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 753.79ms (753.62ms CPU time)
+
+Ran 6 tests for test/SkillStakingReview.t.sol:SkillStakingReviewTest
+[PASS] testFuzz_FreshIdsMatchIndependentOccupiedSet(uint256) (runs: 256, μ: 9982503, ~: 10019402)
+[PASS] test_ChosenIdsAtUintBoundaryRemainValid() (gas: 717628)
+[PASS] test_EpochZeroWithdrawalViewMatchesExecutableExit() (gas: 494053)
+[PASS] test_GenesisClaimGasIndependentOfChosenIdRun() (gas: 371180705)
+[PASS] test_PartialGenesisTopupTransferAndExitPreserveOwnerTotals() (gas: 1171445)
+[PASS] test_ReferralStakeLookupGasIndependentOfUnsolicitedNfts() (gas: 192121341)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 996.66ms (1.19s CPU time)
+
+Ran 9 tests for test/SpawnStaging.t.sol:SpawnStaging
+[PASS] test_birth_idempotent_when_front_run() (gas: 22009407)
+[PASS] test_carry_flows_through_birth() (gas: 22128248)
+[PASS] test_gas_reserve_bounded_birth_flat() (gas: 63113775)
+[PASS] test_guards() (gas: 22017368)
+[PASS] test_mining_bound_enforced() (gas: 8434431)
+[PASS] test_predictions_exact() (gas: 22043706)
+[PASS] test_spawnNextRound_composed_compat() (gas: 22003107)
+[PASS] test_staged_rebirth_e2e() (gas: 22027031)
+[PASS] test_stale_context_fenced() (gas: 25079190)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 342.49ms (327.27ms CPU time)
+
+Ran 8 tests for test/unit/StagedGenesis.t.sol:StagedGenesisTest
+[PASS] test_DelayedBirthStartsFullPredepositWindowAtWiring() (gas: 15253466)
+[PASS] test_StagedGenesis_ComposedPathsIntact() (gas: 31581629)
+[PASS] test_StagedGenesis_FullFlow() (gas: 18209234)
+[PASS] test_StagedGenesis_GasBounds() (gas: 15239832)
+[PASS] test_StagedGenesis_Guards() (gas: 2723953)
+[PASS] test_StagedGenesis_RebirthSplit() (gas: 31602540)
+[PASS] test_StagedGenesis_StaleDescriptorCaughtAtWire() (gas: 15062107)
+[PASS] test_StagedGenesis_StaleDescriptorFailsClosed() (gas: 1612964)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 103.20ms (100.31ms CPU time)
+
+Ran 6 tests for test/unit/TestnetFaucet.t.sol:TestnetFaucetTest
+[PASS] test_DripEvent() (gas: 46472)
+[PASS] test_DripZeroReverts() (gas: 11114)
+[PASS] test_FaucetIsUnlimited() (gas: 85358)
+[PASS] test_FaucetMintsFreeWithZeroBalanceAndZeroETH() (gas: 52943)
+[PASS] test_FaucetMixETHTransfersWithoutETHBacking() (gas: 76197)
+[PASS] test_TokenPublicMint() (gas: 43491)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 469.29µs (169.08µs CPU time)
+
+Ran 7 tests for test/TicketRulesV3.t.sol:TicketRulesV3Test
+[PASS] test_ExactMinimumThroughRealV4() (gas: 27515298)
+[PASS] test_GuardedRoutePinsTheQuotedTicketPrice() (gas: 4244109)
+[PASS] test_LaunchPriceTable() (gas: 116272647)
+[PASS] test_PreOwnFeeSamplingKeepsTheTicket() (gas: 2229909)
+[PASS] test_PureCeilingTable() (gas: 1205)
+[PASS] test_RawDonationDoesNotReprice() (gas: 31301)
+[PASS] test_SellFeesRepriceTicketsNotTheCurve() (gas: 5867921)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 230.13ms (199.71ms CPU time)
+
+Ran 6 tests for test/SineV3Primitive.t.sol:SineV3PrimitiveTest
+[PASS] testFuzz_ExactAdjacentReserveOrder(uint256,uint256) (runs: 256, μ: 1660489, ~: 1680235)
+[PASS] test_AllCanonicalAnchorsAndGridBoundaries() (gas: 5920508)
+[PASS] test_LargeLaunchInverseGasAndMinimalEndpoint() (gas: 4866718)
+[PASS] test_LowPriceSellUsesTheFullIntegral() (gas: 4933175)
+[PASS] test_RejectsDataInWrongOrder() (gas: 58062)
+[PASS] test_TailPlateauInverseFindsFirstRoundedSupplyEndpoint() (gas: 8831591)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 1.47s (1.47s CPU time)
+
+Ran 7 tests for test/UncappedCapacity.t.sol:UncappedCapacityTest
+[PASS] test_LargeIBCOLaunchClaimsAndDirectRedemption() (gas: 4271729)
+[PASS] test_LargeRepresentablePotRemainsClaimable() (gas: 25882055)
+[PASS] test_UnrepresentableDepositRollsBackBeforeItCanPoisonLaunch() (gas: 3023662)
+[PASS] test_UnrepresentableFactoryDonationCannotBlockTheNextRound() (gas: 22015557)
+[PASS] test_V4RejectsBuyBeyondTheWaveDomain() (gas: 3067631)
+[PASS] test_V4RejectsInputsBeyondSigned128Bits() (gas: 3060971)
+[PASS] test_V4RejectsOversizedActiveAndFlatSellOutputs() (gas: 23041038)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 99.92ms (89.38ms CPU time)
+
+Ran 1 test for test/SineV3InverseLifecycle.t.sol:SineV3InverseLifecycleTest
+[PASS] test_RealV4SmallSaleAtWave63PaysCompleteCurveOutput() (gas: 25057117)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 65.54ms (37.80ms CPU time)
+
+Ran 6 tests for test/SineV3Economics.t.sol:SineV3EconomicsTest
+[PASS] testFuzz_BuySellRoundTripNeverWins(uint8,uint88) (runs: 256, μ: 16054043, ~: 16598411)
+[PASS] test_DomainFailureLeavesStateUntouched() (gas: 363686)
+[PASS] test_HelperCurveLegsConservative() (gas: 47287220)
+[PASS] test_InverseGasBounded() (gas: 3972503)
+[PASS] test_MultiWaveGasIsFlat() (gas: 6367034)
+[PASS] test_TelescopingExactness() (gas: 127142322)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 12.97s (13.10s CPU time)
+
+Ran 1 test for test/local/VectorDump.t.sol:VectorDumpTest
+[PASS] test_dumpVector() (gas: 84858562)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 252.88ms (251.35ms CPU time)
+
+Ran 1 test for test/dinosat/VerificationSentinels.t.sol:VerificationSentinels
+[PASS] test_false_assertion_reverts() (gas: 4359)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 103.25µs (22.75µs CPU time)
+
+Ran 13 tests for test/unit/Vesting.t.sol:VestingTest
+[PASS] test_CancelRestoresFullPower() (gas: 272257)
+[PASS] test_CancelSameEpoch() (gas: 205223)
+[PASS] test_DecayPins() (gas: 305463)
+[PASS] test_DecayTimelineAndInstantCancel() (gas: 358000)
+[PASS] test_DustRounding() (gas: 628024)
+[PASS] test_FeeSplitExact() (gas: 690741)
+[PASS] test_GenesisShareFees() (gas: 685917)
+[PASS] test_MultiPepesAndClaimAll() (gas: 719802)
+[PASS] test_SparseReplayAcrossGap() (gas: 384210)
+[PASS] test_StakeForRevertsWhileDecaying() (gas: 233821)
+[PASS] test_TotalWeightStaggeredExact() (gas: 497994)
+[PASS] test_WithdrawGating() (gas: 374147)
+[PASS] test_WithdrawWithoutRequestReverts() (gas: 29466)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 8.65ms (7.02ms CPU time)
+
+Ran 8 tests for test/unit/ZapPredeposit.t.sol:ZapPredepositTest
+[PASS] test_EIP170_ZapsUnderLimit() (gas: 5479)
+[PASS] test_PredepositForIsPermissionless() (gas: 161958)
+[PASS] test_ZapInPredeposit_AllowsDepositsAboveFormerCap() (gas: 234935)
+[PASS] test_ZapInPredeposit_CreditsUserNotZap() (gas: 187743)
+[PASS] test_ZapInPredeposit_ExchangeRateHonored() (gas: 182171)
+[PASS] test_ZapInPredeposit_MinSharesReverts() (gas: 75623)
+[PASS] test_ZapInPredeposit_OneWeiCreditsCaller() (gas: 175612)
+[PASS] test_ZapInPredeposit_ZeroETHReverts() (gas: 13382)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 16.26ms (750.17µs CPU time)
+
+Ran 11 tests for test/dinosat/SineV3PrimitiveSymbolic.t.sol:SineV3PrimitiveSymbolicTest
+[PASS] test_all_knots_nondecreasing() (gas: 3162736)
+[PASS] test_check_cell_upper_edge_anchor() (gas: 1692905)
+[PASS] test_check_selected_knots_strictly_increase() (gas: 12606)
+[PASS] test_fuzz_cell_monotone_0(uint256) (runs: 256, μ: 304566, ~: 304664)
+[PASS] test_fuzz_cell_monotone_1000(uint256) (runs: 256, μ: 483026, ~: 497204)
+[PASS] test_fuzz_cell_monotone_500(uint256) (runs: 256, μ: 269973, ~: 270067)
+[PASS] test_fuzz_cell_monotone_708(uint256) (runs: 256, μ: 262022, ~: 262122)
+[PASS] test_fuzz_cell_monotone_710(uint256) (runs: 256, μ: 486576, ~: 494847)
+[PASS] test_fuzz_cell_monotone_711(uint256) (runs: 256, μ: 530608, ~: 537580)
+[PASS] test_fuzz_cell_monotone_716(uint256) (runs: 256, μ: 532967, ~: 537772)
+[PASS] test_fuzz_cell_terminal_plateau(uint256) (runs: 256, μ: 202930, ~: 203793)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 2.67s (4.36s CPU time)
+
+Ran 6 tests for test/SineV3ReviewRegression.t.sol:SineV3ReviewRegressionTest
+[PASS] test_BaselinePriceNeverDecreasesAtAdjacentReserveWei() (gas: 276883)
+[PASS] test_BaselineSupplyNeverDecreasesAtAdjacentReserveWei() (gas: 1752921)
+[PASS] test_InverseClosesBracketForSmallSaleAtWave32() (gas: 4281158)
+[PASS] test_InverseClosesBracketForSmallSaleAtWave63() (gas: 4267803)
+[PASS] test_InverseFailsClosedForUnsupportedBracketWidth() (gas: 9541)
+[PASS] test_LargeLaunchSupplyNeverDecreasesAtAdjacentReserveWei() (gas: 1748557)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 40.39ms (39.28ms CPU time)
+
+Ran 6 tests for test/FableAuditPoC.t.sol:FableAuditPoC
+[PASS] testFuzz_F6_TinyRoundDustRoundTripNeverWins(uint256,uint8) (runs: 256, μ: 31035626, ~: 30040684)
+[PASS] test_F1_EmptyHookDataSeatsTheRouterAndStrandsThePot() (gas: 17323714)
+[PASS] test_F2_ReferralSelfRebateViaNftTransfer() (gas: 2544177)
+[PASS] test_F3_OwnerCanBirthGenesisOverALiveRound() (gas: 14975665)
+[PASS] test_F4_RebirthPreLaunchMinimumAndPredepositGas() (gas: 24356752)
+[PASS] test_F5_StrangerStakeForOnlyBenefitsOwner() (gas: 4030173)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 16.40s (16.45s CPU time)
+
+Ran 63 tests for test/SineV3Independent.t.sol:SineV3IndependentTest
+[PASS] testFuzz_AdjacentSupplies(uint256,uint8) (runs: 256, μ: 1648627, ~: 1635372)
+[PASS] testFuzz_InverseReturnsEarliestFeasibleReserve(uint256,uint256,uint8) (runs: 256, μ: 6274646, ~: 4076379)
+[PASS] test_AllBoundaries_0() (gas: 517810359)
+[PASS] test_AllBoundaries_1000() (gas: 491265258)
+[PASS] test_AllBoundaries_1200() (gas: 490655468)
+[PASS] test_AllBoundaries_1400() (gas: 490656326)
+[PASS] test_AllBoundaries_1600() (gas: 490655578)
+[PASS] test_AllBoundaries_1800() (gas: 490655248)
+[PASS] test_AllBoundaries_200() (gas: 518245532)
+[PASS] test_AllBoundaries_2000() (gas: 490656018)
+[PASS] test_AllBoundaries_2200() (gas: 490660265)
+[PASS] test_AllBoundaries_2400() (gas: 490686426)
+[PASS] test_AllBoundaries_2600() (gas: 490686074)
+[PASS] test_AllBoundaries_2800() (gas: 490686602)
+[PASS] test_AllBoundaries_3000() (gas: 490686954)
+[PASS] test_AllBoundaries_3200() (gas: 490687020)
+[PASS] test_AllBoundaries_3400() (gas: 490686844)
+[PASS] test_AllBoundaries_3600() (gas: 490690136)
+[PASS] test_AllBoundaries_3800() (gas: 490690940)
+[PASS] test_AllBoundaries_400() (gas: 505490444)
+[PASS] test_AllBoundaries_4000() (gas: 490691094)
+[PASS] test_AllBoundaries_4200() (gas: 490691490)
+[PASS] test_AllBoundaries_4400() (gas: 490690918)
+[PASS] test_AllBoundaries_4600() (gas: 467417212)
+[PASS] test_AllBoundaries_4800() (gas: 260853869)
+[PASS] test_AllBoundaries_600() (gas: 515750616)
+[PASS] test_AllBoundaries_800() (gas: 506208668)
+[PASS] test_AllControls_0() (gas: 62940662)
+[PASS] test_AllControls_1000() (gas: 54637546)
+[PASS] test_AllControls_1200() (gas: 54637078)
+[PASS] test_AllControls_1400() (gas: 54637012)
+[PASS] test_AllControls_1600() (gas: 54636308)
+[PASS] test_AllControls_1800() (gas: 54637518)
+[PASS] test_AllControls_200() (gas: 61575854)
+[PASS] test_AllControls_2000() (gas: 54636858)
+[PASS] test_AllControls_2200() (gas: 54639388)
+[PASS] test_AllControls_2400() (gas: 54647588)
+[PASS] test_AllControls_2600() (gas: 54647764)
+[PASS] test_AllControls_2800() (gas: 54647984)
+[PASS] test_AllControls_3000() (gas: 54648457)
+[PASS] test_AllControls_3200() (gas: 54647346)
+[PASS] test_AllControls_3400() (gas: 54648006)
+[PASS] test_AllControls_3600() (gas: 54650780)
+[PASS] test_AllControls_3800() (gas: 54649540)
+[PASS] test_AllControls_400() (gas: 55926648)
+[PASS] test_AllControls_4000() (gas: 54649760)
+[PASS] test_AllControls_4200() (gas: 54649716)
+[PASS] test_AllControls_4400() (gas: 54649320)
+[PASS] test_AllControls_4600() (gas: 46807376)
+[PASS] test_AllControls_4800() (gas: 12318250)
+[PASS] test_AllControls_600() (gas: 58134600)
+[PASS] test_AllControls_800() (gas: 55257749)
+[PASS] test_OneSidedPhysicalDomainEndpoints() (gas: 2122880)
+[PASS] test_SmallSalesAtWave_0() (gas: 41071311)
+[PASS] test_SmallSalesAtWave_1() (gas: 48398099)
+[PASS] test_SmallSalesAtWave_10() (gas: 48151683)
+[PASS] test_SmallSalesAtWave_1024() (gas: 73077545)
+[PASS] test_SmallSalesAtWave_128() (gas: 54227865)
+[PASS] test_SmallSalesAtWave_32() (gas: 49100453)
+[PASS] test_SmallSalesAtWave_4096() (gas: 78508550)
+[PASS] test_SmallSalesAtWave_512() (gas: 67514932)
+[PASS] test_SmallSalesAtWave_63() (gas: 53916899)
+[PASS] test_SmallSalesAtWave_64() (gas: 53736241)
+Suite result: ok. 63 passed; 0 failed; 0 skipped; finished in 14.58s (54.29s CPU time)
+
+Ran 12 tests for test/dinosat/SineV3MathSymbolic.t.sol:SineV3MathSymbolicTest
+[PASS] test_check_domain_admits_boundary() (gas: 130233)
+[PASS] test_check_domain_rejects_above_max() (gas: 2459)
+[PASS] test_check_domain_rejects_bad_pl() (gas: 2236)
+[PASS] test_check_lamat_floorsqrt_boot450() (gas: 1358)
+[PASS] test_check_lamat_floorsqrt_boot600k() (gas: 928)
+[PASS] test_check_lamat_floorsqrt_boot90() (gas: 1632)
+[PASS] test_domain_rejection_boundaries() (gas: 18491)
+[PASS] test_fuzz_buyout_spot_bound(uint256) (runs: 256, μ: 1243363, ~: 1247095)
+[PASS] test_fuzz_buyout_supply_monotone(uint256) (runs: 256, μ: 1631267, ~: 1634183)
+[PASS] test_fuzz_domain_rejects_excess_reserve(uint256) (runs: 256, μ: 6263, ~: 6178)
+[PASS] test_fuzz_domain_rejects_invalid_price(uint256) (runs: 256, μ: 8401, ~: 8395)
+[PASS] test_fuzz_inverse_minimal_and_sell_conservative(uint256,uint256) (runs: 256, μ: 15673651, ~: 7346169)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 13.05s (29.72s CPU time)
+
+Ran 1 test for test/SineStateful.t.sol:SineStatefulTest
+[PASS] invariant_SupplyAndEscrowSolvent() (runs: 64, calls: 2048, reverts: 0)
+
+╭------------------+----------+-------+---------+----------╮
+| Contract         | Selector | Calls | Reverts | Discards |
++==========================================================+
+| SineStatefulTest | advance  | 397   | 0       | 0        |
+|------------------+----------+-------+---------+----------|
+| SineStatefulTest | buy      | 410   | 0       | 0        |
+|------------------+----------+-------+---------+----------|
+| SineStatefulTest | redeem   | 424   | 0       | 0        |
+|------------------+----------+-------+---------+----------|
+| SineStatefulTest | sell     | 404   | 0       | 0        |
+|------------------+----------+-------+---------+----------|
+| SineStatefulTest | settle   | 413   | 0       | 0        |
+╰------------------+----------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 20.77s (20.72s CPU time)
+
+Ran 9 tests for test/attack/NK24Math.t.sol:NK24MathTest
+[PASS] test_NK_BuyIntegralNeverExceedsInput_prod() (gas: 10292200)
+[PASS] test_NK_BuyIntegralNeverExceedsInput_rand(uint256) (runs: 256, μ: 2673054, ~: 2687620)
+[PASS] test_NK_MicroCycleDrift_prod() (gas: 16756393)
+[PASS] test_NK_NewtonConvergenceSoundness(uint256) (runs: 256, μ: 82451, ~: 60814)
+[PASS] test_NK_PriceContinuousAtBoundaries_prod() (gas: 7654059)
+[PASS] test_NK_PriceMonotonicNonDecreasing_rand(uint256) (runs: 256, μ: 1152553, ~: 1144832)
+[PASS] test_NK_SplitBuysNeverBeatSingle(uint256) (runs: 256, μ: 33008257, ~: 32865423)
+[PASS] test_NK_SplitBuysNeverBeatSingle_prod() (gas: 5750733)
+[PASS] test_NK_SplitSellsAreNeutral(uint256) (runs: 256, μ: 1370454, ~: 1367989)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 31.44s (32.72s CPU time)
+
+Ran 5 tests for test/invariant/CurveMathInvariant.t.sol:CurveMathInvariantTest
+[PASS] invariant_NoMoneyPrinter() (runs: 64, calls: 2048, reverts: 0)
+
+╭----------+----------+-------+---------+----------╮
+| Contract | Selector | Calls | Reverts | Discards |
++==================================================+
+| Handler  | buy      | 1030  | 0       | 0        |
+|----------+----------+-------+---------+----------|
+| Handler  | sell     | 1018  | 0       | 0        |
+╰----------+----------+-------+---------+----------╯
+
+[PASS] invariant_PriceAlwaysPositive() (runs: 64, calls: 2048, reverts: 0)
+
+╭----------+----------+-------+---------+----------╮
+| Contract | Selector | Calls | Reverts | Discards |
++==================================================+
+| Handler  | buy      | 1005  | 0       | 0        |
+|----------+----------+-------+---------+----------|
+| Handler  | sell     | 1043  | 0       | 0        |
+╰----------+----------+-------+---------+----------╯
+
+[PASS] invariant_ReserveConsistency() (runs: 64, calls: 2048, reverts: 0)
+
+╭----------+----------+-------+---------+----------╮
+| Contract | Selector | Calls | Reverts | Discards |
++==================================================+
+| Handler  | buy      | 1006  | 0       | 0        |
+|----------+----------+-------+---------+----------|
+| Handler  | sell     | 1042  | 0       | 0        |
+╰----------+----------+-------+---------+----------╯
+
+[PASS] invariant_SupplyBounded() (runs: 64, calls: 2048, reverts: 0)
+
+╭----------+----------+-------+---------+----------╮
+| Contract | Selector | Calls | Reverts | Discards |
++==================================================+
+| Handler  | buy      | 1062  | 0       | 0        |
+|----------+----------+-------+---------+----------|
+| Handler  | sell     | 986   | 0       | 0        |
+╰----------+----------+-------+---------+----------╯
+
+[PASS] invariant_SupplyNeverNegative() (runs: 64, calls: 2048, reverts: 0)
+
+╭----------+----------+-------+---------+----------╮
+| Contract | Selector | Calls | Reverts | Discards |
++==================================================+
+| Handler  | buy      | 996   | 0       | 0        |
+|----------+----------+-------+---------+----------|
+| Handler  | sell     | 1052  | 0       | 0        |
+╰----------+----------+-------+---------+----------╯
+
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 34.26s (2.49s CPU time)
+
+Ran 29 tests for test/unit/CurveMath.t.sol:CurveMathTest
+[PASS] testFuzz_BuyAtArbitrarySupply(uint256,uint256) (runs: 256, μ: 75589, ~: 71611)
+[PASS] testFuzz_BuyOutputPositive(uint256,uint256) (runs: 256, μ: 69391, ~: 62577)
+[PASS] testFuzz_MultiRoundTrip(uint256) (runs: 256, μ: 92892, ~: 84335)
+[PASS] testFuzz_PriceMonotonic(uint256,uint256) (runs: 256, μ: 29528, ~: 29616)
+[PASS] testFuzz_RoundTrip(uint256) (runs: 256, μ: 74573, ~: 66326)
+[PASS] test_BuyIncreasesSupplyAndPrice() (gas: 171997)
+[PASS] test_BuyThenSellAtHigherSupply() (gas: 88223)
+[PASS] test_BuyThenSellRoundTrip() (gas: 68343)
+[PASS] test_BuyZeroETH() (gas: 24973)
+[PASS] test_FirstBuy() (gas: 64103)
+[PASS] test_MultiCurve_BoundaryContinuity() (gas: 78222)
+[PASS] test_MultiCurve_CrossBoundarySwap() (gas: 117798)
+[PASS] test_MultiCurve_PriceAtZero() (gas: 41729)
+[PASS] test_MultiCurve_PriceMonotonic() (gas: 95973)
+[PASS] test_MultiCurve_RoundTrip() (gas: 84168)
+[PASS] test_MultiCurve_SecondExpBurstFaster() (gas: 55554)
+[PASS] test_MultiCurve_ZonesHaveDifferentGrowthRates() (gas: 62832)
+[PASS] test_PriceAtZero() (gas: 25034)
+[PASS] test_PriceInflectionContinuous() (gas: 36802)
+[PASS] test_PriceMonotonicIncreasing() (gas: 101925)
+[PASS] test_SellDecreasesPrice() (gas: 70930)
+[PASS] test_SellMoreThanSupply() (gas: 24555)
+[PASS] test_SellZeroPSP() (gas: 24643)
+[PASS] test_SmallSwapLowSlippage() (gas: 84433)
+[PASS] test_TimingsFullAxisRoundtrip() (gas: 2247)
+[PASS] test_TimingsGuards() (gas: 91395)
+[PASS] test_TimingsLayout() (gas: 1174)
+[PASS] test_TimingsPackCappedRoundtrip() (gas: 1996)
+[PASS] test_TimingsPackRoundtrip() (gas: 869)
+Suite result: ok. 29 passed; 0 failed; 0 skipped; finished in 34.50s (34.62s CPU time)
+
+Ran 4 tests for test/audit/testnet-final/SineCustodyInvariants.t.sol:SineCustodyInvariants
+[PASS] testFuzz_Audit_SineChopInvariants(uint8,uint8) (runs: 256, μ: 36896105, ~: 28135275)
+[PASS] testFuzz_Audit_SineWholeBalanceSell(uint88) (runs: 256, μ: 5105810, ~: 5105810)
+[PASS] test_Audit_SineSupplyBoundGenesis() (gas: 814669)
+[PASS] test_Audit_SlidingFeeBoundaryCustody() (gas: 6851584)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 30.84s (34.54s CPU time)
+
+Ran 16 tests for test/wave2/auditorB/B4_CurveMathFuzz.t.sol:B4_CurveMathFuzz
+[PASS] test_B4a2_dustSupplyOvershoot_pinned() (gas: 225821)
+[PASS] test_B4a_buyBoundedByIntegral_fuzz(uint64,uint128,uint128) (runs: 256, μ: 872333, ~: 860097)
+[PASS] test_B4b2_roundTripLoses_production_fuzz(uint128) (runs: 256, μ: 65966, ~: 51563)
+[PASS] test_B4b_FIXED_overMintBeyondIntegral_deterministic() (gas: 224292)
+[PASS] test_B4b_FIXED_subBpsRegimeNowConservative() (gas: 173708)
+[PASS] test_B4c_FINDING_curveIntegralMulWadFail_deterministic() (gas: 810867)
+[PASS] test_B4c_priceMonotone_fuzz(uint64,uint128) (runs: 256, μ: 13556, ~: 13252)
+[PASS] test_B4d_noPanicAtScale_fuzz(uint64) (runs: 256, μ: 140244, ~: 140700)
+[PASS] test_B4e_sellAboveMaxSupplyPanics_library() (gas: 807877)
+[PASS] test_B4f_sellAboveMaxSupplyWrongSegment_library() (gas: 13740)
+[PASS] test_B4g_hugeP0ValidatedButPanics_library() (gas: 807647)
+[PASS] test_B4h_logRateExactlyOneNoPanic() (gas: 10890)
+[PASS] test_B4i_maxSteepnessNoPanic() (gas: 9198)
+[PASS] test_B4j_FIXED_chopBuyBulkSellLosesFees() (gas: 383888)
+[PASS] test_B4j_FIXED_segmentationTelescopesExactly() (gas: 225825)
+[PASS] test_B4j_multiOscillationRoundTrip(uint64) (runs: 256, μ: 233986, ~: 221018)
+Suite result: ok. 16 passed; 0 failed; 0 skipped; finished in 32.50s (32.56s CPU time)
+
+Ran 8 tests for test/audit/AuditCurveMath.t.sol:AuditCurveMathTest
+[PASS] test_A1_NoOverMint_RandomMultiZone(uint256,uint256,uint256) (runs: 256, μ: 80352, ~: 58265)
+[PASS] test_A2_RoundTripLossy_RandomMultiZone(uint256,uint256,uint256) (runs: 256, μ: 73690, ~: 56814)
+[PASS] test_A3_SellNeverOverPays(uint256,uint256,uint256) (runs: 256, μ: 19019, ~: 18155)
+[PASS] test_A4_PriceContinuousAtBoundaries(uint256) (runs: 256, μ: 36851, ~: 36161)
+[PASS] test_A5_FlatRoundTripNoProfit(uint256,uint256,uint256) (runs: 256, μ: 5161, ~: 5177)
+[PASS] test_A6_FlatBuyNeverDilutesBacking(uint256,uint256,uint256) (runs: 256, μ: 1749, ~: 1778)
+[PASS] test_A7_FlatSellNeverDilutesBacking(uint256,uint256,uint256) (runs: 256, μ: 2013, ~: 2109)
+[PASS] test_A8_GenesisBuyDeterministic() (gas: 73596)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 34.08s (34.36s CPU time)
+
+Ran 14 tests for test/FableBreakAttempts.t.sol:FableBreakAttempts
+[PASS] testFuzz_A_EveryoneCanFullyExitAfterChaos(uint256) (runs: 49, μ: 26392755, ~: 24765806)
+[PASS] testFuzz_B2_DeepSellBelowBootNeverBricks(uint256) (runs: 257, μ: 59067611, ~: 60579048)
+[PASS] testFuzz_B3_WithdrawAtFlatFromEveryDecayPhase(uint8) (runs: 257, μ: 17520233, ~: 17520314)
+[PASS] test_B1_DetonateWithPendingReservationThenRecover() (gas: 15561777)
+[PASS] test_B4_LadderClaimsSumToPotAcrossEvictions() (gas: 22837108)
+[PASS] test_B5_CapacityEdgeFailsClosedButExitsWork() (gas: 47047091)
+[PASS] test_B6_ClockBoundaryIsExact() (gas: 17619811)
+[PASS] test_B7_EmptySuccessorIsRecoverableByAnyone() (gas: 17596567)
+[PASS] test_B8_VaultRateMoveIsInvisibleToSettlement() (gas: 30868835)
+[PASS] test_T1_DoubleClaimsYieldNothing() (gas: 2544785)
+[PASS] test_T2_PrivilegedEntryPointsRejectStrangers() (gas: 110241)
+[PASS] test_T3_FlatSellAndRedeemAgree() (gas: 18271073)
+[PASS] test_T4_SpoofedTraderOnlyCreditsTheVictim() (gas: 2308764)
+[PASS] test_T5_LateGenesisClaimAfterRebirth() (gas: 17219057)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 35.76s (73.94s CPU time)
+
+Ran 97 test suites in 35.76s (377.41s CPU time): 788 tests passed, 0 failed, 0 skipped (788 total tests)
+........
+----------------------------------------------------------------------
+Ran 8 tests in 0.000s
+
+OK
+Updated existing trait in expanded version only: hats/HEADBAND
+Updated existing trait in expanded version only: hats/HOODIE
+Updated existing trait in expanded version only: eyewear/SHADES
+Updated existing trait in expanded version only: eyewear/GLASSES
+Updated existing trait in expanded version only: eyewear/MOGGED
+Updated existing trait in expanded version only: eyewear/HEARTGLASSES
+Updated existing trait in expanded version only: eyewear/CYBERSHADES
+Updated existing trait in expanded version only: eyewear/COOLSHADES
+Expanded art: 191664000 combinations, 11731 storage bytes; legacy artifacts preserved; export sha256 639463739fb34575b3998d098e3274bdf454b0e465c7a8eb3f36227bdfae328d
+Expanded and legacy client renderer fixtures verified
+✓ no-governance gate: clean (proposeCarpetBomb|voteCarpetBomb|castWeightOn|QUORUM_BIPS all dead)
+CurveHook: runtime 20379, initcode 21958
+HookDeployer: runtime 2183, initcode 25585
+HookInitCode: runtime 876, initcode 23275
+PSPFactory: runtime 19795, initcode 26845
+SineV3Math: runtime 14182, initcode 14897
+Excluded prototype VectorPepeDescriptor: 181095 bytes; NOT DEPLOYABLE, not used by DeployPSP
+Size gate: 50 production artifacts passed (constructor arguments require deployment checks).
+SineV3Data0: returned data runtime 21993 bytes
+SineV3Data1: returned data runtime 22001 bytes
+SineV3Data2: returned data runtime 22001 bytes
+SineV3Data3: returned data runtime 18705 bytes
+Independent sine vectors match.
+primitive anchors: 512/4937
+primitive anchors: 1024/4937
+primitive anchors: 1536/4937
+primitive anchors: 2048/4937
+primitive anchors: 2560/4937
+primitive anchors: 3072/4937
+primitive anchors: 3584/4937
+primitive anchors: 4096/4937
+primitive anchors: 4608/4937
+primitive anchors: 4938, split-cell relative error 4.784e-42
+sine v3 generated files match.
+Monotone price: coefficients ordered, analytic error bounds pass, 117 independent fixtures match.
+150 independent small-reserve fixtures; worst Simpson split difference 6.0845E-35
+{
+  "cells": 4937,
+  "samples_per_cell": 81,
+  "worst_relative_density": "9.84065191262670088674988671605313171513772886071580572588700E-11",
+  "worst_at": [
+    715,
+    "1",
+    "0.644443438595304509894186213126855276922259045059395462297075681280578"
+  ],
+  "minimum_coefficient_ratio": "0.5216544741287248979320209680792219840685340262022396490747450690424454",
+  "largest_absolute_signed_sum": "47044541898427000183743479466335468607004523896101926460777",
+  "largest_cell_span_f36": "989195820481800499700747478139240409377270881909191570.7799871299132866"
+}
+ABI gate: 172 functions/events match Foundry artifacts; PoolKey encoding exact.
+TAP version 13
+# Subtest: deployed getter bytes preserve deposit amount and genesis claim availability
+ok 1 - deployed getter bytes preserve deposit amount and genesis claim availability
+  ---
+  duration_ms: 7.93775
+  type: 'test'
+  ...
+# Subtest: curve config getter returns price and packed timings as two outputs
+ok 2 - curve config getter returns price and packed timings as two outputs
+  ---
+  duration_ms: 7.747792
+  type: 'test'
+  ...
+# Subtest: unrepresentable chart labels remain unavailable instead of throwing
+ok 3 - unrepresentable chart labels remain unavailable instead of throwing
+  ---
+  duration_ms: 0.719125
+  type: 'test'
+  ...
+# Subtest: oversized swaps decode across the hook, routers, and nested V4 errors
+ok 4 - oversized swaps decode across the hook, routers, and nested V4 errors
+  ---
+  duration_ms: 8.585375
+  type: 'test'
+  ...
+# Subtest: capacity and curve errors give useful feedback without changing unknown errors
+ok 5 - capacity and curve errors give useful feedback without changing unknown errors
+  ---
+  duration_ms: 1.213875
+  type: 'test'
+  ...
+# Subtest: v3 helper and round errors remain readable through V4 wrappers
+ok 6 - v3 helper and round errors remain readable through V4 wrappers
+  ---
+  duration_ms: 2.922458
+  type: 'test'
+  ...
+# Subtest: monotone-core errors decode from bare selectors and wrapped data
+ok 7 - monotone-core errors decode from bare selectors and wrapped data
+  ---
+  duration_ms: 7.297625
+  type: 'test'
+  ...
+# Subtest: capacity simulation failure never submits and shows a readable toast
+ok 8 - capacity simulation failure never submits and shows a readable toast
+  ---
+  duration_ms: 1.15
+  type: 'test'
+  ...
+# Subtest: atomic wallet failure shows a readable error without fabricating a hash
+ok 9 - atomic wallet failure shows a readable error without fabricating a hash
+  ---
+  duration_ms: 0.666166
+  type: 'test'
+  ...
+# Subtest: v3 manifest reads the versioned curve, pins its helper and checks materialization
+ok 10 - v3 manifest reads the versioned curve, pins its helper and checks materialization
+  ---
+  duration_ms: 4.705791
+  type: 'test'
+  ...
+# Subtest: unlaunched v3 manifest accepts the fixed 0.005 floor with no materialized curve
+ok 11 - unlaunched v3 manifest accepts the fixed 0.005 floor with no materialized curve
+  ---
+  duration_ms: 0.346709
+  type: 'test'
+  ...
+# Subtest: v3 manifest rejects stale minima, helper substitution and invalid materialized values
+ok 12 - v3 manifest rejects stale minima, helper substitution and invalid materialized values
+  ---
+  duration_ms: 4.399125
+  type: 'test'
+  ...
+# Subtest: legacy manifest keeps the original parameter tuple and static minimum
+ok 13 - legacy manifest keeps the original parameter tuple and static minimum
+  ---
+  duration_ms: 0.415542
+  type: 'test'
+  ...
+# Subtest: unknown versions and failed version reads never fall back to legacy curve decoding
+ok 14 - unknown versions and failed version reads never fall back to legacy curve decoding
+  ---
+  duration_ms: 0.970083
+  type: 'test'
+  ...
+# Subtest: registry helper discovery requires the current getter and rejects failed or invalid reads
+ok 15 - registry helper discovery requires the current getter and rejects failed or invalid reads
+  ---
+  duration_ms: 0.420041
+  type: 'test'
+  ...
+# Subtest: legacy deployer artifacts omit the helper without an RPC probe
+ok 16 - legacy deployer artifacts omit the helper without an RPC probe
+  ---
+  duration_ms: 0.930208
+  type: 'test'
+  ...
+# Subtest: registry helper executable code must match without immutable exclusions
+ok 17 - registry helper executable code must match without immutable exclusions
+  ---
+  duration_ms: 0.650625
+  type: 'test'
+  ...
+# Subtest: dirty-source bypass is limited to an explicitly labeled local Base Sepolia Anvil rehearsal
+ok 18 - dirty-source bypass is limited to an explicitly labeled local Base Sepolia Anvil rehearsal
+  ---
+  duration_ms: 3.212792
+  type: 'test'
+  ...
+# Subtest: runtime matching allows constructor immutables while rejecting changed executable code and bad ranges
+ok 19 - runtime matching allows constructor immutables while rejecting changed executable code and bad ranges
+  ---
+  duration_ms: 0.823541
+  type: 'test'
+  ...
+# Subtest: factory history starts at a successful canonical CREATE receipt for that factory
+ok 20 - factory history starts at a successful canonical CREATE receipt for that factory
+  ---
+  duration_ms: 0.3645
+  type: 'test'
+  ...
+# Subtest: timing inspection pins detonation and wallet cap to their separate 64-bit fields
+ok 21 - timing inspection pins detonation and wallet cap to their separate 64-bit fields
+  ---
+  duration_ms: 0.220084
+  type: 'test'
+  ...
+# Subtest: uncapped version two defaults and short playtest overrides are independently verified
+ok 22 - uncapped version two defaults and short playtest overrides are independently verified
+  ---
+  duration_ms: 0.150667
+  type: 'test'
+  ...
+# Subtest: frontend export uses public RPCs and confirmed creation block, leaving naming disabled for its separate release
+ok 23 - frontend export uses public RPCs and confirmed creation block, leaving naming disabled for its separate release
+  ---
+  duration_ms: 0.789459
+  type: 'test'
+  ...
+# Subtest: rehearsal frontend reads stay local and cannot fall back to the real testnet
+ok 24 - rehearsal frontend reads stay local and cannot fall back to the real testnet
+  ---
+  duration_ms: 0.278417
+  type: 'test'
+  ...
+# Subtest: sine data authentication checks the full STOP-prefixed runtime and exact length
+ok 25 - sine data authentication checks the full STOP-prefixed runtime and exact length
+  ---
+  duration_ms: 2.01625
+  type: 'test'
+  ...
+# Subtest: deployment runner defaults to a local rehearsal with the current uncapped testnet profile
+ok 26 - deployment runner defaults to a local rehearsal with the current uncapped testnet profile
+  ---
+  duration_ms: 0.797792
+  type: 'test'
+  ...
+# Subtest: live deployment needs an explicit keystore and sender and refuses private-key CLI input
+ok 27 - live deployment needs an explicit keystore and sender and refuses private-key CLI input
+  ---
+  duration_ms: 2.224834
+  type: 'test'
+  ...
+# Subtest: invalid timing and narrowed sine inputs fail before connecting or writing
+ok 28 - invalid timing and narrowed sine inputs fail before connecting or writing
+  ---
+  duration_ms: 0.992667
+  type: 'test'
+  ...
+# Subtest: v3 deployment accepts bounded launch prices and rejects every retired curve override
+ok 29 - v3 deployment accepts bounded launch prices and rejects every retired curve override
+  ---
+  duration_ms: 0.400709
+  type: 'test'
+  ...
+# Subtest: network preflight rejects wrong chain, missing pool manager and non-Anvil rehearsal endpoints
+ok 30 - network preflight rejects wrong chain, missing pool manager and non-Anvil rehearsal endpoints
+  ---
+  duration_ms: 0.91325
+  type: 'test'
+  ...
+# Subtest: addresses come from successful matching receipts and every submitted transaction is checked
+ok 31 - addresses come from successful matching receipts and every submitted transaction is checked
+  ---
+  duration_ms: 0.808042
+  type: 'test'
+  ...
+# Subtest: old-round exits are independent of current-round game constants
+ok 32 - old-round exits are independent of current-round game constants
+  ---
+  duration_ms: 1.5575
+  type: 'test'
+  ...
+# Subtest: exit bypass rejects altered targets, new exposure, unrelated approvals and ETH
+ok 33 - exit bypass rejects altered targets, new exposure, unrelated approvals and ETH
+  ---
+  duration_ms: 0.322209
+  type: 'test'
+  ...
+# Subtest: exit preflight reads only the selected registry entry even if the current round is unreadable
+ok 34 - exit preflight reads only the selected registry entry even if the current round is unreadable
+  ---
+  duration_ms: 0.956166
+  type: 'test'
+  ...
+# Subtest: paper and thumbnail match all specified cube-root milestones
+ok 35 - paper and thumbnail match all specified cube-root milestones
+  ---
+  duration_ms: 2.0015
+  type: 'test'
+  ...
+# Subtest: paper scaling changes additional backing by square root across example raises
+ok 36 - paper scaling changes additional backing by square root across example raises
+  ---
+  duration_ms: 0.89025
+  type: 'test'
+  ...
+# Subtest: the signed curve supports prelaunch prices and continues after wave ten
+ok 37 - the signed curve supports prelaunch prices and continues after wave ten
+  ---
+  duration_ms: 11.386209
+  type: 'test'
+  ...
+# Subtest: paper tickets round up in integer wei and retain the one-wei floor
+ok 38 - paper tickets round up in integer wei and retain the one-wei floor
+  ---
+  duration_ms: 0.68775
+  type: 'test'
+  ...
+# Subtest: paper clock rejects below the current spot and counts exact whole tickets
+ok 39 - paper clock rejects below the current spot and counts exact whole tickets
+  ---
+  duration_ms: 0.873875
+  type: 'test'
+  ...
+# Subtest: paper decimal entry and labels preserve sub-picounit ticket prices
+ok 40 - paper decimal entry and labels preserve sub-picounit ticket prices
+  ---
+  duration_ms: 1.075584
+  type: 'test'
+  ...
+# Subtest: rendered paper shows eleven wave markers and the current ticket threshold
+ok 41 - rendered paper shows eleven wave markers and the current ticket threshold
+  ---
+  duration_ms: 22.133833
+  type: 'test'
+  ...
+# Subtest: minimum ladder threshold, multiple seats, and 69-second increments
+ok 42 - minimum ladder threshold, multiple seats, and 69-second increments
+  ---
+  duration_ms: 0.694625
+  type: 'test'
+  ...
+# Subtest: split orders cannot manufacture seats or time from remainders
+ok 43 - split orders cannot manufacture seats or time from remainders
+  ---
+  duration_ms: 0.399667
+  type: 'test'
+  ...
+# Subtest: slippage preserves exact integer floor beyond JS number precision
+ok 44 - slippage preserves exact integer floor beyond JS number precision
+  ---
+  duration_ms: 0.225041
+  type: 'test'
+  ...
+# Subtest: legacy deployment rules cannot authorize new-interface actions
+ok 45 - legacy deployment rules cannot authorize new-interface actions
+  ---
+  duration_ms: 0.246792
+  type: 'test'
+  ...
+# Subtest: linear tickets rise smoothly from the genesis pot and floor only whole tickets
+ok 46 - linear tickets rise smoothly from the genesis pot and floor only whole tickets
+  ---
+  duration_ms: 0.435
+  type: 'test'
+  ...
+# Subtest: v3 tickets cover the whole pot with exact ceiling division through uint256 max
+ok 47 - v3 tickets cover the whole pot with exact ceiling division through uint256 max
+  ---
+  duration_ms: 0.440458
+  type: 'test'
+  ...
+# Subtest: v3 minimum is one exact current ticket and missing rules fail closed
+ok 48 - v3 minimum is one exact current ticket and missing rules fail closed
+  ---
+  duration_ms: 0.302333
+  type: 'test'
+  ...
+# Subtest: ticket guards reject missing and stale quotes without losing bigint precision
+ok 49 - ticket guards reject missing and stale quotes without losing bigint precision
+  ---
+  duration_ms: 0.207
+  type: 'test'
+  ...
+# Subtest: graveyard winner labels cover all ten ladder ranks and group sizes
+ok 50 - graveyard winner labels cover all ten ladder ranks and group sizes
+  ---
+  duration_ms: 0.611042
+  type: 'test'
+  ...
+# Subtest: history starts at deployment, advances in bounded pages and replaces reorg overlap
+ok 51 - history starts at deployment, advances in bounded pages and replaces reorg overlap
+  ---
+  duration_ms: 2.589875
+  type: 'test'
+  ...
+# Subtest: failed history pages do not skip events on retry
+ok 52 - failed history pages do not skip events on retry
+  ---
+  duration_ms: 0.652
+  type: 'test'
+  ...
+# Subtest: losing eligibility cannot silently turn a reviewed free registration into a paid transaction
+ok 53 - losing eligibility cannot silently turn a reviewed free registration into a paid transaction
+  ---
+  duration_ms: 1.321458
+  type: 'test'
+  ...
+# Subtest: name plans persist exactly and reject malformed local-storage data
+ok 54 - name plans persist exactly and reject malformed local-storage data
+  ---
+  duration_ms: 1.550917
+  type: 'test'
+  ...
+# Subtest: label validation covers the contract boundaries
+ok 55 - label validation covers the contract boundaries
+  ---
+  duration_ms: 0.354125
+  type: 'test'
+  ...
+# Subtest: commitments bind the name, secret, wallet, network, parent and registrar
+ok 56 - commitments bind the name, secret, wallet, network, parent and registrar
+  ---
+  duration_ms: 5.561875
+  type: 'test'
+  ...
+# Subtest: registration preflight pins custody, rules, proof and fee to one block
+ok 57 - registration preflight pins custody, rules, proof and fee to one block
+  ---
+  duration_ms: 0.929708
+  type: 'test'
+  ...
+# Subtest: wrong network, ABI rules, parent, custody, epoch and source block registration
+ok 58 - wrong network, ABI rules, parent, custody, epoch and source block registration
+  ---
+  duration_ms: 1.950792
+  type: 'test'
+  ...
+# Subtest: unavailable eligibility never quietly charges a funded wallet
+ok 59 - unavailable eligibility never quietly charges a funded wallet
+  ---
+  duration_ms: 0.464041
+  type: 'test'
+  ...
+# Subtest: eligibility enumeration reaches older rounds and NFTs after the first batch
+ok 60 - eligibility enumeration reaches older rounds and NFTs after the first batch
+  ---
+  duration_ms: 8.176625
+  type: 'test'
+  ...
+# Subtest: cancelled eligibility scans stop before further round reads
+ok 61 - cancelled eligibility scans stop before further round reads
+  ---
+  duration_ms: 0.528708
+  type: 'test'
+  ...
+# Subtest: hybrid quote keeps PSP reads on source and WNS reads on destination
+ok 62 - hybrid quote keeps PSP reads on source and WNS reads on destination
+  ---
+  duration_ms: 2.672083
+  type: 'test'
+  ...
+# Subtest: empty wallets use exact paid path while source failures, wrong chain or revoked signer block free quoting
+ok 63 - empty wallets use exact paid path while source failures, wrong chain or revoked signer block free quoting
+  ---
+  duration_ms: 1.333333
+  type: 'test'
+  ...
+# Subtest: permit transport accepts only a bounded, complete contract proof
+ok 64 - permit transport accepts only a bounded, complete contract proof
+  ---
+  duration_ms: 20.381
+  type: 'test'
+  ...
+# Subtest: verifier outages and unsettled ownership produce errors rather than a paid permit
+ok 65 - verifier outages and unsettled ownership produce errors rather than a paid permit
+  ---
+  duration_ms: 1.101333
+  type: 'test'
+  ...
+# Subtest: safe transfer input rejects malformed, zero, self and staking-contract recipients
+ok 66 - safe transfer input rejects malformed, zero, self and staking-contract recipients
+  ---
+  duration_ms: 4.168042
+  type: 'test'
+  ...
+# Subtest: upgraded reinvestment grants only missing individual approvals
+ok 67 - upgraded reinvestment grants only missing individual approvals
+  ---
+  duration_ms: 0.978875
+  type: 'test'
+  ...
+# Subtest: existing collection approval works and legacy fallback stays explicit
+ok 68 - existing collection approval works and legacy fallback stays explicit
+  ---
+  duration_ms: 0.205375
+  type: 'test'
+  ...
+# Subtest: unknown capability or invalid batches cause zero approval writes
+ok 69 - unknown capability or invalid batches cause zero approval writes
+  ---
+  duration_ms: 0.582458
+  type: 'test'
+  ...
+# Subtest: transferred NFT stops approval for the entire batch before a wallet prompt
+ok 70 - transferred NFT stops approval for the entire batch before a wallet prompt
+  ---
+  duration_ms: 0.227958
+  type: 'test'
+  ...
+# Subtest: wallet or ownership changes during the first approval stop subsequent signatures
+ok 71 - wallet or ownership changes during the first approval stop subsequent signatures
+  ---
+  duration_ms: 0.356208
+  type: 'test'
+  ...
+# Subtest: rejected, reverted and unconfirmed approvals never proceed
+ok 72 - rejected, reverted and unconfirmed approvals never proceed
+  ---
+  duration_ms: 0.379458
+  type: 'test'
+  ...
+# Subtest: revocation of an earlier approval is rechecked after later approvals
+ok 73 - revocation of an earlier approval is rechecked after later approvals
+  ---
+  duration_ms: 0.232583
+  type: 'test'
+  ...
+# Subtest: round-specific NFT management admits only safe transfers and revocations
+ok 74 - round-specific NFT management admits only safe transfers and revocations
+  ---
+  duration_ms: 0.580417
+  type: 'test'
+  ...
+# Subtest: bulk reinvestment requests one collection approval, then none on repeat
+ok 75 - bulk reinvestment requests one collection approval, then none on repeat
+  ---
+  duration_ms: 0.503917
+  type: 'test'
+  ...
+# Subtest: bulk approval still aborts after ownership or session changes
+ok 76 - bulk approval still aborts after ownership or session changes
+  ---
+  duration_ms: 0.305167
+  type: 'test'
+  ...
+# Subtest: a successor clears rebirth and settlement even while the old-round reader and local receipt persist
+ok 77 - a successor clears rebirth and settlement even while the old-round reader and local receipt persist
+  ---
+  duration_ms: 2.009917
+  type: 'test'
+  ...
+# Subtest: settlement must belong to this round and hook, regardless of polling order
+ok 78 - settlement must belong to this round and hook, regardless of polling order
+  ---
+  duration_ms: 0.179667
+  type: 'test'
+  ...
+# Subtest: claim amounts stay scoped to the settled round and its hook
+ok 79 - claim amounts stay scoped to the settled round and its hook
+  ---
+  duration_ms: 0.087542
+  type: 'test'
+  ...
+# Subtest: an RPC outage hides spawning until current-round reads recover
+ok 80 - an RPC outage hides spawning until current-round reads recover
+  ---
+  duration_ms: 0.06875
+  type: 'test'
+  ...
+# Subtest: loading, zero and unknown round state never offer a spawn
+ok 81 - loading, zero and unknown round state never offer a spawn
+  ---
+  duration_ms: 0.420334
+  type: 'test'
+  ...
+# Subtest: claims and reinvestment move pending to paid without resetting earned fees
+ok 82 - claims and reinvestment move pending to paid without resetting earned fees
+  ---
+  duration_ms: 1.241333
+  type: 'test'
+  ...
+# Subtest: missing reads remain unknown instead of presenting partial fee totals
+ok 83 - missing reads remain unknown instead of presenting partial fee totals
+  ---
+  duration_ms: 0.365083
+  type: 'test'
+  ...
+# Subtest: explains nested insufficient-allowance revert signatures
+ok 84 - explains nested insufficient-allowance revert signatures
+  ---
+  duration_ms: 2.412875
+  type: 'test'
+  ...
+# Subtest: explains decoded insufficient allowance and preserves unrelated errors
+ok 85 - explains decoded insufficient allowance and preserves unrelated errors
+  ---
+  duration_ms: 4.718416
+  type: 'test'
+  ...
+# Subtest: 499.9999999 stays visibly below 500 and MAX preserves its exact dust remainder
+ok 86 - 499.9999999 stays visibly below 500 and MAX preserves its exact dust remainder
+  ---
+  duration_ms: 1.668083
+  type: 'test'
+  ...
+# Subtest: the live round remainder and one-wei cap boundary never become rounded 500/500
+ok 87 - the live round remainder and one-wei cap boundary never become rounded 500/500
+  ---
+  duration_ms: 0.182291
+  type: 'test'
+  ...
+# Subtest: all positive sub-buy-minimum deposits qualify, beyond just a final-cap-fill exception
+ok 88 - all positive sub-buy-minimum deposits qualify, beyond just a final-cap-fill exception
+  ---
+  duration_ms: 0.17075
+  type: 'test'
+  ...
+# Subtest: legacy and unreadable deployments retain their actual old minimum
+ok 89 - legacy and unreadable deployments retain their actual old minimum
+  ---
+  duration_ms: 0.092125
+  type: 'test'
+  ...
+# Subtest: MAX respects wallet headroom, global headroom and balance, clamping already-filled caps
+ok 90 - MAX respects wallet headroom, global headroom and balance, clamping already-filled caps
+  ---
+  duration_ms: 0.199375
+  type: 'test'
+  ...
+# Subtest: wei-scale MAX remains exact across a deterministic range of wallet, balance and global limits
+ok 91 - wei-scale MAX remains exact across a deterministic range of wallet, balance and global limits
+  ---
+  duration_ms: 1.376958
+  type: 'test'
+  ...
+# Subtest: version two zero-cap IBCOs take exact wallet balance, including tiny and very large raises
+ok 92 - version two zero-cap IBCOs take exact wallet balance, including tiny and very large raises
+  ---
+  duration_ms: 0.113708
+  type: 'test'
+  ...
+# Subtest: zero means unlimited only with the exact on-chain version capability
+ok 93 - zero means unlimited only with the exact on-chain version capability
+  ---
+  duration_ms: 0.08175
+  type: 'test'
+  ...
+# Subtest: legacy selector absence hides the new rewards path, while connection errors remain errors
+ok 94 - legacy selector absence hides the new rewards path, while connection errors remain errors
+  ---
+  duration_ms: 1.089458
+  type: 'test'
+  ...
+# Subtest: claims verify the selected historic registry without consulting the latest round or NFT balance
+ok 95 - claims verify the selected historic registry without consulting the latest round or NFT balance
+  ---
+  duration_ms: 0.617666
+  type: 'test'
+  ...
+# Subtest: claim exception rejects wrong round targets, unrelated actions, recipients and native ETH
+ok 96 - claim exception rejects wrong round targets, unrelated actions, recipients and native ETH
+  ---
+  duration_ms: 0.514458
+  type: 'test'
+  ...
+# Subtest: claim preflight fails closed on legacy, future-version and unreadable registries
+ok 97 - claim preflight fails closed on legacy, future-version and unreadable registries
+  ---
+  duration_ms: 0.194667
+  type: 'test'
+  ...
+# Subtest: referral claim calldata contains no arbitrary payout recipient
+ok 98 - referral claim calldata contains no arbitrary payout recipient
+  ---
+  duration_ms: 0.603333
+  type: 'test'
+  ...
+# Subtest: 20 distinct quips leave room for the testnet label and X-shortened referral URL
+ok 99 - 20 distinct quips leave room for the testnet label and X-shortened referral URL
+  ---
+  duration_ms: 1.308167
+  type: 'test'
+  ...
+# Subtest: reroll can reach either end of the list while skipping the current quip
+ok 100 - reroll can reach either end of the list while skipping the current quip
+  ---
+  duration_ms: 0.644209
+  type: 'test'
+  ...
+# Subtest: X intent preserves the complete referral scope and full uint256 ID
+ok 101 - X intent preserves the complete referral scope and full uint256 ID
+  ---
+  duration_ms: 1.95675
+  type: 'test'
+  ...
+# Subtest: practice-network shares identify the playtest while mainnet shares keep the brand
+ok 102 - practice-network shares identify the playtest while mainnet shares keep the brand
+  ---
+  duration_ms: 0.158708
+  type: 'test'
+  ...
+# Subtest: shared art uses selected NFT on-chain DNA including zero, rather than deriving it from its ID
+ok 103 - shared art uses selected NFT on-chain DNA including zero, rather than deriving it from its ID
+  ---
+  duration_ms: 0.511625
+  type: 'test'
+  ...
+# Subtest: failed DNA reads stay retryable and never substitute another Pepe
+ok 104 - failed DNA reads stay retryable and never substitute another Pepe
+  ---
+  duration_ms: 0.598209
+  type: 'test'
+  ...
+# Subtest: generated link round-trips with chain and round registry scope
+ok 105 - generated link round-trips with chain and round registry scope
+  ---
+  duration_ms: 5.368042
+  type: 'test'
+  ...
+# Subtest: old rounds and other chains cannot reuse an NFT id as a referral
+ok 106 - old rounds and other chains cannot reuse an NFT id as a referral
+  ---
+  duration_ms: 0.740625
+  type: 'test'
+  ...
+# Subtest: legacy id-only links and unscoped persisted values are rejected
+ok 107 - legacy id-only links and unscoped persisted values are rejected
+  ---
+  duration_ms: 0.271
+  type: 'test'
+  ...
+# Subtest: a scoped hint survives reload without becoming on-chain attribution
+ok 108 - a scoped hint survives reload without becoming on-chain attribution
+  ---
+  duration_ms: 0.137459
+  type: 'test'
+  ...
+# Subtest: malformed and overflowing parameters never reach a transaction
+ok 109 - malformed and overflowing parameters never reach a transaction
+  ---
+  duration_ms: 0.543541
+  type: 'test'
+  ...
+# Subtest: uint256 maximum is accepted and case-normalized registry keys match
+ok 110 - uint256 maximum is accepted and case-normalized registry keys match
+  ---
+  duration_ms: 0.225125
+  type: 'test'
+  ...
+# Subtest: recorded attribution always wins over an incoming link
+ok 111 - recorded attribution always wins over an incoming link
+  ---
+  duration_ms: 0.163083
+  type: 'test'
+  ...
+# Subtest: an unresolved wallet referral never silently drops the incoming hint
+ok 112 - an unresolved wallet referral never silently drops the incoming hint
+  ---
+  duration_ms: 1.193792
+  type: 'test'
+  ...
+# Subtest: purchase and approval preflight rejects legacy or stale round targets
+ok 113 - purchase and approval preflight rejects legacy or stale round targets
+  ---
+  duration_ms: 0.591417
+  type: 'test'
+  ...
+# Subtest: buy calldata contains the referral alongside price protection; no trader override exists
+ok 114 - buy calldata contains the referral alongside price protection; no trader override exists
+  ---
+  duration_ms: 16.857
+  type: 'test'
+  ...
+# Subtest: reinvestment requires both current-round wiring and corrected buyer attribution
+ok 115 - reinvestment requires both current-round wiring and corrected buyer attribution
+  ---
+  duration_ms: 0.85575
+  type: 'test'
+  ...
+# Subtest: failed rule reads retry without caching an incompatible deployment
+ok 116 - failed rule reads retry without caching an incompatible deployment
+  ---
+  duration_ms: 1.512208
+  type: 'test'
+  ...
+# Subtest: a real legacy-rule mismatch remains incompatible
+ok 117 - a real legacy-rule mismatch remains incompatible
+  ---
+  duration_ms: 0.189667
+  type: 'test'
+  ...
+# Subtest: RPC availability errors stay distinct from contract and game-rule failures
+ok 118 - RPC availability errors stay distinct from contract and game-rule failures
+  ---
+  duration_ms: 1.679667
+  type: 'test'
+  ...
+# Subtest: a full final ladder awards the canonical shares in newest-seat order
+ok 119 - a full final ladder awards the canonical shares in newest-seat order
+  ---
+  duration_ms: 1.709667
+  type: 'test'
+  ...
+# Subtest: wallet totals sum individually floored prizes, including case-insensitive repeated seats
+ok 120 - wallet totals sum individually floored prizes, including case-insensitive repeated seats
+  ---
+  duration_ms: 0.298917
+  type: 'test'
+  ...
+# Subtest: a single seat wins the whole pot and a zero-seat round has an empty winners list
+ok 121 - a single seat wins the whole pot and a zero-seat round has an empty winners list
+  ---
+  duration_ms: 0.115625
+  type: 'test'
+  ...
+# Subtest: archive reads only the final ten seats and never subtracts already claimed winnings
+ok 122 - archive reads only the final ten seats and never subtracts already claimed winnings
+  ---
+  duration_ms: 3.584083
+  type: 'test'
+  ...
+# Subtest: small ladders read only occupied seats and renormalize; an empty ladder needs no board calls
+ok 123 - small ladders read only occupied seats and renormalize; an empty ladder needs no board calls
+  ---
+  duration_ms: 0.308708
+  type: 'test'
+  ...
+# Subtest: a failed or missing seat rejects the list instead of inflating the other winners’ shares
+ok 124 - a failed or missing seat rejects the list instead of inflating the other winners’ shares
+  ---
+  duration_ms: 0.52525
+  type: 'test'
+  ...
+# Subtest: live rounds and invalid winner addresses cannot appear as finalized results
+ok 125 - live rounds and invalid winner addresses cannot appear as finalized results
+  ---
+  duration_ms: 0.329625
+  type: 'test'
+  ...
+# Subtest: different dead rounds read their own hook and preserve their own winners
+ok 126 - different dead rounds read their own hook and preserve their own winners
+  ---
+  duration_ms: 0.170167
+  type: 'test'
+  ...
+# Subtest: concurrent wallet reads batch and deduplicate without mixing reversed responses
+ok 127 - concurrent wallet reads batch and deduplicate without mixing reversed responses
+  ---
+  duration_ms: 58.734542
+  type: 'test'
+  ...
+# Subtest: one reverted read does not replace another wallet balance or silently return zero
+ok 128 - one reverted read does not replace another wallet balance or silently return zero
+  ---
+  duration_ms: 23.89975
+  type: 'test'
+  ...
+# Subtest: a stalled RPC releases the read for the polling hook to retry
+ok 129 - a stalled RPC releases the read for the polling hook to retry
+  ---
+  duration_ms: 55.040208
+  type: 'test'
+  ...
+# Subtest: chain-aware view reads use one Multicall3 eth_call and keep each result attached to its request
+ok 130 - chain-aware view reads use one Multicall3 eth_call and keep each result attached to its request
+  ---
+  duration_ms: 352.549875
+  type: 'test'
+  ...
+# Subtest: a rate-limited provider falls back for reads without dropping their arguments
+ok 131 - a rate-limited provider falls back for reads without dropping their arguments
+  ---
+  duration_ms: 45.587541
+  type: 'test'
+  ...
+# Subtest: quote, rate and mode are read in one explicit aggregate at the same block
+ok 132 - quote, rate and mode are read in one explicit aggregate at the same block
+  ---
+  duration_ms: 46.886041
+  type: 'test'
+  ...
+# Subtest: a missing fee read rejects the entire quote snapshot
+ok 133 - a missing fee read rejects the entire quote snapshot
+  ---
+  duration_ms: 47.154708
+  type: 'test'
+  ...
+# Subtest: the active chart renders finite, increasing prices and correctly scaled PSP supply without point RPCs
+ok 134 - the active chart renders finite, increasing prices and correctly scaled PSP supply without point RPCs
+  ---
+  duration_ms: 3.992666
+  type: 'test'
+  ...
+# Subtest: unmaterialized chart coefficients cannot produce a misleading chart
+ok 135 - unmaterialized chart coefficients cannot produce a misleading chart
+  ---
+  duration_ms: 0.420708
+  type: 'test'
+  ...
+# Subtest: chart geometry grows past the old four-wave end and keeps headroom beyond 10k
+ok 136 - chart geometry grows past the old four-wave end and keeps headroom beyond 10k
+  ---
+  duration_ms: 10.004417
+  type: 'test'
+  ...
+# Subtest: expansion preserves the original curve and launch supply
+ok 137 - expansion preserves the original curve and launch supply
+  ---
+  duration_ms: 4.857375
+  type: 'test'
+  ...
+# Subtest: expanded logarithmic axes use bounded, ordered ticks inside the visible range
+ok 138 - expanded logarithmic axes use bounded, ordered ticks inside the visible range
+  ---
+  duration_ms: 0.898958
+  type: 'test'
+  ...
+# Subtest: ten-million reserve extrapolation is bounded without inventing capped prices
+ok 139 - ten-million reserve extrapolation is bounded without inventing capped prices
+  ---
+  duration_ms: 23.636917
+  type: 'test'
+  ...
+# Subtest: dimensionless v2 charts preserve legacy geometry and scale with the IBCO
+ok 140 - dimensionless v2 charts preserve legacy geometry and scale with the IBCO
+  ---
+  duration_ms: 3.612959
+  type: 'test'
+  ...
+# Subtest: scaled rounds use wavelength headroom instead of a fixed 1000 mixETH jump
+ok 141 - scaled rounds use wavelength headroom instead of a fixed 1000 mixETH jump
+  ---
+  duration_ms: 0.551333
+  type: 'test'
+  ...
+# Subtest: v3 chart covers real reserves from zero with ten correct postlaunch milestones
+ok 142 - v3 chart covers real reserves from zero with ten correct postlaunch milestones
+  ---
+  duration_ms: 5.080792
+  type: 'test'
+  ...
+# Subtest: v3 live chart stops at the current helper domain instead of quoting impossible states
+ok 143 - v3 live chart stops at the current helper domain instead of quoting impossible states
+  ---
+  duration_ms: 12.6565
+  type: 'test'
+  ...
+# Subtest: v3 expands through wave 64 while preserving detail around the launch
+ok 144 - v3 expands through wave 64 while preserving detail around the launch
+  ---
+  duration_ms: 3.519125
+  type: 'test'
+  ...
+# Subtest: v3 chart capacity matches the generated settlement data
+ok 145 - v3 chart capacity matches the generated settlement data
+  ---
+  duration_ms: 0.567083
+  type: 'test'
+  ...
+# Subtest: a prelaunch chart refreshes when the same hook launches, then caches its coefficients
+ok 146 - a prelaunch chart refreshes when the same hook launches, then caches its coefficients
+  ---
+  duration_ms: 11.918625
+  type: 'test'
+  ...
+# Subtest: failed coefficient reads retry rather than caching a permanent chart failure
+ok 147 - failed coefficient reads retry rather than caching a permanent chart failure
+  ---
+  duration_ms: 1.838333
+  type: 'test'
+  ...
+# Subtest: a successor hook gets an independent coefficient read
+ok 148 - a successor hook gets an independent coefficient read
+  ---
+  duration_ms: 3.085791
+  type: 'test'
+  ...
+# Subtest: new and explicit legacy sine versions resolve without interpretation guesses
+ok 149 - new and explicit legacy sine versions resolve without interpretation guesses
+  ---
+  duration_ms: 2.304
+  type: 'test'
+  ...
+# Subtest: only a missing legacy selector falls back, while transport failures retry
+ok 150 - only a missing legacy selector falls back, while transport failures retry
+  ---
+  duration_ms: 0.563
+  type: 'test'
+  ...
+# Subtest: top-up input preserves exact Max and single-wei amounts without rounding
+ok 151 - top-up input preserves exact Max and single-wei amounts without rounding
+  ---
+  duration_ms: 1.27225
+  type: 'test'
+  ...
+# Subtest: top-up approves only the requested amount and keeps the owner and NFT id
+ok 152 - top-up approves only the requested amount and keeps the owner and NFT id
+  ---
+  duration_ms: 0.861625
+  type: 'test'
+  ...
+# Subtest: existing PSP allowance skips a redundant approval
+ok 153 - existing PSP allowance skips a redundant approval
+  ---
+  duration_ms: 0.279958
+  type: 'test'
+  ...
+# Subtest: insufficient balance, transferred NFT, withdrawal and dead rounds never request approval
+ok 154 - insufficient balance, transferred NFT, withdrawal and dead rounds never request approval
+  ---
+  duration_ms: 0.660708
+  type: 'test'
+  ...
+# Subtest: approval rejection, revert or unknown confirmation cannot proceed to staking
+ok 155 - approval rejection, revert or unknown confirmation cannot proceed to staking
+  ---
+  duration_ms: 0.420334
+  type: 'test'
+  ...
+# Subtest: state changes during approval are rechecked before the second wallet transaction
+ok 156 - state changes during approval are rechecked before the second wallet transaction
+  ---
+  duration_ms: 0.347125
+  type: 'test'
+  ...
+# Subtest: wallet, chain or round change while checking or approving stops the top-up
+ok 157 - wallet, chain or round change while checking or approving stops the top-up
+  ---
+  duration_ms: 0.285542
+  type: 'test'
+  ...
+# Subtest: failed staking receipt propagates as a failure and never repeats the write
+ok 158 - failed staking receipt propagates as a failure and never repeats the write
+  ---
+  duration_ms: 0.135084
+  type: 'test'
+  ...
+# Subtest: round start lookup includes construction, handles timestamp gaps and rejects a lagging head
+ok 159 - round start lookup includes construction, handles timestamp gaps and rejects a lagging head
+  ---
+  duration_ms: 0.994375
+  type: 'test'
+  ...
+# Subtest: a late round loads from its own creation block, including the first trade
+ok 160 - a late round loads from its own creation block, including the first trade
+  ---
+  duration_ms: 1.007708
+  type: 'test'
+  ...
+# Subtest: recent trades appear before long backfill finishes and partial totals never read as zero
+ok 161 - recent trades appear before long backfill finishes and partial totals never read as zero
+  ---
+  duration_ms: 0.520375
+  type: 'test'
+  ...
+# Subtest: a later failed page retains progress and recent trades, then resumes without skipping totals
+ok 162 - a later failed page retains progress and recent trades, then resumes without skipping totals
+  ---
+  duration_ms: 0.368375
+  type: 'test'
+  ...
+# Subtest: failed refresh keeps known totals and recovers with the new trade
+ok 163 - failed refresh keeps known totals and recovers with the new trade
+  ---
+  duration_ms: 0.204917
+  type: 'test'
+  ...
+# Subtest: concurrent subscribers share a poll and different rounds retain separate histories
+ok 164 - concurrent subscribers share a poll and different rounds retain separate histories
+  ---
+  duration_ms: 0.203334
+  type: 'test'
+  ...
+# Subtest: summary handles numeric ordering, zero clock extension, fees, sells and duplicate pages
+ok 165 - summary handles numeric ordering, zero clock extension, fees, sells and duplicate pages
+  ---
+  duration_ms: 0.220625
+  type: 'test'
+  ...
+# Subtest: several buys in one transaction retain their individual clock extensions
+ok 166 - several buys in one transaction retain their individual clock extensions
+  ---
+  duration_ms: 0.096208
+  type: 'test'
+  ...
+# Subtest: a short reorg replaces changed trades and removes orphaned totals
+ok 167 - a short reorg replaces changed trades and removes orphaned totals
+  ---
+  duration_ms: 0.449542
+  type: 'test'
+  ...
+# Subtest: buy fees use gross mixETH input and preserve the quoted PSP output
+ok 168 - buy fees use gross mixETH input and preserve the quoted PSP output
+  ---
+  duration_ms: 1.848083
+  type: 'test'
+  ...
+# Subtest: sell fee estimates recover gross-based fees within one wei without reducing net output
+ok 169 - sell fee estimates recover gross-based fees within one wei without reducing net output
+  ---
+  duration_ms: 7.132167
+  type: 'test'
+  ...
+# Subtest: flat sells show zero fees regardless of the sliding-rate getter
+ok 170 - flat sells show zero fees regardless of the sliding-rate getter
+  ---
+  duration_ms: 0.225792
+  type: 'test'
+  ...
+# Subtest: invalid quotes, fee rates and inactive modes cannot produce a fee estimate
+ok 171 - invalid quotes, fee rates and inactive modes cannot produce a fee estimate
+  ---
+  duration_ms: 0.466
+  type: 'test'
+  ...
+# Subtest: manual dismissal suppresses later transaction updates
+ok 172 - manual dismissal suppresses later transaction updates
+  ---
+  duration_ms: 1.7265
+  type: 'test'
+  ...
+# Subtest: expired pending toast can return with final receipt, and refresh errors cannot undo success
+ok 173 - expired pending toast can return with final receipt, and refresh errors cannot undo success
+  ---
+  duration_ms: 0.664708
+  type: 'test'
+  ...
+# Subtest: dependent operations wait for successful mining and use replacement hash
+ok 174 - dependent operations wait for successful mining and use replacement hash
+  ---
+  duration_ms: 1.776584
+  type: 'test'
+  ...
+# Subtest: failed simulation never opens wallet
+ok 175 - failed simulation never opens wallet
+  ---
+  duration_ms: 1.155375
+  type: 'test'
+  ...
+# Subtest: submitted but reverted transaction is not success
+ok 176 - submitted but reverted transaction is not success
+  ---
+  duration_ms: 0.681291
+  type: 'test'
+  ...
+# Subtest: timeout remains unknown, never marks the operation successful
+ok 177 - timeout remains unknown, never marks the operation successful
+  ---
+  duration_ms: 0.249167
+  type: 'test'
+  ...
+# Subtest: successful cancellation or replacement is not a successful game action
+ok 178 - successful cancellation or replacement is not a successful game action
+  ---
+  duration_ms: 0.41475
+  type: 'test'
+  ...
+# Subtest: toast lifecycle follows confirmation and replacement hash
+ok 179 - toast lifecycle follows confirmation and replacement hash
+  ---
+  duration_ms: 0.205708
+  type: 'test'
+  ...
+# Subtest: toast distinguishes unknown confirmation from reverted receipt
+ok 180 - toast distinguishes unknown confirmation from reverted receipt
+  ---
+  duration_ms: 0.386791
+  type: 'test'
+  ...
+# Subtest: wallet rejection has no invented explorer hash
+ok 181 - wallet rejection has no invented explorer hash
+  ---
+  duration_ms: 0.207875
+  type: 'test'
+  ...
+# Subtest: atomic detection accepts ready and upgradeable accounts, fails closed otherwise
+ok 182 - atomic detection accepts ready and upgradeable accounts, fails closed otherwise
+  ---
+  duration_ms: 0.774625
+  type: 'test'
+  ...
+# Subtest: success requires one successful atomic receipt
+ok 183 - success requires one successful atomic receipt
+  ---
+  duration_ms: 0.307708
+  type: 'test'
+  ...
+# Subtest: deferred reinvest approval checks ownership without requiring queued approval to already exist
+ok 184 - deferred reinvest approval checks ownership without requiring queued approval to already exist
+  ---
+  duration_ms: 0.849958
+  type: 'test'
+  ...
+# Subtest: top-up atomic path executes once and never retries rejected batch
+ok 185 - top-up atomic path executes once and never retries rejected batch
+  ---
+  duration_ms: 0.339042
+  type: 'test'
+  ...
+# Subtest: batch confirms chain receipt before success and uses transaction hash, never bundle id
+ok 186 - batch confirms chain receipt before success and uses transaction hash, never bundle id
+  ---
+  duration_ms: 0.311458
+  type: 'test'
+  ...
+# Subtest: rejection, timeout, and revert never retry or announce success
+ok 187 - rejection, timeout, and revert never retry or announce success
+  ---
+  duration_ms: 1.019666
+  type: 'test'
+  ...
+# Subtest: address DNA is stable across casing/reloads and differs for different wallets
+ok 188 - address DNA is stable across casing/reloads and differs for different wallets
+  ---
+  duration_ms: 0.913
+  type: 'test'
+  ...
+# Subtest: legacy address placeholders retain their full-width and padded-address golden vectors
+ok 189 - legacy address placeholders retain their full-width and padded-address golden vectors
+  ---
+  duration_ms: 0.227167
+  type: 'test'
+  ...
+# Subtest: an unminted wallet uses the collision-aware preview, then its immutable minted DNA
+ok 190 - an unminted wallet uses the collision-aware preview, then its immutable minted DNA
+  ---
+  duration_ms: 0.762041
+  type: 'test'
+  ...
+# Subtest: the same unminted wallet uses each round’s own seeded preview
+ok 191 - the same unminted wallet uses each round’s own seeded preview
+  ---
+  duration_ms: 0.19475
+  type: 'test'
+  ...
+# Subtest: large address-derived NFT IDs fit labels without changing bigint identity
+ok 192 - large address-derived NFT IDs fit labels without changing bigint identity
+  ---
+  duration_ms: 0.167
+  type: 'test'
+  ...
+# Subtest: primary NFT art replaces fallback, including zero-DNA NFTs, without re-fetching cached art
+ok 193 - primary NFT art replaces fallback, including zero-DNA NFTs, without re-fetching cached art
+  ---
+  duration_ms: 0.277542
+  type: 'test'
+  ...
+# Subtest: no-NFT state is not cached: minting and transfers change the next read
+ok 194 - no-NFT state is not cached: minting and transfers change the next read
+  ---
+  duration_ms: 0.457875
+  type: 'test'
+  ...
+# Subtest: failed renderer falls back to the owned DNA and retries successfully
+ok 195 - failed renderer falls back to the owned DNA and retries successfully
+  ---
+  duration_ms: 0.229291
+  type: 'test'
+  ...
+# Subtest: art cache separates stakers and renderer changes
+ok 196 - art cache separates stakers and renderer changes
+  ---
+  duration_ms: 0.4485
+  type: 'test'
+  ...
+# Subtest: missing staker needs no RPC and ownership lookup failures remain retryable
+ok 197 - missing staker needs no RPC and ownership lookup failures remain retryable
+  ---
+  duration_ms: 0.737541
+  type: 'test'
+  ...
+# Subtest: action switches 1 to 84532 before continuing
+ok 198 - action switches 1 to 84532 before continuing
+  ---
+  duration_ms: 1.552708
+  type: 'test'
+  ...
+# Subtest: action switches 84532 to 1 before continuing
+ok 199 - action switches 84532 to 1 before continuing
+  ---
+  duration_ms: 0.106334
+  type: 'test'
+  ...
+# Subtest: correct network requires no prompt
+ok 200 - correct network requires no prompt
+  ---
+  duration_ms: 0.207292
+  type: 'test'
+  ...
+# Subtest: rejected switch stops the action
+ok 201 - rejected switch stops the action
+  ---
+  duration_ms: 0.395459
+  type: 'test'
+  ...
+# Subtest: account change during switch stops the action
+ok 202 - account change during switch stops the action
+  ---
+  duration_ms: 0.168917
+  type: 'test'
+  ...
+# Subtest: wallet that stays on the old network cannot continue
+ok 203 - wallet that stays on the old network cannot continue
+  ---
+  duration_ms: 0.124833
+  type: 'test'
+  ...
+# Subtest: WNS namehash matches the actual pepetesters.wei parent token
+ok 204 - WNS namehash matches the actual pepetesters.wei parent token
+  ---
+  duration_ms: 1.216459
+  type: 'test'
+  ...
+# Subtest: registered app name appears without a separate WNS primary transaction; all reads share a block
+ok 205 - registered app name appears without a separate WNS primary transaction; all reads share a block
+  ---
+  duration_ms: 0.445958
+  type: 'test'
+  ...
+# Subtest: canonical WNS primary names work before a PSP registrar is configured
+ok 206 - canonical WNS primary names work before a PSP registrar is configured
+  ---
+  duration_ms: 0.277708
+  type: 'test'
+  ...
+# Subtest: transferred, redirected and expired names do not label the previous wallet
+ok 207 - transferred, redirected and expired names do not label the previous wallet
+  ---
+  duration_ms: 0.409125
+  type: 'test'
+  ...
+# Subtest: forged reverse mappings and names under another parent are rejected
+ok 208 - forged reverse mappings and names under another parent are rejected
+  ---
+  duration_ms: 0.318666
+  type: 'test'
+  ...
+# Subtest: unsafe Unicode, markup, dot and whitespace labels remain addresses
+ok 209 - unsafe Unicode, markup, dot and whitespace labels remain addresses
+  ---
+  duration_ms: 1.011167
+  type: 'test'
+  ...
+# Subtest: wrong networks, misconfigured parents and unavailable RPC fail closed
+ok 210 - wrong networks, misconfigured parents and unavailable RPC fail closed
+  ---
+  duration_ms: 0.428375
+  type: 'test'
+  ...
+# Subtest: an unregistered wallet resolves to no name
+ok 211 - an unregistered wallet resolves to no name
+  ---
+  duration_ms: 0.113666
+  type: 'test'
+  ...
+1..211
+# tests 211
+# suites 0
+# pass 211
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1376.390125
+TAP version 13
+# Subtest: HTTP boundary enforces origin, method, media type, body limit and JSON
+ok 1 - HTTP boundary enforces origin, method, media type, body limit and JSON
+  ---
+  duration_ms: 33.898875
+  type: 'test'
+  ...
+# Subtest: service errors hide RPC URLs and provider credentials
+ok 2 - service errors hide RPC URLs and provider credentials
+  ---
+  duration_ms: 6.774542
+  type: 'test'
+  ...
+# Subtest: stale eligibility is retriable without a paid fallback
+ok 3 - stale eligibility is retriable without a paid fallback
+  ---
+  duration_ms: 2.059916
+  type: 'test'
+  ...
+# Subtest: rate limit cannot be bypassed by spoofing proxy headers
+ok 4 - rate limit cannot be bypassed by spoofing proxy headers
+  ---
+  duration_ms: 5.154167
+  type: 'test'
+  ...
+# Subtest: bounded concurrent work rejects extra requests
+ok 5 - bounded concurrent work rejects extra requests
+  ---
+  duration_ms: 2.774625
+  type: 'test'
+  ...
+# Subtest: operator config keeps a dedicated key private and rejects public HTTP, wildcard origins and key symlinks
+ok 6 - operator config keeps a dedicated key private and rejects public HTTP, wildcard origins and key symlinks
+  ---
+  duration_ms: 26.490875
+  type: 'test'
+  ...
+# Subtest: valid finalized and current position creates a wallet, source, name and destination-bound permit
+ok 7 - valid finalized and current position creates a wallet, source, name and destination-bound permit
+  ---
+  duration_ms: 10.178125
+  type: 'test'
+  ...
+# Subtest: ownership, principal, finality and deployment failures never produce signatures
+ok 8 - ownership, principal, finality and deployment failures never produce signatures
+  ---
+  duration_ms: 3.658541
+  type: 'test'
+  ...
+# Subtest: late destination change suppresses even an already signed response
+ok 9 - late destination change suppresses even an already signed response
+  ---
+  duration_ms: 1.91375
+  type: 'test'
+  ...
+# Subtest: aborted verification never signs
+ok 10 - aborted verification never signs
+  ---
+  duration_ms: 0.239583
+  type: 'test'
+  ...
+# Subtest: requests cannot select arbitrary networks, contracts, RPC endpoints or malformed identifiers
+ok 11 - requests cannot select arbitrary networks, contracts, RPC endpoints or malformed identifiers
+  ---
+  duration_ms: 0.431375
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 402.728959
+vite v6.4.3 building for production...
+transforming...
+node_modules/@coinbase/wallet-sdk/node_modules/ox/_esm/core/Address.js (6:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@coinbase/wallet-sdk/node_modules/ox/_esm/core/Address.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@coinbase/wallet-sdk/node_modules/ox/_esm/core/Base64.js (6:27): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@coinbase/wallet-sdk/node_modules/ox/_esm/core/Base64.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@base-org/account/node_modules/ox/_esm/core/Address.js (6:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@base-org/account/node_modules/ox/_esm/core/Address.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@base-org/account/node_modules/ox/_esm/core/Base64.js (6:27): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@base-org/account/node_modules/ox/_esm/core/Base64.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/porto/node_modules/ox/_esm/core/Base64.js (6:27): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/porto/node_modules/ox/_esm/core/Base64.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@coinbase/wallet-sdk/node_modules/ox/_esm/core/internal/cursor.js (2:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@coinbase/wallet-sdk/node_modules/ox/_esm/core/internal/cursor.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@base-org/account/node_modules/ox/_esm/core/internal/cursor.js (2:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@base-org/account/node_modules/ox/_esm/core/internal/cursor.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/porto/node_modules/zod/v4/core/util.js (330:0): A comment
+
+"// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle."
+
+in "node_modules/porto/node_modules/zod/v4/core/util.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/porto/node_modules/zod/v4/core/regexes.js (70:0): A comment
+
+"/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+ * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+ * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+
+in "node_modules/porto/node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@walletconnect/utils/node_modules/ox/_esm/core/internal/cursor.js (2:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@walletconnect/utils/node_modules/ox/_esm/core/internal/cursor.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@walletconnect/utils/node_modules/ox/_esm/core/Address.js (6:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@walletconnect/utils/node_modules/ox/_esm/core/Address.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@reown/appkit/node_modules/ox/_esm/core/Address.js (6:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@reown/appkit/node_modules/ox/_esm/core/Address.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@reown/appkit/node_modules/ox/_esm/core/internal/cursor.js (2:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@reown/appkit/node_modules/ox/_esm/core/internal/cursor.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@reown/appkit-controllers/node_modules/ox/_esm/core/Address.js (6:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@reown/appkit-controllers/node_modules/ox/_esm/core/Address.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@reown/appkit-controllers/node_modules/ox/_esm/core/internal/cursor.js (2:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@reown/appkit-controllers/node_modules/ox/_esm/core/internal/cursor.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 5774 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                                        0.98 kB │ gzip:   0.52 kB
+dist/assets/ibm-plex-mono-vietnamese-500-normal-C8zxqsMH.woff          5.62 kB
+dist/assets/ibm-plex-mono-vietnamese-400-normal-DDuiU_S-.woff          5.62 kB
+dist/assets/ibm-plex-mono-vietnamese-600-normal-iLQfcSjf.woff          5.71 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-500-normal-BIfNGwUT.woff        5.77 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-600-normal-9HEixskS.woff        5.79 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-400-normal-DMdlQ8Kv.woff        5.82 kB
+dist/assets/ibm-plex-mono-vietnamese-400-normal-BulugwFq.woff2         5.87 kB
+dist/assets/ibm-plex-mono-vietnamese-500-normal-DZ4AoWbu.woff2         6.04 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-400-normal-xuaO2J-f.woff2       6.91 kB
+dist/assets/ibm-plex-mono-vietnamese-600-normal-D2EvbN8M.woff2         6.93 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-500-normal-BqneJy0T.woff2       6.97 kB
+dist/assets/ibm-plex-mono-cyrillic-400-normal-CEL4l2ZJ.woff            7.20 kB
+dist/assets/ibm-plex-mono-cyrillic-500-normal-Ael50iVv.woff            7.21 kB
+dist/assets/ibm-plex-mono-cyrillic-600-normal-fLZuRloM.woff            7.27 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-600-normal-V-xxqcpd.woff2       7.69 kB
+dist/assets/ibm-plex-mono-cyrillic-400-normal-BSMlKf0J.woff2           8.36 kB
+dist/assets/ibm-plex-mono-cyrillic-500-normal-Bq9vWWag.woff2           8.46 kB
+dist/assets/ibm-plex-mono-cyrillic-600-normal-CTOM6hUh.woff2           9.35 kB
+dist/assets/ibm-plex-mono-latin-ext-400-normal-D3D2R8hC.woff          11.77 kB
+dist/assets/ibm-plex-mono-latin-ext-500-normal-CZ70TYgx.woff          11.77 kB
+dist/assets/ibm-plex-mono-latin-ext-600-normal-DmB0ttJJ.woff          11.83 kB
+dist/assets/ibm-plex-mono-latin-400-normal-CvHOgSBP.woff              13.14 kB
+dist/assets/ibm-plex-mono-latin-500-normal-CB9ihrfo.woff              13.16 kB
+dist/assets/ibm-plex-sans-vietnamese-wght-normal-Dg1JeJN0.woff2       13.16 kB
+dist/assets/ibm-plex-mono-latin-600-normal-DWFSQ4vo.woff              13.21 kB
+dist/assets/ibm-plex-mono-latin-ext-400-normal-BmRBH3aV.woff2         13.35 kB
+dist/assets/ibm-plex-mono-latin-ext-500-normal-CAhNIIs5.woff2         13.43 kB
+dist/assets/ibm-plex-mono-latin-ext-600-normal-D38SheWl.woff2         14.33 kB
+dist/assets/ibm-plex-mono-latin-400-normal-DMJ8VG8y.woff2             14.71 kB
+dist/assets/ibm-plex-mono-latin-500-normal-DSY6xOcd.woff2             14.89 kB
+dist/assets/ibm-plex-mono-latin-600-normal-BgSNZQsw.woff2             15.62 kB
+dist/assets/ibm-plex-sans-greek-wght-normal-CmyJS8uq.woff2            19.50 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-wght-normal-d45eAU9y.woff2     23.57 kB
+dist/assets/ibm-plex-sans-cyrillic-wght-normal-BAAhND-U.woff2         29.51 kB
+dist/assets/ibm-plex-sans-latin-ext-wght-normal-CIII54If.woff2        30.96 kB
+dist/assets/ibm-plex-sans-latin-wght-normal-IvpUvPa2.woff2            45.71 kB
+dist/assets/index-DYpwUc5P.css                                        95.48 kB │ gzip:  17.77 kB
+dist/assets/cursor-Bw6Zt6It.js                                         0.32 kB │ gzip:   0.25 kB
+dist/assets/chevron-left-DZIOlccM.js                                   0.45 kB │ gzip:   0.30 kB
+dist/assets/chevron-top-D9EvjzMV.js                                    0.46 kB │ gzip:   0.30 kB
+dist/assets/external-link-BNLmI_uE.js                                  0.46 kB │ gzip:   0.30 kB
+dist/assets/chevron-bottom-C4opaY4d.js                                 0.46 kB │ gzip:   0.31 kB
+dist/assets/chevron-right-BkLZHv8o.js                                  0.46 kB │ gzip:   0.30 kB
+dist/assets/arrow-top-TpONHGWE.js                                      0.47 kB │ gzip:   0.31 kB
+dist/assets/arrow-bottom-CRnoE7ry.js                                   0.47 kB │ gzip:   0.31 kB
+dist/assets/arrow-left-BlTdTfqm.js                                     0.47 kB │ gzip:   0.31 kB
+dist/assets/arrow-right-wPTw-WRs.js                                    0.47 kB │ gzip:   0.31 kB
+dist/assets/off-C4tLvPwl.js                                            0.49 kB │ gzip:   0.32 kB
+dist/assets/search-Ciyy-lWh.js                                         0.50 kB │ gzip:   0.32 kB
+dist/assets/close-B2Xu_mF9.js                                          0.50 kB │ gzip:   0.32 kB
+dist/assets/all-wallets-D9URBEf8.js                                    0.51 kB │ gzip:   0.29 kB
+dist/assets/filters-VVoLpJvw.js                                        0.51 kB │ gzip:   0.30 kB
+dist/assets/celo-GEP4TUHG-CenIBYLU.js                                  0.51 kB │ gzip:   0.31 kB
+dist/assets/Windows-PPTHQER6-BlyV2p7Y.js                               0.52 kB │ gzip:   0.29 kB
+dist/assets/info-circle-BobhvpQ-.js                                    0.53 kB │ gzip:   0.32 kB
+dist/assets/more-BlFynC41.js                                           0.55 kB │ gzip:   0.33 kB
+dist/assets/refresh-CLpLhb5L.js                                        0.55 kB │ gzip:   0.35 kB
+dist/assets/warning-circle-CN7mH39J.js                                 0.55 kB │ gzip:   0.34 kB
+dist/assets/coinPlaceholder-Bdl-BImZ.js                                0.56 kB │ gzip:   0.37 kB
+dist/assets/compass-CTZBSKHl.js                                        0.58 kB │ gzip:   0.37 kB
+dist/assets/zetachain-TLDS5IPW-Udhyw16T.js                             0.60 kB │ gzip:   0.38 kB
+dist/assets/base-OAXLRA4F-CoYTVIiL.js                                  0.60 kB │ gzip:   0.33 kB
+dist/assets/swapVertical-BRF_YxN7.js                                   0.60 kB │ gzip:   0.36 kB
+dist/assets/swapHorizontal-DPeOK4fW.js                                 0.61 kB │ gzip:   0.36 kB
+dist/assets/x-CBC7rFGP.js                                              0.63 kB │ gzip:   0.42 kB
+dist/assets/cursor-transparent-CODUkIRv.js                             0.64 kB │ gzip:   0.38 kB
+dist/assets/twitterIcon-B2iLpbRi.js                                    0.64 kB │ gzip:   0.41 kB
+dist/assets/mobile-wPVtRqLP.js                                         0.65 kB │ gzip:   0.35 kB
+dist/assets/checkmark-bold-DM8P0Kgz.js                                 0.71 kB │ gzip:   0.46 kB
+dist/assets/hyperevm-VKPAA4SA-CHwraEsx.js                              0.73 kB │ gzip:   0.41 kB
+dist/assets/optimism-HAF2GUT7-ec6Nqxs9.js                              0.73 kB │ gzip:   0.38 kB
+dist/assets/monad-4KWC6TSS-DVXSkpiz.js                                 0.74 kB │ gzip:   0.40 kB
+dist/assets/etherscan-DQsDWpmK.js                                      0.76 kB │ gzip:   0.47 kB
+dist/assets/checkmark-o6guxcFx.js                                      0.76 kB │ gzip:   0.50 kB
+dist/assets/help-circle-8t_f3Rza.js                                    0.77 kB │ gzip:   0.45 kB
+dist/assets/wallet-CO-HFZTA.js                                         0.78 kB │ gzip:   0.44 kB
+dist/assets/plus-21jS6Jj0.js                                           0.82 kB │ gzip:   0.45 kB
+dist/assets/verify-filled-CHSJjyE8.js                                  0.82 kB │ gzip:   0.49 kB
+dist/assets/add-CWzZvr73.js                                            0.83 kB │ gzip:   0.45 kB
+dist/assets/flow-5FQJFCTK-CUie2reO.js                                  0.86 kB │ gzip:   0.39 kB
+dist/assets/google-C_LvcJsE.js                                         0.87 kB │ gzip:   0.48 kB
+dist/assets/three-dots-DCvZkh3e.js                                     0.90 kB │ gzip:   0.44 kB
+dist/assets/clock-DcKnG9F8.js                                          0.90 kB │ gzip:   0.50 kB
+dist/assets/base-QS6CYWIN-CsjdbWCf.js                                  0.90 kB │ gzip:   0.39 kB
+dist/assets/disconnect-DEaWAlYO.js                                     0.95 kB │ gzip:   0.53 kB
+dist/assets/index-nibyPLVP.js                                          0.95 kB │ gzip:   0.47 kB
+dist/assets/twitch-CNWXZj8-.js                                         0.96 kB │ gzip:   0.52 kB
+dist/assets/unichain-C5BWO2ZY-BfguYsnu.js                              0.98 kB │ gzip:   0.46 kB
+dist/assets/superposition-HG6MMR2Y-bRkgatRO.js                         0.99 kB │ gzip:   0.55 kB
+dist/assets/bank-CpdkMzC5.js                                           1.00 kB │ gzip:   0.55 kB
+dist/assets/apple-DV8JCs_n.js                                          1.02 kB │ gzip:   0.55 kB
+dist/assets/linea-QRMVQ5DY-DuI3vv0d.js                                 1.05 kB │ gzip:   0.47 kB
+dist/assets/injectedWallet-AWJSZPMG-Df9x-YJA.js                        1.05 kB │ gzip:   0.48 kB
+dist/assets/play-store-DM09vccc.js                                     1.06 kB │ gzip:   0.54 kB
+dist/assets/farcaster-BDsfhk24.js                                      1.07 kB │ gzip:   0.56 kB
+dist/assets/zksync-DH7HK5U4-Dt4usFw6.js                                1.11 kB │ gzip:   0.49 kB
+dist/assets/arrow-bottom-circle-C1p4c19J.js                            1.19 kB │ gzip:   0.56 kB
+dist/assets/github-B5p0rqqb.js                                         1.19 kB │ gzip:   0.63 kB
+dist/assets/swapHorizontalBold-CcrevW3O.js                             1.22 kB │ gzip:   0.64 kB
+dist/assets/app-store-HWRZJXiM.js                                      1.26 kB │ gzip:   0.70 kB
+dist/assets/mail-CFGlzLEV.js                                           1.26 kB │ gzip:   0.68 kB
+dist/assets/avalanche-KOMJD3XY-Dsn_JPR4.js                             1.27 kB │ gzip:   0.66 kB
+dist/assets/facebook-D9Y2zvgl.js                                       1.29 kB │ gzip:   0.67 kB
+dist/assets/xdc-KJ3TDBYO-DNV6zchh.js                                   1.31 kB │ gzip:   0.60 kB
+dist/assets/wallet-placeholder-BqH6NVYo.js                             1.32 kB │ gzip:   0.62 kB
+dist/assets/desktop-C5uKRPnb.js                                        1.33 kB │ gzip:   0.67 kB
+dist/assets/discord-BIbl2_Qb.js                                        1.36 kB │ gzip:   0.68 kB
+dist/assets/swapHorizontalMedium-CShHaf16.js                           1.36 kB │ gzip:   0.71 kB
+dist/assets/ethereum-RGGVA4PY-SWGOlkuk.js                              1.37 kB │ gzip:   0.45 kB
+dist/assets/ink-FZMYZWHG-62p-5IK5.js                                   1.38 kB │ gzip:   0.61 kB
+dist/assets/recycle-horizontal-BwHAePXp.js                             1.40 kB │ gzip:   0.73 kB
+dist/assets/apechain-SX5YFU6N-q5qBv-mp.js                              1.46 kB │ gzip:   0.64 kB
+dist/assets/kaia-65D2U3PU-JmuLQ4gC.js                                  1.48 kB │ gzip:   0.67 kB
+dist/assets/degen-FQQ4XGHB-CeHTs88l.js                                 1.49 kB │ gzip:   0.72 kB
+dist/assets/extension-CCfOAIB-.js                                      1.49 kB │ gzip:   0.72 kB
+dist/assets/telegram-DG0sFFsx.js                                       1.51 kB │ gzip:   0.86 kB
+dist/assets/swapHorizontalRoundedBold-C6P4hGn3.js                      1.51 kB │ gzip:   0.80 kB
+dist/assets/cronos-HJPAQTAE-BEOvlOC4.js                                1.52 kB │ gzip:   0.61 kB
+dist/assets/verify-Br75Srlt.js                                         1.53 kB │ gzip:   0.73 kB
+dist/assets/polygon-WW6ZI7PM-DXlmm4L1.js                               1.53 kB │ gzip:   0.63 kB
+dist/assets/gravity-J5YQHTYH-Bj6B0uod.js                               1.54 kB │ gzip:   0.74 kB
+dist/assets/qr-code-B0oMN0x7.js                                        1.57 kB │ gzip:   0.55 kB
+dist/assets/bsc-N647EYR2-B2nLKXWV.js                                   1.59 kB │ gzip:   0.61 kB
+dist/assets/browser-BBJ-sxBt.js                                        1.64 kB │ gzip:   0.81 kB
+dist/assets/blast-V555OVXZ-BbhJh1tj.js                                 1.67 kB │ gzip:   0.73 kB
+dist/assets/network-placeholder-BxGliyG5.js                            1.71 kB │ gzip:   0.76 kB
+dist/assets/Chrome-65Q5P54Y-DR9MQEVr.js                                1.72 kB │ gzip:   0.58 kB
+dist/assets/gnosis-37ZC4RBL-B137OtHZ.js                                1.80 kB │ gzip:   0.72 kB
+dist/assets/id-Cco42Vsj.js                                             1.81 kB │ gzip:   0.83 kB
+dist/assets/nftPlaceholder-BrzCkyIh.js                                 1.81 kB │ gzip:   0.90 kB
+dist/assets/safeWallet-5MNKTR5Z-D-5imDLD.js                            1.82 kB │ gzip:   0.71 kB
+dist/assets/walletConnectWallet-YHWKVTDY-D3lyiczV.js                   1.88 kB │ gzip:   0.70 kB
+dist/assets/Opera-KQZLSACL-Cwv5MDFy.js                                 2.10 kB │ gzip:   0.76 kB
+dist/assets/metaMaskWallet-EI6MED72-D5HFOsnz.js                        2.20 kB │ gzip:   0.89 kB
+dist/assets/info-JH_y0h1E.js                                           2.32 kB │ gzip:   1.17 kB
+dist/assets/exclamation-triangle-B1TAbQyI.js                           2.48 kB │ gzip:   1.16 kB
+dist/assets/send-DVI07EMD.js                                           2.48 kB │ gzip:   1.30 kB
+dist/assets/arbitrum-WURIBY6W-CqVkHBr5.js                              2.59 kB │ gzip:   0.86 kB
+dist/assets/scroll-5OBGQVOV-DJFECiai.js                                2.63 kB │ gzip:   1.02 kB
+dist/assets/card-CNCthoU7.js                                           2.65 kB │ gzip:   1.20 kB
+dist/assets/chrome-store-BB3ylXr9.js                                   2.65 kB │ gzip:   1.04 kB
+dist/assets/reown-logo-DcCLVF39.js                                     2.66 kB │ gzip:   1.09 kB
+dist/assets/ronin-EMCPYXZT-N-QBHZdV.js                                 2.67 kB │ gzip:   1.20 kB
+dist/assets/zora-FYL5H3IO-iB4wygST.js                                  2.68 kB │ gzip:   0.59 kB
+dist/assets/lightbulb-CRhIflLm.js                                      2.77 kB │ gzip:   1.25 kB
+dist/assets/refresh-S4T5V5GX-CwqIaaxK.js                               3.00 kB │ gzip:   0.95 kB
+dist/assets/ccip-DhkcPzql.js                                           3.04 kB │ gzip:   1.39 kB
+dist/assets/manta-SI27YFEJ-CpVOKa06.js                                 3.20 kB │ gzip:   1.33 kB
+dist/assets/connect-UA7M4XW6-IY3X6Bmr.js                               3.55 kB │ gzip:   1.08 kB
+dist/assets/image-Ga90MD7J.js                                          3.55 kB │ gzip:   1.54 kB
+dist/assets/berachain-NJECWIVC-DumxnFvf.js                             3.78 kB │ gzip:   1.25 kB
+dist/assets/copy-CUJx85xb.js                                           3.87 kB │ gzip:   1.50 kB
+dist/assets/walletconnect-BIv5IIo8.js                                  4.12 kB │ gzip:   1.69 kB
+dist/assets/hardhat-TX56IT5N-CV1FY-wE.js                               4.20 kB │ gzip:   1.35 kB
+dist/assets/Brave-BRAKJXDS-mq-Xo37j.js                                 4.26 kB │ gzip:   1.49 kB
+dist/assets/create-FASO7PVG-D_rvSpre.js                                4.33 kB │ gzip:   1.09 kB
+dist/assets/scan-4UYSQ56Q-CjMz6-XC.js                                  4.59 kB │ gzip:   1.16 kB
+dist/assets/rainbowWallet-O26YNBMX-DUhYus-9.js                         5.12 kB │ gzip:   0.96 kB
+dist/assets/mantle-CKIUT334-DR2WgqzU.js                                5.27 kB │ gzip:   2.25 kB
+dist/assets/sign-A7IJEUT5-CGsRnPrd.js                                  5.55 kB │ gzip:   4.23 kB
+dist/assets/Edge-XSPUTORV-DEoZslQE.js                                  5.82 kB │ gzip:   1.34 kB
+dist/assets/events-DQ172AOg.js                                         6.13 kB │ gzip:   2.09 kB
+dist/assets/Arc-VDBY7LNS-BChRXCXW.js                                   6.62 kB │ gzip:   1.62 kB
+dist/assets/index-B-pg-DkK.js                                          9.39 kB │ gzip:   3.07 kB
+dist/assets/Browser-76IHF3Y2-BMhRaC5Z.js                              11.82 kB │ gzip:   2.18 kB
+dist/assets/login-UP3DZBGS-Db_wM5oQ.js                                12.00 kB │ gzip:   2.98 kB
+dist/assets/Safari-ZPL37GXR-C4Ggg6rz.js                               13.75 kB │ gzip:   3.75 kB
+dist/assets/Firefox-AAHGJQIP-Bp_Hm04m.js                              15.19 kB │ gzip:   3.39 kB
+dist/assets/index-BV8s6ez1.js                                         17.28 kB │ gzip:   4.75 kB
+dist/assets/sanko-RHQYXGM5-OX010CbN.js                                21.93 kB │ gzip:  16.45 kB
+dist/assets/assets-Q6ZU7ZJ5-P8HioiAD.js                               23.62 kB │ gzip:   4.10 kB
+dist/assets/secp256k1-QQ3fi8ZR.js                                     31.46 kB │ gzip:  12.58 kB
+dist/assets/secp256k1-CcM4Nd7Z.js                                     31.49 kB │ gzip:  12.60 kB
+dist/assets/index-CkNkz5oZ.js                                         38.88 kB │ gzip:   9.40 kB
+dist/assets/w3m-modal-DR2Kkd3K.js                                     40.11 kB │ gzip:   9.42 kB
+dist/assets/Macos-MW4AE7LN-Vvm8Drw3.js                                49.68 kB │ gzip:  35.82 kB
+dist/assets/zh_CN-4XK5YJPR-Bt6Yz5Ek.js                                54.62 kB │ gzip:   5.75 kB
+dist/assets/zh_TW-CNCRXH6Z-BNelatfN.js                                54.66 kB │ gzip:   5.46 kB
+dist/assets/zh_HK-N4YN2WSI-Cvzl1V16.js                                55.52 kB │ gzip:   5.51 kB
+dist/assets/id_ID-SBYANJ7G-Cjpa4ay6.js                                60.04 kB │ gzip:   5.50 kB
+dist/assets/ms_MY-EZSGYYYQ-4cPLK-3L.js                                60.89 kB │ gzip:   5.15 kB
+dist/assets/pt_BR-JQFQ3P4L-DOHfdcA2.js                                61.26 kB │ gzip:   5.29 kB
+dist/assets/es_419-7LMPU7G4-DH7rM0yQ.js                               61.61 kB │ gzip:   5.67 kB
+dist/assets/tr_TR-5FKHPPIO-D5jTpIm9.js                                63.31 kB │ gzip:   5.74 kB
+dist/assets/ko_KR-FR54RFUG-upinSHjQ.js                                65.33 kB │ gzip:   6.52 kB
+dist/assets/de_DE-YE3KOFHU-BRt5ztUe.js                                66.81 kB │ gzip:   5.58 kB
+dist/assets/fr_FR-VBJP3ZLL-B-_ocunw.js                                67.47 kB │ gzip:   5.60 kB
+dist/assets/vi_VN-5EVRZKLY-x078672g.js                                68.84 kB │ gzip:   5.47 kB
+dist/assets/ar_AR-LIPSOZP5-BQrIDibT.js                                71.12 kB │ gzip:   6.19 kB
+dist/assets/ja_JP-ZRMWJV3I-DXbifiMm.js                                73.59 kB │ gzip:   6.62 kB
+dist/assets/uk_UA-ZD4IBC52-DgnQrpzl.js                                89.01 kB │ gzip:   6.36 kB
+dist/assets/ru_RU-Z42UEJBP-Cvb2oWxQ.js                                90.64 kB │ gzip:   7.00 kB
+dist/assets/Linux-OO4TNCLJ-B0aw93n9.js                                91.13 kB │ gzip:  14.88 kB
+dist/assets/th_TH-4YB4VSB2-BUipNP-V.js                               106.23 kB │ gzip:   7.67 kB
+dist/assets/hi_IN-WBVD5XYI-D73g2UFs.js                               110.28 kB │ gzip:   8.11 kB
+dist/assets/basic-C61NUBOU.js                                        144.37 kB │ gzip:  33.65 kB
+dist/assets/index-CkqDzvU6.js                                        301.34 kB │ gzip: 114.98 kB
+dist/assets/index.es-B1wK6jyL.js                                     416.95 kB │ gzip: 120.35 kB
+dist/assets/core-BGcR7RP5.js                                         495.36 kB │ gzip: 134.40 kB
+dist/assets/metamask-sdk-BsuXwIYc.js                                 558.14 kB │ gzip: 170.71 kB
+dist/assets/index-CcMsZfJJ.js                                        638.97 kB │ gzip: 178.26 kB
+dist/assets/index-AmWGBmOq.js                                      1,277.19 kB │ gzip: 391.19 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 8.32s

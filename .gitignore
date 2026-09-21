@@ -4,6 +4,9 @@
 # foundry build artifacts
 out/
 cache/
+out-halmos/
+cache-halmos/
+.venv-formal/
 
 # agent working files (review runs are captured in SECURITY-REVIEW*.md)
 .fix-prompt.txt

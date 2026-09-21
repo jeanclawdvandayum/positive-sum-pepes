@@ -1,0 +1,15 @@
+No files changed, compilation skipped
+
+Ran 1 test for test/dinosat/SineV3PriceSymbolic.t.sol:SineV3PriceSymbolicTest
+[FAIL: `vm.assume` rejected too many inputs (65536 allowed)] test_check_phaseat_monotone_pos_q4(uint88) (runs: 207, μ: 120131, ~: 120131)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 234.43ms (232.02ms CPU time)
+
+Ran 1 test suite in 264.79ms (234.43ms CPU time): 0 tests passed, 1 failed, 0 skipped (1 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/dinosat/SineV3PriceSymbolic.t.sol:SineV3PriceSymbolicTest
+[FAIL: `vm.assume` rejected too many inputs (65536 allowed)] test_check_phaseat_monotone_pos_q4(uint88) (runs: 207, μ: 120131, ~: 120131)
+
+Encountered a total of 1 failing tests, 0 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 1 failed test

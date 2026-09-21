@@ -1,5 +1,25 @@
 # Audit preparation — September 2026
 
+## September 21 — current single-sine verification status
+
+The September 15 monotonicity and inverse defects below are historical and
+fixed. The current Solidity gate passes **788 tests in 97 suites**, with no
+failures or skips. Symbolic-only assumptions now have bounded Forge wrappers.
+The older CurveMath input-generation failure is also fixed without reducing
+its domain or raising rejection limits.
+
+The formal package separates **8 quantified EVM properties**, **5 concrete
+checks**, and **12 integer arithmetic lemmas**. Negative controls check that
+false claims and empty domains fail. Full nonconstant curve and settlement
+proofs remain incomplete. Do not describe this as whole-protocol formal
+verification. See [the proof scope and commands](FORMAL-VERIFICATION.md) and
+the latest GATE-LOG entry for the combined gate result.
+
+The strengthened real-V4 campaign counts all unpaid staking fees, checks
+position custody and earning weight, and requires the expected capacity
+error. No production contract or deployed address changed in this work.
+The following dated sections preserve the earlier review record.
+
 ## September 15 — single-sine review blocks release
 
 The `single-sine-spec` review found price and supply decreases at adjacent

@@ -1,6 +1,6 @@
 # Single-sine repair report — September 15, 2026
 
-**Repair status: implemented locally; final validation is pending.** This report records the changes made after the [initial review](2026-09-15-single-sine-review.md). It does not approve a public deployment. The final gate, runtime sizes, gas measurements and deployment receipts must be filled in below before a release decision is recorded.
+**Historical repair record.** Later GATE-LOG entries completed validation of these repairs and lifted the original numerical release block. The original pending fields below describe this report's earlier state. Current results and proof limits are in [READINESS](READINESS.md) and [FORMAL-VERIFICATION](FORMAL-VERIFICATION.md). This report does not approve a public deployment.
 
 The scope is branch `single-sine-spec`, starting from `a80984c8`, plus the local review and repair changes. The [original implementation handoff](../implementation-prompts/2026-09-14-single-sine-cuberoot-pot-tickets.md) remains the acceptance reference. Existing deployments retain their existing bytecode. No public deployment, hosted-page publication or live-address change forms part of this repair.
 

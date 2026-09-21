@@ -242,7 +242,7 @@ contract CurveMathTest is Test {
     function test_MultiCurve_RoundTrip() public {
         uint256 ethIn = 1e18;
         uint256 supply = CurveMath.computeBuyOutput(ethIn, 0, multiCC);
-        vm.assume(supply > 1);
+        assertGt(supply, 1, "buy must produce a sellable amount");
         uint256 ethOut = CurveMath.computeSellOutput(supply - 1, supply, multiCC);
         assertTrue(ethOut > 0 && ethOut < ethIn, "Multi round-trip: 0 < out < in");
     }
@@ -270,8 +270,8 @@ contract CurveMathTest is Test {
     // ═════════════════════════════════════════════════════════
 
     function testFuzz_BuyOutputPositive(uint256 ethInput, uint256 currentSupply) public view {
-        vm.assume(ethInput > 0.001e18 && ethInput < 100e18);
-        vm.assume(currentSupply < 50_000_000e18);
+        ethInput = bound(ethInput, 0.001e18 + 1, 100e18 - 1);
+        currentSupply = bound(currentSupply, 0, 50_000_000e18 - 1);
 
         uint256 pspOut = CurveMath.computeBuyOutput(ethInput, currentSupply, cc);
         assertTrue(pspOut > 0);
@@ -287,10 +287,10 @@ contract CurveMathTest is Test {
     }
 
     function testFuzz_RoundTrip(uint256 ethInput) public {
-        vm.assume(ethInput > 0.01e18 && ethInput < 10e18);
+        ethInput = bound(ethInput, 0.01e18 + 1, 10e18 - 1);
 
         uint256 supply = CurveMath.computeBuyOutput(ethInput, 0, cc);
-        vm.assume(supply > 1);
+        assertGt(supply, 1, "buy must produce a sellable amount");
         uint256 ethOut = CurveMath.computeSellOutput(supply - 1, supply, cc);
 
         assertTrue(ethOut > 0, "Fuzz round-trip: out > 0");
@@ -299,10 +299,10 @@ contract CurveMathTest is Test {
     }
 
     function testFuzz_MultiRoundTrip(uint256 ethInput) public {
-        vm.assume(ethInput > 0.01e18 && ethInput < 10e18);
+        ethInput = bound(ethInput, 0.01e18 + 1, 10e18 - 1);
 
         uint256 supply = CurveMath.computeBuyOutput(ethInput, 0, multiCC);
-        vm.assume(supply > 1);
+        assertGt(supply, 1, "buy must produce a sellable amount");
         uint256 ethOut = CurveMath.computeSellOutput(supply - 1, supply, multiCC);
 
         assertTrue(ethOut > 0, "Multi fuzz: out > 0");
@@ -310,12 +310,13 @@ contract CurveMathTest is Test {
     }
 
     function testFuzz_BuyAtArbitrarySupply(uint256 ethInput, uint256 supply) public {
-        vm.assume(ethInput > 0.01e18 && ethInput < 1000e18);
-        vm.assume(supply > 1e18 && supply < 95_000_000e18);
+        // Generate the original domain directly instead of rejecting most
+        // uint256 pairs and intermittently exhausting Forge's input budget.
+        ethInput = bound(ethInput, 0.01e18 + 1, 1000e18 - 1);
+        supply = bound(supply, 1e18 + 1, 95_000_000e18 - 1);
 
         uint256 pspOut = CurveMath.computeBuyOutput(ethInput, supply, cc);
-        assertTrue(pspOut > 0);
-        vm.assume(pspOut > 1);
+        assertGt(pspOut, 1, "buy must produce a sellable amount");
 
         uint256 ethOut = CurveMath.computeSellOutput(pspOut - 1, supply + pspOut, cc);
         assertTrue(ethOut > 0, "Fuzz buy-at: out > 0");

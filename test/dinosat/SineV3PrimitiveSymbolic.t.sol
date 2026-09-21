@@ -8,7 +8,7 @@ import {SineV3Data} from "../../src/SineV3Data.sol";
 /// @title DinoSAT symbolic tests — SineV3Primitive cumulative curve
 /// @notice The heart of AUD-V3-1's fix: within a graded cell, integer
 ///         de Casteljau over ordered controls is non-decreasing in the
-///         reserve. Proven per ENUMERATED cell with symbolic intra-cell
+///         reserve. Attempted per selected cell with symbolic intra-cell
 ///         offset — the controls are concrete (all-math on a concrete cell
 ///         index), only the evaluation point is symbolic.
 contract SineV3PrimitiveSymbolicTest is Test, SineV3Primitive {
@@ -31,13 +31,12 @@ contract SineV3PrimitiveSymbolicTest is Test, SineV3Primitive {
 
     // ════════════════════════════════════════════════
     // PR-1 (within-cell monotone supply): for enumerated cells across the
-    // whole graded table — first negative-wide, a negative-half, a quarter,
-    // the zero-adjacent half, a positive-half, a positive-wide, and the
-    // final cell — F(start + r) <= F(start + r + 1) for symbolic r.
+    // selected graded cells — sunk negative cells, a reachable negative
+    // quarter, a zero-adjacent quarter, positive half/wide cells, and the
+    // final plateau — F(start + r) <= F(start + r + 1) for symbolic r.
     // Technique: T3 enumeration + symbolic intra-cell offset.
-    // Composition: {0, 500, 708, 711, 716, 1000, 4936} spans every cell
-    // KIND (wide-negative, half-negative, quarter, zero-half, half-positive,
-    // wide-positive, terminal). Classification: ENUMERATE/BOUNDARY.
+    // A selected-cell check does not establish all-cell monotonicity. Sunk
+    // cells and the terminal plateau do not exercise nonconstant interpolation.
     // ════════════════════════════════════════════════
 
     function _checkCellMonotone(uint256 i, uint256 r) internal view {
@@ -46,43 +45,49 @@ contract SineV3PrimitiveSymbolicTest is Test, SineV3Primitive {
         uint256 span = _cellWidthReserve(cell.width4);
         // offset keeps both probes strictly inside the cell
         vm.assume(r < span - 1);
-        uint256 v1 = uint256(_atReserve(cell, lo + r, BOOT, LAM));
-        uint256 v2 = uint256(_atReserve(cell, lo + r + 1, BOOT, LAM));
+        int256 v1 = _atReserve(cell, lo + r, BOOT, LAM);
+        int256 v2 = _atReserve(cell, lo + r + 1, BOOT, LAM);
         assert(v1 <= v2);
     }
 
-    /// @notice Cell 0: leftmost negative-wide cell (phase -2322).
-    function test_check_cell_monotone_0(uint256 r) public view {
+    /// @notice Cell 0: sunk leftmost half cell (phase4 -2322 to -2320).
+    function check_cell_monotone_0(uint256 r) public view {
         _checkCellMonotone(0, r);
     }
 
-    /// @notice Cell 500: negative-half cell (phase -418).
-    function test_check_cell_monotone_500(uint256 r) public view {
+    /// @notice Cell 500: sunk negative-half cell (phase4 -418).
+    function check_cell_monotone_500(uint256 r) public view {
         _checkCellMonotone(500, r);
     }
 
-    /// @notice Cell 708: quarter cell (phase -4 to -3).
-    function test_check_cell_monotone_708(uint256 r) public view {
+    /// @notice Cell 708: sunk quarter cell (phase4 -3 to -2).
+    function check_cell_monotone_708(uint256 r) public view {
         _checkCellMonotone(708, r);
     }
 
-    /// @notice Cell 711: the zero-anchored half cell (phase 0 to 2).
-    function test_check_cell_monotone_711(uint256 r) public view {
+    /// @notice Reachable negative quarter cell, from phase -0.25 to zero.
+    function check_cell_monotone_710(uint256 r) public view {
+        _checkCellMonotone(710, r);
+    }
+
+    /// @notice Cell 711: the zero-anchored quarter cell (phase4 0 to 1).
+    function check_cell_monotone_711(uint256 r) public view {
         _checkCellMonotone(711, r);
     }
 
-    /// @notice Cell 716: positive-half cell (phase 4 to 6).
-    function test_check_cell_monotone_716(uint256 r) public view {
+    /// @notice Cell 716: positive-half cell (phase4 6 to 8).
+    function check_cell_monotone_716(uint256 r) public view {
         _checkCellMonotone(716, r);
     }
 
-    /// @notice Cell 1000: positive-wide cell (phase 636).
-    function test_check_cell_monotone_1000(uint256 r) public view {
+    /// @notice Cell 1000: positive-wide cell (phase4 636).
+    function check_cell_monotone_1000(uint256 r) public view {
         _checkCellMonotone(1000, r);
     }
 
-    /// @notice Cell 4936: terminal positive cell (phase 16380 to 16384).
-    function test_check_cell_monotone_4936(uint256 r) public view {
+    /// @notice Constant rounded terminal plateau, not an interpolation proof.
+    function check_cell_terminal_plateau(uint256 r) public view {
+        assert(_knot(4936) == _knot(4937));
         _checkCellMonotone(4936, r);
     }
 
@@ -110,7 +115,7 @@ contract SineV3PrimitiveSymbolicTest is Test, SineV3Primitive {
     /// design (bisection support). We pin both behaviors.
     function test_check_cell_upper_edge_anchor() public view {
         // Reachable cells: both edges anchor exactly.
-        uint256[2] memory reachable = [uint256(711), 716];
+        uint256[3] memory reachable = [uint256(710), 711, 716];
         for (uint256 k; k < reachable.length; ++k) {
             uint256 i = reachable[k];
             Cell memory cell = _prepare(i);
@@ -129,33 +134,47 @@ contract SineV3PrimitiveSymbolicTest is Test, SineV3Primitive {
         }
     }
 
-    /// @notice Knots strictly increase across the enumerated span.
-    function test_check_knots_increase() public view {
-        uint256[8] memory cells = [uint256(0), 1, 500, 708, 711, 716, 1000, 4936];
-        for (uint256 k; k < cells.length - 1; ++k) {
+    /// @notice Selected nonconstant cells have strictly increasing anchors.
+    function test_check_selected_knots_strictly_increase() public view {
+        uint256[8] memory cells = [uint256(0), 1, 500, 708, 710, 711, 716, 1000];
+        for (uint256 k; k < cells.length; ++k) {
             assert(_knot(cells[k]) < _knot(cells[k] + 1));
         }
+    }
+
+    /// @notice Every anchor pair is ordered; the final plateau is included.
+    function test_all_knots_nondecreasing() public view {
+        int256 previous = _knot(0);
+        for (uint256 i = 1; i < 4938; ++i) {
+            int256 next = _knot(i);
+            assert(previous <= next);
+            previous = next;
+        }
+        assert(_knot(4936) == _knot(4937));
     }
 
     // ════════════════════════════════════════════════
     // FUZZ WRAPPERS (T17)
     // ════════════════════════════════════════════════
 
-    function test_fuzz_cell_monotone_711(uint256 rawR) public view {
-        Cell memory cell = _prepare(711);
+    function _fuzzCellMonotone(uint256 i, uint256 rawR) internal view {
+        Cell memory cell = _prepare(i);
         uint256 span = _cellWidthReserve(cell.width4);
         uint256 r = bound(rawR, 0, span - 2);
         uint256 lo = _edgeLow(cell.left4);
-        assert(uint256(_atReserve(cell, lo + r, BOOT, LAM))
-            <= uint256(_atReserve(cell, lo + r + 1, BOOT, LAM)));
+        assert(_atReserve(cell, lo + r, BOOT, LAM)
+            <= _atReserve(cell, lo + r + 1, BOOT, LAM));
     }
 
-    function test_fuzz_cell_monotone_0(uint256 rawR) public view {
-        Cell memory cell = _prepare(0);
-        uint256 span = _cellWidthReserve(cell.width4);
-        uint256 r = bound(rawR, 0, span - 2);
-        uint256 lo = _edgeLow(cell.left4);
-        assert(uint256(_atReserve(cell, lo + r, BOOT, LAM))
-            <= uint256(_atReserve(cell, lo + r + 1, BOOT, LAM)));
+    function test_fuzz_cell_monotone_0(uint256 r) public view { _fuzzCellMonotone(0, r); }
+    function test_fuzz_cell_monotone_500(uint256 r) public view { _fuzzCellMonotone(500, r); }
+    function test_fuzz_cell_monotone_708(uint256 r) public view { _fuzzCellMonotone(708, r); }
+    function test_fuzz_cell_monotone_710(uint256 r) public view { _fuzzCellMonotone(710, r); }
+    function test_fuzz_cell_monotone_711(uint256 r) public view { _fuzzCellMonotone(711, r); }
+    function test_fuzz_cell_monotone_716(uint256 r) public view { _fuzzCellMonotone(716, r); }
+    function test_fuzz_cell_monotone_1000(uint256 r) public view { _fuzzCellMonotone(1000, r); }
+    function test_fuzz_cell_terminal_plateau(uint256 r) public view {
+        assert(_knot(4936) == _knot(4937));
+        _fuzzCellMonotone(4936, r);
     }
 }

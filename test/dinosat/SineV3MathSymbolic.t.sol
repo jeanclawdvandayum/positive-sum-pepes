@@ -78,9 +78,51 @@ contract SineV3MathSymbolicTest is Test, SineV3Math {
         }
     }
 
+    /// @notice Every unsupported launch price fails with the domain error,
+    /// including values that could overflow later price arithmetic.
+    function check_domain_rejects_invalid_price(uint256 pL) public {
+        vm.assume(pL < 1e9 || pL > 1e18);
+        (bool success, bytes memory result) = address(this).call(
+            abi.encodeWithSelector(this.priceWad.selector, BOOT, BOOT, LAM, pL)
+        );
+        assert(!success);
+        assert(result.length == 4);
+        assert(bytes4(result) == SineV3Math.SineV3Domain.selector);
+    }
+
+    /// @notice Every reserve beyond capacity fails with the domain error,
+    /// including uint256.max, before reserve arithmetic can overflow.
+    function check_domain_rejects_excess_reserve(uint256 reserve) public {
+        vm.assume(reserve > BOOT + POST_WAVES * LAM);
+        (bool success, bytes memory result) = address(this).call(
+            abi.encodeWithSelector(this.priceWad.selector, reserve, BOOT, LAM, PL)
+        );
+        assert(!success);
+        assert(result.length == 4);
+        assert(bytes4(result) == SineV3Math.SineV3Domain.selector);
+    }
+
+    function test_fuzz_domain_rejects_invalid_price(uint256 raw) public {
+        check_domain_rejects_invalid_price(bound(raw, 0, 1e9 - 1));
+        check_domain_rejects_invalid_price(bound(raw, 1e18 + 1, type(uint256).max));
+    }
+
+    function test_fuzz_domain_rejects_excess_reserve(uint256 raw) public {
+        check_domain_rejects_excess_reserve(bound(raw, BOOT + POST_WAVES * LAM + 1, type(uint256).max));
+    }
+
+    function test_domain_rejection_boundaries() public {
+        check_domain_rejects_invalid_price(0);
+        check_domain_rejects_invalid_price(1e9 - 1);
+        check_domain_rejects_invalid_price(1e18 + 1);
+        check_domain_rejects_invalid_price(type(uint256).max);
+        check_domain_rejects_excess_reserve(BOOT + POST_WAVES * LAM + 1);
+        check_domain_rejects_excess_reserve(type(uint256).max);
+    }
+
     // ════════════════════════════════════════════════
     // DM-3 (buyOut conservation at the canonical row): for buys confined
-    // to the zero-anchored cell [boot, boot + lam/2), out never exceeds
+    // to the first two quarter cells [boot, boot + lam/2), out never exceeds
     // the starting-spot bound (spend / price(boot)), and the supply delta
     // is non-negative. spotBound inline: spend*WAD/PL with spend < 1e24,
     // WAD=1e18 -> product 1e42 fits. price(boot) = scaledExp(0, PL) = PL.
@@ -90,8 +132,8 @@ contract SineV3MathSymbolicTest is Test, SineV3Math {
     // ════════════════════════════════════════════════
 
     /// @notice out <= spend * WAD / PL (no free PSP above spot).
-    function test_check_buyout_spot_bound(uint112 spend) public view {
-        // Justification: buys confined to cell 711: width = 2*lam/4 = 477.5e18
+    function check_buyout_spot_bound(uint112 spend) public view {
+        // This launch-row domain spans the first two quarter cells.
         vm.assume(spend >= 1 && spend < 477e18);
         uint256 out = this.buyOut(BOOT, BOOT, LAM, PL, spend);
         // 2026-09-18 adjudication: the assert math must widen to uint256 —
@@ -102,7 +144,7 @@ contract SineV3MathSymbolicTest is Test, SineV3Math {
     }
 
     /// @notice Supply never decreases across a buy (monotone primitive).
-    function test_check_buyout_supply_monotone(uint112 spend) public view {
+    function check_buyout_supply_monotone(uint112 spend) public view {
         vm.assume(spend >= 1 && spend < 477e18);
         uint256 q0 = this.supplyWad(BOOT, BOOT, LAM, PL);
         uint256 q1 = this.supplyWad(BOOT + spend, BOOT, LAM, PL);
@@ -115,14 +157,30 @@ contract SineV3MathSymbolicTest is Test, SineV3Math {
 
     function test_fuzz_buyout_spot_bound(uint256 raw) public view {
         uint256 spend = bound(raw, 1, 477e18 - 1);
-        uint256 out = this.buyOut(BOOT, BOOT, LAM, PL, spend);
-        assert(out <= spend * 1e18 / PL);
+        check_buyout_spot_bound(uint112(spend));
     }
 
     function test_fuzz_buyout_supply_monotone(uint256 raw) public view {
         uint256 spend = bound(raw, 1, 477e18 - 1);
-        uint256 q0 = this.supplyWad(BOOT, BOOT, LAM, PL);
-        uint256 q1 = this.supplyWad(BOOT + spend, BOOT, LAM, PL);
-        assert(q1 >= q0);
+        check_buyout_supply_monotone(uint112(spend));
+    }
+
+    /// @notice The actual inverse returns the first reserve that backs its
+    /// target. This bounded launch-row property includes prelaunch reserves
+    /// and sixteen active waves; it is not a full-domain symbolic proof.
+    function test_fuzz_inverse_minimal_and_sell_conservative(uint256 rawReserve, uint256 rawTarget) public view {
+        uint256 reserve = bound(rawReserve, BOOT / 2, BOOT + 16 * LAM);
+        uint256 currentSupply = this.supplyWad(reserve, BOOT, LAM, PL);
+        uint256 target = bound(rawTarget, 1, currentSupply);
+        int256 f0 = _fAtReserve(0, BOOT, LAM);
+        uint256 endpoint = _reserveAtPrimitive(reserve, BOOT, LAM, PL, target, f0);
+        assert(endpoint <= reserve);
+        assert(this.supplyWad(endpoint, BOOT, LAM, PL) >= target);
+        if (endpoint != 0) assert(this.supplyWad(endpoint - 1, BOOT, LAM, PL) < target);
+
+        uint256 payout = this.sellOut(reserve, BOOT, LAM, PL, currentSupply - target);
+        assert(payout <= reserve);
+        assert(reserve - payout >= endpoint);
+        assert(this.supplyWad(reserve - payout, BOOT, LAM, PL) >= target);
     }
 }

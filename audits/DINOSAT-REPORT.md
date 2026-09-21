@@ -1,5 +1,10 @@
 # DinoSAT Formal Verification Report — single-sine-spec (SineV3)
 
+> Historical campaign record. The September 21 review corrected the proof
+> scope below. Current harnesses, commands, and evidence are documented in
+> [FORMAL-VERIFICATION](../docs/audit/FORMAL-VERIFICATION.md). A Forge test
+> count is not a count of completed symbolic proofs.
+
 **Target:** `single-sine-spec` @ `e9a70d44` (SineV3 curve core: `SineV3Primitive`, `SineV3Price`, `SineV3Math` + `SineV3Data` canonical shards)
 **Methodology:** DinoSAT skill (halmos 0.3.3 + Z3 4.12.6, bounded-budget per-test watchdog, per-test log files, vacuity discipline)
 **Date:** 2026-09-18 · **Operator:** Hermes (scoopy-directed)
@@ -13,9 +18,10 @@ The SineV3 integer curve core was probed with symbolic execution across three
 contracts (Primitive / Price / Math). **No contract-level vulnerability was
 found.** One halmos-reported FAIL was adjudicated to a **test-design artifact**
 (probing cells outside their reachable reserve domain); the contract's
-documented saturation semantics hold exactly. The crown property — within-cell
-monotone supply — is Z3-proven on the reachable positive tail and pinned by
-exact anchors + fuzz on the reachable negative half-cell.
+documented saturation semantics hold exactly. The successful terminal-cell
+check covers a constant rounded plateau. This campaign did not complete a
+symbolic proof of nonconstant within-cell interpolation. Exact anchors,
+structural arguments, and fuzz tests supply separate evidence.
 
 ## 2. Verdict table
 
@@ -29,9 +35,9 @@ exact anchors + fuzz on the reachable negative half-cell.
 | test_check_cell_monotone_711 | 711 (zero-adjacent half, reachable) | see §2.4 escalation | |
 | test_check_cell_monotone_716 | 716 (half-positive, reachable) | see §2.4 escalation | |
 | test_check_cell_monotone_1000 | 1000 (wide-positive, reachable) | see §2.4 escalation | |
-| test_check_cell_monotone_4936 | 4936 (terminal) | **PASS (3–10 paths, ≤2.9s)** | real proof, deepest graded cell |
+| test_check_cell_monotone_4936 | 4936 (terminal) | **PASS (3–10 paths, ≤2.9s)** | constant plateau: both knots equal; does not exercise nonconstant interpolation |
 | test_check_cell_upper_edge_anchor | 711/716 + sunk pins | **PASS** (after fix; forge-confirms) | initial FAIL = test artifact, §3.1 |
-| test_check_knots_increase | span {0,1,500,708,711,716,1000,4936} | **PASS** | strict knot ordering across kinds |
+| test_check_knots_increase | {0,1,500,708,711,716,1000} | **PASS** | old loop skipped final listed cell4936; its knots are equal |
 
 ### 2.2 SineV3PriceSymbolicTest
 
@@ -177,5 +183,5 @@ the campaign had left at TIMEOUT/BLOCKED → fuzz tier. All four adjudicated as
 | test_check_phaseat_displacement_neg | x=882 → panic 0x01 | same | same |
 | test_fuzz_scaledexp_monotone | e clamped to 1e21 → SineV3PriceOverflow | clamp domain exceeded the overflow-free domain: scaledExp reverts (fail-closed guard, itself proven PASS) at |e| ≥ ~1e21; 1e20 verified non-reverting. | clamp tightened to ±1e20 |
 
-Post-fix suite: **37/37 PASS** (3 suites). No `src/` changes. Probes run via a throwaway
+Post-fix Forge suite: **37/37 PASS** (3 suites), not 37 symbolic proofs. No `src/` changes. Probes run via a throwaway
 diag contract (deleted); receipts reproducible with the constants in the table.

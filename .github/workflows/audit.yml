@@ -23,3 +23,25 @@ jobs:
       - run: bash scripts/check-audit.sh
       - run: npm audit --omit=dev --audit-level=high
         working-directory: frontend
+  formal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r scripts/formal/requirements.txt
+      - run: python scripts/formal/test_runner.py
+      - run: python scripts/formal/prove_arithmetic.py --output formal-results/arithmetic
+      - run: python scripts/formal/run.py --output formal-results/evm
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: formal-verification-evidence
+          path: formal-results/

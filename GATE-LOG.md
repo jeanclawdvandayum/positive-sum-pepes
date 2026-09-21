@@ -1624,3 +1624,35 @@ LOCAL LIFECYCLE: fresh disposable Anvil on chain31337 — 18/18 deployment recei
 - Companion commit adds the `[profile.halmos]` foundry table (halmos run
   config for `test/dinosat`, inert for the default gate profile) that failed
   to ride with `0f08c032`.
+
+## 2026-09-21 — formal verification and accounting checks
+
+- Base: `38222f7f` on `single-sine-spec`, plus working-tree verification
+  changes. No production Solidity changes or deployments.
+- `bash scripts/check-audit.sh`: **PASS**, exit 0. **788 Solidity tests /
+  97 suites**, no failures or skips; 211 frontend tests; names 11/11;
+  50 production artifacts pass the size gate; 172 ABI functions/events
+  match. Numerical validators, no-governance check, TypeScript and the
+  normal Vite build pass. Vite still reports its chunk-size advisory.
+- The gate ran eight formal-runner unit tests. After adding the credential
+  exclusion test, the separate final runner suite passed **9/9**.
+- Pinned Halmos/Z3 core: **8 quantified EVM properties proved**, **5
+  concrete checks passed**, and both negative controls detected. The real
+  constructor/runtime identity prerequisite passed. Final recorded source
+  hashes match the working tree. Release compiler settings are used;
+  default and formal runtime templates match for CurveHook and all three
+  SineV3 libraries.
+- Arithmetic models: **12 integer lemmas passed**, each with satisfiable
+  assumptions; both deliberately incorrect models produced counterexamples.
+  These are model proofs, not complete EVM refinement proofs.
+- Fable checks now include all unpaid staking fees, principal custody,
+  position weights and the exact capacity error. The legacy CurveMath
+  harness also passed 29 tests with 2,000 runs per fuzz property, seed 1,
+  after replacing restrictive input assumptions with equivalent bounds.
+- Two direct EVM ticket properties exceeded 90-second deadlines; a fresh
+  phase-monotonicity attempt exceeded 60 seconds. These remain unresolved.
+  Complete curve, inverse and staking-state proofs are not claimed.
+- Scope and reproduction: [FORMAL-VERIFICATION.md](docs/audit/FORMAL-VERIFICATION.md).
+  Raw results: [formal evidence](docs/audit/2026-09-21-formal-evidence/),
+  including `deterministic-gate.log`. Archived compiler configuration excludes
+  RPC and explorer credentials.
