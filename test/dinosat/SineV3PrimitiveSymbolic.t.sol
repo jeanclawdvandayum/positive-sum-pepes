@@ -75,6 +75,16 @@ contract SineV3PrimitiveSymbolicTest is Test, SineV3Primitive {
         _checkCellMonotone(711, r);
     }
 
+    /// @notice Cell 712: the second launch quarter cell (phase4 1 to 2) —
+    /// the upper half of the canonical buyOut spend domain [boot, boot + lam/2).
+    /// Added 2026-09-22: with 711 it covers both cells buyOut's launch-row
+    /// properties read; per-cell EVM monotonicity here is the EVM pillar of
+    /// the buyOut supply-monotone closure (the full-domain EVM proof stays
+    /// blocked on halmos 0.3.3 symbolic EXTCODECOPY offsets).
+    function check_cell_monotone_712(uint256 r) public view {
+        _checkCellMonotone(712, r);
+    }
+
     /// @notice Cell 716: positive-half cell (phase4 6 to 8).
     function check_cell_monotone_716(uint256 r) public view {
         _checkCellMonotone(716, r);
@@ -115,7 +125,7 @@ contract SineV3PrimitiveSymbolicTest is Test, SineV3Primitive {
     /// design (bisection support). We pin both behaviors.
     function test_check_cell_upper_edge_anchor() public view {
         // Reachable cells: both edges anchor exactly.
-        uint256[3] memory reachable = [uint256(710), 711, 716];
+        uint256[4] memory reachable = [uint256(710), 711, 712, 716];
         for (uint256 k; k < reachable.length; ++k) {
             uint256 i = reachable[k];
             Cell memory cell = _prepare(i);
@@ -136,7 +146,7 @@ contract SineV3PrimitiveSymbolicTest is Test, SineV3Primitive {
 
     /// @notice Selected nonconstant cells have strictly increasing anchors.
     function test_check_selected_knots_strictly_increase() public view {
-        uint256[8] memory cells = [uint256(0), 1, 500, 708, 710, 711, 716, 1000];
+        uint256[9] memory cells = [uint256(0), 1, 500, 708, 710, 711, 712, 716, 1000];
         for (uint256 k; k < cells.length; ++k) {
             assert(_knot(cells[k]) < _knot(cells[k] + 1));
         }
@@ -171,6 +181,7 @@ contract SineV3PrimitiveSymbolicTest is Test, SineV3Primitive {
     function test_fuzz_cell_monotone_708(uint256 r) public view { _fuzzCellMonotone(708, r); }
     function test_fuzz_cell_monotone_710(uint256 r) public view { _fuzzCellMonotone(710, r); }
     function test_fuzz_cell_monotone_711(uint256 r) public view { _fuzzCellMonotone(711, r); }
+    function test_fuzz_cell_monotone_712(uint256 r) public view { _fuzzCellMonotone(712, r); }
     function test_fuzz_cell_monotone_716(uint256 r) public view { _fuzzCellMonotone(716, r); }
     function test_fuzz_cell_monotone_1000(uint256 r) public view { _fuzzCellMonotone(1000, r); }
     function test_fuzz_cell_terminal_plateau(uint256 r) public view {

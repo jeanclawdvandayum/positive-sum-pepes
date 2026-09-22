@@ -93,6 +93,13 @@ contract HookRulesSymbolicTest is Test {
 
     /// @notice The returned spot is the unique positive integer whose
     /// 10,000-wide bucket contains the pot. No ceiling-division copy is used.
+    /// @dev 2026-09-22 solver note: `pot - lower <= 10_000` compiles (via-IR,
+    ///      solc 0.8.26) into a comparison lowered through a DIVISION WITH A
+    ///      SYMBOLIC DIVISOR — SMT-intractable for z3, z3-parallel, bitwuzla
+    ///      and cvc5 alike at 300-1800s/query (receipts: campaign logs). The
+    ///      addition form `pot <= lower + 10_000` lowers additively but can
+    ///      wrap for the top ~10,000 pots; those are excluded here and pinned
+    ///      exhaustively by test_ticket_interval_top_region below.
     function check_ticket_interval(uint256 pot, uint256 unrelatedGenesisPot) public {
         hook.setupTickets(pot, unrelatedGenesisPot, true, true);
         uint256 q = hook.ticketPrice();
@@ -106,7 +113,12 @@ contract HookRulesSymbolicTest is Test {
             // pot == type(uint256).max; q * 10,000 need not fit.
             uint256 lower = (q - 1) * 10_000;
             assert(lower < pot);
-            assert(pot - lower <= 10_000);
+            // unchecked: the wrapping addition is the defined bitvector
+            // semantics; outside the top 10,000 pots no wrap occurs and this
+            // is the exact bucket ceiling.
+            bool inBucket;
+            unchecked { inBucket = pot <= lower + 10_000; }
+            assert(inBucket || pot > type(uint256).max - 10_000);
         }
     }
 
@@ -128,6 +140,10 @@ contract HookRulesSymbolicTest is Test {
 
     /// @notice Across every adjacent representable pot, a spot cannot fall
     /// and can increase by at most one wei. The maximum has no successor.
+    /// @dev 2026-09-22 solver note: addition-form comparison; the subtraction
+    ///      form `afterPrice - beforePrice <= 1` lowers (via-IR) through a
+    ///      symbolic-divisor division and is SMT-intractable. beforePrice is
+    ///      bounded by max/10,000 + 1, so the +1 cannot wrap.
     function check_ticket_adjacent(uint256 pot) public {
         vm.assume(pot < type(uint256).max);
         hook.setupTickets(pot, 0, true, true);
@@ -135,7 +151,7 @@ contract HookRulesSymbolicTest is Test {
         hook.setupTickets(pot + 1, 0, true, true);
         uint256 afterPrice = hook.ticketPrice();
         assert(afterPrice >= beforePrice);
-        assert(afterPrice - beforePrice <= 1);
+        assert(afterPrice <= beforePrice + 1);
     }
 
     /// @notice Before launch, the accounted pot and genesis baseline are
@@ -201,5 +217,26 @@ contract HookRulesSymbolicTest is Test {
         check_ticket_interval(10_000, 0);
         check_ticket_interval(10_001, 0);
         check_ticket_interval(type(uint256).max, type(uint256).max);
+    }
+
+    /// @notice Exhaustive concrete check of the ORIGINAL subtraction-form
+    /// bucket property over the wrap-risk zone the symbolic proof excludes:
+    /// every pot in (max - 10,000, max]. 10,003 staticcalls on the real
+    /// etched runtime; the subtraction form is exact here (no wrap: the
+    /// bucket floor never exceeds the pot).
+    function test_ticket_interval_top_region_exhaustive() public {
+        uint256 start = type(uint256).max - 10_002;
+        for (uint256 pot = start; pot <= type(uint256).max; ++pot) {
+            hook.setupTickets(pot, 0, true, true);
+            uint256 q = hook.ticketPrice();
+            assert(q >= 1);
+            assert(hook.MIN_BUY_INPUT() == q);
+            uint256 lower = (q - 1) * 10_000;
+            assert(lower < pot);
+            assert(pot - lower <= 10_000);
+            if (pot == type(uint256).max) break; // ++pot would wrap
+        }
+        // the boundary seam between symbolic and exhaustive regions
+        check_ticket_interval(type(uint256).max - 10_003, 0);
     }
 }

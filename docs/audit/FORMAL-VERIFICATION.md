@@ -33,10 +33,10 @@ Compiler evidence uses an allowlist of build settings. It excludes explorer keys
 
 | Property | Domain and limit | EVM suite |
 | --- | --- | --- |
-| Active ticket interval | Every uint256 pot, arbitrary genesis-pot field, initialized sine state | Extended: timed out |
+| Active ticket interval | Every uint256 pot, arbitrary genesis-pot field, initialized sine state | Extended: intractable — see below |
 | Positive ticket minimum | Every uint256 pot, minimum exactly equals ticket cost | Required |
 | Whole-pot pricing | Every uint256 pot, independent of either genesis-pot value | Required |
-| Adjacent ticket order | Every pot below uint256 maximum, next cost increases by at most one wei | Extended: timed out |
+| Adjacent ticket order | Every pot below uint256 maximum, next cost increases by at most one wei | Extended: intractable — see below |
 | Prelaunch minimum | Empty pot before pool initialization, both configuration flags | Required |
 | Legacy minimum | Every uint256 pot, sine disabled | Required |
 | Unauthorized mode change | Every caller except the fixed controller, all four initial and destination modes | Required |
@@ -107,6 +107,8 @@ Source changes during a run invalidate its summary. Each run has per-property wa
 ## Unresolved scope
 
 The full nonconstant curve, exponential stack, and settlement inverse do not yet have completed end-to-end symbolic proofs. The old campaign timed out or encountered unsupported symbolic code access on these paths.
+
+**September 22 escalation (see [the escalation report](2026-09-22-formal-escalation.md)):** the two direct EVM ticket properties were re-attempted at 20× wall budget, 10–15× solver budget, with z3 (serial and 8-thread), bitwuzla, cvc5 and yices, with a re-engineered addition-form specification, and in an isolated minimal-implementation diagnostic. They remain open at the bitvector tier: the compiled queries require relational reasoning over 256-bit division and remainder that no tested engine decides. The old specification's subtraction-under-comparison additionally compiled (via-IR) into a division with a symbolic divisor — the single monster query per property. The composition closure for both properties now rests on the full-domain integer-tier lemmas, the no-overflow bridge, an exhaustive concrete check of the top 10,000 pots, and full-domain fuzz. No engine produced a counterexample at any budget.
 
 To attempt these properties without relabeling them:
 

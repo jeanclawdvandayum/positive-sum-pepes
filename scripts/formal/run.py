@@ -50,6 +50,7 @@ EXTENDED = [
     ("SineV3PriceSymbolicTest", "check_scaledexp_monotone", "proof"),
     ("SineV3PrimitiveSymbolicTest", "check_cell_monotone_710", "proof"),
     ("SineV3PrimitiveSymbolicTest", "check_cell_monotone_711", "proof"),
+    ("SineV3PrimitiveSymbolicTest", "check_cell_monotone_712", "proof"),
     ("SineV3PrimitiveSymbolicTest", "check_cell_monotone_716", "proof"),
     ("SineV3PrimitiveSymbolicTest", "check_cell_monotone_1000", "proof"),
     ("SineV3MathSymbolicTest", "check_buyout_spot_bound", "proof"),
