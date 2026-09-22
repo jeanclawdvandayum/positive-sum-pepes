@@ -179,9 +179,29 @@ for attempt in 1 2 3 4 5; do
   cast rpc evm_mine --rpc-url "$RPC" >/dev/null
 done
 [ -n "$DET_TX" ] && [ "$DET_TX" != "null" ] || { echo "✗ detonate never landed"; cat /tmp/psp-e2e-det-err.log; exit 1; }
-receipt "detonate→RESERVE+BIRTH (rando)" "$DET_TX"
+receipt "detonate→halt+flatten+mark (rando)" "$DET_TX"
 
-# post-detonation invariants: flat mode, locks open, round 2 already born
+# AUD-3 rebirth: under a production per-tx gas cap (~2^24 on Base Sepolia)
+# gasleft() can never exceed detonate's 30M composed-spawn threshold, so the
+# successor is NEVER born inside the detonate tx on-chain. Anyone completes it
+# permissionlessly: reserveSpawn + 3× birthStep. Drive exactly that here —
+# this is the real production rebirth path (2026-09-22). The bounded entropy
+# mine in reserveSpawn cheap-fails per block, so retry with fresh entropy
+# (same pattern as the detonate loop above) under a generous gas cap.
+RES_TX=""
+for i in $(seq 1 20); do
+  RES_TX=$(cast send "$FACTORY" "reserveSpawn(uint256)" 1 --gas-limit 15000000 \
+    --rpc-url "$RPC" --private-key "$K_RANDO" --json 2>/tmp/psp-e2e-res-err.log | jq -r '.transactionHash // empty') || true
+  [ -n "$RES_TX" ] && [ "$RES_TX" != "null" ] && break
+  cast rpc evm_mine --rpc-url "$RPC" >/dev/null
+done
+[ -n "$RES_TX" ] && [ "$RES_TX" != "null" ] || { echo "✗ reserveSpawn never landed"; cat /tmp/psp-e2e-res-err.log; exit 1; }
+receipt "R2 reserveSpawn (permissionless)" "$RES_TX"
+send "R2 birthStep 1/3" "$K_RANDO" "$FACTORY" "birthStep()"
+send "R2 birthStep 2/3" "$K_RANDO" "$FACTORY" "birthStep()"
+send "R2 birthStep 3/3" "$K_RANDO" "$FACTORY" "birthStep()"
+
+# post-detonation invariants: flat mode, locks open, round 2 born
 MODE=$(cast call "$R1_HOOK" "mode()(uint8)" --rpc-url "$RPC")
 echo "  R1 hook mode=$MODE (2 = Flat expected)"
 FLAT_TS=$(cast call "$R1_CTRL" "flatTime()(uint256)" --rpc-url "$RPC" | awk '{print $1}')
