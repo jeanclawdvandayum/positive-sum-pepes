@@ -34,14 +34,21 @@ html[data-theme=light] {
   --time-text: #825500;
   color-scheme: light;
 }
-html[data-urgency=safe] { --time-lit: #b6f544; --time-text: #b6f544; }
-html[data-urgency=warm] { --time-lit: #ffc64d; --time-text: #ffc64d; }
-html[data-urgency=critical] { --time-lit: #ff777d; --time-text: #ff777d; }
+/* Urgency bands: <10% of the window left = critical, <30% = warm, else safe.
+   Dark digits ride the theme's own green/amber/red. The light theme is the
+   rolling-paper palette (editorial.css): digits sit on the olive housing
+   #20231c as print-ink lime/orange/vermilion — lime echoing the action
+   color — while ground text inverts to deep hues on the warm paper. Red vs
+   green part ways in lightness too, not just hue, for deuteranopia
+   (lit L* 87.8/81.2/66.6 dark · 91.9/75.5/61.0 light). */
+html[data-urgency=safe] { --time-lit: #b9eb8e; --time-text: #b9eb8e; }
+html[data-urgency=warm] { --time-lit: #ffbe55; --time-text: #ffbe55; }
+html[data-urgency=critical] { --time-lit: #f67f79; --time-text: #f67f79; }
 html[data-urgency=idle] { --time-lit: #dceaf2; --time-text: #b2c4cc; }
-html[data-theme=light][data-urgency=safe] { --time-text: #12603b; }
-html[data-theme=light][data-urgency=warm] { --time-text: #825500; }
-html[data-theme=light][data-urgency=critical] { --time-text: #ae223f; }
-html[data-theme=light][data-urgency=idle] { --time-text: #465d65; }
+html[data-theme=light][data-urgency=safe] { --time-lit: #d5f56b; --time-text: #334b2e; }
+html[data-theme=light][data-urgency=warm] { --time-lit: #ffa726; --time-text: #8a4b00; }
+html[data-theme=light][data-urgency=critical] { --time-lit: #ff5c3d; --time-text: #b8321c; }
+html[data-theme=light][data-urgency=idle] { --time-lit: #f2f0e7; --time-text: #465d65; }
 
 .btn:not(.secondary), .tabs button.active, .inline-input button,
 .pepe-choice.selected:after { background: var(--action); color: var(--action-ink); }
@@ -103,11 +110,11 @@ html[data-urgency=critical] .instrument-status {
   color: var(--clock-housing);
   box-shadow: 3px 3px 0 #0005;
 }
-html[data-urgency=critical] :is(.instrument,.play-clockband>.clock,.mini-clock,.strip-clock) {
+html[data-urgency=critical] :is(.instrument,.play-clockband>.clock,.predeposit-state>.clock,.mini-clock,.strip-clock) {
   border-color: var(--time-lit);
   animation: clock-alarm 1.8s ease-in-out infinite;
 }
-@keyframes clock-alarm { 50% { outline: 2px solid #ff777d77; outline-offset: 3px; } }
+@keyframes clock-alarm { 50% { outline: 2px solid color-mix(in srgb,var(--time-lit) 47%,transparent); outline-offset: 3px; } }
 
 /* Flat fills remain legible behind the ladder's text. */
 .ladder-row { background: var(--panel); }
@@ -144,7 +151,7 @@ html[data-theme=light] .prototype-strip { background: var(--raised); }
   .instrument .clock { padding: 17px 4px; }
 }
 @media(prefers-reduced-motion:reduce) {
-  html[data-urgency=critical] :is(.instrument,.play-clockband>.clock,.mini-clock,.strip-clock) { animation: none; outline: 2px solid #ff777d77; outline-offset: 2px; }
+  html[data-urgency=critical] :is(.instrument,.play-clockband>.clock,.predeposit-state>.clock,.mini-clock,.strip-clock) { animation: none; outline: 2px solid color-mix(in srgb,var(--time-lit) 47%,transparent); outline-offset: 2px; }
 }
 
 .play-clockband h1 span.money { color: var(--amber); }

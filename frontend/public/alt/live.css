@@ -8,7 +8,7 @@ body.alt-mode {--bg-0:var(--bg);--bg-1:var(--panel);--bg-2:var(--raised);--text-
 .alt-stake .alt-stake-layout>div:nth-child(2){grid-row:1;grid-column:2}.alt-stake [aria-label="your pepe"] h1{font-size:32px;overflow-wrap:anywhere}.alt-stake .alt-stake-layout h2{font-size:30px}.alt-stake .alt-identity-row h3{font-size:29px}.alt-shell .mini-clock:empty{display:none}.alt-stake [aria-label="your pepe"]{height:100%}.alt-stake .alt-stake-layout>div:first-child{align-self:stretch}
 @media(max-width:800px){.alt-stake .alt-stake-layout>div:nth-child(2){grid-column:1;grid-row:auto}}
 .under-hero>.editorial-pepe{width:27px;height:27px;flex-shrink:0}.editorial-pepe svg{width:100%;height:100%;display:block}
-.alt-shell .predeposit-state .alt-clock,.alt-shell .play-clockband .alt-clock{width:fit-content;margin:24px auto;padding:14px 24px;background:var(--clock-housing);color:var(--clock-money);border:1px solid var(--clock-line);border-radius:0;box-shadow:5px 5px 0 var(--shadow)}
+.alt-shell .predeposit-state .alt-clock,.alt-shell .play-clockband .alt-clock{width:fit-content;margin:24px auto;padding:14px 24px;background:var(--clock-housing);color:var(--time-lit);border:1px solid var(--clock-line);border-radius:0;box-shadow:5px 5px 0 var(--shadow)}
 @media(max-width:480px){.alt-shell .predeposit-state .alt-clock,.alt-shell .play-clockband .alt-clock{font-size:clamp(39px,10vw,50px);padding:12px 14px}}
 .wallet-art{width:24px!important;height:24px!important;flex-shrink:0;border-radius:4px}.alt-shell .wallet-button{min-width:0}.alt-shell .wallet-label{font-family:var(--body);font-size:12px}
 

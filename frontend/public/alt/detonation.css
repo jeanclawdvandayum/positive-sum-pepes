@@ -296,7 +296,7 @@ body.alt-mode .dtn-clock {
   font-family: Segment, var(--mono);
   font-size: clamp(42px, 8.5vw, 112px);
   line-height: 1.13;
-  color: var(--clock-money);
+  color: var(--time-lit);
   background: var(--clock-housing);
   border: 1px solid var(--clock-line);
   box-shadow: 5px 5px 0 var(--shadow);
