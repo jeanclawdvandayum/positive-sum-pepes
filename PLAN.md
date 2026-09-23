@@ -205,3 +205,42 @@ reporting.
 - `tsc -b`, `npm run build:alt`, the default `vite build` and `frontend/tests` all pass.
 - The original UI shows no visual diff on `/`, `/play` and `/predeposit`.
 - One commit per feature on `alt-ui-fx`.
+
+---
+
+# Round 2 — wallet modal, picker spacing, truthful buy chip
+
+## Feature 5 — RainbowKit modal in the alt style (alt only)
+- `frontend/src/App.tsx`: when `VITE_ALT_UI === '1'` pass an alt theme from new `frontend/src/alt/rainbowTheme.ts`;
+  the original UI keeps its current dark/light themes byte-for-byte.
+- The alt theme is built on `darkTheme()`/`lightTheme()` (for resolved mode) but every color, font, radius and
+  shadow points at alt CSS variables (`var(--panel)`, `var(--ink)`, `var(--green)`, `var(--line)`,
+  `var(--body)`, …). The variables switch with `html[data-theme]`, so one mapping covers day and night.
+- All radii are `0`. Fonts: body = `var(--body)`; titles use `var(--display)` via scoped CSS overrides in
+  `public/alt/polish.css` under `body.alt-mode [data-rk]`. Shadows are hard offsets (`5px 5px 0 var(--shadow)`), with no blur.
+- The overlay matches the site (dim scrim; blur `none` or `small`). Buttons follow the alt button language:
+  square, green action and hard shadow.
+- Covers the connect, account and chain modals. Text stays as RainbowKit renders it.
+
+## Feature 6 — Pepe picker spacing (IBCO, alt only)
+- The picker card on `#/predeposit` has large blank areas: the grid is capped at 370px and centered inside
+  a card that spans two rows. In alt, the tiles grow to fill the card width (3×2 grid, even gaps), and the
+  card's vertical space is used without empty bands.
+- The helper line "tap a pepe to select it" (and its selected-state text) aligns with the left edge of the
+  tile grid.
+- The stake page picker must not regress (check `#/stake`). Mobile 390px stays usable.
+
+## Feature 7 — Buy success chip reports confirmed facts only
+- Delete the pre-sign estimate (`primeFxDetail` in AltTrade). Remove `primeFxDetail`/`takeFxDetail` and all
+  their plumbing if nothing else uses them.
+- In `useConfirmedWrite`, the `wait` step already fetches the receipt. Keep that receipt (don't read it a second time),
+  decode `TimeAdded(address,uint256,uint256)` (ABI in `lib/abi.ts`) from its logs, and use the confirmed
+  `secondsAdded` for the buy chip as `+m:ss`. `secondsAdded == 0` (clock at cap) → no numeric chip. No seat
+  count, because seats can't be derived exactly from the events.
+- Put the decode in a pure exported helper, and cover it with a node test in `frontend/tests/`. The test builds
+  realistic receipt logs:
+  - the normal case;
+  - a clock capped by a concurrent buy (seconds smaller than the estimate);
+  - zero seconds;
+  - no TimeAdded log;
+  - an unrelated log first.
