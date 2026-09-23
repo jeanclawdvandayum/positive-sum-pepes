@@ -1,0 +1,666 @@
+{
+  "chainId": 84532,
+  "revision": "9d1528c21b1eac6721010226dfa96dceed5dbb13",
+  "contracts": {
+    "sineV3Math": {
+      "address": "0xeBaC3bf34A6a8343832118534e106332FB669099",
+      "identifier": "src/SineV3Math.sol:SineV3Math",
+      "verificationId": "1761c893-7ce8-41e7-9782-043447e525fc",
+      "matchId": "51543667",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:48:47Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "1761c893-7ce8-41e7-9782-043447e525fc",
+        "jobStartTime": "2026-09-23T06:48:44Z",
+        "jobFinishTime": "2026-09-23T06:48:47Z",
+        "compilationTime": "2328",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xeBaC3bf34A6a8343832118534e106332FB669099",
+          "verifiedAt": "2026-09-23T06:48:47Z",
+          "matchId": "51543667"
+        }
+      }
+    },
+    "sineV3Data0": {
+      "address": "0x4Fa2Ba72d4cf575a897fE5bb02EbbEC85377789A",
+      "identifier": "src/SineV3Data.sol:SineV3Data0",
+      "verificationId": "96036544-4339-41cc-b25d-d0242467d5fc",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
+    },
+    "sineV3Data1": {
+      "address": "0xFdf786342C307Fb79cb66dE4e0C482Be40Ca1B2D",
+      "identifier": "src/SineV3Data.sol:SineV3Data1",
+      "verificationId": "2e9d8c54-f8ff-45bd-91df-7bc8b0470a9f",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
+    },
+    "sineV3Data2": {
+      "address": "0x8e29e5c5BD2CAbA6b7BE75E05e1A8e05db2AcCFe",
+      "identifier": "src/SineV3Data.sol:SineV3Data2",
+      "verificationId": "450bfb21-31bb-4a18-9e6d-d92e1dc9a9be",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
+    },
+    "sineV3Data3": {
+      "address": "0x3F9f27Be0412cCb10897738B2Dd2b70f81AaFF59",
+      "identifier": "src/SineV3Data.sol:SineV3Data3",
+      "verificationId": "5f210ba0-87ca-41f4-97ec-1e82e3be4f1b",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
+    },
+    "factory": {
+      "address": "0xa447E25584Bd22DF06835d82c69FA055f9093298",
+      "identifier": "src/PSPFactory.sol:PSPFactory",
+      "verificationId": "b5672a17-00bb-419c-84a0-96a73a554bf1",
+      "matchId": "51543686",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:49:25Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "b5672a17-00bb-419c-84a0-96a73a554bf1",
+        "jobStartTime": "2026-09-23T06:49:00Z",
+        "jobFinishTime": "2026-09-23T06:49:25Z",
+        "compilationTime": "11220",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xa447E25584Bd22DF06835d82c69FA055f9093298",
+          "verifiedAt": "2026-09-23T06:49:25Z",
+          "matchId": "51543686"
+        }
+      }
+    },
+    "token": {
+      "address": "0xc271459fFEc58018B57e1463dbEA83218d7f34D9",
+      "identifier": "src/PSPToken.sol:PSPToken",
+      "verificationId": "f1816e31-6ce3-4fcb-bdf2-bf413fe3e487",
+      "matchId": "51543671",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:49:08Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "f1816e31-6ce3-4fcb-bdf2-bf413fe3e487",
+        "jobStartTime": "2026-09-23T06:49:04Z",
+        "jobFinishTime": "2026-09-23T06:49:08Z",
+        "compilationTime": "3726",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xc271459fFEc58018B57e1463dbEA83218d7f34D9",
+          "verifiedAt": "2026-09-23T06:49:08Z",
+          "matchId": "51543671"
+        }
+      }
+    },
+    "controller": {
+      "address": "0x7bfae3aDa34D5d96f8e8cA35b28A05929c70BfcD",
+      "identifier": "src/RoundController.sol:RoundController",
+      "verificationId": "e202740b-4c68-4e7e-b0bd-bc60328bc0f0",
+      "matchId": "51543689",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:49:28Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "e202740b-4c68-4e7e-b0bd-bc60328bc0f0",
+        "jobStartTime": "2026-09-23T06:49:07Z",
+        "jobFinishTime": "2026-09-23T06:49:28Z",
+        "compilationTime": "9807",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x7bfae3aDa34D5d96f8e8cA35b28A05929c70BfcD",
+          "verifiedAt": "2026-09-23T06:49:28Z",
+          "matchId": "51543689"
+        }
+      }
+    },
+    "hook": {
+      "address": "0x83D99926cE5d7E3045886F60E1e0dB5bdb0feA88",
+      "identifier": "src/CurveHook.sol:CurveHook",
+      "verificationId": "36c52c53-139c-4597-b096-d148e762a0cc",
+      "matchId": "51543672",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:49:18Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "36c52c53-139c-4597-b096-d148e762a0cc",
+        "jobStartTime": "2026-09-23T06:49:09Z",
+        "jobFinishTime": "2026-09-23T06:49:18Z",
+        "compilationTime": "7603",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x83D99926cE5d7E3045886F60E1e0dB5bdb0feA88",
+          "verifiedAt": "2026-09-23T06:49:18Z",
+          "matchId": "51543672"
+        }
+      }
+    },
+    "staker": {
+      "address": "0x6A67204db8e03766D5F61f3932457a2dc5C01c7E",
+      "identifier": "src/PSPStaker.sol:PSPStaker",
+      "verificationId": "4089e0e7-515a-458c-9f5d-b901abf65154",
+      "matchId": "51543673",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:49:20Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "4089e0e7-515a-458c-9f5d-b901abf65154",
+        "jobStartTime": "2026-09-23T06:49:12Z",
+        "jobFinishTime": "2026-09-23T06:49:20Z",
+        "compilationTime": "7444",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x6A67204db8e03766D5F61f3932457a2dc5C01c7E",
+          "verifiedAt": "2026-09-23T06:49:20Z",
+          "matchId": "51543673"
+        }
+      }
+    },
+    "mix": {
+      "address": "0xE0B393AD29a65c8038A806A0C81BB44fD48fCced",
+      "identifier": "src/testnet/SepoliaMixETH.sol:SepoliaMixETH",
+      "verificationId": "472bd428-e0e2-4166-ba5c-c2aa153c16e0",
+      "matchId": "51543688",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:49:26Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "472bd428-e0e2-4166-ba5c-c2aa153c16e0",
+        "jobStartTime": "2026-09-23T06:49:14Z",
+        "jobFinishTime": "2026-09-23T06:49:26Z",
+        "compilationTime": "3616",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xE0B393AD29a65c8038A806A0C81BB44fD48fCced",
+          "verifiedAt": "2026-09-23T06:49:26Z",
+          "matchId": "51543688"
+        }
+      }
+    },
+    "registry": {
+      "address": "0x95D18F7CAc8f0858A283D87D0E55817436f3D0dD",
+      "identifier": "src/PSPReferralRegistry.sol:PSPReferralRegistry",
+      "verificationId": "5802280f-de37-4106-b794-1870872f32d1",
+      "matchId": "51543675",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:49:21Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "5802280f-de37-4106-b794-1870872f32d1",
+        "jobStartTime": "2026-09-23T06:49:16Z",
+        "jobFinishTime": "2026-09-23T06:49:21Z",
+        "compilationTime": "4481",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x95D18F7CAc8f0858A283D87D0E55817436f3D0dD",
+          "verifiedAt": "2026-09-23T06:49:21Z",
+          "matchId": "51543675"
+        }
+      }
+    },
+    "zapIn": {
+      "address": "0xaC2a38131B4E8Ac8d736325800b57b2a58115f62",
+      "identifier": "src/PSPZapIn.sol:PSPZapIn",
+      "verificationId": "835e2ecc-9806-4936-bd67-b910ca76cee4",
+      "matchId": "51543674",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:49:20Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "835e2ecc-9806-4936-bd67-b910ca76cee4",
+        "jobStartTime": "2026-09-23T06:49:18Z",
+        "jobFinishTime": "2026-09-23T06:49:20Z",
+        "compilationTime": "1406",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xaC2a38131B4E8Ac8d736325800b57b2a58115f62",
+          "verifiedAt": "2026-09-23T06:49:20Z",
+          "matchId": "51543674"
+        }
+      }
+    },
+    "zapOut": {
+      "address": "0x8B4643d89C4C55e520E813102430Df28EC469dE5",
+      "identifier": "src/PSPZapOut.sol:PSPZapOut",
+      "verificationId": "10eb5a5a-2b32-4d93-8ba2-09e243bb73ae",
+      "matchId": "51543678",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:49:24Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "10eb5a5a-2b32-4d93-8ba2-09e243bb73ae",
+        "jobStartTime": "2026-09-23T06:49:23Z",
+        "jobFinishTime": "2026-09-23T06:49:24Z",
+        "compilationTime": "872",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x8B4643d89C4C55e520E813102430Df28EC469dE5",
+          "verifiedAt": "2026-09-23T06:49:24Z",
+          "matchId": "51543678"
+        }
+      }
+    },
+    "faucet": {
+      "address": "0x2250484Bcfd89344ee9aD661Fe485D29eF61B1DE",
+      "identifier": "src/testnet/MixETHFaucet.sol:MixETHFaucet",
+      "verificationId": "74024b0a-0665-4ba9-b70c-72a21d540b23",
+      "matchId": "51543687",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:49:26Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "74024b0a-0665-4ba9-b70c-72a21d540b23",
+        "jobStartTime": "2026-09-23T06:49:25Z",
+        "jobFinishTime": "2026-09-23T06:49:26Z",
+        "compilationTime": "488",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x2250484Bcfd89344ee9aD661Fe485D29eF61B1DE",
+          "verifiedAt": "2026-09-23T06:49:26Z",
+          "matchId": "51543687"
+        }
+      }
+    },
+    "reinvestor": {
+      "address": "0x3231Ee56BCdb7615fF118488D3a0412fB0dfd6Ca",
+      "identifier": "src/PSPReinvestor.sol:PSPReinvestor",
+      "verificationId": "85906aed-d463-45ed-8346-1ce00149e0dc",
+      "matchId": "51543690",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:49:31Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "85906aed-d463-45ed-8346-1ce00149e0dc",
+        "jobStartTime": "2026-09-23T06:49:28Z",
+        "jobFinishTime": "2026-09-23T06:49:31Z",
+        "compilationTime": "2092",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x3231Ee56BCdb7615fF118488D3a0412fB0dfd6Ca",
+          "verifiedAt": "2026-09-23T06:49:31Z",
+          "matchId": "51543690"
+        }
+      }
+    },
+    "descriptor": {
+      "address": "0x304C84B67614291A401913593167957EdC67FdB8",
+      "identifier": "src/PepeExpandedDescriptor.sol:PepeExpandedDescriptor",
+      "verificationId": "3c5e4ad6-0f4c-4bfd-b7a4-768bffee3e28",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
+    },
+    "hookDeployer": {
+      "address": "0x2AA7b9D9CE18889CDDe404FA9E41Ce68FB63c033",
+      "identifier": "src/HookDeployer.sol:HookDeployer",
+      "verificationId": "fa450470-c6ef-4bae-9f9b-68dc83b7f40a",
+      "matchId": "51543721",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:50:17Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "fa450470-c6ef-4bae-9f9b-68dc83b7f40a",
+        "jobStartTime": "2026-09-23T06:49:33Z",
+        "jobFinishTime": "2026-09-23T06:50:17Z",
+        "compilationTime": "24149",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x2AA7b9D9CE18889CDDe404FA9E41Ce68FB63c033",
+          "verifiedAt": "2026-09-23T06:50:17Z",
+          "matchId": "51543721"
+        }
+      }
+    },
+    "controllerDeployer": {
+      "address": "0xFE3b98e032E6803B66fbB5D8577Bde0EF038b3aD",
+      "identifier": "src/ControllerDeployer.sol:ControllerDeployer",
+      "verificationId": "5b1c646f-92f1-424b-9cef-5e22a580b869",
+      "matchId": "51543720",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:50:15Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "5b1c646f-92f1-424b-9cef-5e22a580b869",
+        "jobStartTime": "2026-09-23T06:49:36Z",
+        "jobFinishTime": "2026-09-23T06:50:15Z",
+        "compilationTime": "22482",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xFE3b98e032E6803B66fbB5D8577Bde0EF038b3aD",
+          "verifiedAt": "2026-09-23T06:50:15Z",
+          "matchId": "51543720"
+        }
+      }
+    },
+    "stakerDeployer": {
+      "address": "0x2655a7160eb034e91d544239a24Ad3346ca2d872",
+      "identifier": "src/StakerDeployer.sol:StakerDeployer",
+      "verificationId": "2c99bff0-e65b-4ced-938d-2d67bfa9c5d8",
+      "matchId": "51543707",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:50:07Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "2c99bff0-e65b-4ced-938d-2d67bfa9c5d8",
+        "jobStartTime": "2026-09-23T06:49:40Z",
+        "jobFinishTime": "2026-09-23T06:50:07Z",
+        "compilationTime": "15891",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x2655a7160eb034e91d544239a24Ad3346ca2d872",
+          "verifiedAt": "2026-09-23T06:50:07Z",
+          "matchId": "51543707"
+        }
+      }
+    },
+    "tokenDeployer": {
+      "address": "0x69720cD8E4d43E1f0CaB186F3191c553aC181301",
+      "identifier": "src/ControllerDeployer.sol:TokenDeployer",
+      "verificationId": "a5af8a85-e868-423d-b1b1-9d25ae4b9cde",
+      "matchId": "51543694",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:49:55Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "a5af8a85-e868-423d-b1b1-9d25ae4b9cde",
+        "jobStartTime": "2026-09-23T06:49:42Z",
+        "jobFinishTime": "2026-09-23T06:49:55Z",
+        "compilationTime": "5616",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x69720cD8E4d43E1f0CaB186F3191c553aC181301",
+          "verifiedAt": "2026-09-23T06:49:55Z",
+          "matchId": "51543694"
+        }
+      }
+    },
+    "hookInitCode": {
+      "address": "0x726Ae2B2578A899D1436fA75803c8f5A84a09AaD",
+      "identifier": "src/HookInitCode.sol:HookInitCode",
+      "verificationId": "f67d9be5-b73f-4003-ba5e-d78c1e13bd64",
+      "matchId": "51543722",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:50:19Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "f67d9be5-b73f-4003-ba5e-d78c1e13bd64",
+        "jobStartTime": "2026-09-23T06:49:44Z",
+        "jobFinishTime": "2026-09-23T06:50:19Z",
+        "compilationTime": "19861",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x726Ae2B2578A899D1436fA75803c8f5A84a09AaD",
+          "verifiedAt": "2026-09-23T06:50:19Z",
+          "matchId": "51543722"
+        }
+      }
+    },
+    "registryInitCode": {
+      "address": "0x69Efc19266B1637bFd08d61B83c903713c82728a",
+      "identifier": "src/ReferralRegistryInitCode.sol:ReferralRegistryInitCode",
+      "verificationId": "d85731a8-fd9a-413f-a10a-0efdba98cae9",
+      "matchId": "51543704",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T06:50:04Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "d85731a8-fd9a-413f-a10a-0efdba98cae9",
+        "jobStartTime": "2026-09-23T06:49:47Z",
+        "jobFinishTime": "2026-09-23T06:50:04Z",
+        "compilationTime": "9693",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x69Efc19266B1637bFd08d61B83c903713c82728a",
+          "verifiedAt": "2026-09-23T06:50:04Z",
+          "matchId": "51543704"
+        }
+      }
+    }
+  }
+}
