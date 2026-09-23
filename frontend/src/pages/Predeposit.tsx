@@ -60,6 +60,7 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
   const depositSession = `${address}:${round.controller}`
   const latestDepositSession = useRef(depositSession)
   latestDepositSession.current = depositSession
+  const pickerRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => { setSelectedPepe(null); setStep('idle'); setError(null) }, [address, round.controller])
   const depositPepe = reservedPepe && reservedPepe > 0n ? reservedPepe : selectedPepe
 
@@ -178,6 +179,28 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
   const globalCapExceeded = globalRemaining !== undefined && amountWad > globalRemaining
   const belowMinimum = amountWad > 0n && amountWad < minimum
   const legacyDust = globalRemaining !== undefined && globalRemaining > 0n && globalRemaining < minimum
+
+  /// Feature 1 (alt motion pass): the commit amount demands a pepe choice.
+  /// Shows with or without a connected wallet.
+  const needsPepe =
+    variant === 'alt' &&
+    artVersion === 2n &&
+    !(reservedPepe && reservedPepe > 0n) &&
+    selectedPepe === null &&
+    amountWad > 0n &&
+    !pd?.closed
+  const amountInvalid = belowMinimum || globalCapExceeded || walletCapExceeded || (amountWad > 0n && !balanceOk)
+
+  /// When the commit field blurs while the picker is being demanded, bring the
+  /// highlighted picker on screen — never while the user is typing.
+  function onAmountBlur() {
+    const el = pickerRef.current
+    if (!el || !needsPepe) return
+    const rect = el.getBoundingClientRect()
+    if (rect.bottom > 0 && rect.top < window.innerHeight) return
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' })
+  }
 
   const endTime = pd && duration !== undefined ? pd.startTime + duration : undefined
   const remaining = endTime !== undefined ? Math.max(0, Number(endTime - BigInt(nowSec))) : undefined
@@ -359,7 +382,7 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
             </div>
           </div>
 
-          <div className="pd-picker min-w-0 lg:col-start-1 lg:row-start-1 lg:row-span-2">
+          <div ref={pickerRef} className="pd-picker min-w-0 lg:col-start-1 lg:row-start-1 lg:row-span-2">
           {artVersion === 2n && !pd?.closed && (
             reservedPepe && reservedPepe > 0n ? (
               <div className="card flex flex-col items-center gap-5 p-5 text-center" aria-label="your reserved pepe">
@@ -376,7 +399,7 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
               </div>
             ) : <PepePicker round={round} selected={selectedPepe} onSelect={setSelectedPepe}
                   seed={pickerSeed} onReroll={() => { setSelectedPepe(null); setPickerSeed(s => s + 1) }}
-                  disabled={busy} actionLabel="deposit" />
+                  disabled={busy} actionLabel="deposit" attention={variant === 'alt' ? needsPepe : undefined} />
           )}
 
           </div>
@@ -411,6 +434,8 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
                 value={amount}
                 inputMode="decimal"
                 onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                onBlur={onAmountBlur}
+                aria-invalid={variant === 'alt' && amountInvalid ? true : undefined}
               />
               <AmountSlider amount={amount} maximum={maxDeposit} onChange={setAmount} disabled={busy || !!pd?.closed} label="share of your available deposit" />
               {walletCap !== undefined && walletCap > 0n && myDep !== undefined && (

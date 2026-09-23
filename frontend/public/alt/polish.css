@@ -1,0 +1,276 @@
+/* polish.css — slice A: Feature 1 (IBCO pepe-selector attention) + Feature 2
+   (hover & micro polish). Loaded only by AltShell (stylesheet list), so every
+   rule below only ever applies to the alt UI; the original UI never fetches
+   this file. Reduced motion: style.css already hard-kills animations and
+   transitions globally (`* { animation:none!important; transition:none!important }`);
+   the reduced-motion block at the bottom strips transforms down to color/opacity. */
+
+/* Motion tokens (opus design pass): one clock for the whole file. */
+.alt-shell {
+  --t-fast: 120ms;  /* press, color snaps */
+  --t-base: 220ms;  /* hover lift, nav underline, tab slab, focus underline */
+  --t-slow: 360ms;  /* arm fill, stamp, deal, hop, theme sun */
+  --t-emph: 550ms;  /* sheen, attention pulses */
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-pop: cubic-bezier(.34, 1.56, .64, 1);
+}
+
+/* ───────────────────────── Feature 1 — IBCO picker attention ───────────────────────── */
+
+/* data-attention is 'true' | 'false' while the prop is passed (alt Predeposit), so the
+   'true'→'false' transition gives the ring a fade-out resolve; the attribute is absent
+   entirely when the prop is not passed (original UI, stake pickers). */
+.alt-shell [data-attention] { position: relative; }
+.alt-shell [data-attention]::after {
+  content: ''; position: absolute; inset: -4px; z-index: 1; pointer-events: none;
+  border: 3px solid var(--action);
+  box-shadow: 0 0 0 1px var(--ink),
+              0 0 22px color-mix(in srgb, var(--action) 55%, transparent);
+  opacity: 0;
+  transition: opacity var(--t-slow) var(--ease-out);
+}
+/* two strong pulses, then the steady glow ring (static opacity .8 under the animation) */
+.alt-shell [data-attention='true']::after {
+  opacity: .8;
+  animation: pick-pulse var(--t-emph) ease-in-out 2;
+}
+@keyframes pick-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .2 } }
+
+/* helper line becomes an action chip with a bobbing ↑ while attention is on
+   (decorative glyph only — the text itself is untouched) */
+.alt-shell [data-attention='true'] .picker-hint {
+  display: inline-block;
+  background: var(--action);
+  color: var(--action-ink);
+  padding: 3px 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.alt-shell [data-attention='true'] .picker-hint::after {
+  content: '↑'; display: inline-block; margin-left: 7px;
+  animation: hint-bob 1.1s ease-in-out infinite;
+}
+@keyframes hint-bob { 50% { transform: translateY(-3px) } }
+
+/* tile entrance (deal-in) is the ONLY animation on the button itself — attention and
+   selection animate the inner art frame instead, so resolving/re-arming never restarts
+   the deal across the grid (opus QA round 1). */
+.alt-shell [data-pepe-grid] > button { animation: tile-deal var(--t-slow) var(--ease-out) backwards; }
+.alt-shell [data-pepe-grid] > button:nth-child(2) { animation-delay: 30ms; }
+.alt-shell [data-pepe-grid] > button:nth-child(3) { animation-delay: 60ms; }
+.alt-shell [data-pepe-grid] > button:nth-child(4) { animation-delay: 90ms; }
+.alt-shell [data-pepe-grid] > button:nth-child(5) { animation-delay: 120ms; }
+.alt-shell [data-pepe-grid] > button:nth-child(6) { animation-delay: 150ms; }
+@keyframes tile-deal { from { transform: translateY(8px); opacity: 0 } }
+
+/* Feature 1 — one-time staggered hop across the tiles when attention kicks on */
+.alt-shell [data-attention='true'] [data-pepe-grid] > button > div {
+  animation: tile-hop var(--t-slow) var(--ease-pop) backwards;
+}
+.alt-shell [data-attention='true'] [data-pepe-grid] > button:nth-child(2) > div { animation-delay: 45ms; }
+.alt-shell [data-attention='true'] [data-pepe-grid] > button:nth-child(3) > div { animation-delay: 90ms; }
+.alt-shell [data-attention='true'] [data-pepe-grid] > button:nth-child(4) > div { animation-delay: 135ms; }
+.alt-shell [data-attention='true'] [data-pepe-grid] > button:nth-child(5) > div { animation-delay: 180ms; }
+.alt-shell [data-attention='true'] [data-pepe-grid] > button:nth-child(6) > div { animation-delay: 225ms; }
+@keyframes tile-hop { 45% { transform: translateY(-6px) } }
+
+/* selecting a tile resolves the highlight: stamp-pop on the art frame + ✓ badge pop */
+.alt-shell [data-pepe-grid] button[aria-pressed='true'] > div {
+  animation: pick-stamp var(--t-slow) var(--ease-pop);
+}
+.alt-shell [data-pepe-grid] button[aria-pressed='true'] > span:last-child {
+  animation: pick-badge .3s cubic-bezier(.34, 1.56, .64, 1) backwards;
+}
+@keyframes pick-stamp { 0% { transform: scale(1) } 45% { transform: scale(1.1) } 100% { transform: scale(1) } }
+@keyframes pick-badge { 0% { transform: scale(0); opacity: 0 } 60% { transform: scale(1.3); opacity: 1 } 100% { transform: scale(1) } }
+
+/* ───────────────────────── Feature 2 — hover & micro polish ───────────────────────── */
+
+/* Item 1 — primary buttons: one-time diagonal sheen on hover, 1px press depress,
+   and the accent fill sweeping left→right when a CTA arms (disabled → enabled).
+   The sweep is a transform-only raised cover (z-index:-1 ::before, isolation keeps
+   it above the button's own background and under the label) that retracts on arm.
+   Selector list mirrors live.css's unified action-button treatment; .alt-detonate
+   is slice C territory (its own hover/press/pending motion). */
+.alt-shell :is(.tx-action:not(.alt-detonate), .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button) {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition: filter var(--t-fast), transform var(--t-fast);
+}
+.alt-shell :is(.tx-action:not(.alt-detonate), .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button)::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: var(--raised);
+  transform: scaleX(0); transform-origin: right center;
+  transition: transform var(--t-slow) var(--ease-out);
+  pointer-events: none;
+}
+.alt-shell :is(.tx-action:not(.alt-detonate), .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button):disabled::before {
+  transform: scaleX(1);
+}
+.alt-shell :is(.tx-action:not(.alt-detonate), .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button)::after {
+  content: ''; position: absolute; top: -25%; bottom: -25%; left: -30%; width: 40%;
+  background: linear-gradient(105deg, transparent, rgb(255 255 255 / .32) 50%, transparent);
+  transform: translateX(-130%); /* parked off the left edge */
+  pointer-events: none;
+}
+.alt-shell :is(.tx-action:not(.alt-detonate), .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button):enabled:hover::after {
+  animation: btn-sheen var(--t-emph) var(--ease-out);
+}
+.alt-shell :is(.tx-action:not(.alt-detonate), .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button):enabled:active {
+  transform: translateY(1px);
+  filter: brightness(.97);
+}
+@keyframes btn-sheen { to { transform: translateX(430%) } }
+
+/* Item 2 — pepe tiles (IBCO + stake pickers share PepePicker): hover lifts, tilts,
+   gains a --green edge glow (static color), and the art snaps up one crisp pixelated
+   step. Taken/busy tiles are disabled and don't react. */
+.alt-shell [data-pepe-grid] > button { transition: transform var(--t-base) var(--ease-out); }
+.alt-shell [data-pepe-grid] > button:not(:disabled):hover {
+  transform: translateY(-3px) rotate(-2deg);
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px var(--green), 0 6px 14px color-mix(in srgb, var(--green) 25%, transparent);
+  z-index: 1;
+}
+.alt-shell [data-pepe-grid] > button > div { image-rendering: pixelated; transition: transform var(--t-base) steps(2, end); }
+.alt-shell [data-pepe-grid] > button:not(:disabled):hover > div { transform: scale(1.08); }
+
+/* the die spins a stepped 360° whenever the candidate set re-rolls — PixelIcon is
+   keyed to `seed` in PepePicker, so the animation plays on each fresh deal
+   (that remount also carries the tiles' deal-in above). */
+.alt-shell .st-btn svg { animation: die-roll .5s steps(4) 1; }
+@keyframes die-roll { to { transform: rotate(360deg) } }
+
+/* Item 4 — nav links: underline slides in from the left on hover; the active link
+   keeps its persistent underline. (A slide *between* routes needs a
+   document.startViewTransition wrapper in AltShell — reported to slice B.) */
+.alt-shell .site-header nav a::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  background: var(--green);
+  transform: scaleX(0); transform-origin: left center;
+  transition: transform var(--t-base) var(--ease-out);
+  pointer-events: none;
+}
+.alt-shell .site-header nav a:hover::after,
+.alt-shell .site-header nav a.active::after { transform: scaleX(1); }
+@media (max-width: 800px) {
+  /* keep style.css's inset active underline on the mobile nav grid */
+  .alt-shell .site-header nav a.active::after { left: 12px; right: 12px; }
+}
+
+/* Item 5 — buy/sell tabs: a sliding indicator slab moves between the two tabs.
+   :has-guarded so browsers without it keep the plain per-button fill. */
+@supports selector(:has(*)) {
+  .alt-shell .tabs { position: relative; }
+  .alt-shell .tabs::before {
+    content: ''; position: absolute; top: 3px; bottom: 3px; left: 3px;
+    width: calc(50% - 4.5px);
+    background: var(--action);
+    transition: transform var(--t-base) var(--ease-out);
+  }
+  .alt-shell .tabs:has(button.active:nth-child(2))::before { transform: translateX(calc(100% + 3px)); }
+  .alt-shell .tabs button { position: relative; z-index: 1; }
+  .alt-shell .tabs button.active { background: transparent; color: var(--action-ink); }
+}
+
+/* Item 6 — ladder rows: hover brightens the row and grows the share bar 4%;
+   own rows shimmer once when they first appear. */
+.alt-shell .ladder-row { transition: filter var(--t-base) var(--ease-out); }
+.alt-shell .ladder-row:hover { filter: brightness(1.13); }
+.alt-shell .ladder-row:hover::before { width: calc(var(--share) + 4%); }
+.alt-shell .ladder-row.you::after {
+  content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(100deg, transparent 42%, color-mix(in srgb, var(--green) 30%, transparent) 50%, transparent 58%);
+  transform: translateX(-100%);
+  animation: you-shimmer 1.5s ease .15s 1 both;
+}
+@keyframes you-shimmer { from { transform: translateX(-100%) } to { transform: translateX(100%) } }
+
+/* Item 7 — amount inputs: a green underline grows from the caret (left) side on
+   focus; invalid input shakes 2px with a flicker (aria-invalid is set by
+   Predeposit / AltTrade, gated to the alt variant in Predeposit). */
+.alt-shell .amount-field { position: relative; }
+.alt-shell .amount-field::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  background: var(--green);
+  transform: scaleX(0); transform-origin: left center;
+  transition: transform var(--t-base) var(--ease-out);
+  pointer-events: none;
+}
+.alt-shell .amount-field:focus-within::after { transform: scaleX(1); }
+/* .input-amount has no wrapper hook for a pseudo, so its focus state is a static
+   green border (color state only — no background-size animation); the animated
+   caret-side grow lives on .amount-field::after above (transform). */
+.alt-shell .input-amount:focus { border-color: var(--green); }
+.alt-shell .input-amount[aria-invalid='true'],
+.alt-shell #buy-amount[aria-invalid='true'] {
+  color: var(--red);
+  animation: invalid-shake var(--t-slow) var(--ease-out), invalid-flicker var(--t-slow) var(--ease-out);
+}
+.alt-shell .input-amount[aria-invalid='true'] { border-color: var(--red); }
+@keyframes invalid-shake { 20%, 60% { transform: translateX(-2px) } 40%, 80% { transform: translateX(2px) } }
+@keyframes invalid-flicker { 50% { opacity: .55 } }
+
+/* Item 8 — theme toggle: the sun quarter-turns on each click (dark→light = 90°).
+   aria-label is "Switch to … theme" on the toggle, "Toggle navigation" on the menu
+   button, so the $= hook only catches the sun. */
+.alt-shell .icon-button[aria-label$='theme'] { transition: transform var(--t-slow) var(--ease-pop); }
+html[data-theme='light'] .alt-shell .icon-button[aria-label$='theme'] { transform: rotate(90deg); }
+
+/* Item 9 — instrument pot digits flash on value change: implemented in AltCommon
+   Instrument with el.animate (brightness 600ms; opacity blink under reduced motion). */
+
+/* Item 10 — wallet chip glow while a tx is pending: the chip markup lives in
+   AltShell.tsx (slice B). Wiring for slice B:
+     subscribe transactionToasts in AltShell and add a class when
+     snapshot().some(t => ['preparing','simulating','wallet','pending'].includes(t.stage)), e.g.
+     <button className={`wallet-button${pending ? ' tx-pending' : ''}`}>
+   then pair it with:
+     .alt-shell .wallet-button.tx-pending { animation: chip-breathe 2.2s ease-in-out infinite; }
+     @keyframes chip-breathe { 50% { box-shadow: 0 0 14px color-mix(in srgb, var(--green) 45%, transparent) } }
+   (only while a tx is pending — not an ambient loop). */
+
+/* ───────────────────────── prefers-reduced-motion ─────────────────────────
+   style.css kills every animation/transition globally; keep the static color
+   affordances and strip every *transform* movement down to color/opacity only.
+   The pot flash and the blur scrollIntoView are gated on the media query in TSX. */
+@media (prefers-reduced-motion: reduce) {
+  .alt-shell [data-attention='true']::after { animation: none; opacity: .8; }
+  .alt-shell [data-attention='true'] .picker-hint::after { animation: none; }
+  .alt-shell [data-pepe-grid] > button,
+  .alt-shell [data-pepe-grid] > button > div,
+  .alt-shell [data-pepe-grid] > button:not(:disabled):hover,
+  .alt-shell [data-pepe-grid] > button:not(:disabled):hover > div,
+  .alt-shell [data-pepe-grid] button[aria-pressed='true'] > div,
+  .alt-shell [data-pepe-grid] button[aria-pressed='true'] > span:last-child,
+  .alt-shell .st-btn svg,
+  .alt-shell .ladder-row.you::after,
+  .alt-shell .ladder-row,
+  .alt-shell :is(.tx-action, .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button),
+  .alt-shell :is(.tx-action, .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button)::before,
+  .alt-shell :is(.tx-action, .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button)::after,
+  .alt-shell .site-header nav a::after,
+  .alt-shell .amount-field::after,
+  .alt-shell .icon-button[aria-label$='theme'] {
+    animation: none !important;
+    transition: none !important;
+  }
+  /* no transform movement at all — hover glow, focus line and armed states stay as color */
+  .alt-shell [data-pepe-grid] > button:not(:disabled):hover,
+  .alt-shell [data-pepe-grid] > button:not(:disabled):hover > div,
+  .alt-shell :is(.tx-action, .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button):enabled:active {
+    transform: none;
+  }
+  .alt-shell .icon-button[aria-label$='theme'] { transform: none !important; }
+  /* sliding indicators become instant state colors */
+  .alt-shell .tabs::before { display: none; }
+  .alt-shell .tabs button.active { background: var(--action); color: var(--action-ink); }
+  .alt-shell .site-header nav a::after { transform: none; opacity: 0; }
+  .alt-shell .site-header nav a:hover::after,
+  .alt-shell .site-header nav a.active::after { opacity: 1; }
+  .alt-shell .amount-field::after { transform: none; opacity: 0; }
+  .alt-shell .amount-field:focus-within::after { opacity: 1; }
+  .alt-shell .input-amount[aria-invalid='true'],
+  .alt-shell #buy-amount[aria-invalid='true'] { animation: none; color: var(--red); }
+}

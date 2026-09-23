@@ -27,13 +27,15 @@ interface Props {
   onReroll: () => void
   disabled?: boolean
   actionLabel?: string
+  /** alt UI only: pulse the picker so the IBCO commit flow points here (public/alt/polish.css) */
+  attention?: boolean
 }
 
 /// The art randomizer — 6 candidate pepes rendered by the ON-CHAIN descriptor
 /// (eth_call renderSVG(keccak(id))). What you see is exactly what you'll mint:
 /// lockWithPepe(amount, id) commits that id, and its dna is the previewed dna.
 /// Refresh rolls 6 fresh ids. This is the "choose your accomplice" step of staking.
-export default function PepePicker({ round, selected, onSelect, seed, onReroll, disabled = false, actionLabel = 'stake' }: Props) {
+export default function PepePicker({ round, selected, onSelect, seed, onReroll, disabled = false, actionLabel = 'stake', attention }: Props) {
   const staker = round.staker
   const dnaVersion = usePepeDnaVersion(staker)
   const [descriptorResult, setDescriptor] = useState<{ staker: string; value: string }>()
@@ -112,7 +114,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll, 
   }, [descriptor, candidates, dnaVersion])
 
   return (
-    <div className="rounded-2xl border border-line bg-bg-1 p-4">
+    <div className="rounded-2xl border border-line bg-bg-1 p-4" data-attention={attention === undefined ? undefined : String(attention)}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="font-display text-lg text-text-hi">choose your accomplice</h2>
@@ -130,11 +132,12 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll, 
             onReroll()
           }}
         >
-          <PixelIcon name="die" size={16} /> refresh
+          {/* key=seed: alt CSS spins the die (polish.css) each time the set re-rolls */}
+          <PixelIcon name="die" size={16} key={seed} /> refresh
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-3">
+      <div className="mt-3 grid grid-cols-3 gap-3" data-pepe-grid="">
         {candidates.map((id, index) => {
           const isSel = selected === id
           const taken = available?.[index] === false
@@ -171,7 +174,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll, 
         })}
       </div>
 
-      <p className="mt-2 text-xs text-text-lo">
+      <p className="picker-hint mt-2 text-xs text-text-lo">
         {selected
           ? `pepe #${fmtPepeId(selected)} selected · pick another or ${actionLabel} below`
           : 'tap a pepe to select it'}
