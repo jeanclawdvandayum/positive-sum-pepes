@@ -11,8 +11,12 @@ import { useConfirmedWrite } from '../../lib/useConfirmedWrite'
 // that state); the button also self-hides the moment the round lane
 // reports the round no longer Active.
 //
-// No ambient motion (spec §4): the only animation is the existing pending
-// fill, and prefers-reduced-motion already degrades it to a static tint.
+// No ambient motion in the original UI (spec §4): the only animation is the
+// existing pending fill, and prefers-reduced-motion already degrades it to a
+// static tint. variant="alt" (alt UI only, styles in public/alt/detonation.css)
+// adds decorative spans — hazard-stripe crawl, fuse spark, bottom-edge fuse —
+// and a data-state hook (armed|pending|done). The FX itself ('detonate') is
+// fired by useConfirmedWrite on write success; never fired here.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from 'react'
@@ -27,9 +31,11 @@ type Step = 'idle' | 'pending' | 'done'
 export default function DetonateButton({
   round,
   onDetonated,
+  variant,
 }: {
   round: RoundInfo
   onDetonated: () => void
+  variant?: 'alt'
 }) {
   const { zero } = usePhase()
   const [step, setStep] = useState<Step>('idle')
@@ -59,20 +65,31 @@ export default function DetonateButton({
     }
   }
 
+  const alt = variant === 'alt'
+  const label = step === 'pending' ? 'detonating…' : step === 'done' ? 'detonated ✓' : 'detonate'
+
   return (
     <div className="mt-6 flex flex-col items-center gap-1.5">
       <button
         onClick={detonate}
         disabled={step !== 'idle'}
         data-pending={step === 'pending' || undefined}
+        data-state={alt ? (step === 'idle' ? 'armed' : step) : undefined}
         aria-label="detonate — settle the round"
-        className="tx-action relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-phase-critical/60 bg-phase-critical/10 px-8 py-3 font-display text-xl text-phase-critical transition hover:bg-phase-critical/20 active:translate-y-[1px] disabled:cursor-wait disabled:opacity-80"
+        className={`tx-action relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-phase-critical/60 bg-phase-critical/10 px-8 py-3 font-display text-xl text-phase-critical transition hover:bg-phase-critical/20 active:translate-y-[1px] disabled:cursor-wait disabled:opacity-80${alt ? ' alt-detonate' : ''}`}
       >
         <span className="pl-btn-fill" aria-hidden="true" />
-        <PixelIcon name="bomb" size={20} />
-        <span className="relative">
-          {step === 'pending' ? 'detonating…' : step === 'done' ? 'detonated ✓' : 'detonate'}
-        </span>
+        {alt && <span className="dtn-stripes" aria-hidden="true" />}
+        {alt ? (
+          <span className="dtn-bomb">
+            <PixelIcon name="bomb" size={26} />
+            <span className="dtn-spark" aria-hidden="true" />
+          </span>
+        ) : (
+          <PixelIcon name="bomb" size={20} />
+        )}
+        <span className="relative">{label}</span>
+        {alt && <span className="dtn-fuse" aria-hidden="true" />}
       </button>
       {error ? (
         <p className="max-w-md break-words text-center text-xs text-phase-critical">{error}</p>
