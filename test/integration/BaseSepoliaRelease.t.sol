@@ -141,7 +141,7 @@ contract BaseSepoliaReleaseTest is Test {
         assertEq(c.registry.PURCHASE_REFERRAL_VERSION(), 1);
         assertEq(c.reinvestor.ATTRIBUTION_VERSION(), 1);
         assertTrue(c.staker.supportsInterface(0x80ac58cd));
-        assertEq(c.r.controller.PREDEPOSIT_CAP(), 0);
+        assertEq(c.r.controller.PREDEPOSIT_CAP(), 1000e18);
         assertEq(c.r.controller.PREDEPOSIT_CAP_PER_WALLET(), vm.envOr("PSP_WALLET_CAP_MIX", uint256(0)) * 1e18);
         assertEq(c.r.controller.PREDEPOSIT_DURATION(), vm.envOr("PSP_PREDEPOSIT_SEC", uint256(259200)));
         assertEq(c.r.controller.VEST_DURATION(), vm.envOr("PSP_VEST_SEC", uint256(2419200)));

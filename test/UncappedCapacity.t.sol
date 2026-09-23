@@ -24,7 +24,9 @@ import {MockPoolManager} from "./mocks/MockPoolManager.sol";
 import {TicketSwapper} from "./wave2/auditorC/CBase.sol";
 
 /// @title UncappedCapacityTest
-/// @notice Large IBCOs keep claim and exit arithmetic valid; individual V4 swaps fit their delta widths.
+/// @notice Large boots (public deposits within the pooled cap plus the
+///         factory's cap-exempt carry) keep claim and exit arithmetic valid;
+///         individual V4 swaps fit their delta widths.
 contract UncappedCapacityTest is Test {
     SepoliaMixETH mix;
     MockPoolManager manager;
@@ -54,6 +56,16 @@ contract UncappedCapacityTest is Test {
         vm.stopPrank();
     }
 
+    /// @dev Factory carry is exempt from the pooled cap — the only route to
+    ///      a boot larger than 1000 mixETH of public deposits.
+    function _carry(uint256 amount) private {
+        mix.mint(address(factory), amount);
+        vm.startPrank(address(factory));
+        mix.approve(address(round.controller), amount);
+        round.controller.seedCarry(amount);
+        vm.stopPrank();
+    }
+
     function _launch() private {
         skip(60);
         round.controller.launchPooledBuy();
@@ -79,14 +91,15 @@ contract UncappedCapacityTest is Test {
         assertEq(round.hook.totalSupplyPSP(), supply);
     }
 
-    function test_LargeIBCOLaunchClaimsAndDirectRedemption() public {
+    function test_LargeBootLaunchClaimsAndDirectRedemption() public {
         // A large launch keeps proportional allocations and indefinite exits.
-        // The price-derived upper-capacity cases have their own lifecycle suite.
-        _deposit(round.controller, alice, 150_000e18);
-        _deposit(round.controller, bob, 300_000e18);
+        // The boot pairs the full public cap with exempt factory carry; the
+        // price-derived upper-capacity cases have their own lifecycle suite.
+        _deposit(round.controller, alice, 500e18); // public leg first: carry counts
+        _carry(449_500e18); // cap-exempt remainder of the 450k boot
         _launch();
         uint256 snapshot = round.controller.genesisPSPSnapshot();
-        uint256 expected = Math.mulDiv(snapshot, 150_000e18, 450_000e18);
+        uint256 expected = Math.mulDiv(snapshot, 500e18, 450_000e18);
         vm.prank(alice);
         round.controller.claimPredepositPSP();
         PSPStaker staker = round.controller.staker();
@@ -100,19 +113,29 @@ contract UncappedCapacityTest is Test {
         round.token.approve(address(round.hook), principal);
         uint256 paid = round.hook.redeemBacking(principal);
         vm.stopPrank();
-        assertApproxEqAbs(paid, 150_000e18, 1);
+        assertApproxEqAbs(paid, 500e18, 1);
     }
 
     function test_UnrepresentableDepositRollsBackBeforeItCanPoisonLaunch() public {
         _deposit(round.controller, alice, 500e18);
         uint256 oversized = type(uint256).max / 2;
+        // The public path hits the pooled cap first — before any transfer
         mix.mint(bob, oversized);
         vm.startPrank(bob);
         mix.approve(address(round.controller), oversized);
-        vm.expectRevert(RoundController.PredepositCapacityExceeded.selector);
+        vm.expectRevert(RoundController.CapExceeded.selector);
         round.controller.predeposit(oversized);
         vm.stopPrank();
         assertEq(mix.balanceOf(bob), oversized);
+        // The exempt carry path still meets the arithmetic domain guard
+        vm.prank(bob);
+        mix.transfer(address(factory), oversized); // reuse the funds — no second max/2 mint (supply would overflow)
+        vm.startPrank(address(factory));
+        mix.approve(address(round.controller), oversized);
+        vm.expectRevert(RoundController.PredepositCapacityExceeded.selector);
+        round.controller.seedCarry(oversized);
+        vm.stopPrank();
+        assertEq(mix.balanceOf(address(factory)), oversized);
         assertEq(round.controller.totalPredepositMixETH(), 500e18);
         _launch();
         assertEq(uint8(round.hook.mode()), uint8(CurveHook.Mode.Active));
@@ -138,7 +161,7 @@ contract UncappedCapacityTest is Test {
     }
 
     function test_V4RejectsInputsBeyondSigned128Bits() public {
-        _deposit(round.controller, alice, 450_000e18); // top of the supported band
+        _carry(450_000e18); // top of the supported band, via exempt carry
         _launch();
         uint256 oversized = uint256(uint128(type(int128).max)) + 1;
         vm.expectRevert(CurveHook.SwapTooLarge.selector);
@@ -153,7 +176,7 @@ contract UncappedCapacityTest is Test {
     function test_V4RejectsBuyBeyondTheWaveDomain() public {
         // An input far past the remaining-output capacity must fail before
         // it changes reserves or mints PSP. Signed delta guards also apply.
-        _deposit(round.controller, alice, 450_000e18);
+        _carry(450_000e18);
         _launch();
         PoolKey memory key = _key();
         bool buyZeroForOne = Currency.unwrap(key.currency0) == address(mix);
@@ -170,7 +193,7 @@ contract UncappedCapacityTest is Test {
         // A sell larger than the minted supply fails in both live and flat
         // modes, with reserve and supply accounting intact.
         _useHighPriceCurve();
-        _deposit(round.controller, alice, 450_000e18);
+        _carry(450_000e18);
         _launch();
         _expectSellExceedsSupply(1e38);
         skip(180);
@@ -201,7 +224,7 @@ contract UncappedCapacityTest is Test {
 
     function test_LargeRepresentablePotRemainsClaimable() public {
         _useHighPriceCurve();
-        _deposit(round.controller, alice, 500_000e18);
+        _carry(500_000e18);
         _launch();
         TicketSwapper swapper = new TicketSwapper(IPoolManager(address(manager)), IERC20(address(mix)));
         // A one-million-mix buy earns about 200k tickets with bounded seat

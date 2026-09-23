@@ -139,7 +139,7 @@ export function assertTimingProfile(timings) {
   const walletCap = ((packed >> 192n) & mask) * 10n ** 18n
   if (timings.PREDEPOSIT_DURATION !== predeposit || timings.VEST_DURATION !== vest ||
       timings.detWindow !== clock || timings.PREDEPOSIT_CAP_PER_WALLET !== walletCap ||
-      timings.PREDEPOSIT_CAP !== (current ? 0n : 1000n * 10n ** 18n) || timings.epochSize !== vest / 6n) {
+      timings.PREDEPOSIT_CAP !== 1000n * 10n ** 18n || timings.epochSize !== vest / 6n) {
     throw Error('Deployed timing/cap getters do not match the four-field factory timing profile')
   }
 }

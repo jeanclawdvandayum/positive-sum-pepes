@@ -116,14 +116,23 @@ contract ZapPredepositTest is Test {
         zapIn.zapInPredeposit(controller, 0);
     }
 
-    function test_ZapInPredeposit_AllowsDepositsAboveFormerCap() public {
-        vm.deal(alice, 20_000e18);
-        vm.startPrank(alice);
-        zapIn.zapInPredeposit{value: 10_000e18}(controller, 0);
-        zapIn.zapInPredeposit{value: 1}(controller, 0);
-        vm.stopPrank();
+    function test_ZapInPredeposit_RespectsTheTotalCap() public {
+        mixETH.approve(address(controller), 400e18);
+        controller.predeposit(400e18);
+
+        // the zap path fills exactly the remaining headroom
+        vm.deal(alice, 600e18);
+        vm.prank(alice);
+        zapIn.zapInPredeposit{value: 600e18}(controller, 0);
         (uint256 recorded,) = controller.predeposits(alice);
-        assertEq(recorded, 10_000e18 + 1);
+        assertEq(recorded, 600e18);
+        assertEq(controller.totalPredepositMixETH(), 1000e18);
+
+        // one wrapped wei more reverts through the controller's cap guard
+        vm.deal(alice, 1);
+        vm.prank(alice);
+        vm.expectRevert(RoundController.CapExceeded.selector);
+        zapIn.zapInPredeposit{value: 1}(controller, 0);
     }
 
     function test_PredepositForIsPermissionless() public {

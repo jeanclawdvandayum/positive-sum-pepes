@@ -92,13 +92,16 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     uint256 public totalInitialPSP; // snapshot of PSP minted at launch
     bool public predepositClosed;
 
-    /// @dev The public IBCO window starts at final factory wiring. Deposits
-    ///      have no global cap. Anyone may launch after the window elapses.
-    ///      Packed timings preserve shorter windows for local playtests.
+    /// @dev The public IBCO window starts at final factory wiring. Public
+    ///      deposits are capped at PREDEPOSIT_CAP in total (testnet rule,
+    ///      scoopy 2026-09-23: reverses the uncapped v3 IBCO for lifecycle
+    ///      testing). Anyone may launch once the window elapses or the cap is
+    ///      reached. Packed timings preserve shorter windows for playtests.
     uint256 public immutable PREDEPOSIT_DURATION; // default 3 days
-    /// @notice Zero means the pooled IBCO has no total deposit cap.
-    uint256 public constant PREDEPOSIT_CAP = 0;
-    /// @notice Version 2 accepts positive uncapped pooled deposits.
+    /// @notice Total pooled IBCO cap for public deposits. Factory carry is
+    ///         exempt from the check but counts toward the total.
+    uint256 public constant PREDEPOSIT_CAP = 1000 ether;
+    /// @notice Version 2 accepts any positive pooled deposit within the caps.
     uint256 public constant PREDEPOSIT_RULES_VERSION = 2;
     /// @dev Genesis pooled buy routes this share of the boot into the hook's
     ///      ladder pot at launch (mirrors the sine pre-wave fee). The rest
@@ -331,6 +334,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         ) {
             revert WalletCapExceeded();
         }
+        if (totalPredepositMixETH + mixETHAmount > PREDEPOSIT_CAP) revert CapExceeded();
 
         // PD-1: predeposit accepts every positive amount. The minimum gross
         // purchase applies to active curve buys, not pooled predeposits.
@@ -421,8 +425,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     }
 
     /// @dev Window state, shared by launchPooledBuy and the UI.
-    function _capReached() internal pure returns (bool) {
-        return false; // PREDEPOSIT_CAP == 0 denotes an uncapped IBCO.
+    function _capReached() internal view returns (bool) {
+        return totalPredepositMixETH >= PREDEPOSIT_CAP;
     }
 
     function _windowOver() internal view returns (bool) {
@@ -457,12 +461,12 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     }
 
     /// @notice Launch the bonding curve with the pooled predeposit.
-    /// @dev Anyone may launch after the three-day window (or constructor
-    ///      override). The controller's existing factory-only bypass remains.
+    /// @dev Anyone may launch after the window (or constructor override) or
+    ///      once the total cap is reached. The owner may launch early.
     function launchPooledBuy() external nonReentrant {
         if (address(hook) == address(0)) revert NotPredeposit();
         if (predepositClosed) revert PredepositClosed();
-        if (msg.sender != owner() && !_windowOver()) revert PredepositOpen();
+        if (msg.sender != owner() && !_windowOver() && !_capReached()) revert PredepositOpen();
         predepositClosed = true;
 
         // Boot pool = public predeposit + any carry bonus (old-pot deposits).

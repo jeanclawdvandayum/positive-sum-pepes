@@ -377,17 +377,21 @@ contract RealV4LifecycleTest is RealV4Base {
     function test_LocalV4_DonationCannotPoisonNextLaunch() public {
         vm.warp(hook.detonationAt());
         controller.detonate{gas: 1_000_000}();
-        mixETH.transfer(address(factory),50_000e18);
+        mixETH.transfer(address(factory), 50_000e18);
         factory.reserveSpawn(1);
-        for(uint256 i;i<3;++i)factory.birthStep{gas:12_000_000}();
-        RoundController next=factory.getRound(2).controller;
-        assertEq(next.totalPredepositMixETH(),50_000e18);
-        vm.expectRevert(RoundController.PredepositOpen.selector);
-        next.launchPooledBuy();
-        skip(next.PREDEPOSIT_DURATION());
-        next.launchPooledBuy();
-        assertEq(uint256(factory.getRound(2).hook.mode()),1);
-        assertEq(mixETH.balanceOf(address(factory)),0);
+        for (uint256 i; i < 3; ++i) factory.birthStep{gas: 12_000_000}();
+        RoundController next = factory.getRound(2).controller;
+        assertEq(next.totalPredepositMixETH(), 50_000e18);
+        // The oversized donation rides the cap-exempt carry: it counts
+        // toward the pooled total (round launchable early) without
+        // shortening the public window.
+        (,,,, bool capReached, bool windowOver, bool launchable) = next.predepositState();
+        assertTrue(capReached, "carry counts toward the cap");
+        assertFalse(windowOver, "carry does not shorten the window");
+        assertTrue(launchable);
+        next.launchPooledBuy(); // non-owner, window still open — cap reached
+        assertEq(uint256(factory.getRound(2).hook.mode()), 1);
+        assertEq(mixETH.balanceOf(address(factory)), 0);
         (uint256 boot, uint256 lam, uint256 target,) = factory.getRound(2).hook.sineV3();
         assertEq(boot, 45_000e18);        // 90% of the 50k carry rounds forward
         assertEq(lam, 9_550e18);          // lambda scales: sqrt(45000/450) = 10

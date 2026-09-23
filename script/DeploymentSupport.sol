@@ -120,7 +120,7 @@ abstract contract DeploymentSupport is Script {
             "game rules mismatch");
         require(r.hook.sineV3Table() == factory.sineV3Table() && r.hook.sinePL() == factory.gameSinePL(),
             "sine v3 helper or launch price mismatch");
-        require(r.controller.PREDEPOSIT_RULES_VERSION() == 2 && r.controller.PREDEPOSIT_CAP() == 0,
+        require(r.controller.PREDEPOSIT_RULES_VERSION() == 2 && r.controller.PREDEPOSIT_CAP() == 1000 ether,
             "predeposit rules mismatch");
         PSPStaker staker = r.controller.staker();
         require(address(staker).code.length != 0 && address(staker.controller()) == address(r.controller)

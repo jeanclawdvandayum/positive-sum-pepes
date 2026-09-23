@@ -22,7 +22,9 @@ import {StakerDeployer} from "src/StakerDeployer.sol";
 
 
 /// @title PredepositWindowTest
-/// @notice Uncapped IBCO deposits retain the full three-day public launch window.
+/// @notice The capped IBCO keeps its three-day public window; reaching the
+///         pooled cap early makes the launch permissionless, while factory
+///         carry is cap-exempt but counts toward the total.
 contract PredepositWindowTest is Test {
     MockPoolManager poolManager;
     MockMixETH mixETH;
@@ -65,28 +67,47 @@ contract PredepositWindowTest is Test {
         vm.stopPrank();
     }
 
+    function _carry(uint256 amount) internal {
+        mixETH.transfer(address(factory), amount);
+        vm.startPrank(address(factory));
+        mixETH.approve(address(controller), amount);
+        controller.seedCarry(amount);
+        vm.stopPrank();
+    }
+
     // ─────────────── constants ───────────────
 
     function test_constants() public view {
         assertEq(controller.PREDEPOSIT_DURATION(), 3 days, "three days");
-        assertEq(controller.PREDEPOSIT_CAP(), 0, "uncapped sentinel");
+        assertEq(controller.PREDEPOSIT_CAP(), 1000 ether, "testnet pooled cap");
         assertEq(controller.VEST_DURATION(), 28 days, "four-week decay horizon");
         assertEq(controller.staker().epochSize(), 28 days / 6);
     }
 
-    function test_UncappedDepositCanExceedFormerCapInOneCallAndTopUp() public {
-        _deposit(alice, 20_000e18);
-        _deposit(alice, 10_000e18);
-        _deposit(bob, 15_000e18);
-        assertEq(controller.totalPredepositMixETH(), 45_000e18);
-        (uint256 credited,) = controller.predeposits(alice);
-        assertEq(credited, 30_000e18);
+    function test_PublicDepositOverRemainingCapRevertsInOneCallAndOnTopUp() public {
+        // one call over the cap
+        mixETH.transfer(alice, 1000e18 + 1);
+        vm.startPrank(alice);
+        mixETH.approve(address(controller), 1000e18 + 1);
+        vm.expectRevert(RoundController.CapExceeded.selector);
+        controller.predeposit(1000e18 + 1);
+        vm.stopPrank();
+        assertEq(controller.totalPredepositMixETH(), 0, "reverted deposit counted nothing");
+
+        // top-up past the remaining headroom
+        _deposit(alice, 600e18);
+        mixETH.transfer(bob, 401e18);
+        vm.startPrank(bob);
+        mixETH.approve(address(controller), 401e18);
+        vm.expectRevert(RoundController.CapExceeded.selector);
+        controller.predeposit(401e18); // 600 + 401 > 1000
+        vm.stopPrank();
+        assertEq(controller.totalPredepositMixETH(), 600e18);
+        (uint256 credited,) = controller.predeposits(bob);
+        assertEq(credited, 0, "reverted top-up credited nothing");
         (,,,, bool reached,, bool launchable) = controller.predepositState();
-        assertFalse(reached);
+        assertFalse(reached, "still under the cap");
         assertFalse(launchable);
-        vm.prank(rando);
-        vm.expectRevert(RoundController.PredepositOpen.selector);
-        controller.launchPooledBuy();
     }
 
     function testFuzzPositiveSubMinimumPredeposit(uint64 raw) public {
@@ -117,14 +138,12 @@ contract PredepositWindowTest is Test {
         controller.predepositFor(alice, 0);
     }
 
-    function testFuzzDustAtFormerCapKeepsWindowOpen(uint64 raw) public {
+    function testFuzzDustShortOfCapKeepsWindowOpen(uint64 raw) public {
         uint256 dust = bound(raw, 1, 0.005e18 - 1);
         _deposit(alice, 1000e18 - dust);
-        _deposit(bob, dust);
-        _deposit(bob, 1);
-        assertEq(controller.totalPredepositMixETH(), 1000e18 + 1);
+        assertEq(controller.totalPredepositMixETH(), 1000e18 - dust);
         (,,,, bool reached,, bool launchable) = controller.predepositState();
-        assertFalse(reached);
+        assertFalse(reached, "dust short of the cap");
         assertFalse(launchable);
     }
 
@@ -155,6 +174,25 @@ contract PredepositWindowTest is Test {
         assertTrue(controller.predepositClosed(), "owner early launch");
     }
 
+    function test_window_CapReachedAllowsNonOwnerLaunchBeforeWindowEnds() public {
+        _deposit(alice, 1000e18 - 1);
+        (,,,, bool capReached,, bool launchable) = controller.predepositState();
+        assertFalse(capReached, "one wei short of the cap");
+        assertFalse(launchable);
+        vm.prank(rando);
+        vm.expectRevert(RoundController.PredepositOpen.selector);
+        controller.launchPooledBuy();
+        assertFalse(controller.predepositClosed());
+
+        _deposit(bob, 1); // public total reaches exactly 1000 mixETH
+        (,,,, bool reached,, bool launchableAfter) = controller.predepositState();
+        assertTrue(reached, "exactly at the cap");
+        assertTrue(launchableAfter);
+        vm.prank(rando); // non-owner, window still open
+        controller.launchPooledBuy();
+        assertTrue(controller.predepositClosed());
+    }
+
     function test_window_PredepositBlockedAfterClose() public {
         _deposit(alice, 100e18);
         vm.prank(address(factory));
@@ -175,7 +213,7 @@ contract PredepositWindowTest is Test {
             bool launchable
         ) = controller.predepositState();
         assertEq(total, 1000e18 / 2);
-        assertEq(cap, 0);
+        assertEq(cap, 1000e18);
         assertEq(start, controller.predepositStartTime());
         assertFalse(closed);
         assertFalse(capReached);
@@ -190,20 +228,16 @@ contract PredepositWindowTest is Test {
 
     // ─────────────── carry seeding ───────────────
 
-    function test_seedCarry_FactoryOnlyAndKeepsTheFullWindow() public {
+    function test_seedCarry_FactoryOnlyAndSubCapCarryKeepsWindowOpen() public {
         vm.prank(rando);
         vm.expectRevert(RoundController.NotFactory.selector);
-        controller.seedCarry(25_000e18);
+        controller.seedCarry(500e18);
 
-        mixETH.transfer(address(factory), 25_000e18);
-        vm.startPrank(address(factory));
-        mixETH.approve(address(controller), 25_000e18);
-        controller.seedCarry(25_000e18);
-        vm.stopPrank();
+        _carry(500e18);
 
-        assertEq(controller.totalPredepositMixETH(), 25_000e18);
+        assertEq(controller.totalPredepositMixETH(), 500e18);
         (,,,, bool capReached, bool windowOver, bool launchable) = controller.predepositState();
-        assertFalse(capReached);
+        assertFalse(capReached, "sub-cap carry");
         assertFalse(windowOver);
         assertFalse(launchable);
         vm.prank(rando);
@@ -211,14 +245,44 @@ contract PredepositWindowTest is Test {
         controller.launchPooledBuy();
     }
 
-    function test_seedCarry_StillAcceptsPublicDepositsAfter() public {
-        mixETH.transfer(address(factory), 5000e18);
-        vm.startPrank(address(factory));
-        mixETH.approve(address(controller), 5000e18);
-        controller.seedCarry(5000e18);
+    function test_seedCarry_AboveTheCapIsExemptAndMakesRoundLaunchable() public {
+        _carry(25_000e18); // far above the pooled cap — exempt, but counted
+        assertEq(controller.totalPredepositMixETH(), 25_000e18);
+        (uint256 factoryShares,) = controller.predeposits(address(factory));
+        assertEq(factoryShares, 25_000e18, "carry is a full share");
+        (,,,, bool capReached, bool windowOver, bool launchable) = controller.predepositState();
+        assertTrue(capReached, "carry counts toward the total");
+        assertFalse(windowOver, "carry does not shorten the window");
+        assertTrue(launchable);
+
+        // no public headroom remains: even one wei reverts CapExceeded
+        mixETH.transfer(alice, 1);
+        vm.startPrank(alice);
+        mixETH.approve(address(controller), 1);
+        vm.expectRevert(RoundController.CapExceeded.selector);
+        controller.predeposit(1);
         vm.stopPrank();
-        _deposit(alice, 10_000e18);
-        assertEq(controller.totalPredepositMixETH(), 15_000e18);
+
+        vm.prank(rando); // non-owner, window still open
+        controller.launchPooledBuy();
+        assertTrue(controller.predepositClosed());
+    }
+
+    function test_seedCarry_StillAcceptsPublicDepositsAfter() public {
+        _carry(600e18);
+        _deposit(alice, 300e18);
+        assertEq(controller.totalPredepositMixETH(), 900e18);
+
+        // one wei past the remaining headroom reverts
+        mixETH.transfer(bob, 101e18);
+        vm.startPrank(bob);
+        mixETH.approve(address(controller), 101e18);
+        vm.expectRevert(RoundController.CapExceeded.selector);
+        controller.predeposit(101e18);
+        vm.stopPrank();
+
+        _deposit(bob, 100e18); // exactly the remaining headroom
+        assertEq(controller.totalPredepositMixETH(), 1000e18);
     }
 
     // ─────────────── html (walk-away UI) ───────────────

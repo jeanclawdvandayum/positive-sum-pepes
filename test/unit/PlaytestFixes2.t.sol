@@ -144,15 +144,19 @@ contract PlaytestFixes2 is Test {
         vm.stopPrank();
     }
 
-    function test_UncappedProfileHasNoWalletCap() public {
-        // the default (timings == 0) factory is UNCAPPED — one wallet may
-        // predeposit above the former global cap and add more later
+    function test_DefaultProfileHasNoWalletCap() public {
+        // the default (timings == 0) factory has no per-wallet cap — one
+        // wallet may predeposit the whole pooled cap and top up: 1000e18 is
+        // 100x the capped profile's 10e18 wallet ceiling
         assertEq(controller.PREDEPOSIT_CAP_PER_WALLET(), 0);
         vm.startPrank(alice);
         mixETH.approve(address(controller), type(uint256).max);
-        controller.predeposit(2000e18);
+        controller.predeposit(999e18);
+        controller.predeposit(1e18); // top-up to exactly the pooled cap
         vm.stopPrank();
-        assertEq(controller.totalPredepositMixETH(), 2000e18);
+        assertEq(controller.totalPredepositMixETH(), 1000e18);
+        (uint256 credited,) = controller.predeposits(alice);
+        assertEq(credited, 1000e18);
     }
 
     // ─────────────── #6: factory UI views + rebirth ───────────────

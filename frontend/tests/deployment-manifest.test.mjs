@@ -153,11 +153,11 @@ test('timing inspection pins detonation and wallet cap to their separate 64-bit 
   assert.doesNotThrow(() => assertTimingProfile({ ...custom, packed: 0n, PREDEPOSIT_DURATION: 604800n, VEST_DURATION: 3628800n, detWindow: 259200n, PREDEPOSIT_CAP_PER_WALLET: 0n, epochSize: 604800n }))
 })
 
-test('uncapped version two defaults and short playtest overrides are independently verified', () => {
+test('version two defaults (1000 mixETH total cap) and short playtest overrides are independently verified', () => {
   const current = {
     PREDEPOSIT_RULES_VERSION: 2n, packed: 0n,
     PREDEPOSIT_DURATION: 259200n, VEST_DURATION: 2419200n, detWindow: 248660n,
-    PREDEPOSIT_CAP_PER_WALLET: 0n, PREDEPOSIT_CAP: 0n, epochSize: 403200n,
+    PREDEPOSIT_CAP_PER_WALLET: 0n, PREDEPOSIT_CAP: 1000n * 10n ** 18n, epochSize: 403200n,
   }
   assert.doesNotThrow(() => assertTimingProfile(current))
   assert.doesNotThrow(() => assertTimingProfile({ ...current,
@@ -165,7 +165,7 @@ test('uncapped version two defaults and short playtest overrides are independent
     PREDEPOSIT_DURATION: 60n, VEST_DURATION: 3600n, detWindow: 90n, epochSize: 600n,
   }))
   for (const change of [{ PREDEPOSIT_RULES_VERSION: 3n }, { PREDEPOSIT_RULES_VERSION: undefined },
-    { PREDEPOSIT_CAP: 1000n * 10n ** 18n }, { VEST_DURATION: 3628800n }, { detWindow: 15600n }]) {
+    { PREDEPOSIT_CAP: 0n }, { VEST_DURATION: 3628800n }, { detWindow: 15600n }]) {
     assert.throws(() => assertTimingProfile({ ...current, ...change }))
   }
 })

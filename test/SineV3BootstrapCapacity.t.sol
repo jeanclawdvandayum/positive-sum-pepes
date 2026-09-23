@@ -69,7 +69,21 @@ contract SineV3BootstrapCapacityTest is Test {
         vm.stopPrank();
     }
 
+    /// @dev Factory carry is exempt from the pooled cap — the only route to
+    ///      a large genesis boot under the 1000-mix public rule.
+    function _carry(uint256 amount) private {
+        mix.mint(address(factory), amount);
+        vm.startPrank(address(factory));
+        mix.approve(address(round.controller), amount);
+        round.controller.seedCarry(amount);
+        vm.stopPrank();
+    }
+
     function _rejectDeposit(address who, uint256 amount) private {
+        _rejectDeposit(who, amount, RoundController.PredepositCapacityExceeded.selector);
+    }
+
+    function _rejectDeposit(address who, uint256 amount, bytes4 err) private {
         mix.mint(who, amount);
         uint256 held = mix.balanceOf(who);
         uint256 pooled = round.controller.totalPredepositMixETH();
@@ -78,7 +92,7 @@ contract SineV3BootstrapCapacityTest is Test {
         (uint256 contribution, bool claimed) = round.controller.predeposits(who);
         vm.startPrank(who);
         mix.approve(address(round.controller), amount);
-        vm.expectRevert(RoundController.PredepositCapacityExceeded.selector);
+        vm.expectRevert(err);
         round.controller.predeposit(amount);
         vm.stopPrank();
         assertEq(mix.balanceOf(who), held, "rejected contribution was transferred");
@@ -86,6 +100,28 @@ contract SineV3BootstrapCapacityTest is Test {
         assertEq(round.controller.totalPredepositMixETH(), pooled);
         assertEq(round.controller.totalPredepositors(), count);
         (uint256 afterContribution, bool afterClaimed) = round.controller.predeposits(who);
+        assertEq(afterContribution, contribution);
+        assertEq(afterClaimed, claimed);
+    }
+
+    /// @dev The capacity domain guard only still guards the exempt carry
+    ///      path — the public path reverts CapExceeded first (see
+    ///      _rejectDeposit(.., CapExceeded)).
+    function _rejectCarry(uint256 amount) private {
+        mix.mint(address(factory), amount);
+        uint256 held = mix.balanceOf(address(factory));
+        uint256 pooled = round.controller.totalPredepositMixETH();
+        uint256 controllerBalance = mix.balanceOf(address(round.controller));
+        (uint256 contribution, bool claimed) = round.controller.predeposits(address(factory));
+        vm.startPrank(address(factory));
+        mix.approve(address(round.controller), amount);
+        vm.expectRevert(RoundController.PredepositCapacityExceeded.selector);
+        round.controller.seedCarry(amount);
+        vm.stopPrank();
+        assertEq(mix.balanceOf(address(factory)), held, "rejected carry was transferred");
+        assertEq(mix.balanceOf(address(round.controller)), controllerBalance);
+        assertEq(round.controller.totalPredepositMixETH(), pooled);
+        (uint256 afterContribution, bool afterClaimed) = round.controller.predeposits(address(factory));
         assertEq(afterContribution, contribution);
         assertEq(afterClaimed, claimed);
     }
@@ -205,11 +241,14 @@ contract SineV3BootstrapCapacityTest is Test {
 
     function test_OpeningPriceCapacityRejectsAllFactoryPriceExtremes() public {
         _newRound(1e9);
-        _rejectDeposit(alice, 24_000_000e18);
+        _rejectDeposit(alice, 24_000_000e18, RoundController.CapExceeded.selector);
+        _rejectCarry(24_000_000e18);
         _newRound(75e12);
-        _rejectDeposit(alice, 210_000_000e18);
+        _rejectDeposit(alice, 210_000_000e18, RoundController.CapExceeded.selector);
+        _rejectCarry(210_000_000e18);
         _newRound(1e18);
-        _rejectDeposit(alice, 800_000_000e18);
+        _rejectDeposit(alice, 800_000_000e18, RoundController.CapExceeded.selector);
+        _rejectCarry(800_000_000e18);
     }
 
     function test_LaunchBeyondTheOldSixteenWaveLimitRetainsEveryExit() public {
@@ -231,11 +270,12 @@ contract SineV3BootstrapCapacityTest is Test {
     }
 
     function _largeLifecycle(uint256 gross, bool aboveSigned128) private {
-        _deposit(alice, gross);
+        _carry(gross);
         _launch();
         uint256 q0 = round.controller.genesisPSPSnapshot();
         if (aboveSigned128) assertGt(q0, uint256(uint128(type(int128).max)));
-        (uint256 id, uint256 principal) = _claim(alice);
+        address boot = address(factory);
+        (uint256 id, uint256 principal) = _claim(boot);
         assertEq(principal, q0);
 
         Currency c0 = Currency.wrap(address(mix));
@@ -266,12 +306,12 @@ contract SineV3BootstrapCapacityTest is Test {
         vm.prank(bob);
         round.hook.claimPot();
         assertEq(mix.balanceOf(bob) - bobBefore, pot);
-        uint256 aliceBefore = mix.balanceOf(alice);
-        vm.prank(alice);
+        uint256 bootBefore = mix.balanceOf(boot);
+        vm.prank(boot);
         staker.claimFees(id);
-        assertEq(mix.balanceOf(alice) - aliceBefore, fees);
+        assertEq(mix.balanceOf(boot) - bootBefore, fees);
         uint256 backing = round.hook.reserveMixETH();
-        assertEq(_redeem(alice, id, principal), backing);
+        assertEq(_redeem(boot, id, principal), backing);
         assertEq(round.hook.reserveMixETH(), 0);
         assertEq(round.hook.totalSupplyPSP(), 0);
     }

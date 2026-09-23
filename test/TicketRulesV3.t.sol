@@ -71,8 +71,22 @@ contract TicketRulesV3Test is RealV4Base {
             factory.reserveSpawn(factory.currentRoundId());
             for (uint256 s; s < 3; ++s) factory.birthStep{gas: 16_000_000}();
             PSPFactory.Round memory next = factory.getRound(factory.currentRoundId());
-            mixETH.approve(address(next.controller), gross[i + 1]);
-            next.controller.predeposit(gross[i + 1]);
+            // Public leg fills the pooled cap exactly; the remainder rides
+            // the factory's cap-exempt carry so the table still spans a
+            // 2,000-mix launch.
+            uint256 size = gross[i + 1];
+            uint256 cap = next.controller.PREDEPOSIT_CAP();
+            uint256 publicLeg = size > cap ? cap : size;
+            mixETH.approve(address(next.controller), publicLeg);
+            next.controller.predeposit(publicLeg);
+            uint256 carryLeg = size - publicLeg;
+            if (carryLeg > 0) {
+                mixETH.transfer(address(factory), carryLeg);
+                vm.startPrank(address(factory));
+                mixETH.approve(address(next.controller), carryLeg);
+                next.controller.seedCarry(carryLeg);
+                vm.stopPrank();
+            }
             vm.prank(address(factory));
             next.controller.launchPooledBuy();
             ctl = next.controller;
