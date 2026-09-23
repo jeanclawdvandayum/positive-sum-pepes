@@ -274,3 +274,179 @@ html[data-theme='light'] .alt-shell .icon-button[aria-label$='theme'] { transfor
   .alt-shell .input-amount[aria-invalid='true'],
   .alt-shell #buy-amount[aria-invalid='true'] { animation: none; color: var(--red); }
 }
+
+/* ───────────────────────── Feature 5 — RainbowKit modal in the alt skin ─────────────────────────
+   Theme variables come from src/alt/rainbowTheme.ts: every --rk-* color/font/radius/shadow
+   points at the site tokens, which flip with html[data-theme]. RK teleports its dialog
+   portals to <body> as [data-rk][role=dialog] — outside .alt-shell — so live.css's global
+   squaring never reaches them and the modal is re-skinned here. Scoping to the dialog
+   overlays (role=dialog only exists on the modal portals; the outer [data-rk] also wraps
+   the whole app) keeps every rule below off the site. */
+
+/* square geometry at the same !important strength live.css uses inside .alt-shell;
+   wallet logos are rounded inline by RK in some flows, so imgs alone keep the site's
+   small icon soften (3px, cf. .receive-token img) */
+body.alt-mode [data-rk][role='dialog'] *,
+body.alt-mode [data-rk][role='dialog'] *::before,
+body.alt-mode [data-rk][role='dialog'] *::after { border-radius: 0 !important; }
+body.alt-mode [data-rk][role='dialog'] img { border-radius: 3px !important; }
+
+/* site fonts: --rk-fonts-body already maps to var(--body); the belt-and-braces root rule
+   catches anything RK styles by inheritance, titles get the display face */
+body.alt-mode [data-rk][role='dialog'] { font-family: var(--body); }
+body.alt-mode [data-rk][role='dialog'] h1,
+body.alt-mode [data-rk][role='dialog'] h2,
+body.alt-mode [data-rk][role='dialog'] h3 { font-family: var(--display); letter-spacing: -.025em; font-size: 20px; font-weight: 400; }
+/* the "What is a Wallet?" / "Get a Wallet" view titles are DIVs, not headings —
+   same display face so every modal title matches. The header row is the only div
+   containing the Close button; matches nothing in the connect view (h1 there). */
+body.alt-mode [data-rk][role='dialog'] div:has(> button[aria-label='Close']) > div[style*='flex-grow'] > div {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 20px;
+  letter-spacing: -.025em;
+}
+
+/* the dialog box wears the site card language: 1px line border + hard offset shadow */
+body.alt-mode [data-rk][role='dialog'] [role='document'] {
+  border: 1px solid var(--line);
+  box-shadow: 5px 5px 0 var(--shadow);
+}
+
+/* wallet rows respond like the site's buttons: lift + brighten on hover
+   (transitions limited to transform/filter — compositor-only per the plan's
+   ground rules; the background change itself is a static state swap) */
+body.alt-mode [data-rk][role='dialog'] button[data-testid^='rk-wallet-option-'] {
+  transition: filter .15s, transform .15s;
+}
+body.alt-mode [data-rk][role='dialog'] button[data-testid^='rk-wallet-option-']:hover {
+  background: var(--raised);
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+}
+body.alt-mode [data-rk][role='dialog'] button[aria-label='Close']:hover { background: var(--line); }
+body.alt-mode [data-rk][role='dialog'] :is(button, a):focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+}
+
+/* the "Learn More" / "Get a wallet" footer link wears the site's secondary-button
+   language (transparent fill, line border, green border on hover — cf. .wallet-button,
+   .btn.secondary). Hook (OpusQA round 1): RK gives its clickable footer link an inline
+   `will-change: transform`, and in the connect view the only other will-change carriers
+   are <button>s (Close, wallet rows) which can't match div[style...]. The :has() gate
+   pins the rule to the connect view so the Learn/Get view panels never match. */
+body.alt-mode [data-rk][role='dialog'] [role='document']:has(button[data-testid^='rk-wallet-option-']) div[style*='will-change'] {
+  background: transparent;
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-family: var(--body);
+  font-weight: 600;
+  font-size: 13px;
+  transition: transform .15s;
+}
+/* RK colors the inner label with its accent class — keep the site ink on top */
+body.alt-mode [data-rk][role='dialog'] [role='document']:has(button[data-testid^='rk-wallet-option-']) div[style*='will-change'] > div {
+  color: var(--ink) !important;
+}
+body.alt-mode [data-rk][role='dialog'] [role='document']:has(button[data-testid^='rk-wallet-option-']) div[style*='will-change']:hover {
+  border-color: var(--green);
+  transform: translateY(-1px);
+}
+
+/* modal action buttons ("Get a Wallet", "GET", cancel-style) wear the site's primary
+   button proportions: square, lime fill, hard offset shadow. Skips Close/Back
+   (aria-label) and the wallet rows (data-testid). Transitions stay compositor-only.
+   Light theme follows the site's light primary: ink border + ink shadow (live.css).
+   accentColor stays var(--green) in the theme so the Back chevron and the "Learn
+   More" text link keep their readable green in light. (OpusQA round 1) */
+body.alt-mode [data-rk][role='dialog'] button:not([aria-label]):not([data-testid]) {
+  background: var(--action) !important;
+  color: var(--action-ink) !important;
+  min-height: 40px;
+  padding: 8px 18px !important;
+  border: 1px solid transparent;
+  box-shadow: 3px 3px 0 var(--shadow);
+  font-weight: 700;
+  transition: transform .15s, filter .15s;
+}
+/* RK colors nested label/icon nodes with its own classes — force the whole
+   subtree onto the action ink (AstraQA round 2: Copy Address label rendered
+   --ink on lime at 1.14:1; svg follows currentColor) */
+body.alt-mode [data-rk][role='dialog'] button:not([aria-label]):not([data-testid]) * {
+  color: inherit !important;
+}
+/* the header Back chevron is navigational, not an action — keep it a green ghost
+   (QA's intent: accentColor stays green so the chevron reads in light; its inline
+   title is svg-only, so the :not([aria-label]) skip doesn't catch it) */
+body.alt-mode [data-rk][role='dialog'] div:has(> button[aria-label='Close']) button:not([aria-label]) {
+  background: transparent !important;
+  color: var(--green) !important;
+  border: 0;
+  box-shadow: none;
+  min-height: 0;
+  padding: 6px;
+  font-weight: 400;
+  transition: transform .15s, filter .15s;
+}
+html[data-theme='light'] body.alt-mode [data-rk][role='dialog'] button:not([aria-label]):not([data-testid]) {
+  border-color: var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+/* keep the Back ghost clean in light too — the light action shadow above out-ranks
+   the base header reset on specificity (OpusQA round 2) */
+html[data-theme='light'] body.alt-mode [data-rk][role='dialog'] div:has(> button[aria-label='Close']) button:not([aria-label]) {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* reduced motion: style.css already kills animations/transitions page-wide (portals
+   included); strip the remaining static hover transforms down to color/brightness */
+@media (prefers-reduced-motion: reduce) {
+  body.alt-mode [data-rk][role='dialog'] button[data-testid^='rk-wallet-option-']:hover,
+  body.alt-mode [data-rk][role='dialog'] button[aria-label='Close']:hover,
+  body.alt-mode [data-rk][role='dialog'] [role='document']:has(button[data-testid^='rk-wallet-option-']) div[style*='will-change']:hover {
+    transform: none;
+  }
+}
+
+/* ───────────────────────── Feature 6 — IBCO picker fills its two-row card ─────────────────────────
+   Predeposit's inline <style> caps the tile grid at 370px and centers it (≥1024px) inside
+   a card that spans the progress + deposit rows, leaving dead bands. In alt the picker
+   column takes the wider share of .pd-grid and the tiles stay SQUARE at the largest size
+   the card affords (container-query min() of the width and height limits), centered in
+   the leftover — no blank bands in the card and no letterboxing inside the tiles
+   (OpusQA round 1 prototype). Scoped under .alt-predeposit, so the stake pickers keep
+   their stock geometry. */
+
+.alt-shell .alt-predeposit .pd-picker [data-pepe-grid] { gap: 14px; }
+
+@media (min-width: 1024px) {
+  .alt-shell .alt-predeposit .pd-grid { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
+  /* card root becomes a column (header / grid / hint); the inline height:100% on
+     .pd-picker > div still makes it fill the row-spanned wrapper. The reserved-pepe
+     card is already flex-column, so the same rule is a no-op there. */
+  .alt-shell .alt-predeposit .pd-picker > div { display: flex; flex-direction: column; }
+  .alt-shell .alt-predeposit .pd-picker [data-pepe-grid] {
+    flex: 1 1 0;
+    min-height: 0;
+    container-type: size;      /* the grid opts out of row sizing: the right column sets the height */
+    max-width: none;           /* kills the inline 370px cap + margin-inline:auto */
+    margin-inline: 0;
+    grid-template-columns: repeat(3, auto);
+    grid-auto-rows: auto;
+    justify-content: space-between;
+    align-content: center;
+  }
+  .alt-shell .alt-predeposit .pd-picker [data-pepe-grid] > button {
+    aspect-ratio: 1;
+    width: min((100cqw - 28px) / 3, (100cqh - 14px) / 2);
+  }
+  .alt-shell .alt-predeposit .pd-picker .picker-hint { margin-top: 12px; }
+}
+@media (min-width: 1280px) {
+  .alt-shell .alt-predeposit .pd-grid { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); }
+}

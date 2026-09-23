@@ -3,6 +3,7 @@ import TransactionToasts from './components/TransactionToasts'
 import { useEffect } from 'react'
 import { WagmiProvider } from 'wagmi'
 import { RainbowKitProvider, lightTheme, darkTheme } from '@rainbow-me/rainbowkit'
+import { altRainbowTheme } from './alt/rainbowTheme'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HashRouter, Routes, Route } from 'react-router-dom'
 import { wagmiConfig, ADDRESSES } from './lib/config'
@@ -101,19 +102,24 @@ function Shell() {
         <RainbowKitProvider
           avatar={WalletPepeAvatar}
           theme={
-            resolved === 'dark'
-              ? darkTheme({
-                  accentColor: accent,
-                  accentColorForeground: '#06101d',
-                  borderRadius: 'large',
-                  overlayBlur: 'small',
-                })
-              : lightTheme({
-                  accentColor: accent,
-                  accentColorForeground: 'white',
-                  borderRadius: 'large',
-                  overlayBlur: 'small',
-                })
+            import.meta.env.VITE_ALT_UI === '1' ? (
+              // alt skin: square, pixel shadows, site tokens (public/alt/polish.css)
+              altRainbowTheme(resolved)
+            ) : resolved === 'dark' ? (
+              darkTheme({
+                accentColor: accent,
+                accentColorForeground: '#06101d',
+                borderRadius: 'large',
+                overlayBlur: 'small',
+              })
+            ) : (
+              lightTheme({
+                accentColor: accent,
+                accentColorForeground: 'white',
+                borderRadius: 'large',
+                overlayBlur: 'small',
+              })
+            )
           }
           modalSize="compact"
         >
