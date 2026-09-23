@@ -13,6 +13,7 @@ import { requestNamePermit } from '../../lib/namePermit'
 import { wnsAbi } from '../../lib/weiNames'
 import { confirmTransaction } from '../../lib/transactions'
 import { isRpcUnavailable } from '../../lib/rpcErrors'
+import { captureAnchor, fireFx, isUserRejection } from '../../lib/actionFx'
 
 function errorMessage(error: unknown) {
   if (isRpcUnavailable(error)) return 'The name network is taking longer than usual. Check your wallet’s transaction history before retrying.'
@@ -75,6 +76,7 @@ export default function NameRegistrationCard() {
 
   async function registerName() {
     if (!address || !ready || !ns.registrar || status?.busy) return
+    const anchor = captureAnchor()
     const toast = startTransactionToast(reveal ? 'register name' : 'reserve name', ns.chainId, address)
     setActivity({ key, busy: true })
     try {
@@ -134,6 +136,7 @@ export default function NameRegistrationCard() {
           return { ...receipt, replacementReason }
         },
       }, params, toast.update)
+      fireFx(canReveal ? 'nameRegister' : 'nameCommit', { anchor })
       if (canReveal) {
         try { localStorage.removeItem(key) } catch { /* the confirmed registration remains successful */ }
         setPlanState({ key })
@@ -144,6 +147,7 @@ export default function NameRegistrationCard() {
       await queries.invalidateQueries({ queryKey })
     } catch (error) {
       toast.fail(error)
+      if (!isUserRejection(error)) fireFx('fail', { anchor })
       setActivity({ key, error: errorMessage(error) })
       await queries.invalidateQueries({ queryKey })
     }

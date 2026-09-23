@@ -15,6 +15,11 @@ import { userFacingRpcError } from './rpcErrors'
 import { assertReferralPurchase } from './referrals'
 import { assertReinvestor } from './reinvestRules'
 import { verifyReferralClaim } from './referralRewards'
+import { captureAnchor, fireFx, isUserRejection, takeFxDetail, fxKindFor, type FxKind } from './actionFx'
+
+function fire(kind: FxKind | undefined, anchor: Element | undefined, detail?: string): void {
+  if (kind) fireFx(kind, { anchor, detail })
+}
 
 /** AUD-4: every UI write simulates, waits for mining, and checks receipt status. */
 export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } | { nftRoundId: bigint | undefined } | { referralClaimRoundId: bigint | undefined } | { referralPurchase: { roundId: bigint; registry?: `0x${string}` } }) {
@@ -22,9 +27,23 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
   const client = usePublicClient({ chainId: CHAIN_ID })
   const { writeContractAsync } = useWriteContract()
   type Write = Parameters<typeof writeContractAsync>[0]
-  const confirmed = async (parameters: Write, validateOnly = false) => {
+  // fx.mute silences helper writes (approvals inside writeWithApprovals);
+  // fx.anchor/fx.detail carry the batch entry press and primed chip through
+  // long confirmation flows — present-but-undefined means "use nothing",
+  // absent means self-capture.
+  const confirmed = async (parameters: Write, validateOnly = false, fx?: { mute?: boolean; anchor?: Element; detail?: string }) => {
     if (!client || !address) throw new Error('Connect a wallet first.')
     const toast = validateOnly ? undefined : startTransactionToast(transactionLabel(parameters.functionName), CHAIN_ID, address)
+    const kind = validateOnly || fx?.mute ? undefined : fxKindFor(parameters.functionName)
+    let anchor: Element | undefined
+    if (validateOnly || fx?.mute) anchor = undefined
+    else if (fx && 'anchor' in fx) anchor = fx.anchor
+    else anchor = captureAnchor()
+    // The primed chip detail is consumed at START so the 10s TTL guards
+    // prime→start only; it then rides through wallet and mining.
+    let detail: string | undefined
+    if (fx && 'detail' in fx) detail = fx.detail
+    else detail = takeFxDetail(kind)
     try {
       await ensureWalletChain(address, CHAIN_ID)
       // Immutable legacy deployments do not acquire the new purchase rules.
@@ -100,7 +119,7 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
         throw userFacingRpcError(error)
       }
       if (validateOnly) return undefined
-      return await confirmTransaction({
+      const hash = await confirmTransaction({
         simulate: p => client.simulateContract({ ...p, account: address } as never)
           .catch(error => { throw userFacingRpcError(error) }),
         submit: async p => {
@@ -116,7 +135,13 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
           return { ...receipt, replacementReason }
         },
       }, { ...parameters, account: address, chainId: CHAIN_ID } as typeof parameters, toast?.update)
-    } catch (error) { toast?.fail(error); throw error }
+      if (!fx?.mute) fire(kind, anchor, detail)
+      return hash
+    } catch (error) {
+      toast?.fail(error)
+      if (!validateOnly && !fx?.mute && !isUserRejection(error)) fireFx('fail', { anchor })
+      throw error
+    }
   }
   // Capabilities belong to the selected account AND chain. Never cache by brand.
   const atomicWallet = async () => {
@@ -128,33 +153,61 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
     return supportsAtomicBatch(capabilities) ? wallet : undefined
   }
   const writeWithApprovals = async (action: Write, approvals: Write[] = []) => {
-    if (!approvals.length) return confirmed(action)
-    const wallet = await atomicWallet()
-    if (!wallet) {
-      for (const approval of approvals) await confirmed(approval)
-      return confirmed(action)
-    }
-    const toast = startTransactionToast(`approve & ${transactionLabel(action.functionName)}`, CHAIN_ID, address!)
+    // One press, one animation: anchor and primed chip detail snapshot at entry
+    // and ride through approvals, mining and the batch itself.
+    const anchor = captureAnchor()
+    const detail = takeFxDetail(fxKindFor(action.functionName))
+    if (!approvals.length) return confirmed(action, false, { anchor, detail })
+    // The batch reports exactly ONE fail for a non-rejection, zero for a user
+    // rejection, wherever it fails — wallet guard, an approval leg, the atomic
+    // batch or the action leg.
+    let failReported = false
     try {
-      const calls = [...approvals, action]
-      // Apply the same round, target, referral and reinvestor guards to EVERY call.
-      for (const call of calls) await confirmed(call, true)
-      return await confirmAtomicTransaction({
-        send: async () => {
-          await ensureWalletChain(address!, CHAIN_ID)
-          // The wallet simulates dependent calls together. An isolated action
-          // eth_call would fail before its approval exists.
-          return sendCalls(wallet, {
-            account: address!, chain: wallet.chain, forceAtomic: true,
-            calls: calls.map(call => ({ to: call.address, value: call.value,
-              data: encodeFunctionData(call as never) })),
-          })
-        },
-        wait: id => waitForCallsStatus(wallet, { id, timeout: 180_000, retryCount: 0 }),
-        confirm: hash => client!.waitForTransactionReceipt({ hash, timeout: 180_000 }),
-        notify: toast.update,
-      })
-    } catch (error) { toast.fail(error); throw error }
+      const wallet = await atomicWallet()
+      if (!wallet) {
+        for (const approval of approvals) {
+          try {
+            await confirmed(approval, false, { mute: true })
+          } catch (error) {
+            if (!isUserRejection(error)) { fireFx('fail', { anchor }); failReported = true }
+            throw error
+          }
+        }
+        // The action leg owns its own failure FX from here.
+        failReported = true
+        return await confirmed(action, false, { anchor, detail })
+      }
+      const toast = startTransactionToast(`approve & ${transactionLabel(action.functionName)}`, CHAIN_ID, address!)
+      try {
+        const calls = [...approvals, action]
+        // Apply the same round, target, referral and reinvestor guards to EVERY call.
+        for (const call of calls) await confirmed(call, true)
+        const hash = await confirmAtomicTransaction({
+          send: async () => {
+            await ensureWalletChain(address!, CHAIN_ID)
+            // The wallet simulates dependent calls together. An isolated action
+            // eth_call would fail before its approval exists.
+            return sendCalls(wallet, {
+              account: address!, chain: wallet.chain, forceAtomic: true,
+              calls: calls.map(call => ({ to: call.address, value: call.value,
+                data: encodeFunctionData(call as never) })),
+            })
+          },
+          wait: id => waitForCallsStatus(wallet, { id, timeout: 180_000, retryCount: 0 }),
+          confirm: hash => client!.waitForTransactionReceipt({ hash, timeout: 180_000 }),
+          notify: toast.update,
+        })
+        fire(fxKindFor(action.functionName), anchor, detail)
+        return hash
+      } catch (error) {
+        toast.fail(error)
+        if (!isUserRejection(error)) { fireFx('fail', { anchor }); failReported = true }
+        throw error
+      }
+    } catch (error) {
+      if (!failReported && !isUserRejection(error)) fireFx('fail', { anchor })
+      throw error
+    }
   }
 
   return { writeContractAsync: confirmed as typeof writeContractAsync, writeWithApprovals, atomicWallet }

@@ -7,12 +7,13 @@
 // 80% of that leg. Versioned registries retain rewards for wallet claims.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { useAccount } from 'wagmi'
 import { fmtPepeId } from '../../lib/format'
 import { useCanRefer, refLinkFor, useReferral } from '../../components/ReferralCard'
 import ReferralShare from '../../components/ReferralShare'
 import ReferralRewards from '../../components/ReferralRewards'
+import { fireFx } from '../../lib/actionFx'
 import { useRound } from '../../lib/useRound'
 
 export default function ReferralsCard() {
@@ -33,9 +34,11 @@ export default function ReferralsCard() {
     return () => clearTimeout(t)
   }, [copied])
 
-  async function copyLink() {
+  async function copyLink(event: MouseEvent<HTMLButtonElement>) {
+    const anchor = event.currentTarget
     try {
       await navigator.clipboard.writeText(link)
+      fireFx('refLink', { anchor })
       setCopied(true)
     } catch {
       window.prompt('copy your referral link', link)

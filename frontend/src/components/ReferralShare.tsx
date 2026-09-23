@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type MouseEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAccount } from 'wagmi'
 import { CHAIN_ID, TESTNET_ETH_FAUCET } from '../lib/config'
@@ -9,6 +9,7 @@ import {
   loadReferralPepe, pickReferralQuip, referralPepePng, referralPostText,
   referralXIntent, REFERRAL_QUIPS,
 } from '../lib/referralShare'
+import { fireFx } from '../lib/actionFx'
 
 const button = 'inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 py-2 text-sm font-semibold transition hover:bg-bg-2 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40'
 
@@ -55,8 +56,9 @@ function SharePanel({ staker, tokenId, link }: { staker: `0x${string}`; tokenId:
   const text = referralPostText(REFERRAL_QUIPS[quip], CHAIN_ID)
   const intent = referralXIntent(text, link)
 
-  async function copyAndOpen() {
+  async function copyAndOpen(event: MouseEvent<HTMLButtonElement>) {
     if (!art.data || busy) return
+    const anchor = event.currentTarget
     setBusy(true)
     setStatus('')
     try {
@@ -64,6 +66,7 @@ function SharePanel({ staker, tokenId, link }: { staker: `0x${string}`; tokenId:
       // so clipboard permission is requested directly from the user gesture.
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': art.data })])
       if (!mounted.current) return
+      fireFx('shareImage', { anchor })
       setStatus('pepe copied. paste it into your post in X. use “open X” below if your browser kept you here.')
       window.open(intent, '_blank', 'noopener,noreferrer')
     } catch {

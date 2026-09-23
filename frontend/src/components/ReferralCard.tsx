@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { fireFx } from '../lib/actionFx'
 import { useSearchParams } from 'react-router-dom'
 import { useAccount } from 'wagmi'
 import { factoryAbi, registryAbi, stakerAbi } from '../lib/abi'
@@ -172,9 +173,11 @@ export default function ReferralCard() {
     return () => clearTimeout(t)
   }, [copied])
 
-  async function copyLink() {
+  async function copyLink(event: MouseEvent<HTMLButtonElement>) {
+    const anchor = event.currentTarget
     try {
       await navigator.clipboard.writeText(link)
+      fireFx('refLink', { anchor })
       setCopied(true)
     } catch {
       window.prompt('copy your referral link', link)
