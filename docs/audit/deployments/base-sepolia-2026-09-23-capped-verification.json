@@ -5,62 +5,321 @@
     "sineV3Math": {
       "address": "0x54166753Df053E478bb7A36F7e1A2dE8021B35e7",
       "identifier": "src/SineV3Math.sol:SineV3Math",
-      "error": "TimeoutError: The operation was aborted due to timeout"
+      "verificationId": "4fdd29e4-3bc9-46da-a967-3c9f99fc16f3",
+      "matchId": "51565713",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T14:59:39Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "4fdd29e4-3bc9-46da-a967-3c9f99fc16f3",
+        "jobStartTime": "2026-09-23T14:59:36Z",
+        "jobFinishTime": "2026-09-23T14:59:39Z",
+        "compilationTime": "2156",
+        "externalVerifications": {
+          "etherscan": {
+            "verificationId": "scwiyw9mp3gfi6wi4cirhztsaix89diremnuetqllyi4bkk2w3",
+            "statusUrl": "https://api.etherscan.io/v2/api?chainid=84532&module=contract&action=checkverifystatus&guid=scwiyw9mp3gfi6wi4cirhztsaix89diremnuetqllyi4bkk2w3",
+            "explorerUrl": "https://sepolia.basescan.org//address/0x54166753Df053E478bb7A36F7e1A2dE8021B35e7",
+            "contractApiUrl": "https://api.etherscan.io/v2/api?chainid=84532&module=contract&action=getabi&address=0x54166753Df053E478bb7A36F7e1A2dE8021B35e7"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x54166753Df053E478bb7A36F7e1A2dE8021B35e7",
+          "verifiedAt": "2026-09-23T14:59:39Z",
+          "matchId": "51565713"
+        }
+      }
     },
     "sineV3Data0": {
       "address": "0xcecAA13c1e63AB48f01129DDaa6d4954ffC5f526",
       "identifier": "src/SineV3Data.sol:SineV3Data0",
-      "error": "TimeoutError: The operation was aborted due to timeout"
+      "verificationId": "1f221584-e949-45ff-919b-eef58cf88817",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
     },
     "sineV3Data1": {
       "address": "0x646687bfCe1fD4827527842708468109bF81DE4a",
       "identifier": "src/SineV3Data.sol:SineV3Data1",
-      "error": "TimeoutError: The operation was aborted due to timeout"
+      "verificationId": "8ea3294e-26cc-4b66-aefa-2f93cd31e0d8",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
     },
     "sineV3Data2": {
       "address": "0x93fD5A75AE863b0853aB63580c349cfb56c2EA4d",
       "identifier": "src/SineV3Data.sol:SineV3Data2",
-      "error": "TimeoutError: The operation was aborted due to timeout"
+      "verificationId": "21065655-f605-4a0f-8540-ee9b7435cf73",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
     },
     "sineV3Data3": {
       "address": "0xCEc5F972cEfC1152a723734C6ECF080066BDc423",
       "identifier": "src/SineV3Data.sol:SineV3Data3",
-      "error": "TimeoutError: The operation was aborted due to timeout"
+      "verificationId": "0658447d-2d6f-457f-a87c-4c9e0fe03373",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
     },
     "factory": {
-      "address": "0x9c24d9af0cd2a04796b36e8edf529822c1f1cd8b",
+      "address": "0x9c24D9af0Cd2a04796b36E8eDF529822C1f1CD8b",
       "identifier": "src/PSPFactory.sol:PSPFactory",
-      "error": "TimeoutError: The operation was aborted due to timeout"
+      "verificationId": "33771ed8-a190-43c8-a11b-1ad392c66c7b",
+      "matchId": "51565744",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T15:00:03Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "33771ed8-a190-43c8-a11b-1ad392c66c7b",
+        "jobStartTime": "2026-09-23T14:59:48Z",
+        "jobFinishTime": "2026-09-23T15:00:03Z",
+        "compilationTime": "7911",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "verificationId": "9c24d9af0cd2a04796b36e8edf529822c1f1cd8b6ab3e973",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=9c24d9af0cd2a04796b36e8edf529822c1f1cd8b6ab3e973",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x9c24D9af0Cd2a04796b36E8eDF529822C1f1CD8b",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x9c24D9af0Cd2a04796b36E8eDF529822C1f1CD8b"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x9c24D9af0Cd2a04796b36E8eDF529822C1f1CD8b",
+          "verifiedAt": "2026-09-23T15:00:03Z",
+          "matchId": "51565744"
+        }
+      }
     },
     "token": {
       "address": "0xc54e1c4686C013DA2308652A29b7DFd780370F5F",
       "identifier": "src/PSPToken.sol:PSPToken",
-      "error": "TimeoutError: The operation was aborted due to timeout"
+      "verificationId": "391df8d4-e927-4eb8-a58d-2da2f92a1daf",
+      "matchId": "51565736",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T14:59:52Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "391df8d4-e927-4eb8-a58d-2da2f92a1daf",
+        "jobStartTime": "2026-09-23T14:59:50Z",
+        "jobFinishTime": "2026-09-23T14:59:52Z",
+        "compilationTime": "1582",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xc54e1c4686C013DA2308652A29b7DFd780370F5F",
+          "verifiedAt": "2026-09-23T14:59:52Z",
+          "matchId": "51565736"
+        }
+      }
     },
     "controller": {
       "address": "0x7F7d6f846316F5489CB75a21bdbCE05eE011363A",
       "identifier": "src/RoundController.sol:RoundController",
-      "error": "TimeoutError: The operation was aborted due to timeout"
+      "verificationId": "af309e3f-d75d-40b5-b336-100295ea4505",
+      "matchId": "51565739",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T14:59:57Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "af309e3f-d75d-40b5-b336-100295ea4505",
+        "jobStartTime": "2026-09-23T14:59:52Z",
+        "jobFinishTime": "2026-09-23T14:59:57Z",
+        "compilationTime": "4754",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x7F7d6f846316F5489CB75a21bdbCE05eE011363A",
+          "verifiedAt": "2026-09-23T14:59:57Z",
+          "matchId": "51565739"
+        }
+      }
     },
     "hook": {
       "address": "0xAF5a957cf18d2A04109f15C43C100dd9c2B3AA88",
       "identifier": "src/CurveHook.sol:CurveHook",
-      "error": "TimeoutError: The operation was aborted due to timeout"
+      "verificationId": "c500bc40-3733-457f-865a-e4d33b3363a7",
+      "matchId": "51565741",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T15:00:00Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "c500bc40-3733-457f-865a-e4d33b3363a7",
+        "jobStartTime": "2026-09-23T14:59:53Z",
+        "jobFinishTime": "2026-09-23T15:00:00Z",
+        "compilationTime": "5514",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "verificationId": "af5a957cf18d2a04109f15c43c100dd9c2b3aa886ab3e970",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=af5a957cf18d2a04109f15c43c100dd9c2b3aa886ab3e970",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0xAF5a957cf18d2A04109f15C43C100dd9c2B3AA88",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0xAF5a957cf18d2A04109f15C43C100dd9c2B3AA88"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xAF5a957cf18d2A04109f15C43C100dd9c2B3AA88",
+          "verifiedAt": "2026-09-23T15:00:00Z",
+          "matchId": "51565741"
+        }
+      }
     },
     "staker": {
       "address": "0x1A0B68E1d93c88Ea9731977674356eB037b08779",
       "identifier": "src/PSPStaker.sol:PSPStaker",
-      "error": "TimeoutError: The operation was aborted due to timeout"
+      "verificationId": "8dddc23f-c56b-4813-9043-8b3ffa72d7f8",
+      "matchId": "51565742",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T15:00:01Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "8dddc23f-c56b-4813-9043-8b3ffa72d7f8",
+        "jobStartTime": "2026-09-23T14:59:56Z",
+        "jobFinishTime": "2026-09-23T15:00:01Z",
+        "compilationTime": "4387",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "verificationId": "1a0b68e1d93c88ea9731977674356eb037b087796ab3e971",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=1a0b68e1d93c88ea9731977674356eb037b087796ab3e971",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x1A0B68E1d93c88Ea9731977674356eB037b08779",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x1A0B68E1d93c88Ea9731977674356eB037b08779"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x1A0B68E1d93c88Ea9731977674356eB037b08779",
+          "verifiedAt": "2026-09-23T15:00:01Z",
+          "matchId": "51565742"
+        }
+      }
     },
     "mix": {
       "address": "0xBa934Cd82D48e6ed9a1433B3ad6BA11F2D06e118",
       "identifier": "src/testnet/SepoliaMixETH.sol:SepoliaMixETH",
-      "error": "TimeoutError: The operation was aborted due to timeout"
+      "verificationId": "06969cce-91e9-4926-becb-55700492b63c",
+      "matchId": "51565740",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T14:59:59Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "06969cce-91e9-4926-becb-55700492b63c",
+        "jobStartTime": "2026-09-23T14:59:57Z",
+        "jobFinishTime": "2026-09-23T14:59:59Z",
+        "compilationTime": "1346",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xBa934Cd82D48e6ed9a1433B3ad6BA11F2D06e118",
+          "verifiedAt": "2026-09-23T14:59:59Z",
+          "matchId": "51565740"
+        }
+      }
     },
     "registry": {
       "address": "0x49140438F746EE639982ca1CF3Efc0e39fE851CE",
       "identifier": "src/PSPReferralRegistry.sol:PSPReferralRegistry",
-      "error": "TimeoutError: The operation was aborted due to timeout"
+      "verificationId": "6dc82fa7-ba1f-4aca-a876-9f2a4aa87e9c",
+      "matchId": "51565743",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-23T15:00:02Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "6dc82fa7-ba1f-4aca-a876-9f2a4aa87e9c",
+        "jobStartTime": "2026-09-23T14:59:59Z",
+        "jobFinishTime": "2026-09-23T15:00:02Z",
+        "compilationTime": "2518",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "verificationId": "49140438f746ee639982ca1cf3efc0e39fe851ce6ab3e972",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=49140438f746ee639982ca1cf3efc0e39fe851ce6ab3e972",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x49140438F746EE639982ca1CF3Efc0e39fE851CE",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x49140438F746EE639982ca1CF3Efc0e39fE851CE"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x49140438F746EE639982ca1CF3Efc0e39fE851CE",
+          "verifiedAt": "2026-09-23T15:00:02Z",
+          "matchId": "51565743"
+        }
+      }
     },
     "zapIn": {
       "address": "0x95BC6E5B71209DCDE08b759BC39138883CBd0DA9",
@@ -217,7 +476,7 @@
     "descriptor": {
       "address": "0x1EF007Ee9Ae24D1E92e06e667e192385f4E76506",
       "identifier": "src/PepeExpandedDescriptor.sol:PepeExpandedDescriptor",
-      "verificationId": "05891dad-d234-4444-ac69-e17a393e68b8",
+      "verificationId": "30ae2050-c8c2-4512-8de8-4ebb3ab38983",
       "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
     },
     "hookDeployer": {
