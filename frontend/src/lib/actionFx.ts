@@ -100,7 +100,7 @@ export function fireFx(kind: FxKind, opts: { anchor?: Element | DOMRect; target?
   if (!listeners.size) return
   const id = nextId++
   if (opts.anchor instanceof Element) anchorElements.set(id, opts.anchor)
-  const event: FxEvent = { id, kind, anchor: rectOf(opts.anchor), target: rectOf(opts.target), detail: opts.detail ?? takePrimedDetail(kind) }
+  const event: FxEvent = { id, kind, anchor: rectOf(opts.anchor), target: rectOf(opts.target), detail: opts.detail }
   events = [...events, event]
   listeners.forEach(notify => notify())
 }
@@ -128,28 +128,6 @@ export const actionFx = {
     anchorElements.delete(id)
     listeners.forEach(notify => notify())
   },
-}
-
-/** One-shot detail for the NEXT fireFx of a kind (e.g. the buy time chip),
- *  consumed and cleared on use, expiring after 10s. */
-const primedDetails = new Map<FxKind, { detail: string; at: number }>()
-const PRIME_TTL_MS = 10_000
-
-export function primeFxDetail(kind: FxKind, detail: string): void {
-  primedDetails.set(kind, { detail, at: Date.now() })
-}
-
-function takePrimedDetail(kind: FxKind): string | undefined {
-  const primed = primedDetails.get(kind)
-  primedDetails.delete(kind)
-  return primed && Date.now() - primed.at <= PRIME_TTL_MS ? primed.detail : undefined
-}
-
-/** Consume the primed detail NOW — callers that hold it across a long
- *  transaction (writeWithApprovals) pass it back explicitly on fireFx, so the
- *  TTL only guards prime→start, never the mining wait. */
-export function takeFxDetail(kind: FxKind | undefined): string | undefined {
-  return kind ? takePrimedDetail(kind) : undefined
 }
 
 /** A wallet dismissal is the user changing their mind, not a failure to mourn. */

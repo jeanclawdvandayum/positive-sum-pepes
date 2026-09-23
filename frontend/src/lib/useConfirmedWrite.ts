@@ -1,4 +1,4 @@
-import { encodeFunctionData } from 'viem'
+import { encodeFunctionData, type TransactionReceipt } from 'viem'
 import { getWalletClient } from 'wagmi/actions'
 import { getCapabilities, sendCalls, waitForCallsStatus } from 'viem/actions'
 import { supportsAtomicBatch, confirmAtomicTransaction } from './walletBatch'
@@ -15,7 +15,8 @@ import { userFacingRpcError } from './rpcErrors'
 import { assertReferralPurchase } from './referrals'
 import { assertReinvestor } from './reinvestRules'
 import { verifyReferralClaim } from './referralRewards'
-import { captureAnchor, fireFx, isUserRejection, takeFxDetail, fxKindFor, type FxKind } from './actionFx'
+import { buyFxDetail } from './buyFxDetail'
+import { captureAnchor, fireFx, isUserRejection, fxKindFor, type FxKind } from './actionFx'
 
 function fire(kind: FxKind | undefined, anchor: Element | undefined, detail?: string): void {
   if (kind) fireFx(kind, { anchor, detail })
@@ -28,10 +29,9 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
   const { writeContractAsync } = useWriteContract()
   type Write = Parameters<typeof writeContractAsync>[0]
   // fx.mute silences helper writes (approvals inside writeWithApprovals);
-  // fx.anchor/fx.detail carry the batch entry press and primed chip through
-  // long confirmation flows — present-but-undefined means "use nothing",
-  // absent means self-capture.
-  const confirmed = async (parameters: Write, validateOnly = false, fx?: { mute?: boolean; anchor?: Element; detail?: string }) => {
+  // fx.anchor carries the batch entry press through long confirmation flows —
+  // present-but-undefined means "use nothing", absent means self-capture.
+  const confirmed = async (parameters: Write, validateOnly = false, fx?: { mute?: boolean; anchor?: Element }) => {
     if (!client || !address) throw new Error('Connect a wallet first.')
     const toast = validateOnly ? undefined : startTransactionToast(transactionLabel(parameters.functionName), CHAIN_ID, address)
     const kind = validateOnly || fx?.mute ? undefined : fxKindFor(parameters.functionName)
@@ -39,11 +39,6 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
     if (validateOnly || fx?.mute) anchor = undefined
     else if (fx && 'anchor' in fx) anchor = fx.anchor
     else anchor = captureAnchor()
-    // The primed chip detail is consumed at START so the 10s TTL guards
-    // prime→start only; it then rides through wallet and mining.
-    let detail: string | undefined
-    if (fx && 'detail' in fx) detail = fx.detail
-    else detail = takeFxDetail(kind)
     try {
       await ensureWalletChain(address, CHAIN_ID)
       // Immutable legacy deployments do not acquire the new purchase rules.
@@ -119,6 +114,9 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
         throw userFacingRpcError(error)
       }
       if (validateOnly) return undefined
+      // The wait step already fetches the receipt; keep it so the buy chip
+      // decodes mined facts instead of reading the chain a second time.
+      let receipt: TransactionReceipt | undefined
       const hash = await confirmTransaction({
         simulate: p => client.simulateContract({ ...p, account: address } as never)
           .catch(error => { throw userFacingRpcError(error) }),
@@ -128,14 +126,17 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
         },
         wait: async hash => {
           let replacementReason: string | undefined
-          const receipt = await client.waitForTransactionReceipt({
+          const mined = await client.waitForTransactionReceipt({
             hash, timeout: 180_000,
             onReplaced: replacement => { if (replacement.reason !== 'repriced') replacementReason = replacement.reason },
           })
-          return { ...receipt, replacementReason }
+          receipt = mined
+          return { ...mined, replacementReason }
         },
       }, { ...parameters, account: address, chainId: CHAIN_ID } as typeof parameters, toast?.update)
-      if (!fx?.mute) fire(kind, anchor, detail)
+      // Only buys emit TimeAdded; the chip is the confirmed seconds, never the
+      // pre-sign estimate.
+      if (!fx?.mute) fire(kind, anchor, kind === 'buy' ? buyFxDetail(receipt?.logs) : undefined)
       return hash
     } catch (error) {
       toast?.fail(error)
@@ -153,11 +154,12 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
     return supportsAtomicBatch(capabilities) ? wallet : undefined
   }
   const writeWithApprovals = async (action: Write, approvals: Write[] = []) => {
-    // One press, one animation: anchor and primed chip detail snapshot at entry
-    // and ride through approvals, mining and the batch itself.
+    // One press, one animation: the anchor snapshot at entry rides through
+    // approvals and the batch itself. The buy chip detail, if any, comes from
+    // the mined receipt at fire time.
     const anchor = captureAnchor()
-    const detail = takeFxDetail(fxKindFor(action.functionName))
-    if (!approvals.length) return confirmed(action, false, { anchor, detail })
+    const kind = fxKindFor(action.functionName)
+    if (!approvals.length) return confirmed(action, false, { anchor })
     // The batch reports exactly ONE fail for a non-rejection, zero for a user
     // rejection, wherever it fails — wallet guard, an approval leg, the atomic
     // batch or the action leg.
@@ -175,13 +177,18 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
         }
         // The action leg owns its own failure FX from here.
         failReported = true
-        return await confirmed(action, false, { anchor, detail })
+        return await confirmed(action, false, { anchor })
       }
       const toast = startTransactionToast(`approve & ${transactionLabel(action.functionName)}`, CHAIN_ID, address!)
       try {
         const calls = [...approvals, action]
         // Apply the same round, target, referral and reinvestor guards to EVERY call.
         for (const call of calls) await confirmed(call, true)
+        // The canonical mined receipt is the one the confirm step already
+        // fetches; keep it so the buy chip decodes it with no second read. Its
+        // logs are the whole truth — empty means no confirmed TimeAdded, never
+        // a reason to mine some other source for events.
+        let txReceipt: TransactionReceipt | undefined
         const hash = await confirmAtomicTransaction({
           send: async () => {
             await ensureWalletChain(address!, CHAIN_ID)
@@ -194,10 +201,14 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
             })
           },
           wait: id => waitForCallsStatus(wallet, { id, timeout: 180_000, retryCount: 0 }),
-          confirm: hash => client!.waitForTransactionReceipt({ hash, timeout: 180_000 }),
+          confirm: async hash => {
+            const mined = await client!.waitForTransactionReceipt({ hash, timeout: 180_000 })
+            txReceipt = mined
+            return mined
+          },
           notify: toast.update,
         })
-        fire(fxKindFor(action.functionName), anchor, detail)
+        fire(kind, anchor, kind === 'buy' ? buyFxDetail(txReceipt?.logs) : undefined)
         return hash
       } catch (error) {
         toast.fail(error)

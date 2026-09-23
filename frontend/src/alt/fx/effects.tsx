@@ -45,9 +45,10 @@ export function BuyFx({ event, onDone }: FxProps) {
       <span key={i} className="fx-ticket" style={withVars({ left: a.x, top: a.y, animationDelay: `${i * 55}ms` },
         { '--dx': `${t.x - a.x + (i - (TICKETS - 1) / 2) * 13}px`, '--dy': `${t.y - a.y}px` })} />
     ))}
-    {clock && (
+    {/* Truthful chip only (Round 2, Feature 7): no confirmed TimeAdded, no chip. */}
+    {clock && event.detail && (
       <span className="fx-clock-chip" style={{ left: clock.left + clock.width / 2, top: clock.top - 2 }}>
-        {event.detail ?? '+'}
+        {event.detail}
       </span>
     )}
     <Over rect={event.target ?? queryRect('.ladder-panel')} className="fx-ladder-flash" />
