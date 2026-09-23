@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PSP 420 edition — collection inspector</title>
+<style>
+:root {
+  --bg: #0e120f; --panel: #151b16; --panel-2: #1a221c; --line: #263128;
+  --text: #d9e4da; --dim: #8da392; --accent: #62c875; --warn: #e6b93e;
+  --red: #d0483e; --gold: #e8b93e; --green: #2f9a4a;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.45 var(--ui); }
+header {
+  position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+  padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+header h1 { margin: 0; font-size: 14px; letter-spacing: .12em; }
+header h1 .edition {
+  margin-left: 6px; padding: 1px 7px; border-radius: 4px; font-size: 11px; color: #111;
+  background: linear-gradient(90deg, var(--red) 0 33%, var(--gold) 33% 66%, var(--green) 66%);
+}
+header nav a { color: var(--accent); margin-right: 12px; text-decoration: none; }
+header label { color: var(--dim); font-size: 12px; }
+select, button {
+  font: 12px var(--ui); color: var(--text); background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px;
+}
+button { cursor: pointer; }
+main { padding: 6px 18px 40px; }
+h2 { font-size: 15px; letter-spacing: .08em; margin: 26px 0 4px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+h3 { font-size: 12px; letter-spacing: .1em; color: var(--dim); margin: 16px 0 8px; }
+p.sub { color: var(--dim); margin: 2px 0 10px; }
+.grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.card canvas { display: block; image-rendering: pixelated; }
+.card .lbl { font: 11px var(--mono); text-align: center; max-width: 220px; }
+.card .lbl .id { color: var(--dim); }
+.tag { font: 10px var(--mono); padding: 0 5px; border-radius: 3px; margin-left: 4px; color: #111; }
+.tag.new { background: var(--accent); }
+.tag.changed { background: var(--gold); }
+.tag.renamed { background: #f08f7f; }
+.pair { display: flex; gap: 8px; align-items: flex-start; }
+.pair .side { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.pair .side .cap { font: 10px var(--mono); color: var(--dim); }
+.pair .arrow { align-self: center; color: var(--dim); font-size: 18px; }
+.none-box {
+  display: flex; align-items: center; justify-content: center; color: var(--dim);
+  border: 1px dashed var(--line); font: 11px var(--mono);
+}
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.sw { display: flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px 3px 3px; font: 11px var(--mono); }
+.sw i { display: inline-block; width: 18px; height: 18px; border-radius: 3px; border: 1px solid rgba(255,255,255,.15); }
+.sw.new { border-color: var(--accent); }
+.sw.changed { border-color: var(--gold); }
+#random .card .lbl { font-size: 10px; max-width: 150px; color: var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🐸 PSP COLLECTION <span class="edition">420 EDITION</span></h1>
+  <nav>
+    <a href="#traits">every trait</a>
+    <a href="#changes">original vs 420</a>
+    <a href="#palettes">palettes</a>
+    <a href="#random">random pepes</a>
+  </nav>
+  <label>skin <select id="sel-skin"></select></label>
+  <label>iris <select id="sel-iris"></select></label>
+  <label>bg <select id="sel-bg"></select></label>
+  <label>scale <select id="sel-scale"><option>2</option><option selected>3</option><option>4</option><option>6</option></select></label>
+  <span id="summary" class="sub" style="color:var(--dim);font:11px var(--mono)"></span>
+  <span id="sha" style="color:var(--dim);font:11px var(--mono)"></span>
+</header>
+<main>
+  <section id="traits">
+    <h2>EVERY TRAIT — composited on the base head</h2>
+    <p class="sub">Expressions / eyes are shown with eyes 0 / expression 0; hats, eyewear and items on expression 0 + eyes 0. Labels are DNA ids (stamp axes: 0 = NONE).</p>
+    <div id="traits-body"></div>
+  </section>
+  <section id="changes">
+    <h2>ORIGINAL vs 420 — every changed or added trait</h2>
+    <p class="sub">Left: the original release-2 collection (studio/expanded), rendered with its own palettes. Right: the 420 edition, same DNA id, same skin/iris/bg ids.</p>
+    <div id="changes-body"></div>
+  </section>
+  <section id="palettes">
+    <h2>PALETTES</h2>
+    <p class="sub">Green border = added in 420, gold border = recolored slot. All entries are append-only, so existing DNA ids keep their colors.</p>
+    <div id="palettes-body"></div>
+  </section>
+  <section id="random">
+    <h2>RANDOM PEPES <button id="btn-reroll" type="button">reroll</button></h2>
+    <p class="sub" id="random-sub"></p>
+    <div class="grid" id="random-body"></div>
+  </section>
+</main>
+
+<script src="../compiler.js"></script>
+<script src="defaults.js"></script>
+<script src="original.js"></script>
+<script src="collection.js"></script>
+</body>
+</html>
