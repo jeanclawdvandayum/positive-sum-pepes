@@ -10,7 +10,7 @@ const PSP = window.PSPApp = {};
 // 420 golden: sha256 of compileSolidity(420 defaults). Pinned (and re-verified)
 // by studio-420/tools/make_defaults.py — never the original studio's golden.
 PSP.GOLDEN_SHA =
-  '2c665740887db442a0f3bd4008fa50d94d024ffb9a5c54fbdc3874e6c2693e21';
+  '59397561cfebfd5818e44a62ac7044e7beb719d16834d75ecbf5990c854d52da';
 PSP.EDITION = '420';
 PSP.SIZE = 69;
 PSP.AXES = ['head', 'expressions', 'eyes', 'hats', 'eyewear', 'items'];
