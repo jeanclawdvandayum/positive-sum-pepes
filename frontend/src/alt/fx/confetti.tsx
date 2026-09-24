@@ -60,20 +60,21 @@ function burst(mood: ConfettiMood, o: ConfettiOptions): Piece[] {
     const side = rand() < 0.5 ? -1 : 1
     const dx = side * (0.12 + 0.88 * rand()) * (side < 0 ? reachLeft : reachRight)
     const peak = -rise * (0.45 + 0.55 * rand())
-    const duration = 1500 + rand() * 700
+    // Faces drift slowly enough to read: long airtime, a gentle sway, no edge-on flip.
+    const duration = face ? 3400 + rand() * 1100 : 2000 + rand() * 700
     const delay = (o.delay ?? 0) + rand() * (o.stagger ?? 220)
-    const spin = (rand() < 0.5 ? -1 : 1) * (face ? 160 + rand() * 340 : 300 + rand() * 500)
+    const spin = (rand() < 0.5 ? -1 : 1) * (face ? 12 + rand() * 38 : 300 + rand() * 500)
     const vars: Record<string, string> = {
       '--dx': `${Math.round(dx)}px`,
       '--peak': `${Math.round(peak)}px`,
       '--fall': `${Math.round(fall)}px`,
       '--spin': `${Math.round(spin)}deg`,
-      '--flip': `${Math.round(360 + rand() * 360)}deg`,
+      '--flip': face ? '0deg' : `${Math.round(360 + rand() * 360)}deg`,
     }
     let className = 'fx-pc'
     if (face) {
       const pick = pool.splice(Math.floor(rand() * pool.length), 1)[0] ?? 0
-      const size = Math.round((narrow ? 26 : 32) + rand() * (narrow ? 6 : 8))
+      const size = Math.round((narrow ? 32 : 40) + rand() * (narrow ? 6 : 10))
       vars['--s'] = `${size}px`
       vars['--c'] = String(pick % sheets.cols)
       vars['--r'] = String(Math.floor(pick / sheets.cols))

@@ -37,6 +37,9 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 function DeadRoundCard({ round }: { round: GraveyardRound }) {
   const { address, isConnected } = useAccount()
   const { writeContractAsync, writeWithApprovals } = useConfirmedWrite({ exitRoundId: round.roundId })
+  // A late claim hatches in the dead round's staker; the alt FX reveals that mint.
+  const dnaVersion = usePepeDnaVersion(round.staker)
+  const hatchFx = round.staker && dnaVersion !== undefined ? { hatch: { staker: round.staker, dnaVersion } } : {}
   const [claiming, setClaiming] = useState(false)
   const [redeemStep, setRedeemStep] = useState<RedeemStep>('idle')
   const [redeemErr, setRedeemErr] = useState<string | null>(null)
@@ -152,7 +155,7 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
       {round.unclaimedPredeposit && (
         <button className="m-4 rounded border border-line px-4 py-2" disabled={claiming} onClick={async () => {
           setClaiming(true); setRedeemErr(null)
-          try { await writeContractAsync({ address: round.controller, abi: controllerAbi, functionName: 'claimPredepositPSP' }) }
+          try { await writeContractAsync({ address: round.controller, abi: controllerAbi, functionName: 'claimPredepositPSP' }, false, hatchFx) }
           catch (e) { setRedeemErr(e instanceof Error ? e.message : 'Predeposit claim failed') }
           finally { setClaiming(false) }
         }}>{claiming ? 'claiming…' : 'claim your predeposit position, then unlock below'}</button>

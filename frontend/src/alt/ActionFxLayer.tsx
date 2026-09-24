@@ -11,7 +11,7 @@ import { FX_EFFECTS } from './fx/effects'
 import DetonationSetPiece from './fx/DetonationSetPiece'
 import HatchModal from './fx/HatchModal'
 
-const HARD_STOP_MS = 4000
+const HARD_STOP_MS = 5500
 /** The set-piece runs ~5.6s; its own timer ends it, this is the backstop. */
 const DETONATE_HARD_STOP_MS = 7000
 

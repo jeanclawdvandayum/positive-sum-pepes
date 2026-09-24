@@ -38,7 +38,7 @@ function ladderSeats(target: DOMRect | undefined): DOMRect[] {
  *  seats, each seat flashing as it is taken; the clock jolts and a confirmed
  *  +m:ss chip floats off it; happy pepe confetti bursts from the button. */
 export function BuyFx({ event, onDone }: FxProps) {
-  useTimedDone(onDone, 2600)
+  useTimedDone(onDone, 5000)
   const a = center(event.anchor)
   const [seats] = useState(() => ladderSeats(event.target))
   const [clock] = useState(clockRect)
@@ -83,7 +83,7 @@ export function BuyFx({ event, onDone }: FxProps) {
 /** Drain + sulk: mixETH coins slot into the button under a downward shutter
  *  wipe while a burst of rage/angry/sad/meh pepes flies out of it. */
 export function SellFx({ event, onDone }: FxProps) {
-  useTimedDone(onDone, 2500)
+  useTimedDone(onDone, 5000)
   const a = center(event.anchor)
   return <>
     <Flash at={a} rect={event.anchor} tone="amber" />

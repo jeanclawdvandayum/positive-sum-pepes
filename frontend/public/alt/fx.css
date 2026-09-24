@@ -306,6 +306,8 @@ body.alt-mode .hx-stage {
   border: 1px solid var(--clock-line);
 }
 body.alt-mode .hx-stage > * { position: absolute; display: block; }
+/* Only the egg takes input: the hidden pepe/creature/ray layers sit over it. */
+body.alt-mode .hx-stage > :not(.hx-egg) { pointer-events: none; }
 body.alt-mode .hx-stage img { image-rendering: pixelated; user-select: none; -webkit-user-drag: none; }
 /* spotlight cone from the rig down onto the pedestal */
 body.alt-mode .hx-beam {
