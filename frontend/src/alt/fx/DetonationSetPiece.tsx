@@ -6,6 +6,10 @@
 // any beat, and it auto-ends at 5.6s. Timeline (ms):
 //   0–900      ALARM: dim ramps in, three red vignette pulses, hazard tape
 //              slides onto the top and bottom edges, two siren beams sweep
+//   350–3250   PIXEL BOMB: the site's bomb icon sits at the blast point with
+//              its spark burning down the fuse; at the blast it flashes away
+//              and the cloud erupts from it (the 3D canvas only becomes
+//              visible once its loop starts, at blast−40ms)
 //   900–1000   white flash
 //   950–1300   SLAM: 00:00:00 in --time-lit (forced to the critical red)
 //              lands from scale 3.4 with a red glow; square shockwave ring
@@ -37,6 +41,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { PepeConfetti } from './confetti'
 import { loadBoom3d } from './boomLoader'
+import { PixelIcon } from '../../components/PixelIcon'
 import type { Boom } from './boom3d'
 
 const SEQ_MS = 6200 // stage fade completes at 6200 (CSS: 5800 + 400)
@@ -283,6 +288,15 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
           </div>
         </div>
         {!reduced && <div ref={boomHostRef} className="dtn-boom" />}
+        {/* the bomb the button promised: it sits at the blast point from the
+            alarm on, fuse burning, and flashes into the cloud at the blast
+            (the 3D canvas stays invisible until its loop starts) */}
+        {!reduced && (
+          <span className="dtn-pixel-bomb">
+            <PixelIcon name="bomb" />
+            <span className="dtn-pixel-spark" />
+          </span>
+        )}
         {BOMBS.map((b, i) => (
           <span
             key={`b${i}`}

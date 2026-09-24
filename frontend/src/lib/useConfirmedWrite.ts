@@ -17,6 +17,8 @@ import { assertReinvestor } from './reinvestRules'
 import { verifyReferralClaim } from './referralRewards'
 import { buyFxDetail } from './buyFxDetail'
 import { hatchFxPepeId } from './hatchFxPepe'
+import { potClaimDetail } from './potClaimDetail'
+import { pickVictoryMessage, victoryCards } from './victoryCards'
 import { captureAnchor, fireFx, isUserRejection, fxKindFor, type FxKind, type FxPepe } from './actionFx'
 
 function fire(kind: FxKind | undefined, anchor: Element | undefined, detail?: string, pepe?: FxPepe): void {
@@ -27,8 +29,9 @@ function fire(kind: FxKind | undefined, anchor: Element | undefined, detail?: st
  *  writeWithApprovals); `anchor` carries the batch entry press through long
  *  confirmation flows — present-but-undefined means "use nothing", absent means
  *  self-capture; `hatch` names the staker (and its DNA version) whose mint a
- *  confirmed predeposit claim reveals. */
-type ConfirmedFx = { mute?: boolean; anchor?: Element; hatch?: { staker: `0x${string}`; dnaVersion: bigint } }
+ *  confirmed predeposit claim reveals; `victory` names the round a confirmed
+ *  claimPot payout belongs to (Round 4's persistent victory card). */
+type ConfirmedFx = { mute?: boolean; anchor?: Element; hatch?: { staker: `0x${string}`; dnaVersion: bigint }; victory?: { roundId: bigint; roundName?: string } }
 
 /** AUD-4: every UI write simulates, waits for mining, and checks receipt status. */
 export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } | { nftRoundId: bigint | undefined } | { referralClaimRoundId: bigint | undefined } | { referralPurchase: { roundId: bigint; registry?: `0x${string}` } }) {
@@ -141,11 +144,25 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
       }, { ...parameters, account: address, chainId: CHAIN_ID } as typeof parameters, toast?.update)
       // Only buys emit TimeAdded; the chip is the confirmed seconds, never the
       // pre-sign estimate. A claim's hatched pepe comes from its args/receipt.
+      // A confirmed claimPot (Round 4) celebrates with a random victory message
+      // and pushes a persistent card — but only on the receipt's decoded
+      // payout: no decodable PotClaimed, no card (confirmed facts only).
       if (!fx?.mute) {
         const hatch = kind === 'claimPredeposit' ? fx?.hatch : undefined
         const pepeId = hatch && hatchFxPepeId(parameters.functionName, parameters.args, receipt?.logs, address, hatch.staker)
-        fire(kind, anchor, kind === 'buy' ? buyFxDetail(receipt?.logs) : undefined,
+        const amount = fx?.victory ? potClaimDetail(parameters.functionName, receipt?.logs, address) : undefined
+        const message = amount !== undefined ? pickVictoryMessage() : undefined
+        fire(kind, anchor, kind === 'buy' ? buyFxDetail(receipt?.logs) : message,
           hatch && pepeId !== undefined ? { id: pepeId, dnaVersion: hatch.dnaVersion, staker: hatch.staker } : undefined)
+        if (amount !== undefined && message !== undefined && fx?.victory) {
+          victoryCards.push({
+            roundId: fx.victory.roundId,
+            roundName: fx.victory.roundName,
+            amountMix: amount,
+            message,
+            txHash: hash,
+          })
+        }
       }
       return hash
     } catch (error) {
@@ -234,7 +251,7 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
   // The third argument carries FX-only hints (see ConfirmedFx); wagmi-shaped
   // calls keep their full abi inference through the first signature.
   return {
-    writeContractAsync: confirmed as typeof writeContractAsync & ((parameters: Write, validateOnly: boolean, fx: ConfirmedFx) => Promise<Hash | undefined>),
+    writeContractAsync: confirmed as typeof writeContractAsync & ((parameters: Write, validateOnly: boolean, fx?: ConfirmedFx) => Promise<Hash | undefined>),
     writeWithApprovals, atomicWallet,
   }
 }

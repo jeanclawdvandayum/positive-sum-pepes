@@ -4,8 +4,12 @@
 // Loaded lazily through boomLoader.ts, so three.js never reaches the entry
 // bundle. DetonationSetPiece creates the scene at mount, which compiles the
 // shaders and uploads the buffers during the alarm, starts the loop just
-// before BLAST_MS, and disposes it on finish, skip or unmount. This is the
-// one scoped exception to the one-rAF-loop rule (PLAN Ground rules).
+// before BLAST_MS, and disposes it on finish, skip or unmount. The loop rides
+// the PhaseEngine frame bus — the app's one rAF loop (PLAN Ground rules).
+// The canvas is appended on creation (a failed probe leaves no DOM) and stays
+// invisible until start(), so no pre-blast warm-up frame can leak: the DOM
+// pixel bomb owns the pre-blast frame, the ground and shell shaders also
+// discard at t<0, and the ground lights only after the blast (dust skirt).
 //
 // Look: rendered at 1/4 (1/3 under 700px) of the viewport, upscaled in whole
 // pixels with image-rendering: pixelated. Every surface is posterized to a
@@ -40,6 +44,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three'
+import { subscribeFrames } from '../../phase/PhaseEngine'
 
 export type Rgb = [number, number, number]
 
@@ -280,6 +285,7 @@ const GROUND_FRAG = /* glsl */ `
 ${COMMON}
 varying vec3 vW;
 void main() {
+  if (uT < 0.0) discard; // the ground lights AT the blast, never before it
   float t = uT;
   float d = length(vW.xz);
   float b = bayer4(gl_FragCoord.xy);
@@ -314,6 +320,7 @@ ${COMMON}
 varying vec3 vN;
 varying vec3 vV;
 void main() {
+  if (uT < 0.0) discard; // the condensation shell is a blast-frame ring
   float b = bayer4(gl_FragCoord.xy);
   float rim = 1.0 - abs(dot(normalize(vN), vV));
   float life = 1.0 - smoothstep(0.05, 0.5, uT);
@@ -359,6 +366,9 @@ export function createBoom({ host, clock, groundFrac }: BoomOptions): Boom {
   const renderer = new WebGLRenderer({ canvas, context })
   renderer.setPixelRatio(1)
   renderer.setClearColor(0x000000, 0)
+  // Past the probe: the canvas goes live. Until it is in the DOM the scene
+  // renders off-screen and the stage shows no cloud at all.
+  host.appendChild(canvas)
 
   const uniforms = {
     uT: { value: -1 },
@@ -441,23 +451,22 @@ export function createBoom({ host, clock, groundFrac }: BoomOptions): Boom {
   }
   frame(-1000)
 
-  let raf = 0
-  let running = false
+  let stopFrames: (() => void) | undefined
   let disposed = false
-  const loop = () => {
-    raf = requestAnimationFrame(loop)
-    frame(clock())
-  }
   return {
     start() {
-      if (running || disposed) return
-      running = true
-      raf = requestAnimationFrame(loop)
+      if (disposed || stopFrames) return
+      // One rAF loop for the whole app (PLAN Ground rules): ride the
+      // PhaseEngine frame bus. Its Date.now() callback timestamp is wall
+      // time, not the blast clock, so the clock is polled per frame. Only a
+      // started boom may show: the DOM bomb prop owns the pre-blast frame.
+      canvas.dataset.running = 'true'
+      stopFrames = subscribeFrames(() => frame(clock()))
     },
     dispose() {
       if (disposed) return
       disposed = true
-      cancelAnimationFrame(raf)
+      stopFrames?.()
       window.removeEventListener('resize', layout)
       puffGeo.dispose()
       puffMat.dispose()

@@ -163,7 +163,7 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
       {round.claimablePot > 0n && (
         <button className="m-4 rounded border border-line px-4 py-2" disabled={claiming} onClick={async () => {
           setClaiming(true); setRedeemErr(null)
-          try { await writeContractAsync({ address: round.hook, abi: hookAbi, functionName: 'claimPot' }) }
+          try { await writeContractAsync({ address: round.hook, abi: hookAbi, functionName: 'claimPot' }, false, { victory: { roundId: round.roundId, roundName: round.name } }) }
           catch (e) { setRedeemErr(e instanceof Error ? e.message : 'Pot claim failed') }
           finally { setClaiming(false) }
         }}>{claiming ? 'claiming…' : `claim ${fmtAmount(round.claimablePot)} mixETH ladder winnings`}</button>

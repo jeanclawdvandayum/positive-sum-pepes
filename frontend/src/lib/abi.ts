@@ -152,6 +152,8 @@ export const hookAbi = parseAbi([
   'function potBalance() view returns (uint256)',
   'function claimablePot(address who) view returns (uint256 amount)',
   'function claimPot()',
+  // the mined claim receipt's victory facts: who got paid, and how much
+  'event PotClaimed(address indexed who, uint256 mixETHAmount)',
   // burn PSP for floor pro-rata backing — payout per PSP frozen at detonation
   'function redeemBacking(uint256 pspAmount) returns (uint256 mixETHOut)',
   'event TimeAdded(address indexed buyer, uint256 secondsAdded, uint256 newDetonationAt)',

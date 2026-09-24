@@ -109,7 +109,7 @@ export default function PotBoard({
         address: claimHook,
         abi: hookAbi,
         functionName: 'claimPot',
-      })
+      }, false, roundId !== undefined ? { victory: { roundId, roundName: roundLabel } } : undefined)
       setClaimStep('done')
     } catch (e) {
       setClaimErr(e instanceof Error ? e.message.slice(0, 140) : 'claim failed')

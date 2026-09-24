@@ -11,13 +11,14 @@ must render and behave exactly as before. Branch: `alt-ui-fx` off `single-sine-s
   and is scoped under `.alt-shell` / `body.alt-mode`.
 - **Copy stays the same.** Don't add, remove or reword any user-facing text. Decorative glyphs
   (arrows, icons, particles) are fine. FX chips may show numbers the UI already knows (`+1:09`, `+2 seats`).
-- **No new chain reads, no new rAF loops — one scoped exception (Round 4).** PhaseEngine stays the only
-  permanent rAF loop (CLOCK-REDESIGN §6.7). Everything else is CSS keyframes or `el.animate`. The
-  detonation set-piece's 3D scene (`src/alt/fx/boom3d.ts`, three.js) may run its own
-  `requestAnimationFrame` loop **only while the set-piece is mounted**: created lazily, started just
-  before the blast, stopped on finish, skip or unmount, and disposed completely (renderer, geometries,
-  materials, `forceContextLoss`, canvas removed). Under `prefers-reduced-motion: reduce` it never loads.
-  `three` is the one sanctioned npm dependency added since Round 1, loaded in a lazy chunk (see Feature 4).
+- **No new chain reads, no new rAF loops.** PhaseEngine stays the only rAF loop in the app
+  (CLOCK-REDESIGN §6.7) — since the Round 4 addendum below, the detonation set-piece's 3D scene
+  (`src/alt/fx/boom3d.ts`, three.js) rides its `subscribeFrames` bus as well: started just before the
+  blast, unsubscribed on finish, skip or unmount, and disposed completely (renderer, geometries,
+  materials, `forceContextLoss`, canvas removed). The boom canvas is appended on creation and stays
+  invisible until its loop starts. Everything else is CSS keyframes or `el.animate`. Under
+  `prefers-reduced-motion: reduce` the three.js chunk is never loaded. `three` is the one sanctioned npm
+  dependency added since Round 1, loaded in a lazy chunk (see Feature 4).
 - **Motion answers the user or the data.** No scroll entrances and no new ambient loops outside the clock,
   the armed detonate button and the hatch egg waiting to be tapped. Hover responses are fine on interactive controls, but not on every card.
 - **`prefers-reduced-motion: reduce`** → no transforms, particles or shake. Show a short color or opacity flash
@@ -316,3 +317,58 @@ The CSS cloud read as child-like. The blast is now a real volumetric explosion.
   120/1200/3200/3300/4000/4600/5000/5900ms leaves no canvas, no rAF and no console warnings, and restores
   the page transform exactly. Aborted/slow three.js fetches and blocked WebGL2 fall back to the CSS cloud;
   reduced motion never fetches the chunk.
+
+---
+
+# Round 4 addendum — pot victory cards, one rAF loop, an honest pre-blast
+
+## Feature 11 — receipt-derived winnings + the persistent victory card
+
+- `src/lib/abi.ts`: hookAbi gains `event PotClaimed(address indexed who, uint256 mixETHAmount)` (the
+  CurveHook emits it; `scripts/check-abi.mjs` stays green).
+- `src/lib/potClaimDetail.ts`: pure decoder in the `buyFxDetail` style — for a `claimPot` write it parses
+  the mined receipt's logs, matches `who` to the claimant case-insensitively, and returns the payout as a
+  wei bigint. Anything else (other writes, other claimants, no event, malformed logs) is undefined. Node
+  tests in `tests/potClaimDetail.test.mjs` cover the normal case, someone else's claim, missing event,
+  unrelated logs first, non-claimPot writes and malformed data.
+- `src/lib/victoryCards.ts`: the message list (~12 lowercase deadpan entries, plus the community's
+  "OMG!😭Can't believe I won ! …" entry verbatim) and an external store in the transactionToasts shape —
+  subscribe/snapshot/dismiss/clear, module-level, inert until subscribed. Cards are
+  `{ id, roundId, roundName?, amountMix, message, txHash?, at }`, newest first. `bragText` builds the
+  X post: message first, then `i just claimed <fmtAmount> mixETH from the round <N> pot on positive sum
+  pepes 🚀`; if the pair would exceed 280 chars the info sentence yields before the message does.
+  `bragUrl` URL-encodes it into a `twitter.com/intent/tweet` link.
+- `src/lib/useConfirmedWrite.ts`: a new `victory?: { roundId, roundName? }` FX hint. On a confirmed
+  `claimPot` the receipt's payout is decoded, one message is picked at random, the celebration's banner
+  carries it (`fireFx` detail), and a persistent card is pushed with the receipt hash. No decodable
+  payout → no card (confirmed facts only, Round 2's rule).
+- `src/alt/VictoryCards.tsx`, mounted ONLY in `AltShell`: a bottom-left stack (z 9500, below the toasts)
+  of cards that stay until closed. Each card: a decorative mini pepe, 'POT CLAIMED' in `--display`, the
+  winnings in `fmtAmount`, the round (id + name), the message in the Pixel font, the explorer tx link and
+  a `brag on X ↗` intent link, a close ×, and a mount-time mini confetti burst (skipped under reduced
+  motion; aria-live polite). More than 4 cards collapse into a '+N more' line that expands on click.
+- `claimPot` call sites pass the option: PotBoard (`roundId` + `roundLabel`) and Graveyard
+  (`round.roundId` + `round.name`). FxLab's claimPot button fires the celebration and pushes a real card
+  (demo payout, demo round, no hash) and a 'clear victory cards' control resets the store.
+- `ClaimPotFx` upgrade (effects.tsx + fx.css): the gold confetti and ✓ seal stay; three staggered happy
+  PepeConfetti bursts fly from the anchor and above it, a coin fountain arcs into the wallet chip (which
+  pulses), and the chosen message pops in above the anchor in `--display` amber (19px) and floats gently.
+  Under reduced motion the layer's global rule still reduces everything to the tone ring.
+
+## Feature 12 — the one rAF loop, and the canvas that showed up early
+
+- `boom3d.ts` no longer runs its own `requestAnimationFrame`: the blast loop rides
+  `PhaseEngine.subscribeFrames` (unsubscribed in dispose). The engine's callback timestamp is wall time,
+  not the blast clock, so the set-piece's clock is polled per frame — the visuals are unchanged
+  (identical frames verified in the browser).
+- User-reported: the detonation showed NO cloud, then a beige ground-plane blob before the blast.
+  Root causes, both fixed: `createBoom` never appended its canvas to the host (the scene rendered
+  off-DOM), and the warm-up frame (`frame(-1000)`) painted the ground/shell shaders at `t = -1`, whose
+  negative-time flash mapped far-field pixels onto the light-beige smoke palette entries. Fixes: the
+  canvas is appended past the WebGL probe and stays `opacity: 0` until `start()` sets `data-running`;
+  the ground and shell shaders `discard` at `t < 0` (puffs were already culled); `.dtn-boom` gains
+  `position: absolute` so its `inset: 0` anchors the canvas.
+- The pre-blast frame now belongs to an intentional prop: the site's pixel bomb `PixelIcon` sits at the
+  blast point from the alarm on (`.dtn-pixel-bomb`), its spark creeping down the fuse, and at the blast
+  it flashes away as the cloud erupts from it. Hidden under reduced motion. The ground plane only lights
+  after the blast (dust skirt), verified in both themes at alarm, blast−100ms, blast+400ms and +1800ms.

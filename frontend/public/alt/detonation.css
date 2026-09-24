@@ -577,6 +577,7 @@ body.alt-mode .dtn-ground-ring {
    pixels, between the dim and the slam card. Once the scene is ready the
    stage carries data-boom=3d and the CSS cloud, rings and shock stand down. */
 body.alt-mode .dtn-boom {
+  position: absolute;
   inset: 0;
   z-index: 4;
   pointer-events: none;
@@ -586,6 +587,53 @@ body.alt-mode .dtn-boom-canvas {
   left: 0;
   top: 0;
   image-rendering: pixelated;
+  /* invisible until the render loop starts: the warm-up frame (and anything
+     pre-blast) must never leak — the pixel bomb owns the pre-blast frame */
+  opacity: 0;
+}
+body.alt-mode .dtn-boom-canvas[data-running] { opacity: 1; }
+
+/* the bomb the button promised: the site's pixel bomb icon sits at the blast
+   point from the alarm on, its spark creeping down the fuse, then it flashes
+   into the cloud at the blast (3250ms). Palette vars — not the icon's own
+   blues — would fight the stage; the icon art already matches the button. */
+body.alt-mode .dtn-pixel-bomb {
+  position: absolute;
+  left: var(--bx);
+  top: var(--by);
+  width: clamp(46px, 13vw, 68px);
+  translate: -50% -58%;
+  z-index: 3;
+  opacity: 0;
+  animation:
+    dtn-pixel-bomb-in .3s steps(3) .35s both,
+    dtn-pixel-bomb-flash .2s steps(3) 3250ms forwards;
+}
+body.alt-mode .dtn-pixel-bomb svg { width: 100%; height: auto; display: block; }
+/* the spark creeps down the rope fuse toward the orb, burning hotter */
+body.alt-mode .dtn-pixel-bomb .dtn-pixel-spark {
+  position: absolute;
+  left: 37%;
+  top: 7%;
+  width: 13%;
+  aspect-ratio: 1;
+  background: var(--fire-yellow);
+  box-shadow: 0 0 0 1px var(--fire-white);
+  animation: dtn-pixel-spark-burn 2.9s steps(12) .35s both;
+}
+@keyframes dtn-pixel-bomb-in {
+  from { opacity: 0; scale: .4; }
+  to { opacity: 1; scale: 1; }
+}
+@keyframes dtn-pixel-spark-burn {
+  0% { translate: 0 -2px; filter: brightness(1); }
+  55% { translate: 1px 2px; filter: brightness(1.5); }
+  100% { translate: 2px 7px; filter: brightness(2.4); }
+}
+@keyframes dtn-pixel-bomb-flash {
+  0% { opacity: 1; scale: 1; filter: brightness(1); }
+  35% { opacity: 1; scale: 1.5; filter: brightness(3); }
+  100% { opacity: 0; scale: .2; filter: brightness(3); }
 }
 body.alt-mode .dtn-stage[data-boom='3d'] :is(.dtn-mush, .dtn-ground-ring, .dtn-shock) {
   display: none;
@@ -842,7 +890,7 @@ body.alt-mode .dtn-stamp::after {
     cursor: default;
   }
   body.alt-mode .dtn-stage :is(.dtn-flash, .dtn-ring, .dtn-debris, .dtn-bomb-drop, .dtn-impact, .dtn-alarm, .dtn-siren,
-    .dtn-tape, .dtn-blast, .dtn-shock, .dtn-ground-ring, .dtn-mush, .dtn-confetti) {
+    .dtn-tape, .dtn-blast, .dtn-shock, .dtn-ground-ring, .dtn-mush, .dtn-confetti, .dtn-pixel-bomb) {
     display: none;
   }
   body.alt-mode .dtn-clock {

@@ -5,6 +5,7 @@
 
 import { useRef, useState } from 'react'
 import { fireFx, type FxKind } from '../lib/actionFx'
+import { pickVictoryMessage, victoryCards } from '../lib/victoryCards'
 import { renderPepeSvg } from '../lib/pepeRender'
 import { dnaOfId } from '../components/PepePicker'
 import { PixelIcon } from '../components/PixelIcon'
@@ -37,6 +38,15 @@ export default function FxLab() {
 
   const fire = (kind: FxKind, el: Element) => {
     const spec = TARGETS[kind]
+    // The lab's claimPot plays the full celebration AND pushes a real victory
+    // card: demo payout, demo round, no hash (nothing to link to). The message
+    // is picked once so the banner and the card agree.
+    if (kind === 'claimPot') {
+      const message = pickVictoryMessage()
+      fireFx(kind, { anchor: el, target: spec?.target, detail: message })
+      victoryCards.push({ roundId: 3n, roundName: 'the fx lab round', amountMix: 1234n * 10n ** 16n, message })
+      return
+    }
     fireFx(kind, {
       anchor: el, target: spec?.target, detail: spec?.detail,
       pepe: kind === 'claimPredeposit' ? { id: pepeId, dnaVersion: LAB_DNA_VERSION, dna: dnaOfId(pepeId) } : undefined,
@@ -73,6 +83,7 @@ export default function FxLab() {
           <button className="st-btn" onClick={e => fireFx('claimPredeposit', { anchor: e.currentTarget })}>
             claimPredeposit (no id)
           </button>
+          <button className="st-btn" onClick={() => victoryCards.clear()}>clear victory cards</button>
         </div>
         <div className="fx-lab-states">
           <DetonateState state="armed" />

@@ -277,10 +277,16 @@ export function UnlockFx({ event, onDone }: FxProps) {
   </>
 }
 
-/** Jackpot: gold pixel confetti falls from the top edge and the anchor gets a stamped ✓ seal. */
+/** Jackpot (Round 4): gold pixel confetti falls from the top edge, three happy
+ *  pepe bursts stagger out of the anchor and above it, a coin fountain arcs
+ *  into the wallet chip, the anchor gets a stamped ✓ seal, and the chosen
+ *  victory message (event.detail) floats above it all. */
 export function ClaimPotFx({ event, onDone }: FxProps) {
-  useTimedDone(onDone, 1900)
+  useTimedDone(onDone, 3800)
   const a = center(event.anchor)
+  const chip = event.target ?? queryRect('.wallet-button')
+  const t = center(chip)
+  const anchorTop = event.anchor?.top ?? a.y
   return <>
     <Flash at={a} rect={event.anchor} tone="amber" />
     {Array.from({ length: CONFETTI }, (_, i) => (
@@ -288,7 +294,22 @@ export function ClaimPotFx({ event, onDone }: FxProps) {
         style={withVars({ left: ((i + 0.5) * window.innerWidth) / CONFETTI, top: 0, animationDelay: `${(i * 137) % 400}ms` },
           { '--fall': `${window.innerHeight * (0.42 + (i % 5) * 0.06)}px`, '--sway': `${(i % 2 ? 1 : -1) * (5 + (i % 3) * 3)}px`, '--spin': `${(i % 2 ? 1 : -1) * 270}deg` })} />
     ))}
+    {/* three staggered happy bursts: from the anchor, then higher around it */}
+    {[[0, 0], [-58, -44], [58, -86]].map(([dx, dy], i) => (
+      <PepeConfetti key={`burst${i}`} mood="happy" at={{ x: a.x + dx, y: Math.max(a.y + dy, 44) }}
+        faces={8} bits={4} delay={140 + i * 260} stagger={140} />
+    ))}
+    {/* the payout arcs into the wallet chip, which pulses as the coins land */}
+    {Array.from({ length: COINS }, (_, i) => (
+      <span key={`coin${i}`} className="fx-coin fx-coin-arc" style={withVars({ left: a.x, top: a.y, animationDelay: `${420 + i * 70}ms` },
+        { '--dx': `${t.x - a.x}px`, '--dy': `${t.y - a.y}px` })} />
+    ))}
+    <Over rect={chip} className="fx-chip-pulse" />
     <span className="fx-seal" style={{ left: a.x, top: a.y }}>✓</span>
+    {/* the congratulation: chosen at random in useConfirmedWrite/the lab */}
+    {event.detail && (
+      <span className="fx-victory-banner" style={{ left: clampX(a.x, 130), top: anchorTop - 26 }}>{event.detail}</span>
+    )}
   </>
 }
 

@@ -246,6 +246,24 @@ body.alt-mode .fx-layer .fx-seal {
   opacity: 0;
   animation: fx-seal-drop .5s cubic-bezier(.3,1.5,.5,1) .55s both;
 }
+/* the claimPot congratulation (Round 4): the chosen victory message floats
+   above the anchor, pixel-set in amber, legible in both themes on panel */
+body.alt-mode .fx-layer .fx-victory-banner {
+  translate: -50% -100%;
+  max-width: min(86vw, 430px);
+  padding: 5px 10px;
+  font: 700 19px/1.35 var(--display);
+  text-align: center;
+  color: var(--amber);
+  text-shadow: 2px 2px 0 var(--shadow);
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  border: 1px solid var(--amber);
+  box-shadow: 3px 3px 0 var(--shadow);
+  opacity: 0;
+  animation:
+    fx-victory-pop .42s steps(3) .3s both,
+    fx-victory-float 2.6s ease-in-out .72s infinite;
+}
 
 /* redeem — transmute. */
 body.alt-mode .fx-layer .fx-ember {
@@ -863,6 +881,16 @@ body.alt-mode .fx-lab-stage .instrument .clock { font-size: clamp(32px, 3.2vw, 4
   30% { opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
+@keyframes fx-victory-pop {
+  0% { opacity: 0; scale: .5; }
+  70% { opacity: 1; scale: 1.06; }
+  100% { opacity: 1; scale: 1; }
+}
+/* a gentle float that keeps the banner's centering (translate -50% -100%) */
+@keyframes fx-victory-float {
+  0%, 100% { translate: -50% -100%; }
+  50% { translate: -50% calc(-100% - 6px); }
+}
 @keyframes fx-ember-flicker {
   0% { opacity: 0; transform: translateY(6px); }
   30% { opacity: 1; }
@@ -1097,4 +1125,117 @@ body.alt-mode .fx-lab-stage .instrument .clock { font-size: clamp(32px, 3.2vw, 4
   0% { opacity: 1; filter: brightness(1); }
   30% { filter: brightness(2.2); }
   100% { opacity: 1; filter: brightness(1.3); }
+}
+
+/* ── Round 4: the persistent victory card stack (VictoryCards.tsx, mounted
+   only in AltShell). Cards stay until closed, stack bottom-left under the
+   toasts (9500 < 10000), and use the site card language: panel, line border,
+   hard shadow, square. ── */
+body.alt-mode .victory-stack {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 9500;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 24px));
+}
+body.alt-mode .victory-card {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 5px 5px 0 var(--shadow);
+  animation: victory-card-in .28s steps(3) both;
+}
+@keyframes victory-card-in {
+  from { opacity: 0; transform: translateY(10px) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+body.alt-mode .victory-card .victory-pepe { flex: none; width: 46px; }
+body.alt-mode .victory-card .victory-pepe img {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+body.alt-mode .victory-card .victory-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+body.alt-mode .victory-card .victory-head {
+  font: 700 12px/1.2 var(--display);
+  letter-spacing: .08em;
+  color: var(--muted);
+}
+body.alt-mode .victory-card .victory-amount {
+  font: 700 20px/1.2 var(--display);
+  color: var(--amber);
+}
+body.alt-mode .victory-card .victory-round {
+  font: 12px/1.4 var(--mono);
+  color: var(--muted);
+}
+body.alt-mode .victory-card .victory-message {
+  margin: 4px 0 6px;
+  font: 13px/1.45 var(--display);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+body.alt-mode .victory-card .victory-links { display: flex; gap: 14px; }
+body.alt-mode .victory-card .victory-links a {
+  font: 700 12px/1.4 var(--display);
+  color: var(--green);
+  text-decoration: underline;
+}
+body.alt-mode .victory-card .victory-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font: 700 14px/1 var(--display);
+  color: var(--muted);
+  background: none;
+  border: 1px solid transparent;
+}
+body.alt-mode .victory-card .victory-close:hover { color: var(--ink); border-color: var(--line); }
+body.alt-mode .victory-more {
+  align-self: flex-start;
+  padding: 4px 10px;
+  font: 700 12px/1.4 var(--display);
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 3px 3px 0 var(--shadow);
+}
+/* the mount-time mini burst: on-palette squares flung from the card edge */
+body.alt-mode .victory-card .victory-bit {
+  position: absolute;
+  left: 24px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -3px 0 0 0;
+  background: var(--amber);
+  pointer-events: none;
+  opacity: 0;
+  animation: victory-bit-fly .6s steps(5) both;
+}
+body.alt-mode .victory-card .victory-bit:nth-child(3n) { background: var(--green); }
+body.alt-mode .victory-card .victory-bit:nth-child(3n + 1) { width: 4px; height: 4px; }
+@keyframes victory-bit-fly {
+  0% { translate: 0 0; opacity: 1; }
+  100% { translate: var(--tx) var(--ty); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.alt-mode .victory-card { animation: none; }
+  body.alt-mode .victory-card .victory-bit { display: none; }
 }
