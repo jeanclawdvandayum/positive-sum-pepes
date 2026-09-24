@@ -196,8 +196,10 @@ function VictoryDialog({ victory }: { victory: Victory }) {
       // Write while this page has focus: the PNG is ready before the click,
       // so the clipboard write stays inside the user gesture.
       if (art && typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': art.share })])
-        copied = true
+        // Race a hung permission prompt: the gesture must still open X and
+        // show the paste guide (with copy-again) instead of stalling forever.
+        const write = navigator.clipboard.write([new ClipboardItem({ 'image/png': art.share })])
+        copied = await Promise.race([write.then(() => true), new Promise<false>(r => setTimeout(() => r(false), 1500))])
       }
     } catch {
       copied = false
@@ -241,10 +243,22 @@ function VictoryDialog({ victory }: { victory: Victory }) {
             <a className="vm-link" href={`${explorer.url}/tx/${victory.txHash}`} target="_blank" rel="noopener noreferrer">view tx ↗</a>
           )}
         </div>
-        <p className="vm-hint" role="status">
-          {hint?.copied && 'image copied — paste it in your post'}
-          {hint && !hint.copied && art && <>image not copied — <a href={art.shareUrl} download={`psp-pot-round-${victory.roundId}.png`}>save the png</a> and attach it</>}
-        </p>
+        {hint?.copied && (
+          <div className="vm-paste" role="status">
+            {/* X has no way for a page to attach an image to a post, so the
+                pepe rides the clipboard — make the paste impossible to miss. */}
+            <img className="vm-paste-img" src={art?.shareUrl} alt="" />
+            <ol className="vm-paste-steps">
+              <li>the post is open in a new tab</li>
+              <li>click it and press <kbd>{navigator.platform.toLowerCase().includes('mac') ? '⌘V' : 'Ctrl+V'}</kbd> — the pepe above is on your clipboard</li>
+              <li>post it 🚀</li>
+            </ol>
+            <button type="button" className="vm-paste-copy" onClick={brag}>copy the image again ↻</button>
+          </div>
+        )}
+        {hint && !hint.copied && art && (
+          <p className="vm-hint">image not copied — <a href={art.shareUrl} download={`psp-pot-round-${victory.roundId}.png`}>save the png</a> and attach it</p>
+        )}
       </div>
     </div>,
     document.body,

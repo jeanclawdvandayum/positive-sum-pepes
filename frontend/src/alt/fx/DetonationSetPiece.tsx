@@ -331,6 +331,8 @@ const PUFF_CAP = 48 // live dynamic puffs; + 12 static blast puffs ≤ 60 nodes
 interface Escapee {
   x: number
   y: number
+  /** art px → screen px, sized so ten hulls fit the plane */
+  rpx: number
   /** the seat's own pepe (the ladder row's WalletPepeArt svg), else a
       deterministic decorative pepe so the lab and empty boards still flee
       as recognizable pepes */
@@ -376,13 +378,20 @@ function escapees(): Escapee[] {
   // escape reads as a squadron line-up, not a scatter of ladder rows.
   const planeY = Math.round(vh * 0.8)
   const n = Math.min(seats.length, 10)
-  const inset = vw * (n > 6 ? 0.07 : 0.14)
+  const inset = vw * (n > 6 ? 0.06 : 0.14)
+  // Rockets must fit their seat spacing: the hull (24 art px) grows 1.18x on
+  // the pad and the fins reach ~6 art px further per side, so a rocket needs
+  // roughly 42 art px of room. Scale --rpx to the spacing, whole pixels only
+  // (sub-pixel art blurs), floor 1 (desktop 2 stays).
+  const spacing = n > 1 ? (vw - 2 * inset) / (n - 1) : vw
+  const rpx = Math.max(1, Math.min(2, Math.floor(spacing / 42)))
   return seats.slice(0, 10).map((seat, i) => {
     const x = n === 1 ? vw / 2 : inset + (i * (vw - 2 * inset)) / (n - 1)
     const away = x < vw / 2 ? -1 : 1
     return {
       x: Math.round(x),
       y: planeY,
+      rpx,
       svg: seat.svg,
       art: seat.art,
       launch: ESCAPE_MS + i * ESCAPE_STAGGER,
@@ -739,6 +748,7 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
               '--rx': `${r.dx}px`,
               '--ry': `${-r.rise}px`,
               '--rt': `${r.tilt}deg`,
+              '--rpx': `${r.rpx}px`,
               animationDuration: `${ESCAPE_MS_EACH}ms`,
               animationDelay: `${r.launch}ms`,
             } as CSSProperties}
