@@ -11,16 +11,19 @@ must render and behave exactly as before. Branch: `alt-ui-fx` off `single-sine-s
   and is scoped under `.alt-shell` / `body.alt-mode`.
 - **Copy stays the same.** Don't add, remove or reword any user-facing text. Decorative glyphs
   (arrows, icons, particles) are fine. FX chips may show numbers the UI already knows (`+1:09`, `+2 seats`).
-- **No new chain reads, no new rAF loops.** PhaseEngine is the only rAF loop (CLOCK-REDESIGN §6.7). Build
-  motion with CSS keyframes/transitions or the Web Animations API (`el.animate`). No canvas loops, no
-  `requestAnimationFrame`, no new npm dependencies.
+- **No new chain reads, no new rAF loops — one scoped exception (Round 4).** PhaseEngine stays the only
+  permanent rAF loop (CLOCK-REDESIGN §6.7). Everything else is CSS keyframes or `el.animate`. The
+  detonation set-piece's 3D scene (`src/alt/fx/boom3d.ts`, three.js) may run its own
+  `requestAnimationFrame` loop **only while the set-piece is mounted**: created lazily, started just
+  before the blast, stopped on finish, skip or unmount, and disposed completely (renderer, geometries,
+  materials, `forceContextLoss`, canvas removed). Under `prefers-reduced-motion: reduce` it never loads.
+  `three` is the one sanctioned npm dependency added since Round 1, loaded in a lazy chunk (see Feature 4).
 - **Motion answers the user or the data.** No scroll entrances and no new ambient loops outside the clock,
   the armed detonate button and the hatch egg waiting to be tapped. Hover responses are fine on interactive controls, but not on every card.
 - **`prefers-reduced-motion: reduce`** → no transforms, particles or shake. Show a short color or opacity flash
-  only. The set-piece becomes a static dim + stamp.
+  only. The set-piece becomes a static dim + stamp (no 3D, and the three.js chunk is never fetched).
 - **Never block input.** FX overlays use `pointer-events: none`. Two FX overlays catch input and never trap
-  the user: the detonation set-piece (a click or Esc skips it; it auto-ends at ~5.6s) and the hatch modal
-  (Esc, a click outside the card, or its close control dismisses it at any beat).
+  the user: the detonation set-piece (a click or Esc skips it; it auto-ends at ~6.2s) and the hatch modal
 - **Performance.** Animate only `transform`/`opacity`/`filter`. Allow at most ~50 DOM particles per burst
   (pepe confetti: ≤46). Every FX node is removed on `animationend` or after a timeout.
 
@@ -165,7 +168,7 @@ Contract: `export default function DetonationSetPiece({ onDone }: { onDone: () =
   - Press: the button depresses 2px.
 - **Pending (wallet + mining):** the fuse burns along the button's bottom edge as the pending fill. The spark
   travels, and the label stays as-is.
-- **Success, ~5.6s sequence** (`fireFx('detonate')`; skippable by click or Esc at any beat):
+- **Success, ~6.2s sequence** (`fireFx('detonate')`; skippable by click or Esc at any beat):
   1. 0–900ms **alarm:** the screen dims to 50%, three red vignette pulses, two siren beams sweep, hazard
      tape slides onto the top and bottom edges.
   2. 900–1300ms **slam:** a white flash, then `00:00:00` in `--time-lit` (forced to the critical red) lands
@@ -173,15 +176,30 @@ Contract: `export default function DetonationSetPiece({ onDone }: { onDone: () =
   3. Shake in three stages (page + stage, element.animate, restored exactly): A ±12px at 1000ms, a ±3px
      rumble 1600–3200ms, C ±18px at 3250ms.
   4. 1600–2950ms **carpet bombing:** two passes of 12 pixel bombs (left→right under the clock, then
-     right→left above it), each landing in a fireball with a hanging smoke puff. 3250ms **blast:** a
-     screen-filling explosion flash, a full-screen shockwave and a ground ring; the clock is knocked up and
-     back while a mushroom cloud rises beneath it (3300–4200ms).
-  5. 3350–5300ms **debris:** 16 pixel chunks and a burst of rage/angry/sad/meh pepe confetti from the blast.
-  6. 4200ms **lock:** the ladder rows gray out left to right and the "PAID"-style stamp glyph hits the
+     right→left above it), each landing in a fireball with a hanging smoke puff.
+  5. 3250ms **blast — the 3D cloud takes over** (`src/alt/fx/boom3d.ts`, lazy `import()` behind
+     `boomLoader.ts`; the armed button prefetches the chunk, and the set-piece creates the scene at mount
+     so its shaders compile during the alarm): a hard 40ms screen flash, then a volumetric pixel-3D
+     nuke — ignition fireball, a rising rolling toroidal cap with internal churn that cools
+     white→yellow→orange→red→smoke with an ember-lit underside, a swirling stem, a base-surge dust
+     skirt spreading along the ground, a racing ground shockwave ring and a condensation shell — plus a
+     slow camera push-in and a decaying camera shake under the DOM page shake. Rendered at 1/4 (1/3 on
+     narrow screens) of the viewport and upscaled `image-rendering: pixelated`, posterized to a
+     9-color theme palette (`--boom-*` on `.dtn-stage`) with edge Bayer dithering; 1,651 GPU puffs in
+     one draw call, analytic (no CPU sim), driven by the stage's own CSS clock. The clock is knocked
+     up and back and the cloud rises beneath it.
+  6. 3350–5300ms **debris:** 16 pixel chunks and two flank bursts of pepe confetti thrown from
+     behind the cloud.
+  7. 4200ms **lock:** the ladder rows gray out left to right and the "PAID"-style stamp glyph hits the
      clock's corner (no new copy).
-  7. 4700–5600ms **settle:** the dim relaxes to 45%, the tape and cloud leave, the stage fades out. The
-     existing `onDetonated` flow continues.
-- Reduced motion: dim, then a static stamp and fade (≤1.2s). No shake or particles.
+  8. 5300–6200ms **settle:** the dim relaxes to 45%, the 3D cloud dither-dissolves, the tape leaves,
+     the stage fades out. The existing `onDetonated` flow continues.
+- Fallbacks: no hardware WebGL2 (probed with `failIfMajorPerformanceCaveat`), a failed chunk fetch, or
+  the scene not ready by the blast → the run keeps a rebuilt CSS cloud (same `--boom-*` palette: a
+  cel-shaded cap/stem/skirt of stacked `currentColor` box-shadow lobes that cool with one `filter`
+  ramp) plus the existing shockwave and ground ring.
+- Reduced motion: dim, then a static stamp and fade (≤1.2s). No shake, particles or 3D — the three.js
+  chunk is not even fetched.
 
 ## Build order and ownership (parallel, glm-5.3-flash implementers)
 
@@ -275,7 +293,26 @@ reporting.
 
 ## Feature 9 — Hatch modal, long detonation, global pass
 - Hatch modal: see the catalog row and the `useConfirmedWrite` contract note above (`src/alt/fx/HatchModal.tsx`).
-- Detonation: see Feature 4 (~5.6s beats).
+- Detonation: see Feature 4 (~6.2s beats; Round 4 added the 3D cloud).
 - Global pass: every effect is centered on its anchor, glyphs are sized to read (coins 11px, padlock 26px,
   seal 34px, …), glyph colors hold contrast in both themes, the clock chip is 15px bold on the clock
   housing and prefers an on-screen clock, and particles stay inside a 390px viewport.
+
+---
+
+# Round 4 — the 3D mushroom cloud (three.js)
+
+The CSS cloud read as child-like. The blast is now a real volumetric explosion.
+
+## Feature 10 — Pixel-3D nuke (`three` in a lazy chunk)
+- `frontend/package.json` adds `three` (+ `@types/three` dev-only). It never touches the entry bundle:
+  `src/alt/fx/boom3d.ts` is only reachable through the dynamic `import()` in `src/alt/fx/boomLoader.ts`,
+  which the armed alt detonate button prefetches and the set-piece awaits. `vite build` confirms three
+  lives in its own chunk, and the default (non-alt) build pulls it nowhere (the prefetch is behind
+  `VITE_ALT_UI === '1'`, statically eliminated).
+- See Feature 4 step 5 for the scene contract (palette, puffs, timing, camera) and the fallback ladder.
+- Verification notes (2026-09): a locked 60fps at 1440×900 (165 frames over the blast window: mean 16.67ms,
+  p95/p99/max 16.8ms, zero frames over 20ms; boom CPU cost ≤0.8ms/frame; 1,651 instances). Skip at
+  120/1200/3200/3300/4000/4600/5000/5900ms leaves no canvas, no rAF and no console warnings, and restores
+  the page transform exactly. Aborted/slow three.js fetches and blocked WebGL2 fall back to the CSS cloud;
+  reduced motion never fetches the chunk.

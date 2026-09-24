@@ -15,11 +15,14 @@ import { useConfirmedWrite } from '../../lib/useConfirmedWrite'
 // existing pending fill, and prefers-reduced-motion already degrades it to a
 // static tint. variant="alt" (alt UI only, styles in public/alt/detonation.css)
 // adds decorative spans — hazard-stripe crawl, fuse spark, bottom-edge fuse —
-// and a data-state hook (armed|pending|done). The FX itself ('detonate') is
+// and a data-state hook (armed|pending|done), and once armed it prefetches the
+// set-piece's lazy 3D chunk (three.js). The FX itself ('detonate') is
 // fired by useConfirmedWrite on write success; never fired here.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+import { loadBoom3d } from '../../alt/fx/boomLoader'
 
 import { controllerAbi } from '../../lib/abi'
 import { usePhase } from '../../phase/PhaseEngine'
@@ -41,10 +44,21 @@ export default function DetonateButton({
   const [step, setStep] = useState<Step>('idle')
   const [error, setError] = useState<string | null>(null)
   const { writeContractAsync } = useConfirmedWrite()
+  const armed = zero && round.mode === 1 && !!round.controller
+
+  // Alt builds only (the default build drops this branch and the chunk): warm
+  // the detonation's 3D scene while the player looks at the armed button.
+  useEffect(() => {
+    if (import.meta.env.VITE_ALT_UI !== '1' || variant !== 'alt' || !armed) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    loadBoom3d().catch(() => {
+      // the set-piece retries at mount and falls back to its CSS cloud
+    })
+  }, [variant, armed])
 
   // the clock still lives, or the round already left Active (detonated by
   // someone else / flattened) — nothing to press
-  if (!zero || round.mode !== 1 || !round.controller) return null
+  if (!armed) return null
 
   async function detonate() {
     if (!round.controller || step !== 'idle') return

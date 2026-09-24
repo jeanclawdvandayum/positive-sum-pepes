@@ -36,8 +36,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { PepeConfetti } from './confetti'
+import { loadBoom3d } from './boomLoader'
+import type { Boom } from './boom3d'
 
-const SEQ_MS = 5600 // stage fade completes at 5600 (CSS: 5200 + 400)
+const SEQ_MS = 6200 // stage fade completes at 6200 (CSS: 5800 + 400)
 const REDUCED_MS = 1150 // static dim+stamp, fade ends 1080; ≤1.2s incl. timer slop
 const BLAST_MS = 3250
 const LOCK_MS = 4200
@@ -114,10 +116,16 @@ function impactOrigin(): { ox: string; oy: string } {
 export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
   const [reduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [origin] = useState(impactOrigin)
-  const [blastAt] = useState(() => ({ x: window.innerWidth / 2, y: window.innerHeight * 0.8 }))
+  // the blast point; the pepe confetti bursts from the cloud's two flanks
+  const [blastAt] = useState(() => ({
+    x: window.innerWidth / 2,
+    y: window.innerHeight * 0.8,
+    flank: Math.min(window.innerWidth * 0.2, 300),
+  }))
   const stageRef = useRef<HTMLDivElement | null>(null)
   const quakeRef = useRef<HTMLDivElement | null>(null)
   const clockRef = useRef<HTMLSpanElement | null>(null)
+  const boomHostRef = useRef<HTMLDivElement | null>(null)
 
   // Anchor the stamp to the clock's LAYOUT box (offset* — immune to the slam
   // animation's scale, which getBoundingClientRect would report). The glyph
@@ -147,6 +155,16 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
     const anims: Animation[] = [] // page mutations — cancelled at finish
     const fades: Animation[] = [] // the stage's own exit — kept until unmount
     let finished = false
+    // The 3D cloud: created as soon as its chunk lands (shaders compile during
+    // the alarm), started just before the blast, disposed on finish/unmount.
+    // Not ready by the blast → this run keeps the CSS cloud.
+    let boom: Boom | null = null
+    let boomOff = reduced
+    const dropBoom = () => {
+      boomOff = true
+      boom?.dispose()
+      boom = null
+    }
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') finish()
@@ -156,6 +174,7 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
       finished = true
       timers.forEach(clearTimeout)
       window.removeEventListener('keydown', onKey)
+      dropBoom()
       // Restore the real page immediately: at natural finish the stage is
       // already invisible, and a slow parent must never leave the shell
       // shaken or the ladder gray.
@@ -168,6 +187,31 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
 
     const at = (ms: number, run: () => void) => timers.push(window.setTimeout(run, ms))
     if (!reduced) {
+      // The scene's clock is the stage's own CSS exit animation, so the 3D
+      // stays frame-locked to the CSS beats (and to paused/seeked QA frames).
+      const stage = stageRef.current
+      const t0 = performance.now()
+      let stageAnim: Animation | undefined
+      const clock = () => {
+        stageAnim ??= stage
+          ?.getAnimations()
+          .find(a => a instanceof CSSAnimation && a.animationName === 'dtn-stage-out')
+        return (stageAnim ? Number(stageAnim.currentTime) : performance.now() - t0) - BLAST_MS
+      }
+      loadBoom3d()
+        .then(({ createBoom }) => {
+          const host = boomHostRef.current
+          if (boomOff || !host || !stage) return
+          boom = createBoom({ host, clock, groundFrac: blastAt.y / window.innerHeight })
+          stage.dataset.boom = '3d'
+        })
+        .catch(() => {
+          // no WebGL2, or the chunk failed to load: the CSS cloud plays
+        })
+      at(BLAST_MS - 40, () => {
+        if (boom) boom.start()
+        else boomOff = true
+      })
       // Page + stage shake together. No fill, so the transform is restored
       // exactly at the end of each stage.
       const quake = (frames: Keyframe[], duration: number, easing: string) => {
@@ -208,10 +252,11 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
     return () => {
       timers.forEach(clearTimeout)
       window.removeEventListener('keydown', onKey)
+      dropBoom()
       anims.forEach(a => a.cancel())
       fades.forEach(a => a.cancel())
     }
-  }, [reduced])
+  }, [reduced, blastAt])
 
   return (
     <div
@@ -228,10 +273,16 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
         <span className="dtn-alarm" />
         <span className="dtn-siren dtn-siren-l" />
         <span className="dtn-siren dtn-siren-r" />
+        {/* CSS fallback cloud; stands down once the 3D scene is ready (data-boom) */}
         <div className="dtn-mush">
+          <div className="dtn-mush-skirt" />
           <div className="dtn-mush-stem" />
-          <div className="dtn-mush-cap" />
+          <div className="dtn-mush-head">
+            <div className="dtn-mush-glow" />
+            <div className="dtn-mush-cap" />
+          </div>
         </div>
+        {!reduced && <div ref={boomHostRef} className="dtn-boom" />}
         {BOMBS.map((b, i) => (
           <span
             key={`b${i}`}
@@ -264,7 +315,8 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
         ))}
         {!reduced && (
           <div className="dtn-confetti">
-            <PepeConfetti mood="sad" at={blastAt} faces={30} bits={8} delay={BLAST_MS + 120} stagger={320} power={1.45} seed={11} />
+            <PepeConfetti mood="sad" at={{ x: blastAt.x - blastAt.flank, y: blastAt.y }} faces={11} bits={4} delay={BLAST_MS + 220} stagger={420} power={1.5} seed={11} />
+            <PepeConfetti mood="sad" at={{ x: blastAt.x + blastAt.flank, y: blastAt.y }} faces={11} bits={4} delay={BLAST_MS + 300} stagger={420} power={1.5} seed={29} />
           </div>
         )}
         <span className="dtn-tape dtn-tape-top" />
