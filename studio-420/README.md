@@ -44,7 +44,7 @@ the written `defaults.js` again and checks that the result matches the pin. It a
 
 ## 420 golden
 
-`c1ae86703b49597ca0c384cf017482b4e3387aa8dae37a1a0af5e5a09df92094`
+`2c665740887db442a0f3bd4008fa50d94d024ffb9a5c54fbdc3874e6c2693e21`
 
 This is the sha256 of `art/PepeArtData.sol`, which is also stored in `art/GOLDEN_SHA256`. It is not
 the original golden (`73fff0a5…`) and not the release-2 export hash.
