@@ -11,8 +11,9 @@ export type FxKind =
   | 'claimReferral' | 'nameCommit' | 'nameRegister' | 'refLink' | 'shareImage' | 'faucet'
   | 'transferPepe' | 'approve' | 'spawn' | 'detonate' | 'fail'
 
-/** The pepe a hatch reveals: its id (DNA = keccak(id)) and the staker's art release. */
-export type FxPepe = { id: bigint; dnaVersion: bigint }
+/** The minted position NFT a hatch reveals. Production reads its DNA from
+ *  `staker.dnaOf(id)`; only the dev lab passes `dna` directly. */
+export type FxPepe = { id: bigint; dnaVersion: bigint; staker?: `0x${string}`; dna?: bigint }
 
 export type FxEvent = { id: number; kind: FxKind; anchor?: DOMRect; target?: DOMRect; detail?: string; pepe?: FxPepe }
 

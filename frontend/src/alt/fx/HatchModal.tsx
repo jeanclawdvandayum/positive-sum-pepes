@@ -14,8 +14,9 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import type { FxEvent } from '../../lib/actionFx'
-import { renderDecorativePepeSvg, renderPepeSvg } from '../../lib/pepeRender'
-import { dnaOfId } from '../../components/PepePicker'
+import { renderPepeSvg } from '../../lib/pepeRender'
+import { rpcCall } from '../../lib/rpc'
+import { stakerAbi } from '../../lib/abi'
 import { reducedMotion } from './parts'
 
 type Phase = 'idle' | 'shake' | 'crack' | 'burst' | 'tadpole' | 'legs' | 'froglet' | 'pepe' | 'settled'
@@ -44,6 +45,25 @@ function pixelSvg(rows: string[], palette: Record<string, string>): string {
 }
 
 const FROG = { o: '#16241c', b: '#58a43e', B: '#8fd06a', e: '#ffffff', p: '#16241c', r: '#8a2f3b' }
+
+/** Shown when the minted NFT can't be resolved: a "?" card, never another pepe. */
+const MYSTERY = pixelSvg([
+  'kkkkkkkkkkkkkkk',
+  'kkkkkkkkkkkkkkk',
+  'kkkkkkkkkkkkkkk',
+  'kkkkkkkkkkkkkkk',
+  'kkkkkwwwwwkkkkk',
+  'kkkkwwkkkwwkkkk',
+  'kkkkkkkkkwwkkkk',
+  'kkkkkkkkwwkkkkk',
+  'kkkkkkkwwkkkkkk',
+  'kkkkkkkwwkkkkkk',
+  'kkkkkkkkkkkkkkk',
+  'kkkkkkkwwkkkkkk',
+  'kkkkkkkkkkkkkkk',
+  'kkkkkkkkkkkkkkk',
+  'kkkkkkkkkkkkkkk',
+], { k: '#1d333e', w: '#b9eb8e' })
 
 const TADPOLE = pixelSvg([
   '....oooo.........',
@@ -143,7 +163,19 @@ const SHARDS = 8
 
 export default function HatchModal({ event, onDone }: { event: FxEvent; onDone: () => void }) {
   const [phase, setPhase] = useState<Phase>('idle')
-  const [art] = useState(() => svgUri(event.pepe ? renderPepeSvg(dnaOfId(event.pepe.id), event.pepe.dnaVersion) : renderDecorativePepeSvg()))
+  // The reveal is the minted NFT's canonical art: staker.dnaOf(id), read once.
+  // Unknown or unreadable → a mystery card, never substitute art.
+  const [art, setArt] = useState(() => svgUri(event.pepe?.dna !== undefined
+    ? renderPepeSvg(event.pepe.dna, event.pepe.dnaVersion) : MYSTERY))
+  useEffect(() => {
+    const pepe = event.pepe
+    if (!pepe?.staker || pepe.dna !== undefined) return
+    let live = true
+    ;(rpcCall(pepe.staker, stakerAbi, 'dnaOf', [pepe.id]) as Promise<bigint>)
+      .then(dna => { if (live) setArt(svgUri(renderPepeSvg(dna, pepe.dnaVersion))) })
+      .catch(() => {})
+    return () => { live = false }
+  }, [event.pepe])
   const eggRef = useRef<HTMLButtonElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const pepeRef = useRef<HTMLImageElement>(null)

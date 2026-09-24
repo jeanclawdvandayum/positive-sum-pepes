@@ -26,9 +26,9 @@ function fire(kind: FxKind | undefined, anchor: Element | undefined, detail?: st
 /** FX-only hints for one write. `mute` silences helper writes (approvals inside
  *  writeWithApprovals); `anchor` carries the batch entry press through long
  *  confirmation flows — present-but-undefined means "use nothing", absent means
- *  self-capture; `pepeArt` is the staker's DNA version, which lets a confirmed
- *  predeposit claim reveal the pepe it hatched. */
-type ConfirmedFx = { mute?: boolean; anchor?: Element; pepeArt?: bigint }
+ *  self-capture; `hatch` names the staker (and its DNA version) whose mint a
+ *  confirmed predeposit claim reveals. */
+type ConfirmedFx = { mute?: boolean; anchor?: Element; hatch?: { staker: `0x${string}`; dnaVersion: bigint } }
 
 /** AUD-4: every UI write simulates, waits for mining, and checks receipt status. */
 export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } | { nftRoundId: bigint | undefined } | { referralClaimRoundId: bigint | undefined } | { referralPurchase: { roundId: bigint; registry?: `0x${string}` } }) {
@@ -142,10 +142,10 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
       // Only buys emit TimeAdded; the chip is the confirmed seconds, never the
       // pre-sign estimate. A claim's hatched pepe comes from its args/receipt.
       if (!fx?.mute) {
-        const pepeId = kind === 'claimPredeposit' && fx?.pepeArt !== undefined
-          ? hatchFxPepeId(parameters.functionName, parameters.args, receipt?.logs, address) : undefined
+        const hatch = kind === 'claimPredeposit' ? fx?.hatch : undefined
+        const pepeId = hatch && hatchFxPepeId(parameters.functionName, parameters.args, receipt?.logs, address, hatch.staker)
         fire(kind, anchor, kind === 'buy' ? buyFxDetail(receipt?.logs) : undefined,
-          pepeId === undefined || fx?.pepeArt === undefined ? undefined : { id: pepeId, dnaVersion: fx.pepeArt })
+          hatch && pepeId !== undefined ? { id: pepeId, dnaVersion: hatch.dnaVersion, staker: hatch.staker } : undefined)
       }
       return hash
     } catch (error) {

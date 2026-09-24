@@ -7,6 +7,7 @@ import { hatchFxPepeId } from '../src/lib/hatchFxPepe.ts'
 // Real-shaped receipt logs for a predeposit claim: the PSP ERC-20 moves, then
 // the staker mints the position NFT.
 const STAKER = '0x0000000000000000000000000000000000005ea4'
+const IMPOSTOR = '0x0000000000000000000000000000000000000bad'
 const TOKEN = '0x00000000000000000000000000000000000000aa'
 const USER = '0x00000000000000000000000000000000000000ab'
 const OTHER = '0x00000000000000000000000000000000000000a1'
@@ -19,8 +20,8 @@ const meta = logIndex => ({
   removed: false,
 })
 
-const mintLog = (tokenId, to = USER, logIndex = 1) => ({
-  address: STAKER,
+const mintLog = (tokenId, { to = USER, address = STAKER, logIndex = 1 } = {}) => ({
+  address,
   topics: encodeEventTopics({ abi: stakerAbi, eventName: 'Transfer', args: { from: zeroAddress, to, tokenId } }),
   data: '0x',
   ...meta(logIndex),
@@ -34,21 +35,27 @@ const erc20Mint = logIndex => ({
   ...meta(logIndex),
 })
 
-test('a chosen claim hatches the id it was called with', () => {
-  assert.equal(hatchFxPepeId('claimPredepositPSPWithPepe', [4242n], [], USER), 4242n)
+const plain = logs => hatchFxPepeId('claimPredepositPSP', undefined, logs, USER, STAKER)
+
+test('a chosen claim reveals the id the staker minted, which must equal its argument', () => {
+  assert.equal(hatchFxPepeId('claimPredepositPSPWithPepe', [4242n], [erc20Mint(0), mintLog(4242n)], USER, STAKER), 4242n)
+  assert.equal(hatchFxPepeId('claimPredepositPSPWithPepe', [4242n], [mintLog(4243n)], USER, STAKER), undefined)
+  assert.equal(hatchFxPepeId('claimPredepositPSPWithPepe', [4242n], [], USER, STAKER), undefined)
 })
 
-test('a plain claim hatches the reserved id minted to the claimant, past an ERC-20 transfer', () => {
-  assert.equal(hatchFxPepeId('claimPredepositPSP', undefined, [erc20Mint(0), mintLog(918273645n)], USER), 918273645n)
+test('an automatic claim reveals the wallet-address id it minted', () => {
+  assert.equal(plain([erc20Mint(0), mintLog(BigInt(USER))]), BigInt(USER))
 })
 
-test('an automatic claim (address-id, genesis art) has no id-derived art', () => {
-  assert.equal(hatchFxPepeId('claimPredepositPSP', undefined, [mintLog(BigInt(USER))], USER), undefined)
+test('an automatic claim whose address id collided reveals the fallback nextTokenId', () => {
+  assert.equal(plain([mintLog(7n)]), 7n)
 })
 
-test('mints to someone else, other functions and undecodable receipts reveal nothing', () => {
-  assert.equal(hatchFxPepeId('claimPredepositPSP', undefined, [mintLog(77n, OTHER)], USER), undefined)
-  assert.equal(hatchFxPepeId('claimPredepositPSP', undefined, [{ address: STAKER, data: '0x', topics: [] }], USER), undefined)
-  assert.equal(hatchFxPepeId('claimPredepositPSP', undefined, undefined, USER), undefined)
-  assert.equal(hatchFxPepeId('lockWithPepe', [1n, 5n], [mintLog(5n)], USER), undefined)
+test('only the expected staker, a mint to the claimant, and claim functions count', () => {
+  assert.equal(plain([mintLog(77n, { address: IMPOSTOR })]), undefined)
+  assert.equal(plain([mintLog(77n, { address: IMPOSTOR, logIndex: 0 }), mintLog(78n)]), 78n)
+  assert.equal(plain([mintLog(77n, { to: OTHER })]), undefined)
+  assert.equal(plain([{ address: STAKER, data: '0x', topics: [] }]), undefined)
+  assert.equal(plain(undefined), undefined)
+  assert.equal(hatchFxPepeId('lockWithPepe', [1n, 5n], [mintLog(5n)], USER, STAKER), undefined)
 })

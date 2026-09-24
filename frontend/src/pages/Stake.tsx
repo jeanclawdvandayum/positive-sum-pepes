@@ -351,7 +351,7 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
   useEffect(() => { setClaimStep('idle') }, [claimSession])
 
   // Alt only: the staker's art release lets the hatch FX reveal the claimed pepe.
-  const hatchFx = variant === 'alt' && dnaVersion !== undefined ? { pepeArt: dnaVersion } : {}
+  const hatchFx = variant === 'alt' && dnaVersion !== undefined && round.staker ? { hatch: { staker: round.staker, dnaVersion } } : {}
   async function claimGenesis() {
     setError(null)
     if (!round.controller) return

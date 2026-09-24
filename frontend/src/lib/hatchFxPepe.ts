@@ -1,36 +1,33 @@
-// Which pepe a confirmed predeposit claim hatched (alt hatch modal). No new
-// chain reads: a chosen claim names its id in the write args; a plain claim
-// mints the id the depositor reserved at predeposit time, and the mined
-// receipt's ERC-721 mint Transfer names it.
+// Which position NFT a confirmed predeposit claim minted (alt hatch modal).
+// The id comes from the expected staker's ERC-721 mint Transfer in the mined
+// receipt; the art is then read on-chain (dnaOf) — never derived locally.
+// Automatic claims mint at the wallet-address id, or at nextTokenId when that
+// id is taken, so no id is assumed from the account or the args alone.
 
 import { parseEventLogs, zeroAddress, type Log } from 'viem'
 import { stakerAbi } from './abi.ts'
 
+const CLAIMS: Record<string, true> = { claimPredepositPSP: true, claimPredepositPSPWithPepe: true }
+
 /**
- * The id whose art is `keccak(id)` (dnaOfId), or undefined when the art is not
- * id-derived or cannot be known:
- * - `claimPredepositPSPWithPepe(id)` → the argument.
- * - `claimPredepositPSP()` → the id minted to `account` in `logs`. A depositor
- *   without a reservation gets an automatic mint whose id is their address and
- *   whose art is the wallet's genesis DNA, not keccak(id) → undefined.
- * Anything else, or an undecodable receipt → undefined.
+ * The token id `staker` minted to `account` in `logs`, or undefined when the
+ * receipt holds no such mint. A chosen claim must mint exactly its argument.
  */
 export function hatchFxPepeId(
   functionName: string,
   args: readonly unknown[] | undefined,
   logs: readonly unknown[] | undefined,
   account: string,
+  staker: string,
 ): bigint | undefined {
-  if (functionName === 'claimPredepositPSPWithPepe') {
-    const id = args?.[0]
-    return typeof id === 'bigint' && id > 0n ? id : undefined
-  }
-  if (functionName !== 'claimPredepositPSP' || !logs?.length) return undefined
+  if (!CLAIMS[functionName] || !logs?.length) return undefined
   try {
     for (const log of parseEventLogs({ abi: stakerAbi, eventName: 'Transfer', logs: logs as Log[], strict: true })) {
+      if (log.address.toLowerCase() !== staker.toLowerCase()) continue
       const { from, to, tokenId } = log.args
       if (from !== zeroAddress || to.toLowerCase() !== account.toLowerCase()) continue
-      return tokenId === BigInt(account) ? undefined : tokenId
+      if (functionName === 'claimPredepositPSPWithPepe' && args?.[0] !== tokenId) return undefined
+      return tokenId
     }
   } catch {
     // Falls through to undefined.

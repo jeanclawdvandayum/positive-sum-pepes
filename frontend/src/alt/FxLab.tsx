@@ -39,7 +39,7 @@ export default function FxLab() {
     const spec = TARGETS[kind]
     fireFx(kind, {
       anchor: el, target: spec?.target, detail: spec?.detail,
-      pepe: kind === 'claimPredeposit' ? { id: pepeId, dnaVersion: LAB_DNA_VERSION } : undefined,
+      pepe: kind === 'claimPredeposit' ? { id: pepeId, dnaVersion: LAB_DNA_VERSION, dna: dnaOfId(pepeId) } : undefined,
     })
   }
 
