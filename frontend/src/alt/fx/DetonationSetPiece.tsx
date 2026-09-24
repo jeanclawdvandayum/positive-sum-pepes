@@ -2,37 +2,45 @@
 // DetonationSetPiece — the carpet-bomb set piece (PLAN Feature 4).
 //
 // Rendered by ActionFxLayer for kind 'detonate' (FxLab's mock stage can mount
-// it too). It is the ONLY overlay allowed to catch input: a click or Esc
-// skips it, and it auto-ends in ≤3s. Timeline (ms):
-//   0–120     screen dims to 70% black
-//   100–190   white flash (peak ~110ms)
-//   170–420   clock slams to 00:00:00 (Segment face, scale 2.4→.92→1.04→1,
-//             hard glow)
-//   300–820   shockwave ring + pixel debris from the button (--ox/--oy);
-//             page shake (decaying ±6px translate on .alt-shell via
-//             element.animate, restored after) and the same keyframe curve
-//             on the slam card so the whole frame jolts together
-//   600–1875  carpet bombing: 12 pixel bombs (22px, amber-rimmed, fall
-//             streak) drop in parallel diagonally, staggered left→right,
-//             landing on one diagonal line, each with a 56px impact burst
-//   1800–2280 ladder rows lock (grayscale sweep via element.animate on the
-//             real .ladder-panel rows, if present) + stamp glyph hit on the
-//             clock's corner; dim relaxes 0.7→0.45 so the handoff reads
-//   2700–2900 stage fades out → onDone
+// it too). One of two FX overlays that catch input: a click or Esc skips it at
+// any beat, and it auto-ends at 5.6s. Timeline (ms):
+//   0–900      ALARM: dim ramps in, three red vignette pulses, hazard tape
+//              slides onto the top and bottom edges, two siren beams sweep
+//   900–1000   white flash
+//   950–1300   SLAM: 00:00:00 in --time-lit (forced to the critical red)
+//              lands from scale 3.4 with a red glow; square shockwave ring
+//   1000–1500  shake A: ±12px decaying (page + stage)
+//   1600–2450  CARPET pass 1: 12 bombs sweep left→right onto a diagonal
+//   2100–2950  CARPET pass 2: 12 bombs sweep right→left, higher line
+//   1600–3200  shake B: a ±3px rumble under the bombing
+//   3250–3900  BLAST: a screen-filling explosion flash, a full-screen
+//              shockwave ring and a ground ring; mushroom cloud rises
+//              3300–4200 behind the clock
+//   3250–4050  shake C: ±18px decaying
+//   3350–5300  DEBRIS: 16 pixel chunks + a burst of rage/angry/sad/meh
+//              pepe confetti from the blast
+//   4200–4700  LOCK: ladder rows gray out left→right (the real rows) and the
+//              stamp hits the clock's corner with a jolt
+//   4700–5200  SETTLE: dim relaxes to .45, the cloud and tape leave
+//   5200–5600  stage fades out → onDone
 //
-// prefers-reduced-motion: static dim + stamp, JS opacity fade ≤1.2s — no
+// prefers-reduced-motion: static dim + clock + stamp, opacity fade ≤1.2s — no
 // shake, no particles. PhaseEngine keeps its rAF monopoly: everything here is
 // CSS keyframes or element.animate, animating transform/opacity/filter only.
-// Particle nodes: 12 debris + 12 bombs + 12 impacts = 36 (≤40). Timers and
-// Animation handles are all cleaned up on unmount/skip and the real page
-// elements (.alt-shell transform, ladder filters) are restored.
+// Particle groups: 24 bombs + 24 impacts, 16 debris, 38 confetti — each burst
+// under 50 nodes. Timers and Animation handles are all cleaned up on
+// unmount/skip, and the real page (.alt-shell transform, ladder filters) is
+// restored.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { PepeConfetti } from './confetti'
 
-const SEQ_MS = 2900 // fade completes at 2900 (CSS: 2700+200); ≤3s incl. timer slop
+const SEQ_MS = 5600 // stage fade completes at 5600 (CSS: 5200 + 400)
 const REDUCED_MS = 1150 // static dim+stamp, fade ends 1080; ≤1.2s incl. timer slop
+const BLAST_MS = 3250
+const LOCK_MS = 4200
 
 // Deterministic LCG so QA screenshots repeat exactly.
 function lcg(seed: number) {
@@ -42,28 +50,58 @@ function lcg(seed: number) {
 
 const DEBRIS = (() => {
   const r = lcg(7)
-  return Array.from({ length: 12 }, (_, i) => {
-    const a = r() * Math.PI * 2
-    const d = 80 + r() * 200
+  return Array.from({ length: 16 }, (_, i) => {
+    const a = -Math.PI * (0.05 + 0.9 * r())
+    const d = 140 + r() * 320
     return {
       dx: Math.round(Math.cos(a) * d),
-      dy: Math.round(Math.sin(a) * d - 40),
-      size: 3 + Math.round(r() * 5),
+      dy: Math.round(Math.sin(a) * d),
+      size: 5 + Math.round(r() * 7),
       tone: i % 3,
+      delay: Math.round(r() * 120),
     }
   })
 })()
 
-const FALL_MS = 450
-// One carpet line: bombs fall in parallel (--jx fixed) and land on a single
-// diagonal sweeping left→right.
-const BOMBS = Array.from({ length: 12 }, (_, i) => ({
-  left: `${(i + 0.5) * (100 / 12)}%`,
-  top: `${56 + i * 1.4}vh`,
-  delay: `${600 + i * 75}ms`,
+const FALL_MS = 420
+const PER_PASS = 12
+/** Two carpet passes: left→right low, then right→left higher, overlapping. */
+const BOMBS = [0, 1].flatMap(pass => Array.from({ length: PER_PASS }, (_, i) => {
+  const col = pass === 0 ? i : PER_PASS - 1 - i
+  const drop = (pass === 0 ? 1600 : 2100) + i * 70
+  return {
+    left: `${(col + 0.5) * (100 / PER_PASS)}%`,
+    // pass 1 carpets the band under the clock, pass 2 the band above it
+    top: pass === 0 ? `${62 + col * 1.3}vh` : `${12 + (PER_PASS - 1 - col) * 0.9}vh`,
+    jx: pass === 0 ? '-140px' : '140px',
+    jr: pass === 0 ? '-50deg' : '50deg',
+    drop,
+    land: drop + FALL_MS,
+  }
 }))
 
-/** Impact origin: the live detonate button, else viewport center. */
+/** A decaying translate shake: `peak` px, `steps` alternating jolts. */
+function shakeFrames(peak: number, steps: number): Keyframe[] {
+  const frames: Keyframe[] = [{ transform: 'translate(0px, 0px)' }]
+  for (let i = 0; i < steps; i++) {
+    const amp = peak * (1 - i / steps)
+    const sx = i % 2 ? -1 : 1
+    const sy = i % 3 ? 1 : -1
+    frames.push({ transform: `translate(${(sx * amp).toFixed(1)}px, ${(sy * amp * 0.7).toFixed(1)}px)` })
+  }
+  frames.push({ transform: 'translate(0px, 0px)' })
+  return frames
+}
+
+/** A steady rumble (no decay) for under the bombing. */
+function rumbleFrames(amp: number, steps: number): Keyframe[] {
+  const r = lcg(3)
+  return Array.from({ length: steps }, (_, i) => i === 0 || i === steps - 1
+    ? { transform: 'translate(0px, 0px)' }
+    : { transform: `translate(${((r() * 2 - 1) * amp).toFixed(1)}px, ${((r() * 2 - 1) * amp).toFixed(1)}px)` })
+}
+
+/** Impact origin of the slam ring: the live detonate button, else viewport center. */
 function impactOrigin(): { ox: string; oy: string } {
   const el = document.querySelector('.alt-detonate')
   if (el) {
@@ -76,7 +114,9 @@ function impactOrigin(): { ox: string; oy: string } {
 export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
   const [reduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [origin] = useState(impactOrigin)
+  const [blastAt] = useState(() => ({ x: window.innerWidth / 2, y: window.innerHeight * 0.8 }))
   const stageRef = useRef<HTMLDivElement | null>(null)
+  const quakeRef = useRef<HTMLDivElement | null>(null)
   const clockRef = useRef<HTMLSpanElement | null>(null)
 
   // Anchor the stamp to the clock's LAYOUT box (offset* — immune to the slam
@@ -126,62 +166,45 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
     window.addEventListener('keydown', onKey)
     skipRef.current = finish
 
+    const at = (ms: number, run: () => void) => timers.push(window.setTimeout(run, ms))
     if (!reduced) {
-      // 300ms — page shake on the impact frame: decaying ±6px translate on
-      // the shell. No fill, so the transform is restored exactly at the end.
-      timers.push(
-        window.setTimeout(() => {
-          const shell = document.querySelector('.alt-shell')
-          if (!shell) return
-          anims.push(
-            shell.animate(
-              [
-                { transform: 'translate(0px, 0px)' },
-                { transform: 'translate(6px, -4px)' },
-                { transform: 'translate(-6px, 5px)' },
-                { transform: 'translate(5px, 3px)' },
-                { transform: 'translate(-4px, -3px)' },
-                { transform: 'translate(3px, 2px)' },
-                { transform: 'translate(-2px, -1px)' },
-                { transform: 'translate(1px, 1px)' },
-                { transform: 'translate(0px, 0px)' },
-              ],
-              { duration: 520, easing: 'ease-out' },
-            ),
-          )
-        }, 300),
-      )
-      // 1800ms — ladder lock: grayscale sweep across the real rows,
-      // left→right. cancel() on cleanup restores them.
-      timers.push(
-        window.setTimeout(() => {
-          document
-            .querySelectorAll<HTMLElement>('.alt-shell .ladder-panel .ladder-row')
-            .forEach((row, i) => {
-              anims.push(
-                row.animate(
-                  [{ filter: 'grayscale(0)' }, { filter: 'grayscale(1) brightness(0.85)' }],
-                  { duration: 240, delay: i * 40, easing: 'ease-out', fill: 'forwards' },
-                ),
-              )
-            })
-        }, 1800),
-      )
+      // Page + stage shake together. No fill, so the transform is restored
+      // exactly at the end of each stage.
+      const quake = (frames: Keyframe[], duration: number, easing: string) => {
+        for (const el of [document.querySelector('.alt-shell'), quakeRef.current]) {
+          if (el) anims.push(el.animate(frames, { duration, easing }))
+        }
+      }
+      at(1000, () => quake(shakeFrames(12, 9), 500, 'linear'))
+      at(1600, () => quake(rumbleFrames(3, 24), 1600, 'linear'))
+      at(BLAST_MS, () => quake(shakeFrames(18, 12), 800, 'linear'))
+      // Ladder lock: grayscale sweep across the real rows, left→right (row
+      // order). cancel() on finish restores them.
+      at(LOCK_MS, () => {
+        document
+          .querySelectorAll<HTMLElement>('.alt-shell .ladder-panel .ladder-row')
+          .forEach((row, i) => {
+            anims.push(
+              row.animate(
+                [{ filter: 'grayscale(0)' }, { filter: 'grayscale(1) brightness(0.85)' }],
+                { duration: 240, delay: i * 40, easing: 'ease-out', fill: 'forwards' },
+              ),
+            )
+          })
+      })
     } else {
       // Reduced motion: the stage already renders as a static dim + stamp;
       // exit with a short opacity fade only.
-      timers.push(
-        window.setTimeout(() => {
-          const fade = stageRef.current?.animate([{ opacity: 1 }, { opacity: 0 }], {
-            duration: 200,
-            fill: 'forwards',
-          })
-          if (fade) fades.push(fade)
-        }, 950),
-      )
+      at(950, () => {
+        const fade = stageRef.current?.animate([{ opacity: 1 }, { opacity: 0 }], {
+          duration: 200,
+          fill: 'forwards',
+        })
+        if (fade) fades.push(fade)
+      })
     }
 
-    timers.push(window.setTimeout(finish, reduced ? REDUCED_MS : SEQ_MS))
+    at(reduced ? REDUCED_MS : SEQ_MS, finish)
     return () => {
       timers.forEach(clearTimeout)
       window.removeEventListener('keydown', onKey)
@@ -197,40 +220,58 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
       role="presentation"
       aria-hidden="true"
       data-reduced={reduced || undefined}
-      style={{ '--ox': origin.ox, '--oy': origin.oy } as CSSProperties}
+      style={{ '--ox': origin.ox, '--oy': origin.oy, '--bx': `${blastAt.x}px`, '--by': `${blastAt.y}px` } as CSSProperties}
       onClick={() => skipRef.current()}
     >
-      <span className="dtn-dim" aria-hidden="true" />
-      <span className="dtn-flash" aria-hidden="true" />
-      <div className="dtn-slam" aria-hidden="true">
-        <span ref={clockRef} className="dtn-clock">00:00:00</span>
+      <div ref={quakeRef} className="dtn-quake">
+        <span className="dtn-dim" />
+        <span className="dtn-alarm" />
+        <span className="dtn-siren dtn-siren-l" />
+        <span className="dtn-siren dtn-siren-r" />
+        <div className="dtn-mush">
+          <div className="dtn-mush-stem" />
+          <div className="dtn-mush-cap" />
+        </div>
+        {BOMBS.map((b, i) => (
+          <span
+            key={`b${i}`}
+            className="dtn-bomb-drop"
+            style={{ left: b.left, top: b.top, '--d': `${b.drop}ms`, '--jx': b.jx, '--jr': b.jr } as CSSProperties}
+          />
+        ))}
+        {BOMBS.map((b, i) => (
+          <span
+            key={`i${i}`}
+            className="dtn-impact"
+            style={{ left: b.left, top: b.top, '--id': `${b.land}ms` } as CSSProperties}
+          />
+        ))}
+        <span className="dtn-ring" />
+        {/* the stamp rides the slam card, so the blast's knock-back carries both */}
+        <div className="dtn-slam">
+          <span ref={clockRef} className="dtn-clock">00:00:00</span>
+          <span className="dtn-stamp">✓</span>
+        </div>
+        <span className="dtn-ground-ring" />
+        <span className="dtn-shock" />
+        {DEBRIS.map((p, i) => (
+          <span
+            key={`d${i}`}
+            className="dtn-debris"
+            data-tone={p.tone}
+            style={{ '--dx': `${p.dx}px`, '--dy': `${p.dy}px`, '--dd': `${BLAST_MS + 100 + p.delay}ms`, width: p.size, height: p.size } as CSSProperties}
+          />
+        ))}
+        {!reduced && (
+          <div className="dtn-confetti">
+            <PepeConfetti mood="sad" at={blastAt} faces={30} bits={8} delay={BLAST_MS + 120} stagger={320} power={1.45} seed={11} />
+          </div>
+        )}
+        <span className="dtn-tape dtn-tape-top" />
+        <span className="dtn-tape dtn-tape-bottom" />
+        <span className="dtn-blast" />
+        <span className="dtn-flash" />
       </div>
-      <span className="dtn-ring" aria-hidden="true" />
-      {DEBRIS.map((p, i) => (
-        <span
-          key={i}
-          className="dtn-debris"
-          data-tone={p.tone}
-          style={{ '--dx': `${p.dx}px`, '--dy': `${p.dy}px`, width: p.size, height: p.size } as CSSProperties}
-        />
-      ))}
-      {BOMBS.map((b, i) => (
-        <span
-          key={i}
-          className="dtn-bomb-drop"
-          style={{ left: b.left, top: b.top, '--d': b.delay } as CSSProperties}
-        />
-      ))}
-      {BOMBS.map((b, i) => (
-        <span
-          key={i}
-          className="dtn-impact"
-          style={{ left: b.left, top: b.top, '--id': `${600 + i * 75 + FALL_MS}ms` } as CSSProperties}
-        />
-      ))}
-      <span className="dtn-stamp" aria-hidden="true">
-        ✓
-      </span>
     </div>
   )
 }

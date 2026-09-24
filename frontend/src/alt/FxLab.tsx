@@ -3,8 +3,10 @@
 // builds tree-shake this module away. Labels are the FxKind names themselves;
 // it ships no copy.
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { fireFx, type FxKind } from '../lib/actionFx'
+import { renderPepeSvg } from '../lib/pepeRender'
+import { dnaOfId } from '../components/PepePicker'
 import { PixelIcon } from '../components/PixelIcon'
 
 const KINDS: FxKind[] = [
@@ -14,26 +16,36 @@ const KINDS: FxKind[] = [
   'transferPepe', 'approve', 'spawn', 'fail',
 ]
 
-/** Realistic default targets per kind; effects resolve the rest themselves. */
+/** Realistic default targets per kind; effects resolve the rest themselves.
+ *  The buy chip is the confirmed +m:ss only (Round 2, Feature 7). */
 const TARGETS: Partial<Record<FxKind, { target?: string; detail?: string }>> = {
-  buy: { target: '.ladder-panel', detail: '+1:09 · +2 seats' },
+  buy: { target: '.ladder-panel', detail: '+1:09' },
   predeposit: { target: '.pd-progress' },
   claimFees: { target: '.wallet-button' },
 }
 
-const LADDER_ROWS = [0, 1, 2, 3]
+const LADDER_ROWS = [0, 1, 2, 3, 4]
+/** The lab hatches release-2 art, like a live round's staker. */
+const LAB_DNA_VERSION = 2n
+const randomPepeId = () => BigInt(Math.floor(Math.random() * 2 ** 40)) + 1n
 
 export default function FxLab() {
   const anchors = useRef(new Map<FxKind, HTMLButtonElement>())
   const stage = useRef<HTMLDivElement>(null)
+  // The pepe the hatch will reveal, shown in the mock card so QA can match it.
+  const [pepeId, setPepeId] = useState(randomPepeId)
 
   const fire = (kind: FxKind, el: Element) => {
     const spec = TARGETS[kind]
-    fireFx(kind, { anchor: el, target: spec?.target, detail: spec?.detail })
+    fireFx(kind, {
+      anchor: el, target: spec?.target, detail: spec?.detail,
+      pepe: kind === 'claimPredeposit' ? { id: pepeId, dnaVersion: LAB_DNA_VERSION } : undefined,
+    })
   }
 
+  // The hatch is an interactive modal, so the staggered run skips it.
   const fireAll = () => {
-    KINDS.forEach((kind, i) => setTimeout(() => {
+    KINDS.filter(kind => kind !== 'claimPredeposit').forEach((kind, i) => setTimeout(() => {
       const el = anchors.current.get(kind)
       if (el) fire(kind, el)
     }, i * 220))
@@ -56,6 +68,10 @@ export default function FxLab() {
           <button className="st-btn st-btn-primary" onClick={fireAll}>fire all (staggered)</button>
           <button className="st-btn" onClick={e => fireFx('detonate', { anchor: e.currentTarget, target: '.fx-lab-stage' })}>
             detonate
+          </button>
+          {/* the hatch with no knowable id reveals a decorative pepe */}
+          <button className="st-btn" onClick={e => fireFx('claimPredeposit', { anchor: e.currentTarget })}>
+            claimPredeposit (no id)
           </button>
         </div>
         <div className="fx-lab-states">
@@ -82,7 +98,10 @@ export default function FxLab() {
           <div className="pd-bar"><span /></div>
         </div>
         <div className="rounded-2xl card p-4 fx-lab-pepe">
-          <RandomPepeish />
+          <div className="fx-lab-pepe-art">
+            <img alt="" src={`data:image/svg+xml,${encodeURIComponent(renderPepeSvg(dnaOfId(pepeId), LAB_DNA_VERSION))}`} />
+            <button className="st-btn fx-lab-btn" onClick={() => setPepeId(randomPepeId())}>hatch id {String(pepeId)} ↻</button>
+          </div>
           {/* feed/loop/send-off fire from inside the mock pepe card */}
           <div className="fx-lab-grid">
             {['topUp', 'reinvest', 'transferPepe'].map(kind => kindButton(kind as FxKind))}
@@ -91,11 +110,6 @@ export default function FxLab() {
       </div>
     </div>
   )
-}
-
-/** Decorative stand-in pepe (dev-only page, no copy). */
-function RandomPepeish() {
-  return <div className="fx-lab-pepe-art" aria-hidden="true">◕‿◕</div>
 }
 
 /** Exact alt DetonateButton markup, pinned to one data-state for QA (dev only). */

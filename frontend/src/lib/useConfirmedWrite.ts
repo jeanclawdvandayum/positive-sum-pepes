@@ -1,4 +1,4 @@
-import { encodeFunctionData, type TransactionReceipt } from 'viem'
+import { encodeFunctionData, type Hash, type TransactionReceipt } from 'viem'
 import { getWalletClient } from 'wagmi/actions'
 import { getCapabilities, sendCalls, waitForCallsStatus } from 'viem/actions'
 import { supportsAtomicBatch, confirmAtomicTransaction } from './walletBatch'
@@ -16,11 +16,19 @@ import { assertReferralPurchase } from './referrals'
 import { assertReinvestor } from './reinvestRules'
 import { verifyReferralClaim } from './referralRewards'
 import { buyFxDetail } from './buyFxDetail'
-import { captureAnchor, fireFx, isUserRejection, fxKindFor, type FxKind } from './actionFx'
+import { hatchFxPepeId } from './hatchFxPepe'
+import { captureAnchor, fireFx, isUserRejection, fxKindFor, type FxKind, type FxPepe } from './actionFx'
 
-function fire(kind: FxKind | undefined, anchor: Element | undefined, detail?: string): void {
-  if (kind) fireFx(kind, { anchor, detail })
+function fire(kind: FxKind | undefined, anchor: Element | undefined, detail?: string, pepe?: FxPepe): void {
+  if (kind) fireFx(kind, { anchor, detail, pepe })
 }
+
+/** FX-only hints for one write. `mute` silences helper writes (approvals inside
+ *  writeWithApprovals); `anchor` carries the batch entry press through long
+ *  confirmation flows — present-but-undefined means "use nothing", absent means
+ *  self-capture; `pepeArt` is the staker's DNA version, which lets a confirmed
+ *  predeposit claim reveal the pepe it hatched. */
+type ConfirmedFx = { mute?: boolean; anchor?: Element; pepeArt?: bigint }
 
 /** AUD-4: every UI write simulates, waits for mining, and checks receipt status. */
 export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } | { nftRoundId: bigint | undefined } | { referralClaimRoundId: bigint | undefined } | { referralPurchase: { roundId: bigint; registry?: `0x${string}` } }) {
@@ -28,10 +36,7 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
   const client = usePublicClient({ chainId: CHAIN_ID })
   const { writeContractAsync } = useWriteContract()
   type Write = Parameters<typeof writeContractAsync>[0]
-  // fx.mute silences helper writes (approvals inside writeWithApprovals);
-  // fx.anchor carries the batch entry press through long confirmation flows —
-  // present-but-undefined means "use nothing", absent means self-capture.
-  const confirmed = async (parameters: Write, validateOnly = false, fx?: { mute?: boolean; anchor?: Element }) => {
+  const confirmed = async (parameters: Write, validateOnly = false, fx?: ConfirmedFx) => {
     if (!client || !address) throw new Error('Connect a wallet first.')
     const toast = validateOnly ? undefined : startTransactionToast(transactionLabel(parameters.functionName), CHAIN_ID, address)
     const kind = validateOnly || fx?.mute ? undefined : fxKindFor(parameters.functionName)
@@ -135,8 +140,13 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
         },
       }, { ...parameters, account: address, chainId: CHAIN_ID } as typeof parameters, toast?.update)
       // Only buys emit TimeAdded; the chip is the confirmed seconds, never the
-      // pre-sign estimate.
-      if (!fx?.mute) fire(kind, anchor, kind === 'buy' ? buyFxDetail(receipt?.logs) : undefined)
+      // pre-sign estimate. A claim's hatched pepe comes from its args/receipt.
+      if (!fx?.mute) {
+        const pepeId = kind === 'claimPredeposit' && fx?.pepeArt !== undefined
+          ? hatchFxPepeId(parameters.functionName, parameters.args, receipt?.logs, address) : undefined
+        fire(kind, anchor, kind === 'buy' ? buyFxDetail(receipt?.logs) : undefined,
+          pepeId === undefined || fx?.pepeArt === undefined ? undefined : { id: pepeId, dnaVersion: fx.pepeArt })
+      }
       return hash
     } catch (error) {
       toast?.fail(error)
@@ -221,5 +231,10 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
     }
   }
 
-  return { writeContractAsync: confirmed as typeof writeContractAsync, writeWithApprovals, atomicWallet }
+  // The third argument carries FX-only hints (see ConfirmedFx); wagmi-shaped
+  // calls keep their full abi inference through the first signature.
+  return {
+    writeContractAsync: confirmed as typeof writeContractAsync & ((parameters: Write, validateOnly: boolean, fx: ConfirmedFx) => Promise<Hash | undefined>),
+    writeWithApprovals, atomicWallet,
+  }
 }

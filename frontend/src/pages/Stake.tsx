@@ -350,6 +350,8 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
   latestClaimSession.current = claimSession
   useEffect(() => { setClaimStep('idle') }, [claimSession])
 
+  // Alt only: the staker's art release lets the hatch FX reveal the claimed pepe.
+  const hatchFx = variant === 'alt' && dnaVersion !== undefined ? { pepeArt: dnaVersion } : {}
   async function claimGenesis() {
     setError(null)
     if (!round.controller) return
@@ -363,9 +365,9 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
           throw new Error('That Pepe was just minted. Pick another face. Your predeposit is still yours.')
         }
         await writeContractAsync({ address: round.controller, abi: controllerAbi,
-          functionName: 'claimPredepositPSPWithPepe', args: [genesisPepe] })
+          functionName: 'claimPredepositPSPWithPepe', args: [genesisPepe] }, false, hatchFx)
       } else {
-        await writeContractAsync({ address: round.controller, abi: controllerAbi, functionName: 'claimPredepositPSP' })
+        await writeContractAsync({ address: round.controller, abi: controllerAbi, functionName: 'claimPredepositPSP' }, false, hatchFx)
       }
       if (latestClaimSession.current !== claimSession) return
       setMyDep(deposit => deposit ? { ...deposit, claimed: true } : deposit)

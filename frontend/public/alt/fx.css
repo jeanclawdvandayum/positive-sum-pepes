@@ -21,50 +21,90 @@ body.alt-mode .fx-layer .fx-over > span { position: absolute; inset: 0; }
 
 /* Shared pixel-art bits. left/top from TSX mark each node's CENTER. */
 body.alt-mode .fx-layer .fx-coin {
-  width: 8px; height: 8px; margin: -4px 0 0 -4px;
+  width: 11px; height: 11px; margin: -6px 0 0 -6px;
   background: var(--amber);
-  box-shadow: inset 2px 2px 0 #ffffff59, inset -2px -2px 0 #00000045;
+  box-shadow: 0 0 0 1px var(--shadow), inset 2px 2px 0 #ffffff59, inset -2px -2px 0 #00000045;
 }
 body.alt-mode .fx-layer .fx-bit {
-  width: 8px; height: 8px; margin: -4px 0 0 -4px;
+  width: 10px; height: 10px; margin: -5px 0 0 -5px;
   background: var(--green);
-  box-shadow: 0 0 0 1px var(--green-ink), inset 2px 2px 0 #ffffff45;
+  box-shadow: 0 0 0 1px var(--action-ink), inset 2px 2px 0 #ffffff45;
 }
+/* A pixel plus-star (the node has no text; the shape is the clip). */
 body.alt-mode .fx-layer .fx-spark {
-  width: 9px; height: 9px; margin: -5px 0 0 -5px;
-  color: var(--green);
-  font: 9px/9px var(--mono, monospace);
-  text-align: center;
-  text-shadow: 1px 1px 0 var(--green-ink), -1px -1px 0 var(--green-ink), 1px -1px 0 var(--green-ink), -1px 1px 0 var(--green-ink);
+  width: 10px; height: 10px; margin: -5px 0 0 -5px;
+  background: var(--green);
+  clip-path: polygon(40% 0, 60% 0, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0 60%, 0 40%, 40% 40%);
   opacity: 0;
-  animation: fx-spark-fly .4s steps(3) both;
+  animation: fx-spark-fly .45s steps(3) both;
 }
 
-/* buy — ticket punch. */
+/* Pepe confetti (confetti.tsx): a --s square window into a 10-column sprite
+   sheet of 69px cells, scaled so one cell = --s. `translate` carries the
+   gravity arc, `transform` the drift + tumble. */
+body.alt-mode .fx-pc {
+  position: fixed;
+  display: block;
+  width: var(--s); height: var(--s);
+  margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+  background-repeat: no-repeat;
+  background-size: calc(var(--s) * 10) auto;
+  background-position: calc(var(--s) * var(--c, 0) * -1) calc(var(--s) * var(--r, 0) * -1);
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 2px var(--ink);
+  opacity: 0;
+  animation-name: fx-pc-arc, fx-pc-drift;
+  animation-fill-mode: both;
+  animation-timing-function: linear;
+  will-change: transform, translate, opacity;
+}
+body.alt-mode .fx-pc-bit { box-shadow: none; }
+body.alt-mode .fx-pc-tone0 { background: var(--amber); }
+body.alt-mode .fx-pc-tone1 { background: var(--green); }
+body.alt-mode .fx-pc-tone2 { background: var(--red); }
+body.alt-mode .fx-pc-happy.fx-pc-tone2 { background: var(--action); }
+
+/* buy — ticket punch: stubs print out of the button and land on ladder seats. */
 body.alt-mode .fx-layer .fx-ticket {
   position: relative;
-  width: 22px; height: 14px; margin: -7px 0 0 -11px;
-  background: var(--panel);
-  border: 2px solid var(--action);
+  width: 34px; height: 22px; margin: -11px 0 0 -17px;
+  background: var(--action);
+  border: 2px solid var(--action-ink);
   box-shadow: 2px 2px 0 var(--shadow);
   opacity: 0;
-  animation: fx-ticket-fly 1s cubic-bezier(.3,.1,.65,.9) both;
+  animation-name: fx-ticket-arc, fx-ticket-run;
+  animation-duration: .95s;
+  animation-fill-mode: both;
+  animation-timing-function: linear;
 }
 body.alt-mode .fx-layer .fx-ticket::after {
   content: '';
-  position: absolute; left: 70%; top: 0; bottom: 0;
-  border-left: 2px dotted var(--action);
+  position: absolute; left: 66%; top: 1px; bottom: 1px;
+  border-left: 2px dotted var(--action-ink);
 }
-body.alt-mode .fx-layer .fx-clock-chip {
-  translate: -50% 0;
-  padding: 2px 6px;
-  background: var(--clock-housing);
-  color: var(--amber);
-  font: 14px/1.3 var(--mono, monospace);
-  border: 1px solid var(--clock-line);
+/* the seat a ticket lands on flashes as it is taken */
+body.alt-mode .fx-layer .fx-seat-take {
+  background: color-mix(in srgb, var(--action) 38%, transparent);
+  box-shadow: inset 0 0 0 3px var(--action), 0 0 0 1px var(--action-ink);
   opacity: 0;
-  animation: fx-chip-up .9s steps(5) .15s both;
+  animation: fx-seat-take .56s steps(4) both;
 }
+/* The confirmed +m:ss rides the clock housing's own lit-digit color, so it
+   reads on the dark housing in both themes. */
+body.alt-mode .fx-layer .fx-clock-chip {
+  translate: -50% -100%;
+  padding: 3px 8px;
+  background: var(--clock-housing);
+  color: var(--time-lit);
+  font: 700 15px/1.25 var(--mono, monospace);
+  white-space: nowrap;
+  border: 1px solid var(--clock-line);
+  box-shadow: 2px 2px 0 var(--shadow);
+  opacity: 0;
+  animation: fx-chip-up 1.5s cubic-bezier(.2,.8,.3,1) .15s both;
+}
+/* header mini-clock hugs the top edge: the chip drops below it instead */
+body.alt-mode .fx-layer .fx-clock-chip-below { translate: -50% 0; }
 
 /* sell — drain. */
 body.alt-mode .fx-layer .fx-coin-fall { animation: fx-coin-fall .7s steps(6) both; }
@@ -74,12 +114,6 @@ body.alt-mode .fx-layer .fx-shutter {
   transform-origin: top;
   opacity: 0;
   animation: fx-shutter .9s steps(5) both;
-}
-/* buy — ladder landing echo. */
-body.alt-mode .fx-layer .fx-ladder-flash {
-  box-shadow: inset 0 0 0 2px var(--action);
-  opacity: 0;
-  animation: fx-ladder-flash .3s steps(2) 1s both;
 }
 
 /* predeposit — cannonball. */
@@ -115,28 +149,28 @@ body.alt-mode .fx-layer .fx-clock-reveal {
 
 /* stake — clamp (shared padlock). */
 body.alt-mode .fx-layer .fx-lock {
-  width: 0; height: 0; margin: -11px 0 0 -9px;
+  width: 0; height: 0; margin: -4px 0 0 0;
   animation: fx-lock-drop .36s steps(3) both;
 }
-body.alt-mode .fx-layer .fx-lock-small { margin: -8px 0 0 -6px; transform: scale(.7); }
+body.alt-mode .fx-layer .fx-lock-small { transform: scale(.7); }
 body.alt-mode .fx-layer .fx-lock-body {
-  position: absolute; left: -9px; top: -4px;
-  width: 18px; height: 13px;
+  position: absolute; left: -13px; top: -6px;
+  width: 26px; height: 19px;
   background: var(--amber);
-  border: 2px solid var(--green-ink);
+  border: 2px solid var(--action-ink);
   box-shadow: inset -3px -3px 0 #00000030;
 }
 body.alt-mode .fx-layer .fx-lock-shackle {
-  position: absolute; left: -6px; top: -13px;
-  width: 12px; height: 11px;
-  border: 3px solid var(--amber);
+  position: absolute; left: -8px; top: -20px;
+  width: 16px; height: 15px;
+  border: 4px solid var(--amber);
   border-bottom: 0;
   border-radius: 6px 6px 0 0;
   transform-origin: bottom;
 }
 body.alt-mode .fx-layer .fx-lock .fx-snap { animation: fx-snap .2s steps(2) .38s both; }
 body.alt-mode .fx-layer .fx-chain-link-flash {
-  width: 8px; height: 8px; margin: -4px 0 0 -4px;
+  width: 10px; height: 10px; margin: -5px 0 0 -5px;
   border: 2px solid var(--amber);
   opacity: 0;
   animation: fx-link-flash .3s steps(2) both;
@@ -150,9 +184,9 @@ body.alt-mode .fx-layer .fx-orbit {
 }
 body.alt-mode .fx-layer .fx-orbit .fx-coin { position: absolute; left: 0; top: 0; margin: 0; }
 body.alt-mode .fx-layer .fx-loop-glyph {
-  margin: -11px 0 0 -11px;
+  margin: -14px 0 0 -14px;
   color: var(--amber);
-  font: 22px/1 var(--mono, monospace);
+  font: 28px/1 var(--mono, monospace);
   opacity: 0;
   animation: fx-glyph-in 1.2s steps(4) .1s both;
 }
@@ -165,14 +199,14 @@ body.alt-mode .fx-layer .fx-chip-pulse {
 
 /* requestWithdraw / cancelWithdraw — hourglass & pips. */
 body.alt-mode .fx-layer .fx-hourglass {
-  width: 16px; height: 20px; margin: -10px 0 0 -8px;
+  width: 20px; height: 26px; margin: -13px 0 0 -10px;
   background: var(--amber);
   clip-path: polygon(0 0, 100% 0, 52% 50%, 100% 100%, 0 100%, 48% 50%);
 }
 body.alt-mode .fx-layer .fx-flip-down { animation: fx-flip-down .6s steps(2) both; }
 body.alt-mode .fx-layer .fx-flip-up { animation: fx-flip-up .6s steps(2) both; }
 body.alt-mode .fx-layer .fx-pip {
-  width: 7px; height: 7px; margin: -4px 0 0 -4px;
+  width: 9px; height: 9px; margin: -5px 0 0 -5px;
   border: 1px solid var(--line);
   background: var(--raised);
 }
@@ -193,13 +227,13 @@ body.alt-mode .fx-layer .fx-body-fall { animation: fx-body-fall .8s cubic-bezier
 
 /* claimPot — jackpot. */
 body.alt-mode .fx-layer .fx-confetti {
-  width: 5px; height: 5px; margin: 0 0 0 -2px;
+  width: 6px; height: 6px; margin: 0 0 0 -3px;
   background: var(--amber);
   opacity: 0;
   animation: fx-confetti-fall 1.3s steps(6) both;
 }
-body.alt-mode .fx-layer .fx-confetti-m { width: 7px; height: 7px; margin-left: -3px; }
-body.alt-mode .fx-layer .fx-confetti-l { width: 9px; height: 9px; margin-left: -4px; }
+body.alt-mode .fx-layer .fx-confetti-m { width: 8px; height: 8px; margin-left: -4px; }
+body.alt-mode .fx-layer .fx-confetti-l { width: 11px; height: 11px; margin-left: -5px; }
 body.alt-mode .fx-layer .fx-confetti-alt { background: var(--time-lit); }
 body.alt-mode .fx-layer .fx-seal {
   width: 44px; height: 44px; margin: -22px 0 0 -22px;
@@ -215,7 +249,7 @@ body.alt-mode .fx-layer .fx-seal {
 
 /* redeem — transmute. */
 body.alt-mode .fx-layer .fx-ember {
-  width: 7px; height: 7px; margin: -4px 0 0 -4px;
+  width: 9px; height: 9px; margin: -5px 0 0 -5px;
   background: var(--red);
   box-shadow: inset 2px 2px 0 var(--amber);
   opacity: 0;
@@ -223,48 +257,209 @@ body.alt-mode .fx-layer .fx-ember {
 }
 body.alt-mode .fx-layer .fx-coin-rise { animation: fx-coin-rise .8s steps(6) both; }
 
-/* claimPredeposit — hatch. */
-body.alt-mode .fx-layer .fx-hatch {
-  width: 30px; height: 38px; margin: -19px 0 0 -15px;
-  perspective: 240px;
+/* claimPredeposit — hatch modal (HatchModal.tsx). Its own portal, above the
+   FX layer (9500) and below the toasts (10000). The stage is the dark
+   instrument material in both themes; the egg, creatures and the real pepe
+   art are pixel images scaled by an integer --px. Beats key off data-phase;
+   data-hatched (burst onward) and data-revealed (pepe onward) hold state so
+   one-shot animations play exactly once. */
+body.alt-mode .hx-backdrop {
+  position: fixed; inset: 0; z-index: 9500;
+  display: grid; place-items: center;
+  padding: 16px;
+  background: rgb(2 9 14 / .66);
+  animation: hx-fade-in .2s ease-out both;
 }
-body.alt-mode .fx-layer .fx-hatch-inner {
-  position: absolute; inset: 0;
-  transform-style: preserve-3d;
-  animation: fx-flip-card .52s steps(4) .15s both;
+body.alt-mode .hx-card {
+  position: relative;
+  width: min(440px, 100%);
+  padding: 12px 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 6px 6px 0 var(--shadow);
+  animation: hx-card-in .32s cubic-bezier(.3,1.4,.5,1) both;
 }
-body.alt-mode .fx-layer .fx-cardback,
-body.alt-mode .fx-layer .fx-hatch-face {
-  position: absolute; inset: 0;
-  border: 2px solid var(--line);
-  backface-visibility: hidden;
+body.alt-mode .hx-card .hx-close {
+  position: absolute; top: 20px; right: 20px; z-index: 6;
+  display: grid; place-items: center;
+  width: 36px; height: 36px; padding: 0;
+  font: 700 22px/1 var(--mono);
+  color: var(--clock-ink);
+  background: var(--clock-raised);
+  border: 1px solid var(--clock-line);
+  box-shadow: 2px 2px 0 #000;
+  cursor: pointer;
 }
-body.alt-mode .fx-layer .fx-cardback {
-  background: repeating-conic-gradient(var(--raised) 0 25%, var(--panel) 0 50%) 0 0 / 8px 8px;
+body.alt-mode .hx-card .hx-close:hover { color: var(--action); border-color: var(--action); }
+body.alt-mode .hx-card .hx-close:focus-visible { outline: 2px dashed var(--action); outline-offset: 2px; }
+body.alt-mode .hx-stage {
+  --px: 6px;
+  --cpx: 8px;
+  --pepe: 207px;
+  --floor: 58px;
+  position: relative;
+  height: 350px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 16% at 50% calc(100% - var(--floor) + 4px), rgb(255 246 200 / .22), transparent 70%),
+    var(--clock-housing);
+  border: 1px solid var(--clock-line);
 }
-body.alt-mode .fx-layer .fx-hatch-face {
-  transform: rotateY(180deg);
-  background: var(--green);
-  border-color: var(--green-ink);
+body.alt-mode .hx-stage > * { position: absolute; display: block; }
+body.alt-mode .hx-stage img { image-rendering: pixelated; user-select: none; -webkit-user-drag: none; }
+/* spotlight cone from the rig down onto the pedestal */
+body.alt-mode .hx-beam {
+  left: 50%; top: 0; bottom: var(--floor);
+  width: 300px; margin-left: -150px;
+  background: linear-gradient(to bottom, rgb(255 248 214 / .26), rgb(255 248 214 / .07));
+  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
+  transform-origin: 50% 0;
 }
-body.alt-mode .fx-layer .fx-hatch-face::after {
-  content: '';
-  position: absolute; left: 6px; top: 10px;
-  width: 4px; height: 4px;
-  background: var(--green-ink);
-  box-shadow: 10px 0 0 var(--green-ink), 3px 8px 0 var(--green-ink), 5px 9px 0 var(--green-ink), 7px 9px 0 var(--green-ink), 9px 8px 0 var(--green-ink);
+body.alt-mode .hx-pedestal {
+  left: 50%; bottom: calc(var(--floor) - 36px);
+  width: 156px; height: 26px; margin-left: -78px;
+  background: #3c4d57;
+  box-shadow: inset 0 6px 0 #5b707c, inset 0 -4px 0 #26333b, 0 0 0 2px #0a1319;
+}
+body.alt-mode .hx-pedestal::before {
+  content: ''; position: absolute; left: 14px; right: 14px; top: -10px; height: 10px;
+  background: #6d8592;
+  box-shadow: inset 0 3px 0 #8aa3b0, 0 0 0 2px #0a1319;
+}
+body.alt-mode .hx-rays {
+  left: 50%; bottom: calc(var(--floor) + var(--pepe) / 2 - 190px);
+  width: 380px; height: 380px; margin-left: -190px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgb(255 222 120 / .42) 0 9deg, transparent 9deg 24deg);
+  -webkit-mask: radial-gradient(circle, #000 18%, transparent 68%);
+  mask: radial-gradient(circle, #000 18%, transparent 68%);
+  opacity: 0;
+}
+body.alt-mode .hx-backdrop .hx-egg,
+body.alt-mode .hx-backdrop .hx-egg:disabled {
+  left: 50%; bottom: var(--floor);
+  width: calc(20 * var(--px)); height: calc(24 * var(--px));
+  margin-left: calc(-10 * var(--px));
+  padding: 0; border: 0; background: none;
+  cursor: pointer;
+  transform-origin: 50% 100%;
+}
+body.alt-mode .hx-backdrop .hx-egg:focus-visible { outline: 2px dashed var(--action); outline-offset: 8px; }
+body.alt-mode .hx-egg img { position: absolute; inset: 0; width: 100%; height: 100%; }
+body.alt-mode .hx-crack { opacity: 0; }
+body.alt-mode .hx-flash {
+  left: 50%; bottom: calc(var(--floor) + 12 * var(--px));
+  width: 240px; height: 240px; margin: 0 0 -120px -120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 22%, rgb(255 240 190 / .7) 40%, transparent 70%);
+  opacity: 0;
+}
+body.alt-mode .hx-shard {
+  left: 50%; bottom: calc(var(--floor) + 13 * var(--px));
+  width: calc(2 * var(--px)); height: calc(2 * var(--px));
+  margin-left: calc(-1 * var(--px));
+  background: #f6f0dc;
+  box-shadow: inset calc(-.5 * var(--px)) calc(-.5 * var(--px)) 0 #d6c9a2, 0 0 0 2px #1d2b24;
+  opacity: 0;
+}
+body.alt-mode .hx-creature {
+  left: 50%; bottom: calc(var(--floor) + 2 * var(--px));
+  height: calc(11 * var(--cpx)); width: auto;
+  translate: -50% 0;
+  transform-origin: 50% 100%;
+  opacity: 0;
+}
+body.alt-mode .hx-tadpole { height: calc(9 * var(--cpx)); }
+body.alt-mode .hx-puff {
+  left: 50%; bottom: calc(var(--floor) + 6 * var(--px));
+  width: 150px; height: 150px; margin: 0 0 -75px -75px;
+  background:
+    radial-gradient(circle at 30% 40%, #fff 0 14%, transparent 15%),
+    radial-gradient(circle at 64% 34%, #fff 0 17%, transparent 18%),
+    radial-gradient(circle at 50% 62%, #fff 0 19%, transparent 20%),
+    radial-gradient(circle at 26% 66%, #e9f3d8 0 11%, transparent 12%),
+    radial-gradient(circle at 74% 64%, #e9f3d8 0 12%, transparent 13%);
+  opacity: 0;
+}
+body.alt-mode .hx-pepe {
+  left: 50%; bottom: var(--floor);
+  width: var(--pepe); height: var(--pepe); margin-left: calc(var(--pepe) / -2);
+  box-shadow: 0 0 0 3px #0a1319, 0 0 0 5px rgb(255 222 120 / .9), 0 0 40px rgb(255 222 120 / .45);
+  transform-origin: 50% 100%;
+  opacity: 0;
+}
+body.alt-mode .hx-spark {
+  left: 50%; bottom: calc(var(--floor) + var(--pepe) / 2);
+  width: 14px; height: 14px; margin: 0 0 -7px -7px;
+  background: #ffe27a;
+  clip-path: polygon(40% 0, 60% 0, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0 60%, 0 40%, 40% 40%);
+  opacity: 0;
+}
+body.alt-mode .hx-hint {
+  margin: 10px 0 0;
+  text-align: center;
+  font: 13px/1.2 var(--mono);
+  color: var(--muted);
+  transition: opacity .2s;
+}
+body.alt-mode .hx-hint::before { content: '↑ '; color: var(--green); }
+body.alt-mode .hx-hint[aria-hidden='true'] { opacity: 0; }
+
+/* idle: the egg rocks on its base every few seconds; hover/focus cracks it a little */
+body.alt-mode .hx-stage[data-phase='idle'] .hx-egg { animation: hx-wobble 2.6s ease-in-out .4s infinite; }
+body.alt-mode .hx-stage[data-phase='idle'] .hx-egg:is(:hover, :focus-visible) { animation: hx-jiggle .42s ease-in-out infinite; }
+body.alt-mode .hx-stage[data-phase='idle'] .hx-egg:is(:hover, :focus-visible) .hx-crack-1 { opacity: 1; }
+/* 0–650ms shake, 650–1150ms the cracks spread */
+body.alt-mode .hx-stage[data-phase='shake'] .hx-egg { animation: hx-shake .65s linear both; }
+body.alt-mode .hx-stage[data-phase='shake'] .hx-crack-1 { opacity: 1; }
+body.alt-mode .hx-stage[data-phase='crack'] .hx-egg { animation: hx-jolt .5s steps(4) both; }
+body.alt-mode .hx-stage[data-phase='crack'] .hx-crack-2 { animation: hx-on .01s both; }
+body.alt-mode .hx-stage[data-phase='crack'] .hx-crack-3 { animation: hx-on .01s .25s both; }
+/* 1150ms burst: the cap flies, shards scatter, white pop; the cup sinks later */
+body.alt-mode .hx-stage[data-hatched] .hx-shell-top { animation: hx-cap-off .6s cubic-bezier(.2,.7,.4,1) both; }
+body.alt-mode .hx-stage[data-hatched] .hx-shell-bottom { animation: hx-cup-sink .45s ease-in 1.15s both; }
+body.alt-mode .hx-stage[data-hatched] .hx-flash { animation: hx-flash .4s ease-out both; }
+body.alt-mode .hx-stage[data-hatched] .hx-shard { animation: hx-shard .75s cubic-bezier(.2,.7,.4,1) both; }
+body.alt-mode .hx-stage[data-hatched] .hx-egg { cursor: default; }
+/* 1450ms tadpole wriggles out → 2300 legs sprout → 2850 froglet → 3400 pepe */
+body.alt-mode .hx-stage[data-phase='tadpole'] .hx-tadpole { animation: hx-emerge .5s cubic-bezier(.2,.8,.4,1.2) both, hx-wriggle .26s ease-in-out .5s infinite alternate; }
+body.alt-mode .hx-stage[data-phase='legs'] .hx-legs { animation: hx-morph .32s steps(3) both, hx-hop .5s ease-in-out .32s infinite; }
+body.alt-mode .hx-stage[data-phase='froglet'] .hx-froglet { animation: hx-morph .32s steps(3) both, hx-hop .5s ease-in-out .32s infinite; }
+body.alt-mode .hx-stage[data-phase='legs'] .hx-puff { animation: hx-puff-a .42s ease-out both; }
+body.alt-mode .hx-stage[data-phase='froglet'] .hx-puff { animation: hx-puff-b .42s ease-out both; }
+body.alt-mode .hx-stage[data-revealed] .hx-puff { animation: hx-puff-c .5s ease-out both; }
+body.alt-mode .hx-stage[data-revealed] .hx-pepe { animation: hx-pepe-in .95s cubic-bezier(.3,1.5,.5,1) .12s both; }
+body.alt-mode .hx-stage[data-revealed] .hx-rays { animation: hx-rays-in 2s cubic-bezier(.2,.7,.3,1) both; }
+body.alt-mode .hx-stage[data-revealed] .hx-spark { animation-name: hx-spark-out; animation-duration: .9s; animation-timing-function: cubic-bezier(.2,.7,.4,1); animation-fill-mode: both; }
+body.alt-mode .hx-stage[data-revealed] .hx-flash { animation: hx-flash .4s ease-out both, hx-flash-big .6s ease-out .08s both; }
+body.alt-mode .hx-stage[data-revealed] .hx-beam { animation: hx-beam-up .8s ease-out both; }
+/* 4500ms settled: one gentle bounce, then still */
+body.alt-mode .hx-stage[data-phase='settled'] .hx-pepe { animation: hx-pepe-in .95s cubic-bezier(.3,1.5,.5,1) .12s both, hx-bounce .7s ease-out both; }
+
+@media (max-width: 600px) {
+  body.alt-mode .hx-stage { --px: 5px; --cpx: 6px; --pepe: 138px; --floor: 52px; height: 300px; }
+  body.alt-mode .hx-rays { width: 300px; height: 300px; margin-left: -150px; bottom: calc(var(--floor) + var(--pepe) / 2 - 150px); }
+}
+/* Reduced motion: the tap cross-fades egg → pepe; no shake, burst, creatures or particles. */
+@media (prefers-reduced-motion: reduce) {
+  body.alt-mode .hx-backdrop, body.alt-mode .hx-backdrop * { animation: none !important; }
+  body.alt-mode .hx-backdrop :is(.hx-flash, .hx-shard, .hx-creature, .hx-puff, .hx-spark) { display: none; }
+  /* end states; HatchModal cross-fades into them with an opacity-only WAAPI fade */
+  body.alt-mode .hx-stage[data-revealed] .hx-egg { opacity: 0; }
+  body.alt-mode .hx-stage[data-revealed] .hx-pepe { opacity: 1; }
+  body.alt-mode .hx-stage[data-revealed] .hx-rays { opacity: .5; }
 }
 
 /* claimReferral — chain. */
 body.alt-mode .fx-layer .fx-chain-node {
-  width: 12px; height: 12px; margin: -6px 0 0 -6px;
-  border: 2px solid var(--green-ink);
+  width: 14px; height: 14px; margin: -7px 0 0 -7px;
+  border: 2px solid var(--action-ink);
   background: var(--action);
   opacity: 0;
   animation: fx-node-pop .22s steps(2) both;
 }
 body.alt-mode .fx-layer .fx-chain-bar {
-  width: 20px; height: 2px; margin: -1px 0 0 0;
+  width: 26px; height: 3px; margin: -1px 0 0 0;
   background: var(--green);
   transform-origin: left;
   opacity: 0;
@@ -274,23 +469,23 @@ body.alt-mode .fx-layer .fx-coin-drop-onto { animation: fx-coin-drop-onto .5s st
 
 /* nameCommit — wax seal. */
 body.alt-mode .fx-layer .fx-wax {
-  width: 26px; height: 26px; margin: -13px 0 0 -13px;
+  width: 34px; height: 34px; margin: -17px 0 0 -17px;
   border-radius: 50%;
-  background: var(--green-ink);
-  box-shadow: inset 0 0 0 3px var(--action), 0 0 0 1px var(--ink);
+  background: var(--red);
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--red) 60%, #000), 0 0 0 2px var(--action-ink);
   opacity: 0;
   animation: fx-seal-stamp .42s steps(2) both;
 }
 body.alt-mode .fx-layer .fx-ink {
-  width: 4px; height: 4px; margin: -2px 0 0 -2px;
-  background: var(--action);
+  width: 5px; height: 5px; margin: -3px 0 0 -3px;
+  background: var(--red);
   opacity: 0;
   animation: fx-ink-splash .32s steps(3) both;
 }
 
 /* nameRegister — nameplate. */
 body.alt-mode .fx-layer .fx-plate {
-  width: 76px; height: 20px; margin: -10px 0 0 -38px;
+  width: 96px; height: 26px; margin: -13px 0 0 -48px;
   background: var(--panel);
   border: 2px solid var(--line);
   box-shadow: 3px 3px 0 var(--shadow);
@@ -298,22 +493,22 @@ body.alt-mode .fx-layer .fx-plate {
   animation: fx-plate-in .32s steps(3) both;
 }
 body.alt-mode .fx-layer .fx-caret {
-  position: absolute; left: 5px; top: 3px;
-  width: 2px; height: 12px;
+  position: absolute; left: 6px; top: 4px;
+  width: 3px; height: 14px;
   background: var(--green);
   animation: fx-caret-sweep .64s steps(8) .34s both;
 }
 
 /* refLink — link forge. */
 body.alt-mode .fx-layer .fx-half {
-  width: 20px; height: 26px; margin: -13px 0 0 -10px;
-  border: 4px solid var(--green-ink);
+  width: 24px; height: 30px; margin: -15px 0 0 -12px;
+  border: 5px solid var(--action-ink);
   opacity: 0;
 }
 body.alt-mode .fx-layer .fx-half-l { border-right: 0; border-radius: 10px 0 0 10px; animation: fx-half-snap-l .26s steps(2) .15s both; }
 body.alt-mode .fx-layer .fx-half-r { border-left: 0; border-radius: 0 10px 10px 0; animation: fx-half-snap-r .26s steps(2) .15s both; }
 body.alt-mode .fx-layer .fx-plane {
-  width: 22px; height: 16px; margin: -8px 0 0 -11px;
+  width: 28px; height: 20px; margin: -10px 0 0 -14px;
   background: var(--panel);
   border: 2px solid var(--ink);
   clip-path: polygon(0 0, 100% 45%, 0 90%, 24% 50%);
@@ -324,7 +519,7 @@ body.alt-mode .fx-layer .fx-plane {
 /* shareImage — polaroid. */
 body.alt-mode .fx-layer .fx-white { background: #ffffff; opacity: 0; animation: fx-white-flash .18s steps(2) both; }
 body.alt-mode .fx-layer .fx-polaroid {
-  width: 30px; height: 34px; margin: -17px 0 0 -15px;
+  width: 40px; height: 46px; margin: -23px 0 0 -20px;
   background: #f4f1e8;
   border: 1px solid var(--line);
   box-shadow: 3px 3px 0 var(--shadow);
@@ -333,23 +528,23 @@ body.alt-mode .fx-layer .fx-polaroid {
 }
 body.alt-mode .fx-layer .fx-polaroid::after {
   content: '';
-  position: absolute; inset: 4px 4px 10px;
+  position: absolute; inset: 5px 5px 13px;
   background: var(--green);
 }
 
 /* faucet — drip. */
 body.alt-mode .fx-layer .fx-droplet {
-  width: 6px; height: 10px; margin: -5px 0 0 -3px;
+  width: 8px; height: 13px; margin: -7px 0 0 -4px;
   background: var(--green);
   border-radius: 0 0 3px 3px;
-  box-shadow: 0 0 0 1px var(--green-ink);
+  box-shadow: 0 0 0 1px var(--action-ink);
   opacity: 0;
   animation: fx-drip-fall .3s steps(3) both;
 }
 body.alt-mode .fx-layer .fx-splash-bit {
-  width: 3px; height: 3px; margin: -2px 0 0 -2px;
+  width: 4px; height: 4px; margin: -2px 0 0 -2px;
   background: var(--green);
-  box-shadow: 0 0 0 1px var(--green-ink);
+  box-shadow: 0 0 0 1px var(--action-ink);
   opacity: 0;
   animation: fx-splash-pop .3s steps(3) both;
 }
@@ -395,7 +590,7 @@ body.alt-mode .fx-layer .fx-key-shaft {
 
 /* spawn — respawn. */
 body.alt-mode .fx-layer .fx-egg {
-  width: 12px; height: 16px; margin: -8px 0 0 -6px;
+  width: 18px; height: 24px; margin: -12px 0 0 -9px;
   background: var(--panel);
   border: 2px solid var(--ink);
   border-radius: 45% 45% 40% 40%;
@@ -403,7 +598,7 @@ body.alt-mode .fx-layer .fx-egg {
   animation: fx-egg-roll .64s steps(8) both;
 }
 body.alt-mode .fx-layer .fx-shell {
-  width: 6px; height: 8px; margin: -4px 0 0 -3px;
+  width: 9px; height: 12px; margin: -6px 0 0 -4px;
   background: var(--panel);
   border: 2px solid var(--ink);
   opacity: 0;
@@ -411,7 +606,7 @@ body.alt-mode .fx-layer .fx-shell {
 body.alt-mode .fx-layer .fx-shell-l { animation: fx-shell-l .3s steps(2) .64s forwards; }
 body.alt-mode .fx-layer .fx-shell-r { animation: fx-shell-r .3s steps(2) .64s forwards; }
 body.alt-mode .fx-layer .fx-pop {
-  width: 14px; height: 14px; margin: -7px 0 0 -7px;
+  width: 20px; height: 20px; margin: -10px 0 0 -10px;
   background: var(--green);
   border: 2px solid var(--green-ink);
   opacity: 0;
@@ -419,10 +614,10 @@ body.alt-mode .fx-layer .fx-pop {
 }
 body.alt-mode .fx-layer .fx-pop::after {
   content: '';
-  position: absolute; left: 3px; top: 3px;
-  width: 2px; height: 2px;
+  position: absolute; left: 4px; top: 4px;
+  width: 3px; height: 3px;
   background: var(--green-ink);
-  box-shadow: 5px 0 0 var(--green-ink);
+  box-shadow: 6px 0 0 var(--green-ink);
 }
 
 /* fail — red flicker wash over the anchor rect (normal motion); the shake
@@ -501,27 +696,53 @@ body.alt-mode .fx-lab-stage .ladder-row { display: flex; gap: 10px; align-items:
 body.alt-mode .fx-lab-stage .ladder-row .bar { flex: 1; height: 8px; background: var(--ladder-fill); }
 body.alt-mode .fx-lab-stage .pd-bar { height: 10px; background: var(--ladder-fill); }
 body.alt-mode .fx-lab-pepe { display: grid; gap: 12px; }
-body.alt-mode .fx-lab-pepe-art { display: grid; place-items: center; aspect-ratio: 2/1; background: var(--raised); border: 1px solid var(--line); font-size: 26px; color: var(--muted); }
+body.alt-mode .fx-lab-pepe-art { display: grid; justify-items: center; gap: 10px; padding: 12px; background: var(--raised); border: 1px solid var(--line); }
+body.alt-mode .fx-lab-pepe-art img { width: 138px; height: 138px; image-rendering: pixelated; }
+body.alt-mode .fx-lab-stage .instrument .clock { font-size: clamp(32px, 3.2vw, 46px); }
 @media (max-width: 900px) { body.alt-mode .fx-lab { grid-template-columns: 1fr; } }
 
 /* ── Keyframes ── */
-@keyframes fx-ticket-fly {
-  0% { transform: translate(0, 8px) scale(.4) rotate(-8deg); opacity: 0; }
-  10% { transform: translate(0, -20px) scale(1) rotate(3deg); opacity: 1; }
-  45% { transform: translate(calc(var(--dx) * .45), -48px) rotate(-6deg); opacity: 1; }
-  88% { transform: translate(calc(var(--dx) * .94), calc(var(--dy) * .94)) rotate(4deg); opacity: 1; }
-  100% { transform: translate(var(--dx), var(--dy)) scale(.6) rotate(8deg); opacity: 0; }
+/* Tickets: `translate` flies the arc (rise, then fall onto the seat) while
+   `transform` carries the linear run across, the tumble and the landing punch. */
+@keyframes fx-ticket-arc {
+  0% { translate: 0 6px; animation-timing-function: ease-out; }
+  12% { translate: 0 -26px; animation-timing-function: cubic-bezier(.3,.7,.5,1); }
+  45% { translate: 0 var(--lift); animation-timing-function: cubic-bezier(.5,0,.8,.5); }
+  80% { translate: 0 var(--dy); }
+  100% { translate: 0 var(--dy); }
+}
+@keyframes fx-ticket-run {
+  0% { transform: translateX(0) scale(.3) rotate(-10deg); opacity: 0; }
+  12% { transform: translateX(0) scale(1.1) rotate(-4deg); opacity: 1; animation-timing-function: ease-in-out; }
+  80% { transform: translateX(var(--dx)) scale(1) rotate(0); opacity: 1; }
+  86% { transform: translateX(var(--dx)) scale(1.35, .65); opacity: 1; }
+  92% { transform: translateX(var(--dx)) scale(1); opacity: 1; }
+  100% { transform: translateX(var(--dx)) scale(.8); opacity: 0; }
+}
+@keyframes fx-seat-take {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+  100% { opacity: 0; }
 }
 @keyframes fx-chip-up {
-  0% { transform: translateY(4px); opacity: 0; }
-  12% { opacity: 1; }
-  70% { opacity: 1; }
-  100% { transform: translateY(-32px); opacity: 0; }
+  0% { transform: translateY(8px) scale(.8); opacity: 0; }
+  10% { transform: translateY(0) scale(1.08); opacity: 1; }
+  18% { transform: translateY(0) scale(1); }
+  75% { transform: translateY(-14px); opacity: 1; }
+  100% { transform: translateY(-22px); opacity: 0; }
 }
-@keyframes fx-ladder-flash {
-  0% { opacity: 0; }
-  30% { opacity: 1; }
-  100% { opacity: 0; }
+/* Confetti: ease-out rise to --peak, ease-in fall past the bottom edge; the
+   drift decelerates (air drag) while the piece spins and flutters edge-on. */
+@keyframes fx-pc-arc {
+  0% { translate: 0 0; animation-timing-function: cubic-bezier(.15,.6,.35,1); }
+  30% { translate: 0 var(--peak); animation-timing-function: cubic-bezier(.55,0,.85,.45); }
+  100% { translate: 0 var(--fall); }
+}
+@keyframes fx-pc-drift {
+  0% { transform: translateX(0) rotate(0) rotateY(0) scale(.2); opacity: 0; }
+  5% { transform: translateX(calc(var(--dx) * .12)) rotate(calc(var(--spin) * .05)) rotateY(0) scale(1); opacity: 1; animation-timing-function: cubic-bezier(.2,.5,.4,1); }
+  85% { opacity: 1; }
+  100% { transform: translateX(var(--dx)) rotate(var(--spin)) rotateY(var(--flip)) scale(1); opacity: 0; }
 }
 @keyframes fx-coin-fall {
   0% { transform: translateY(-64px); opacity: 0; }
@@ -651,10 +872,6 @@ body.alt-mode .fx-lab-pepe-art { display: grid; place-items: center; aspect-rati
   25% { opacity: 1; }
   100% { transform: translateY(-44px); opacity: 0; }
 }
-@keyframes fx-flip-card {
-  0% { transform: rotateY(0); }
-  100% { transform: rotateY(180deg); }
-}
 @keyframes fx-spark-fly {
   0% { transform: translate(0, 0) scale(1); opacity: 1; }
   100% { transform: translate(var(--tx), var(--ty)) scale(.4); opacity: 0; }
@@ -765,4 +982,117 @@ body.alt-mode .fx-lab-pepe-art { display: grid; place-items: center; aspect-rati
   40% { transform: scale(1.25) translateY(-4px); opacity: 1; }
   70% { transform: scale(1) translateY(0); }
   100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+/* hatch modal */
+@keyframes hx-fade-in { from { opacity: 0; } }
+@keyframes hx-card-in { from { opacity: 0; transform: translateY(14px) scale(.94); } }
+@keyframes hx-on { from { opacity: 1; } to { opacity: 1; } }
+@keyframes hx-wobble {
+  0%, 58%, 100% { transform: rotate(0); }
+  64% { transform: rotate(-8deg); }
+  70% { transform: rotate(7deg); }
+  76% { transform: rotate(-5deg); }
+  82% { transform: rotate(3deg); }
+  88% { transform: rotate(-1deg); }
+}
+@keyframes hx-jiggle {
+  0%, 100% { transform: rotate(0) translateY(0); }
+  25% { transform: rotate(-3deg) translateY(-2px); }
+  75% { transform: rotate(3deg) translateY(-2px); }
+}
+/* amplitude grows as the thing inside gets impatient */
+@keyframes hx-shake {
+  0% { transform: translateX(0) rotate(0); }
+  10% { transform: translateX(-2px) rotate(-2deg); }
+  20% { transform: translateX(2px) rotate(2deg); }
+  30% { transform: translateX(-3px) rotate(-3deg); }
+  40% { transform: translateX(3px) rotate(4deg); }
+  50% { transform: translateX(-4px) rotate(-5deg); }
+  60% { transform: translateX(5px) rotate(6deg); }
+  70% { transform: translateX(-6px) rotate(-8deg); }
+  80% { transform: translateX(6px) rotate(9deg) translateY(-4px); }
+  90% { transform: translateX(-5px) rotate(-7deg) translateY(-2px); }
+  100% { transform: translateX(0) rotate(0); }
+}
+@keyframes hx-jolt {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(-4px, -3px) scale(1.04, .96); }
+  50% { transform: translate(4px, 0) scale(.97, 1.03); }
+  75% { transform: translate(-3px, -6px) scale(1.05, .95); }
+}
+@keyframes hx-cap-off {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  30% { transform: translate(-18px, -70px) rotate(-26deg); opacity: 1; }
+  100% { transform: translate(-60px, -150px) rotate(-70deg); opacity: 0; }
+}
+@keyframes hx-cup-sink {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(18px) scaleY(.6); opacity: 0; }
+}
+@keyframes hx-flash {
+  0% { transform: scale(.2); opacity: 0; }
+  20% { transform: scale(.9); opacity: 1; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+@keyframes hx-flash-big {
+  0% { transform: scale(.4); opacity: 0; }
+  25% { transform: scale(1.6); opacity: .9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+@keyframes hx-shard {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(var(--tx), calc(var(--ty) + 60px)) rotate(var(--rot)); opacity: 0; }
+}
+@keyframes hx-emerge {
+  0% { transform: translateY(40px) scale(.4); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translateY(-34px) scale(1); opacity: 1; }
+}
+/* the wriggle rides on top of the emerged pose (same end translate) */
+@keyframes hx-wriggle {
+  from { transform: translateY(-34px) rotate(-9deg) skewX(8deg); opacity: 1; }
+  to { transform: translateY(-40px) rotate(9deg) skewX(-8deg); opacity: 1; }
+}
+@keyframes hx-morph {
+  0% { transform: translateY(-34px) scale(.5); opacity: 0; filter: brightness(3); }
+  60% { transform: translateY(-38px) scale(1.15); opacity: 1; filter: brightness(1.6); }
+  100% { transform: translateY(-34px) scale(1); opacity: 1; filter: brightness(1); }
+}
+@keyframes hx-hop {
+  0%, 100% { transform: translateY(-34px) scale(1); opacity: 1; }
+  30% { transform: translateY(-30px) scale(1.12, .86); opacity: 1; }
+  60% { transform: translateY(-56px) scale(.94, 1.08); opacity: 1; }
+}
+@keyframes hx-puff-a { 0% { transform: scale(.3); opacity: 0; } 30% { transform: scale(.9); opacity: .95; } 100% { transform: scale(1.25); opacity: 0; } }
+@keyframes hx-puff-b { 0% { transform: scale(.3); opacity: 0; } 30% { transform: scale(.9); opacity: .95; } 100% { transform: scale(1.25); opacity: 0; } }
+@keyframes hx-puff-c { 0% { transform: scale(.3); opacity: 0; } 30% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
+@keyframes hx-pepe-in {
+  0% { transform: scale(0) rotate(-12deg); opacity: 0; filter: brightness(3); }
+  45% { transform: scale(1.12) rotate(3deg); opacity: 1; filter: brightness(1.5); }
+  70% { transform: scale(.95) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0); opacity: 1; filter: brightness(1); }
+}
+@keyframes hx-bounce {
+  0%, 100% { translate: 0 0; }
+  30% { translate: 0 -16px; }
+  55% { translate: 0 0; }
+  72% { translate: 0 -6px; }
+  86% { translate: 0 0; }
+}
+@keyframes hx-rays-in {
+  0% { transform: scale(.2) rotate(0); opacity: 0; }
+  25% { transform: scale(1.1) rotate(20deg); opacity: 1; }
+  100% { transform: scale(1) rotate(60deg); opacity: .6; }
+}
+@keyframes hx-spark-out {
+  0% { transform: translate(0, 0) scale(.3) rotate(0); opacity: 0; }
+  20% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(1) rotate(90deg); opacity: 0; }
+}
+@keyframes hx-beam-up {
+  0% { opacity: 1; filter: brightness(1); }
+  30% { filter: brightness(2.2); }
+  100% { opacity: 1; filter: brightness(1.3); }
 }

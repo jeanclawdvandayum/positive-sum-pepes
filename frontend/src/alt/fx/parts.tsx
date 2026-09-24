@@ -28,9 +28,11 @@ export function viewportRect(): DOMRect {
   return { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight } as DOMRect
 }
 
-/** The clock on either the play page (.alt-clock) or the header (.mini-clock). */
+/** The clock on the play page (.alt-clock) or in the header (.mini-clock),
+ *  preferring one that is on screen so a scrolled page still sees the chip. */
 export function clockRect(): DOMRect | undefined {
-  return queryRect('.alt-clock') ?? queryRect('.mini-clock')
+  const rects = [queryRect('.alt-clock'), queryRect('.mini-clock')].filter((r): r is DOMRect => !!r && r.width > 0 && r.height > 0)
+  return rects.find(r => r.bottom > 0 && r.top < window.innerHeight) ?? rects[0]
 }
 
 /** The pepe/position card containing (or nearest to) an anchor rect, element included. */
@@ -83,14 +85,19 @@ export function Flash({ at, rect, tone, extra }: { at: { x: number; y: number };
 }
 
 /** Fixed overlay exactly covering a rect (shutters, washes, pulses over UI). */
-export function Over({ rect, className, children }: { rect?: DOMRect; className?: string; children?: ReactNode }) {
+export function Over({ rect, className, style, children }: { rect?: DOMRect; className?: string; style?: CSSProperties; children?: ReactNode }) {
   if (!rect || (rect.width === 0 && rect.height === 0)) return null
   const cls = className ? ` ${className}` : ''
   return (
-    <span className={`fx-over${cls}`} style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}>
+    <span className={`fx-over${cls}`} style={{ ...style, left: rect.left, top: rect.top, width: rect.width, height: rect.height }}>
       {children}
     </span>
   )
+}
+
+/** Keep a glyph of half-extent `half` fully inside the viewport (390px screens). */
+export function clampX(x: number, half: number): number {
+  return Math.min(Math.max(x, half + 6), window.innerWidth - half - 6)
 }
 
 /** React rejects custom properties in style objects without this cast. */

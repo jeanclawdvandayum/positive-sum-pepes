@@ -11,7 +11,12 @@ export type FxKind =
   | 'claimReferral' | 'nameCommit' | 'nameRegister' | 'refLink' | 'shareImage' | 'faucet'
   | 'transferPepe' | 'approve' | 'spawn' | 'detonate' | 'fail'
 
-export type FxEvent = { id: number; kind: FxKind; anchor?: DOMRect; target?: DOMRect; detail?: string }
+/** The pepe a hatch reveals: its id (DNA = keccak(id)) and the staker's art release. */
+export type FxPepe = { id: bigint; dnaVersion: bigint }
+
+export type FxEvent = { id: number; kind: FxKind; anchor?: DOMRect; target?: DOMRect; detail?: string; pepe?: FxPepe }
+
+export type FxOptions = { anchor?: Element | DOMRect; target?: Element | DOMRect | string; detail?: string; pepe?: FxPepe }
 
 /** Every write functionName the UI issues, mapped to its per-action animation. */
 const KIND_FOR_FUNCTION: Record<string, FxKind> = {
@@ -96,11 +101,11 @@ export function captureAnchor(): Element | undefined {
   return lastPress.el
 }
 
-export function fireFx(kind: FxKind, opts: { anchor?: Element | DOMRect; target?: Element | DOMRect | string; detail?: string } = {}): void {
+export function fireFx(kind: FxKind, opts: FxOptions = {}): void {
   if (!listeners.size) return
   const id = nextId++
   if (opts.anchor instanceof Element) anchorElements.set(id, opts.anchor)
-  const event: FxEvent = { id, kind, anchor: rectOf(opts.anchor), target: rectOf(opts.target), detail: opts.detail }
+  const event: FxEvent = { id, kind, anchor: rectOf(opts.anchor), target: rectOf(opts.target), detail: opts.detail, pepe: opts.pepe }
   events = [...events, event]
   listeners.forEach(notify => notify())
 }

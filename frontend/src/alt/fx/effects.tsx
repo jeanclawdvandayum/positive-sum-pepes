@@ -1,13 +1,17 @@
 // The per-action FX catalog (PLAN Feature 3). One small component per kind;
 // each resolves its own default target, positions from the event rects, keeps
-// ≤40 DOM particles, and reports done via a timer (the layer adds a 4s hard
-// cap). Keyframes and node styling live in public/alt/fx.css.
+// ≤~50 DOM particles per burst (the pepe confetti bursts are the largest), and
+// reports done via a timer (the layer adds a 4s hard cap). Keyframes and node
+// styling live in public/alt/fx.css.
 
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { fxAnchorElement, type FxKind } from '../../lib/actionFx'
-import { center, clockRect, feedCard, Flash, nudge, Over, queryRect, reducedMotion, useTimedDone, viewportRect, withVars, type FxProps } from './parts'
+import { center, clampX, clockRect, feedCard, Flash, nudge, Over, queryRect, reducedMotion, useTimedDone, viewportRect, withVars, type FxProps } from './parts'
+import { PepeConfetti } from './confetti'
 
-const TICKETS = 8
+const SEATS = 5
+const TICKET_GAP_MS = 120
+const TICKET_LAND_MS = 760 // 80% of the .95s flight
 const COINS = 8
 const CONFETTI = 40
 const PIPS = 6
@@ -20,44 +24,66 @@ function hourglassSpot(anchor: DOMRect | undefined, fallback: { x: number; y: nu
   return { x: Math.min(sideX, window.innerWidth - 24), y: Math.max(top, 8) }
 }
 
-/** The clock jolts when a ticket prints (spec §4.3); the ladder feels the landing. */
-function useBuyEcho(delayMs: number) {
+/** The seats a buy's tickets land on: the ladder's top rows (newest ticket
+ *  first), else the empty-ladder slot, else the panel or explicit target. */
+function ladderSeats(target: DOMRect | undefined): DOMRect[] {
+  const rows = [...document.querySelectorAll('.ladder-panel .ladder-row')]
+    .slice(0, SEATS).map(row => row.getBoundingClientRect()).filter(rect => rect.width > 0)
+  if (rows.length) return rows
+  const slot = queryRect('.ladder-panel .empty-ladder') ?? target ?? queryRect('.ladder-panel')
+  return slot ? [slot, slot, slot] : []
+}
+
+/** Ticket punch: pixel stubs print out of the button and land on the ladder's
+ *  seats, each seat flashing as it is taken; the clock jolts and a confirmed
+ *  +m:ss chip floats off it; happy pepe confetti bursts from the button. */
+export function BuyFx({ event, onDone }: FxProps) {
+  useTimedDone(onDone, 2600)
+  const a = center(event.anchor)
+  const [seats] = useState(() => ladderSeats(event.target))
+  const [clock] = useState(clockRect)
   useEffect(() => {
     nudge(document.querySelector('.alt-clock') ?? document.querySelector('.mini-clock'), [
       { transform: 'translateY(0)' }, { transform: 'translateY(3px)' }, { transform: 'translateY(-2px)' }, { transform: 'translateY(0)' },
     ], { duration: 240, easing: 'steps(3)' })
     nudge(document.querySelector('.ladder-panel'), [
       { transform: 'translateY(0)' }, { transform: 'translateY(2px)' }, { transform: 'translateY(0)' },
-    ], { duration: 180, easing: 'steps(2)', delay: delayMs })
-  }, [delayMs])
-}
-
-/** Ticket punch: pixel stubs print out of the button and fly into the ladder; the clock jolts. */
-export function BuyFx({ event, onDone }: FxProps) {
-  useTimedDone(onDone, 1500)
-  useBuyEcho(1000)
-  const a = center(event.anchor)
-  const t = center(event.target ?? queryRect('.ladder-panel'))
-  const clock = clockRect()
+    ], { duration: 180, easing: 'steps(2)', delay: TICKET_LAND_MS })
+  }, [])
+  const vh = window.innerHeight
+  // One shared slot (empty ladder / panel) fans its tickets out side by side.
+  const shared = seats.length > 1 && seats[0] === seats[1]
+  // A ladder below the fold still receives its tickets: they fly to the edge.
+  const landings = seats.map((seat, i) => ({
+    x: seat.left + seat.width / 2 + (shared ? (i - 1) * 26 : 0),
+    y: Math.min(Math.max(seat.top + seat.height / 2, 20), vh - 20),
+  }))
+  const chipBelow = clock ? clock.top < 44 : false
   return <>
     <Flash at={a} rect={event.anchor} tone="amber" />
-    {Array.from({ length: TICKETS }, (_, i) => (
-      <span key={i} className="fx-ticket" style={withVars({ left: a.x, top: a.y, animationDelay: `${i * 55}ms` },
-        { '--dx': `${t.x - a.x + (i - (TICKETS - 1) / 2) * 13}px`, '--dy': `${t.y - a.y}px` })} />
+    <PepeConfetti mood="happy" at={a} faces={30} bits={10} />
+    {landings.map((land, i) => (
+      <span key={i} className="fx-ticket" style={withVars({ left: a.x, top: a.y, animationDelay: `${i * TICKET_GAP_MS}ms` }, {
+        '--dx': `${land.x - a.x}px`, '--dy': `${land.y - a.y}px`, '--lift': `${Math.min(land.y, a.y) - a.y - 70}px`,
+      })} />
+    ))}
+    {(shared ? seats.slice(0, 1) : seats).map((seat, i) => (
+      <Over key={`seat${i}`} rect={seat} className="fx-seat-take" style={{ animationDelay: `${TICKET_LAND_MS + i * TICKET_GAP_MS}ms` }} />
     ))}
     {/* Truthful chip only (Round 2, Feature 7): no confirmed TimeAdded, no chip. */}
     {clock && event.detail && (
-      <span className="fx-clock-chip" style={{ left: clock.left + clock.width / 2, top: clock.top - 2 }}>
+      <span className={`fx-clock-chip${chipBelow ? ' fx-clock-chip-below' : ''}`}
+        style={{ left: clampX(clock.left + clock.width / 2, 48), top: chipBelow ? clock.bottom + 6 : clock.top - 6 }}>
         {event.detail}
       </span>
     )}
-    <Over rect={event.target ?? queryRect('.ladder-panel')} className="fx-ladder-flash" />
   </>
 }
 
-/** Drain: mixETH coins slot into the button under a downward shutter wipe. */
+/** Drain + sulk: mixETH coins slot into the button under a downward shutter
+ *  wipe while a burst of rage/angry/sad/meh pepes flies out of it. */
 export function SellFx({ event, onDone }: FxProps) {
-  useTimedDone(onDone, 1200)
+  useTimedDone(onDone, 2500)
   const a = center(event.anchor)
   return <>
     <Flash at={a} rect={event.anchor} tone="amber" />
@@ -65,6 +91,7 @@ export function SellFx({ event, onDone }: FxProps) {
       <span key={i} className="fx-coin fx-coin-fall" style={{ left: a.x + (i - 3) * 11, top: a.y - 8, animationDelay: `${i * 60}ms` }} />
     ))}
     <Over rect={event.anchor} className="fx-over-center"><span className="fx-shutter" /></Over>
+    <PepeConfetti mood="sad" at={a} faces={32} bits={10} delay={120} />
   </>
 }
 
@@ -230,7 +257,7 @@ export function CancelWithdrawFx({ event, onDone }: FxProps) {
         <span className="fx-pip-lit fx-pip-out" style={{ animationDelay: `${240 + (PIPS - 1 - i) * 110}ms` }} />
       </span>
     ))}
-    <span className="fx-lock fx-lock-small fx-lock-rewind" style={{ left: a.x + 54, top: top - 10 }}>
+    <span className="fx-lock fx-lock-small fx-lock-rewind" style={{ left: clampX(a.x + 54, 14), top: top - 10 }}>
       <span className="fx-lock-shackle fx-snap" />
       <span className="fx-lock-body" />
     </span>
@@ -280,38 +307,17 @@ export function RedeemFx({ event, onDone }: FxProps) {
   </>
 }
 
-/** Hatch: a card flips from pixel card-back to the pepe face with a sparkle burst. */
-export function HatchFx({ event, onDone }: FxProps) {
-  useTimedDone(onDone, 1600)
-  const a = center(event.anchor)
-  const sparks = 6
-  return <>
-    <Flash at={a} rect={event.anchor} />
-    <span className="fx-hatch" style={{ left: a.x, top: a.y }}>
-      <span className="fx-hatch-inner">
-        <span className="fx-cardback" />
-        <span className="fx-hatch-face" />
-      </span>
-    </span>
-    {Array.from({ length: sparks }, (_, i) => {
-      const angle = (i / sparks) * Math.PI * 2
-      return <span key={i} className="fx-spark" style={withVars({ left: a.x, top: a.y, animationDelay: `${680 + i * 45}ms` },
-        { '--tx': `${Math.cos(angle) * 30}px`, '--ty': `${Math.sin(angle) * 30 - 8}px` })} />
-    })}
-  </>
-}
-
-/** Chain: three nodes link up in sequence toward the anchor, then coins drop. */
+/** Chain: three nodes link up left to right across the anchor, then coins drop onto it. */
 export function ClaimReferralFx({ event, onDone }: FxProps) {
   useTimedDone(onDone, 1600)
   const a = center(event.anchor)
   const top = event.anchor?.top ?? a.y
   return <>
     <Flash at={a} rect={event.anchor} tone="amber" />
-    {[-72, -36, 0].map((offset, i) => (
+    {[-40, 0, 40].map((offset, i) => (
       <span key={offset} className="fx-chain-node" style={{ left: a.x + offset, top: top - 18, animationDelay: `${120 + i * 240}ms` }} />
     ))}
-    {[-54, -18].map((offset, i) => (
+    {[-33, 7].map((offset, i) => (
       <span key={offset} className="fx-chain-bar" style={{ left: a.x + offset, top: top - 18, animationDelay: `${230 + i * 240}ms` }} />
     ))}
     {[0, 1, 2].map(i => (
@@ -341,12 +347,13 @@ export function NameRegisterFx({ event, onDone }: FxProps) {
   useTimedDone(onDone, 1500)
   const a = center(event.anchor)
   const plateTop = (event.anchor?.bottom ?? a.y + 10) + 14
+  const plateX = clampX(a.x, 48)
   return <>
     <Flash at={a} rect={event.anchor} />
-    <span className="fx-plate" style={{ left: a.x, top: plateTop }}>
+    <span className="fx-plate" style={{ left: plateX, top: plateTop }}>
       <span className="fx-caret" />
     </span>
-    <span className="fx-spark" style={withVars({ left: a.x + 40, top: plateTop, animationDelay: '1020ms' }, { '--tx': '6px', '--ty': '-14px' })} />
+    <span className="fx-spark" style={withVars({ left: plateX + 40, top: plateTop, animationDelay: '1020ms' }, { '--tx': '6px', '--ty': '-14px' })} />
   </>
 }
 
@@ -459,7 +466,9 @@ export function FailFx({ event, onDone }: FxProps) {
   </>
 }
 
-export const FX_EFFECTS: Record<Exclude<FxKind, 'detonate'>, ComponentType<FxProps>> = {
+/** Every non-modal kind. `detonate` (DetonationSetPiece) and `claimPredeposit`
+ *  (HatchModal) are rendered by ActionFxLayer itself. */
+export const FX_EFFECTS: Record<Exclude<FxKind, 'detonate' | 'claimPredeposit'>, ComponentType<FxProps>> = {
   buy: BuyFx,
   sell: SellFx,
   predeposit: PredepositFx,
@@ -473,7 +482,6 @@ export const FX_EFFECTS: Record<Exclude<FxKind, 'detonate'>, ComponentType<FxPro
   unlock: UnlockFx,
   claimPot: ClaimPotFx,
   redeem: RedeemFx,
-  claimPredeposit: HatchFx,
   claimReferral: ClaimReferralFx,
   nameCommit: NameCommitFx,
   nameRegister: NameRegisterFx,
