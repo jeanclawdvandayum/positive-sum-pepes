@@ -1,8 +1,9 @@
 import legacyArt from './pepeArt.json'
 import expandedArt from './pepeArtExpanded.json'
+import art420 from './pepeArt420.json'
 
 // Decorative art follows the newest release; owned NFTs always pass their round version.
-export const DECORATIVE_ART_VERSION = 2n
+export const DECORATIVE_ART_VERSION = 3n
 
 export function renderDecorativePepeSvg(dna = randomDna()): string {
   return renderPepeSvg(dna, DECORATIVE_ART_VERSION)
@@ -122,6 +123,7 @@ export function randomDna(): bigint {
 function artFor(version: bigint): typeof legacyArt {
   if (version === 1n) return legacyArt
   if (version === 2n) return expandedArt
+  if (version === 3n) return art420
   throw new Error('Unsupported Pepe art version')
 }
 

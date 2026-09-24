@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {PepeArt420} from "../art/PepeArt420.sol";
 import {ExpandedPepeArt} from "../art/ExpandedPepeArt.sol";
 import {PepeArtData} from "../PepeArtData.sol";
 
@@ -20,6 +21,9 @@ library PepeDna {
     }
 
     function counts(uint256 version) private pure returns (uint256[8] memory) {
+        if (version == 3) return [uint256(PepeArt420.EXPR_COUNT), PepeArt420.EYE_COUNT,
+            PepeArt420.HAT_COUNT, PepeArt420.WEAR_COUNT, PepeArt420.ITEM_COUNT,
+            PepeArt420.SKIN_COUNT, PepeArt420.IRIS_COUNT, PepeArt420.BG_COUNT];
         if (version == 2) return [uint256(ExpandedPepeArt.EXPR_COUNT), ExpandedPepeArt.EYE_COUNT,
             ExpandedPepeArt.HAT_COUNT, ExpandedPepeArt.WEAR_COUNT, ExpandedPepeArt.ITEM_COUNT,
             ExpandedPepeArt.SKIN_COUNT, ExpandedPepeArt.IRIS_COUNT, ExpandedPepeArt.BG_COUNT];

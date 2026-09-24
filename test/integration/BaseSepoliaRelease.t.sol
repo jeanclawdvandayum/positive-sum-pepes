@@ -137,7 +137,7 @@ contract BaseSepoliaReleaseTest is Test {
         assertEq(c.r.hook.STAKER_BPS(), 6000);
         assertEq(c.r.hook.POT_BPS(), 3500);
         assertEq(c.r.controller.PREDEPOSIT_RULES_VERSION(), 2);
-        assertEq(c.staker.PEPE_DNA_VERSION(), 2);
+        assertEq(c.staker.PEPE_DNA_VERSION(), 3);
         assertEq(c.registry.PURCHASE_REFERRAL_VERSION(), 1);
         assertEq(c.reinvestor.ATTRIBUTION_VERSION(), 1);
         assertTrue(c.staker.supportsInterface(0x80ac58cd));
@@ -149,13 +149,13 @@ contract BaseSepoliaReleaseTest is Test {
     }
 
     function _freshGenesis(ReleaseContext memory c) internal returns (uint256 idA, uint256 idB) {
-        // These distinct IDs are a pinned collision in the expanded release-2 art
+        // These distinct IDs are a pinned collision in the 420 release-3 art
         // decoder. Mint before genesis claims so seeded art cannot occupy them.
-        assertTrue(c.staker.isPepeAvailable(14367));
-        c.staker.lockWithPepe(0, 14367);
-        assertFalse(c.staker.isPepeAvailable(16450));
+        assertTrue(c.staker.isPepeAvailable(10806));
+        c.staker.lockWithPepe(0, 10806);
+        assertFalse(c.staker.isPepeAvailable(17205));
         vm.expectRevert(PSPStaker.PepeDnaTaken.selector);
-        c.staker.lockWithPepe(0, 16450);
+        c.staker.lockWithPepe(0, 17205);
 
         uint256 preview = c.staker.genesisPepeDna(c.a);
         assertTrue(preview != uint256(keccak256(abi.encode(uint256(uint160(c.a))))), "round seed changes address art");
@@ -185,8 +185,8 @@ contract BaseSepoliaReleaseTest is Test {
         idB = c.staker.primaryOf(c.b);
         assertEq(idB, 6000);
         assertEq(c.staker.dnaOf(idB), previewB);
-        assertTrue(PepeDna.key(preview, 2) != PepeDna.key(previewB, 2), "genesis art stays unique");
-        assertTrue(PepeDna.key(preview, 2) != PepeDna.key(c.staker.dnaOf(14367), 2), "all mint paths share reservations");
+        assertTrue(PepeDna.key(preview, 3) != PepeDna.key(previewB, 3), "genesis art stays unique");
+        assertTrue(PepeDna.key(preview, 3) != PepeDna.key(c.staker.dnaOf(10806), 3), "all mint paths share reservations");
         assertEq(uint8(c.r.hook.mode()), uint8(CurveHook.Mode.Active));
     }
 

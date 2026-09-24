@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 forge test --no-match-path 'test/integration/*'
 python3 scripts/formal/test_runner.py
 node script/gen_expanded_art.mjs --check
+node script/gen_420_art.mjs --check
 node script/expanded-art-fixtures.mjs --check
 bash scripts/check-no-governance.sh
 python3 scripts/check-sizes.py

@@ -209,7 +209,7 @@ contract PSPStaker is ReentrancyGuard {
         // Legacy descriptors have no version getter. Unknown versions fail closed.
         (bool ok, bytes memory data) = descriptor_.staticcall(abi.encodeWithSignature("ART_VERSION()"));
         uint256 version = ok && data.length == 32 ? abi.decode(data, (uint256)) : 1;
-        if (version != 1 && version != 2) revert UnsupportedArtVersion();
+        if (version != 1 && version != 2 && version != 3) revert UnsupportedArtVersion();
         PEPE_DNA_VERSION = version;
         _artCombinations = PepeDna.combinations(version);
         _genesisArtSeed = keccak256(abi.encode(

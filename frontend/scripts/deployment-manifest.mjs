@@ -80,6 +80,15 @@ async function main() {
   })
   if (registryInitCode) addresses.registryInitCode = registryInitCode
   addresses.artData = await read(addresses.descriptor, addressGetter('artData'), 'artData')
+  const artVersion = await read(addresses.descriptor, uintGetter('ART_VERSION'), 'ART_VERSION')
+  // Each on-chain art release pairs its descriptor contract with its source
+  // store; the staker must freeze exactly the descriptor's version.
+  const artReleases = {
+    2n: { contract: 'PepeExpandedDescriptor', source: 'src/art/ExpandedPepeArt.sol' },
+    3n: { contract: 'PepeDescriptor420', source: 'src/art/PepeArt420.sol' },
+  }
+  const artRelease = artReleases[artVersion]
+  if (!artRelease) throw Error(`Unsupported descriptor art version ${artVersion}`)
   const codeHashes = {}, codes = {}
   for (const [key, address] of Object.entries(addresses)) {
     const code = await checked(`deployed code for ${key}`, () => client.getCode({ address, blockNumber: block.number }))
@@ -91,7 +100,7 @@ async function main() {
   // executable bytes and metadata distinguish fresh source from legacy APIs
   // with unchanged version numbers (including block-hash genesis art).
   const artifacts = {}
-  const runtimeContracts = { sineV3Math: 'SineV3Math', factory: 'PSPFactory', token: 'PSPToken', controller: 'RoundController', hook: 'CurveHook', staker: 'PSPStaker', registry: 'PSPReferralRegistry', mix: 'SepoliaMixETH', descriptor: 'PepeExpandedDescriptor', hookDeployer: 'HookDeployer', controllerDeployer: 'ControllerDeployer', stakerDeployer: 'StakerDeployer', tokenDeployer: 'TokenDeployer', hookInitCode: 'HookInitCode', registryInitCode: 'ReferralRegistryInitCode', zapIn: 'PSPZapIn', zapOut: 'PSPZapOut', faucet: 'MixETHFaucet', reinvestor: 'PSPReinvestor' }
+  const runtimeContracts = { sineV3Math: 'SineV3Math', factory: 'PSPFactory', token: 'PSPToken', controller: 'RoundController', hook: 'CurveHook', staker: 'PSPStaker', registry: 'PSPReferralRegistry', mix: 'SepoliaMixETH', descriptor: artRelease.contract, hookDeployer: 'HookDeployer', controllerDeployer: 'ControllerDeployer', stakerDeployer: 'StakerDeployer', tokenDeployer: 'TokenDeployer', hookInitCode: 'HookInitCode', registryInitCode: 'ReferralRegistryInitCode', zapIn: 'PSPZapIn', zapOut: 'PSPZapOut', faucet: 'MixETHFaucet', reinvestor: 'PSPReinvestor' }
   for (const [key, contract] of Object.entries(runtimeContracts)) {
     if (!addresses[key]) continue
     const artifact = loadArtifact(contract, contract === 'TokenDeployer' ? 'ControllerDeployer' : contract)
@@ -107,9 +116,8 @@ async function main() {
       artifacts[key] = { contract: expected.contract, generatedDataMatches: true, runtimeHash: expected.hash }
     }
   }
-  const artHex = fs.readFileSync(path.join(root, 'src/art/ExpandedPepeArt.sol'), 'utf8').match(/DATA = hex"([0-9a-fA-F]+)"/)[1]
-  if (codes.artData.toLowerCase() !== ('0x00' + artHex).toLowerCase()) throw Error('Expanded art storage differs from release source')
-  if (await read(addresses.descriptor, uintGetter('ART_VERSION'), 'ART_VERSION') !== 2n) throw Error('Expanded descriptor version mismatch')
+  const artHex = fs.readFileSync(path.join(root, artRelease.source), 'utf8').match(/DATA = hex"([0-9a-fA-F]+)"/)[1]
+  if (codes.artData.toLowerCase() !== ('0x00' + artHex).toLowerCase()) throw Error('Art storage differs from release source')
   const shards = [codes.hookCodeFirst, codes.hookCodeSecond]
   if (shards.some(code => !code.startsWith('0x00'))) throw Error('Hook code shard is not STOP-prefixed')
   const storedCreationCode = '0x' + shards.map(code => code.slice(4)).join('')
@@ -145,7 +153,7 @@ async function main() {
   const features = { SINE_RULES_VERSION: sine.sineVersion, TICKET_RULES_VERSION: sine.ticketVersion }
   for (const [role, getter] of [['controller', 'PREDEPOSIT_RULES_VERSION'], ['controller', 'PREDEPOSIT_ART_VERSION'], ['registry', 'PURCHASE_REFERRAL_VERSION'], ['registry', 'REFERRAL_REWARDS_VERSION'], ['staker', 'NFT_INTERFACE_VERSION'], ['staker', 'PEPE_DNA_VERSION'], ...(addresses.reinvestor ? [['reinvestor', 'ATTRIBUTION_VERSION']] : [])]) {
     const version = await read(addresses[role], uintGetter(getter), getter)
-    if (version !== (['PEPE_DNA_VERSION', 'PREDEPOSIT_RULES_VERSION', 'PREDEPOSIT_ART_VERSION'].includes(getter) ? 2n : 1n)) throw Error(`Unsupported ${getter}`)
+    if (version !== (getter === 'PEPE_DNA_VERSION' ? artVersion : ['PREDEPOSIT_RULES_VERSION', 'PREDEPOSIT_ART_VERSION'].includes(getter) ? 2n : 1n)) throw Error(`Unsupported ${getter}`)
     features[getter] = version
   }
   const supportsAbi = parseAbi(['function supportsInterface(bytes4) view returns(bool)'])

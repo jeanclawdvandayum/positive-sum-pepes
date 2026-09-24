@@ -11,7 +11,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IRoundController} from "../src/interfaces/IRoundController.sol";
 
 contract UnsupportedDescriptor {
-    function ART_VERSION() external pure returns (uint256) { return 3; }
+    function ART_VERSION() external pure returns (uint256) { return 4; }
 }
 
 /// @title ExpandedPepeArtTest

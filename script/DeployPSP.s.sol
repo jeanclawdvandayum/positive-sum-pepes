@@ -10,7 +10,7 @@ import {PSPFactory} from "../src/PSPFactory.sol";
 import {HookDeployer} from "../src/HookDeployer.sol";
 import {ControllerDeployer} from "../src/ControllerDeployer.sol";
 
-import {PepeExpandedDescriptor} from "../src/PepeExpandedDescriptor.sol";
+import {PepeDescriptor420} from "../src/PepeDescriptor420.sol";
 import {PSPZapIn} from "../src/PSPZapIn.sol";
 import {PSPZapOut} from "../src/PSPZapOut.sol";
 import {SineV3Math} from "../src/SineV3Math.sol";
@@ -117,7 +117,10 @@ contract DeployPSP is DeploymentSupport {
         // wire the on-chain pepe art FIRST — it's global on the factory and
         // every round's staker is born with it (rides deployController's
         // raw-calldata passthrough). Factory owner == this broadcaster.
-        PepeExpandedDescriptor descriptor = new PepeExpandedDescriptor();
+        // ON-CHAIN ART RELEASE 3 (420 edition): this descriptor's ART_VERSION
+        // is what freezes PEPE_DNA_VERSION=3 into every round's staker at
+        // birth. Rounds minted before this change keep their own descriptor.
+        PepeDescriptor420 descriptor = new PepeDescriptor420();
         factory.setDescriptor(address(descriptor));
         vm.stopBroadcast();
 

@@ -7,7 +7,7 @@ import {PSPFactory} from "../../src/PSPFactory.sol";
 import {HookDeployer} from "../../src/HookDeployer.sol";
 import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
 import {StakerDeployer} from "../../src/StakerDeployer.sol";
-import {PepeDescriptor} from "../../src/PepeDescriptor.sol";
+import {PepeDescriptor420} from "../../src/PepeDescriptor420.sol";
 import {PSPZapIn} from "../../src/PSPZapIn.sol";
 import {PSPZapOut} from "../../src/PSPZapOut.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
@@ -101,7 +101,7 @@ contract DeploymentScriptsTest is Test {
             address(new SineV3Math(SineV3Data.deploy())),
             CurveMath.packTimingsCapped(7200, 3600, 7200, 0), address(this)
         );
-        factory.setDescriptor(address(new PepeDescriptor()));
+        factory.setDescriptor(address(new PepeDescriptor420()));
         factory.configureSineV3(75_000_000_000_000);
     }
 

@@ -125,7 +125,10 @@ abstract contract DeploymentSupport is Script {
         PSPStaker staker = r.controller.staker();
         require(address(staker).code.length != 0 && address(staker.controller()) == address(r.controller)
             && address(staker.psp()) == address(r.token), "staker wiring mismatch");
-        require(staker.NFT_INTERFACE_VERSION() == 1 && (staker.PEPE_DNA_VERSION() == 1 || staker.PEPE_DNA_VERSION() == 2)
+        // Fresh deploys carry ON-CHAIN ART RELEASE 3 (420 edition): the
+        // staker freezes its descriptor's ART_VERSION, so PEPE_DNA_VERSION 3
+        // proves both the v3 descriptor and the matching collision codec.
+        require(staker.NFT_INTERFACE_VERSION() == 1 && staker.PEPE_DNA_VERSION() == 3
             && staker.supportsInterface(0x80ac58cd), "NFT capabilities missing");
         require(staker.descriptor() == factory.descriptor(), "staker descriptor mismatch");
         PSPReferralRegistry registry = PSPReferralRegistry(factory.referralRegistryOf(roundId));
