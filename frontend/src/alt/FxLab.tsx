@@ -26,12 +26,14 @@ const TARGETS: Partial<Record<FxKind, { target?: string; detail?: string }>> = {
   claimFees: { target: '.wallet-button' },
 }
 
-const LADDER_ROWS = [0, 1, 2, 3, 4]
+// All ten ladder spots, art on the first four (mixed occupied/empty escape).
+const LADDER_ROWS = Array.from({ length: 10 }, (_, i) => i)
 /** The lab hatches release-2 art, like a live round's staker. */
 const LAB_DNA_VERSION = 2n
 const randomPepeId = () => BigInt(Math.floor(Math.random() * 2 ** 40)) + 1n
 /** A connected wallet's own identity pepe, else a fixed demo wallet's. */
 const LAB_WALLET: `0x${string}` = '0x00000000000000000000000000000000006c4b1a'
+const LADDER_ART = Array.from({ length: 4 }, () => renderPepeSvg(dnaOfId(randomPepeId()), LAB_DNA_VERSION))
 const mockHand = (count: number) => Array.from({ length: count }, () => renderPepeSvg(dnaOfId(randomPepeId()), LAB_DNA_VERSION))
 
 export default function FxLab() {
@@ -115,6 +117,7 @@ export default function FxLab() {
             {LADDER_ROWS.map(i => (
               <div key={i} className="ladder-row">
                 <span className="rank">{i + 1}</span>
+                {LADDER_ART[i] !== undefined && <span className="ladder-art" dangerouslySetInnerHTML={{ __html: LADDER_ART[i] }} />}
                 <span className="bar"><span /></span>
               </div>
             ))}

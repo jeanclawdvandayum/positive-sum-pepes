@@ -353,7 +353,6 @@ function escapees(): Escapee[] {
   const vw = window.innerWidth
   const vh = window.innerHeight
   const visible = (el: Element) => el.getBoundingClientRect().width > 0
-  const arts = [...document.querySelectorAll<HTMLElement>('.alt-shell .ladder-panel .ladder-row .ladder-art')].filter(visible)
   const rows = [...document.querySelectorAll<HTMLElement>('.alt-shell .ladder-panel .ladder-row')].filter(visible)
   const rand = lcg(19)
   // a decorative face for boards without seat art (fx lab, empty ladder):
@@ -364,17 +363,15 @@ function escapees(): Escapee[] {
     const dna = BigInt(Math.floor(rand() * 2 ** 48))
     return renderPepeSvg(dna, DECORATIVE_ART_VERSION)
   }
-  const seats: { x: number; y: number; svg: string; art?: HTMLElement }[] = arts.length
-    ? arts.map(art => {
-      const r = art.getBoundingClientRect()
-      return { x: r.left + r.width / 2, y: r.top + r.height / 2, svg: art.innerHTML, art }
+  // ONE ROCKET PER LADDER SPOT: all ten rows flee, occupied or not, and a
+  // wallet holding several spots launches a rocket from each (same face).
+  const seats: { x: number; y: number; svg: string; art?: HTMLElement }[] = rows.length
+    ? rows.map(row => {
+      const art = row.querySelector<HTMLElement>(':scope .ladder-art')
+      if (art && visible(art)) return { x: 0, y: 0, svg: art.innerHTML, art }
+      return { x: 0, y: 0, svg: pepe() }
     })
-    : rows.length
-      ? rows.map(row => {
-        const r = row.getBoundingClientRect()
-        return { x: r.left + 58, y: r.top + r.height / 2, svg: pepe() }
-      })
-      : Array.from({ length: 8 }, (_, i) => ({ x: vw * (0.1 + 0.8 * (i / 7)), y: vh * 0.7, svg: pepe() }))
+    : Array.from({ length: 10 }, () => ({ x: 0, y: 0, svg: pepe() }))
   // One launch plane level with the bomb, evenly spaced across it: the
   // escape reads as a squadron line-up, not a scatter of ladder rows.
   const planeY = Math.round(vh * 0.8)
