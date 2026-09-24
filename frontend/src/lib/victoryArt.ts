@@ -1,9 +1,9 @@
-// The victory modal's pepe hand (Round 5): the fan geometry shared by the CSS
-// hand and the canvas composite, and the fan's PNG. Pepe art is a 69×69 pixel
-// SVG; every raster here draws it at an integer multiple of 69 with smoothing
-// off, so the PNG keeps the art's hard pixel edges. A single pepe uses the
-// shared referralPepePng raster (828px).
-
+// The victory modal's pepe hand (Round 5): the pure art selection (which
+// pepes the cards and the brag PNG draw, derived from the same victory data),
+// the fan geometry shared by the CSS hand and the canvas composite, and the
+// fan's PNG. Pepe art is a 69×69 pixel SVG; every raster here draws it at an
+// integer multiple of 69 with smoothing off, so the PNG keeps the art's hard
+// pixel edges. A single pepe uses the shared referralPepePng raster (828px).
 /** The hand shows at most six cards; the rest collapse into a '+N more' chip. */
 export const FAN_CAP = 6
 /** Cards rotate about a pivot this many card heights below the card tops. */
@@ -20,6 +20,46 @@ export function fanHand(total: number, cap = FAN_CAP): { shown: number; more: nu
 export function fanAngle(i: number, n: number): number {
   if (n < 2) return 0
   return (i - (n - 1) / 2) * Math.min(12, 56 / (n - 1))
+}
+
+/** The pepes the victory modal renders — and, because the brag PNG is drawn
+ *  from this very hand, exactly the pepes the copied image shows. */
+export type VictoryHand = { svgs: readonly string[]; more: number; identity: boolean }
+
+/** Picks a victory's hand from the same data the modal renders. The dev lab's
+ *  ready-made art wins; else the winner's position NFTs in the round's staker
+ *  (already capped by fanHand when the query built them); else the wallet's
+ *  auto-assigned pepe stands in. `undefined` while the NFTs are first loading
+ *  — no card and no PNG ever shows stale art. The selection never branches on
+ *  the victory source: claim and settle feed it the same fields, and only the
+ *  copy around the hand differs. */
+export function victoryHand(input: {
+  mockPepes?: readonly string[]
+  nfts?: { svgs: readonly string[]; more: number }
+  nftsLoading?: boolean
+  identity: string
+}): VictoryHand | undefined {
+  if (input.mockPepes) {
+    const { shown, more } = fanHand(input.mockPepes.length)
+    return { svgs: input.mockPepes.slice(0, shown), more, identity: false }
+  }
+  if (input.nfts && input.nfts.svgs.length > 0) return { svgs: input.nfts.svgs, more: input.nfts.more, identity: false }
+  if (input.nftsLoading && input.nfts === undefined) return undefined
+  return { svgs: [input.identity], more: 0, identity: true }
+}
+
+/** The art-selection predicate for the brag PNG: one pepe shares the single
+ *  card's own raster, several share the whole fan as one composite, and a
+ *  hand with nothing to show shares nothing — the brag button waits. */
+export type VictoryShare =
+  | { kind: 'single'; svg: string }
+  | { kind: 'fan'; svgs: readonly string[]; more: number }
+
+export function shareArt(hand: VictoryHand | undefined): VictoryShare | undefined {
+  if (!hand || hand.svgs.length === 0) return undefined
+  return hand.svgs.length === 1
+    ? { kind: 'single', svg: hand.svgs[0] }
+    : { kind: 'fan', svgs: hand.svgs, more: hand.more }
 }
 
 /** The art at its native 69×69: every SVG rect lands on whole pixels, so the

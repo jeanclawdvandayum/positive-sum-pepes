@@ -24,7 +24,7 @@ import { readRoundWinners } from '../lib/roundWinners'
 import { rpcBatchCall, rpcCall } from '../lib/rpc'
 import { useRound } from '../lib/useRound'
 import { useWalletPepe } from '../lib/useWalletPepe'
-import { fanAngle, fanHand, fanPng, FAN_PIVOT } from '../lib/victoryArt'
+import { fanAngle, fanHand, fanPng, shareArt, FAN_PIVOT, victoryHand, type VictoryHand } from '../lib/victoryArt'
 import {
   bragUrl, loadLastActive, pickVictoryMessage, saveLastActive, settledRound, victories,
   type RoundSighting, type Victory,
@@ -79,11 +79,14 @@ function SettleWatch() {
   return null
 }
 
-type Hand = { svgs: string[]; more: number; identity: boolean }
+/** The winner's hand as the pure victoryHand predicate defines it (see
+ *  victoryArt.ts): the lab's mock art, the staker's NFT fan, or the wallet's
+ *  auto-assigned pepe — the exact pepes both the cards and the brag PNG show. */
 
-/** The winner's position NFTs in the round's staker (first six, local art from
- *  on-chain DNA), else the wallet's assigned pepe; the lab passes mocks. */
-function useHand(victory: Victory): Hand | undefined {
+/** The hand's inputs: the winner's position NFTs (first six, local art from
+ *  on-chain DNA) and the wallet's auto-assigned pepe; the lab passes mocks.
+ *  The pick itself is the pure victoryHand predicate. */
+function useHand(victory: Victory): VictoryHand | undefined {
   const owner = victory.account ?? ZERO
   const nfts = useQuery({
     queryKey: ['victory-pepes', CHAIN_ID, victory.staker, owner],
@@ -103,34 +106,37 @@ function useHand(victory: Victory): Hand | undefined {
     },
   })
   const identity = useWalletPepe(owner, victory.staker)
-  if (victory.mockPepes) {
-    const { shown, more } = fanHand(victory.mockPepes.length)
-    return { svgs: victory.mockPepes.slice(0, shown), more, identity: false }
-  }
-  if (nfts.data?.svgs.length) return { ...nfts.data, identity: false }
-  if (nfts.fetchStatus === 'fetching' && !nfts.data) return undefined
-  return { svgs: [identity], more: 0, identity: true }
+  return victoryHand({
+    mockPepes: victory.mockPepes,
+    nfts: nfts.data,
+    nftsLoading: nfts.fetchStatus === 'fetching',
+    identity,
+  })
 }
 
 type Art = { key: string; cards: string[]; share: Blob; shareUrl: string }
 
-/** Every card is a PNG raster of its pepe; the share image is the single
- *  pepe's PNG or the whole fan composited with the same geometry. */
-function useArt(hand: Hand | undefined): Art | undefined {
+/** Every card is a PNG raster of its pepe; the share image is chosen by the
+ *  pure shareArt predicate from the same hand — the single pepe's own PNG or
+ *  the whole fan composited with the same geometry — so the brag PNG is
+ *  exactly the pepe(s) on the cards. */
+function useArt(hand: VictoryHand | undefined): Art | undefined {
   const key = hand ? `${hand.more}|${hand.svgs.join('|')}` : ''
   const [art, setArt] = useState<Art>()
   useEffect(() => {
     if (!hand) return
+    const share = shareArt(hand)
+    if (!share) return
     let live = true
     const urls: string[] = []
     void (async () => {
       const blobs = await Promise.all(hand.svgs.map(referralPepePng))
-      const share = blobs.length === 1 ? blobs[0] : await fanPng(hand.svgs, hand.more)
+      const shareBlob = share.kind === 'single' ? blobs[0] : await fanPng(share.svgs, share.more)
       if (!live) return
       const cards = blobs.map(blob => URL.createObjectURL(blob))
-      const shareUrl = blobs.length === 1 ? cards[0] : URL.createObjectURL(share)
-      urls.push(...cards, ...(blobs.length === 1 ? [] : [shareUrl]))
-      setArt({ key, cards, share, shareUrl })
+      const shareUrl = share.kind === 'single' ? cards[0] : URL.createObjectURL(shareBlob)
+      urls.push(...cards, ...(share.kind === 'single' ? [] : [shareUrl]))
+      setArt({ key, cards, share: shareBlob, shareUrl })
     })().catch(() => {})
     return () => {
       live = false

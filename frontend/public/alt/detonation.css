@@ -459,16 +459,21 @@ body.alt-mode .dtn-ring {
 
 /* 1450–3160ms ESCAPE: the ladder's winners rocket away to safety, newest
    seat first (90ms apart; the delay and duration are inline from the TSX).
-   Each rocket starts on its seat's real ladder art (the TSX empties the seat
-   as it leaves), sits 260ms on the pad — flame lit, fins out, the face
-   shivering and swelling to 1.35× — then accelerates up and away from the
-   blast column, tilting outward, trailing pixel exhaust, off the top of the
-   screen before the blast. */
+   Each rocket is a chunky pixel capsule drawn on a 24×40 art grid at --rpx
+   screen px per art pixel: a stepped nose cone in the critical red, a
+   banded steel hull (the pixel bomb's own palette), stepped red fins and a
+   nozzle skirt, a flickering pixel flame — and the seat's real pepe in a
+   porthole window. It starts on its seat's ladder art (the TSX empties the
+   seat as it leaves), sits 260ms on the pad — flame lit, the hull shivering
+   and swelling to 1.18× — then arcs up and away from the blast column
+   (steep climb first, sideways drift late), trailing the blast's own pixel
+   smoke puffs (dtn-puff below), off the top of the screen before the blast. */
 body.alt-mode .dtn-rocket {
+  --rpx: 2px; /* screen px per art pixel — whole, so every pixel stays crisp */
   z-index: 6;
-  width: var(--s);
-  height: var(--s);
-  margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+  width: calc(24 * var(--rpx));
+  height: calc(40 * var(--rpx));
+  margin: calc(-20 * var(--rpx)) 0 0 calc(-12 * var(--rpx));
   opacity: 0;
   animation-name: dtn-rocket;
   animation-timing-function: linear;
@@ -476,63 +481,113 @@ body.alt-mode .dtn-rocket {
 }
 @keyframes dtn-rocket {
   0% { opacity: 1; transform: translate(0, 0) scale(1); animation-timing-function: steps(1, end); }
-  5% { transform: translate(-2px, 1px) scale(1.2); animation-timing-function: steps(1, end); }
-  10% { transform: translate(2px, 0) scale(1.35); animation-timing-function: steps(1, end); }
-  15% { transform: translate(-2px, -1px) scale(1.35); animation-timing-function: steps(1, end); }
-  20% { transform: translate(1px, 1px) scale(1.35); animation-timing-function: steps(1, end); }
-  25% { transform: translate(-1px, 0) scale(1.35); animation-timing-function: steps(1, end); }
-  29% { transform: translate(0, 3px) scale(1.35) rotate(0deg); animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45); }
-  100% { opacity: 1; transform: translate(var(--rx), var(--ry)) scale(1.35) rotate(var(--rt)); }
+  5% { transform: translate(-2px, 1px) scale(1.18); animation-timing-function: steps(1, end); }
+  10% { transform: translate(2px, 0) scale(1.18); animation-timing-function: steps(1, end); }
+  15% { transform: translate(-2px, -1px) scale(1.18); animation-timing-function: steps(1, end); }
+  20% { transform: translate(1px, 1px) scale(1.18); animation-timing-function: steps(1, end); }
+  25% { transform: translate(-1px, 0) scale(1.18); animation-timing-function: steps(1, end); }
+  29% { transform: translate(0, 3px) scale(1.18) rotate(0deg); animation-timing-function: cubic-bezier(0.3, 0, 0.7, 0.5); }
+  /* the arc: most of the climb happens first, the sideways drift late */
+  58% { transform: translate(calc(var(--rx) * 0.32), calc(var(--ry) * 0.66)) scale(1.18) rotate(calc(var(--rt) * 0.35)); animation-timing-function: cubic-bezier(0.45, 0, 0.9, 0.6); }
+  100% { opacity: 1; transform: translate(var(--rx), var(--ry)) scale(1.18) rotate(var(--rt)); }
 }
 body.alt-mode .dtn-rocket > * {
   position: absolute;
   display: block;
 }
-/* the passenger: the seat's own pepe (or a happy sprite in the lab) in a
-   hard black frame so it reads against the dim */
-body.alt-mode .dtn-rocket-face {
-  inset: 0;
+/* the hull: posterized steel bands (hard stops, no gradients — the pixel
+   bomb's own metal, so rocket and bomb read as one machine) and one black
+   keyline; the nose cone and the nozzle skirt hang off it */
+body.alt-mode .dtn-rocket-body {
+  left: 0;
+  top: calc(8 * var(--rpx));
+  width: 100%;
+  height: calc(24 * var(--rpx));
+  background: linear-gradient(to right,
+    var(--bomb-b0) 0 8.33%,
+    var(--bomb-b1) 8.33% 29.17%,
+    var(--bomb-b3) 29.17% 45.83%,
+    var(--bomb-b2) 45.83% 70.83%,
+    var(--bomb-b1) 70.83% 91.67%,
+    var(--bomb-b0) 91.67%);
+  box-shadow: 0 0 0 var(--rpx) #000;
+}
+body.alt-mode .dtn-rocket-body::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: calc(-8 * var(--rpx));
+  width: 100%;
+  height: calc(9 * var(--rpx));
+  background: var(--time-lit);
+  clip-path: polygon(33.33% 0, 66.67% 0, 66.67% 33.33%, 83.33% 33.33%, 83.33% 66.67%, 100% 66.67%, 100% 100%, 0 100%, 0 66.67%, 16.67% 66.67%, 16.67% 33.33%, 33.33% 33.33%);
+}
+body.alt-mode .dtn-rocket-body::after {
+  content: '';
+  position: absolute;
+  left: -8.33%;
+  right: -8.33%;
+  bottom: calc(-4 * var(--rpx));
+  height: calc(4 * var(--rpx));
+  background: var(--bomb-b0);
+  clip-path: polygon(7% 0, 93% 0, 100% 100%, 0 100%);
+}
+/* the porthole: the seat's own pepe — the same art the ladder row renders —
+   in a dark-rimmed window with a black ring, a steel bezel and a pixel
+   glint. 14 art px across, so the face reads at 390 as well as 1440. */
+body.alt-mode .dtn-rocket-window {
+  left: calc(5 * var(--rpx));
+  top: calc(5 * var(--rpx));
+  width: calc(14 * var(--rpx));
+  height: calc(14 * var(--rpx));
+  border-radius: 50%;
   overflow: hidden;
-  box-shadow: 0 0 0 2px #000, 3px 3px 0 2px #000;
+  background: var(--bomb-ink);
+  box-shadow: 0 0 0 var(--rpx) #000, 0 0 0 calc(2 * var(--rpx)) var(--bomb-b1);
   image-rendering: pixelated;
 }
-body.alt-mode .dtn-rocket-face svg {
+body.alt-mode .dtn-rocket-window svg {
   display: block;
   width: 100%;
   height: 100%;
 }
-body.alt-mode .dtn-rocket-sprite {
-  background-repeat: no-repeat;
-  background-size: calc(var(--s) * 10) auto;
-  background-position: calc(var(--s) * var(--c) * -1) calc(var(--s) * var(--r) * -1);
+body.alt-mode .dtn-rocket-window::after {
+  content: '';
+  position: absolute;
+  left: 16%;
+  top: 12%;
+  width: 16%;
+  height: 16%;
+  background: #fff;
+  opacity: 0.85;
 }
-/* fins: stepped pixel triangles in the critical red at the lower corners */
+/* fins: stepped pixel planes in the critical red at the lower corners,
+   tucked behind the hull */
 body.alt-mode .dtn-rocket::before,
 body.alt-mode .dtn-rocket::after {
   content: '';
   position: absolute;
-  bottom: -4px;
-  width: 28%;
-  height: 46%;
+  bottom: calc(2 * var(--rpx));
+  width: calc(8 * var(--rpx));
+  height: calc(14 * var(--rpx));
   background: var(--time-lit);
-  box-shadow: 0 0 0 2px #000;
   z-index: -1;
 }
 body.alt-mode .dtn-rocket::before {
-  left: -22%;
-  clip-path: polygon(100% 0, 100% 100%, 0 100%, 0 66%, 33% 66%, 33% 33%, 66% 33%, 66% 0);
+  left: calc(-6 * var(--rpx));
+  clip-path: polygon(100% 0, 100% 100%, 0 100%, 0 64%, 50% 64%, 50% 28%, 100% 28%);
 }
 body.alt-mode .dtn-rocket::after {
-  right: -22%;
-  clip-path: polygon(0 0, 34% 0, 34% 33%, 67% 33%, 67% 66%, 100% 66%, 100% 100%, 0 100%);
+  right: calc(-6 * var(--rpx));
+  clip-path: polygon(0 0, 0 100%, 100% 100%, 100% 64%, 50% 64%, 50% 28%, 0 28%);
 }
 /* exhaust: a stepped pixel flame (white-hot core, yellow, orange, red tip)
-   flickering in two lengths */
+   under the nozzle, flickering in two lengths */
 body.alt-mode .dtn-rocket-flame {
-  left: 30%;
-  top: 100%;
-  width: 40%;
-  height: 80%;
+  left: calc(7 * var(--rpx));
+  top: calc(36 * var(--rpx));
+  width: calc(10 * var(--rpx));
+  height: calc(9 * var(--rpx));
   background: linear-gradient(to bottom, var(--fire-white) 0 22%, var(--fire-yellow) 22% 46%, var(--fire-orange) 46% 72%, var(--fire-red) 72%);
   clip-path: polygon(0 0, 100% 0, 100% 40%, 80% 40%, 80% 70%, 60% 70%, 60% 100%, 40% 100%, 40% 70%, 20% 70%, 20% 40%, 0 40%);
   transform-origin: 50% 0;
@@ -542,25 +597,48 @@ body.alt-mode .dtn-rocket-flame {
   0% { transform: scaleY(1); }
   50% { transform: scaleY(0.6); }
 }
-/* the trail: pixel smoke puffs left behind, unrolling once it lifts off */
-body.alt-mode .dtn-rocket-trail {
-  left: 50%;
-  top: 150%;
-  width: 12px;
-  height: 45vh;
-  margin-left: -6px;
-  background:
-    repeating-linear-gradient(to bottom, var(--boom-smoke-3) 0 10px, transparent 10px 16px) 0 0 / 12px 100% no-repeat;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 30%, transparent);
-  mask-image: linear-gradient(to bottom, #000 0, #000 30%, transparent);
-  transform-origin: 50% 0;
-  transform: scaleY(0);
-  animation: dtn-trail 0.9s linear forwards;
-  animation-delay: inherit;
+
+/* ── the ONE pixel smoke puff ──────────────────────────────────────────────
+   One smoke system, two emitters. The blast (a deterministic base-surge
+   ring of 12 around the bomb, .dtn-puffs-blast) and every rocket's exhaust
+   (spawned at the nozzle by the TSX while it flies, .dtn-puffs-trail, live
+   nodes capped at 48) emit the SAME puff: this sprite, this keyframes, and
+   the cloud's own --boom-smoke-* palette — the same ramp the 3D puffs and
+   the CSS fallback cloud read. Motion is posterized like everything else in
+   the scene: stepped sizes and fades (steps(1, end) segments), drift set
+   per node in --pdx/--pdy. Every node removes itself on animationend (the
+   TSX keeps a timeout backstop), so skips leave no smoke behind. */
+body.alt-mode .dtn-puffs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
-@keyframes dtn-trail {
-  0%, 29% { transform: scaleY(0); animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45); }
-  100% { transform: scaleY(1); }
+body.alt-mode .dtn-puffs-blast { z-index: 3; } /* under the pixel bomb + cloud */
+body.alt-mode .dtn-puffs-trail { z-index: 5; } /* behind the rockets (6) */
+body.alt-mode .dtn-puff {
+  position: absolute;
+  width: var(--pz, 18px);
+  height: var(--pz, 18px);
+  margin: calc(var(--pz, 18px) / -2) 0 0 calc(var(--pz, 18px) / -2);
+  opacity: 0;
+  pointer-events: none;
+  /* the sprite: a stair-stepped blob, a light cap over the body tone —
+     hard stops, no gradients, no blur */
+  background:
+    linear-gradient(to bottom, var(--pt-hi, var(--boom-smoke-3)) 0 38%, transparent 38%),
+    var(--pt, var(--boom-smoke-2));
+  clip-path: polygon(
+    25% 0, 75% 0, 75% 12.5%, 87.5% 12.5%, 87.5% 25%, 100% 25%, 100% 75%,
+    87.5% 75%, 87.5% 87.5%, 75% 87.5%, 75% 100%, 25% 100%, 25% 87.5%,
+    12.5% 87.5%, 12.5% 75%, 0 75%, 0 25%, 12.5% 25%, 12.5% 12.5%, 25% 12.5%);
+  animation: dtn-puff 640ms linear forwards;
+}
+@keyframes dtn-puff {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.4); animation-timing-function: steps(1, end); }
+  12% { opacity: 0.95; transform: translate(calc(var(--pdx, 0px) * 0.2), calc(var(--pdy, 0px) * 0.2)) scale(0.62); animation-timing-function: steps(1, end); }
+  34% { opacity: 0.88; transform: translate(calc(var(--pdx, 0px) * 0.5), calc(var(--pdy, 0px) * 0.5)) scale(0.85); animation-timing-function: steps(1, end); }
+  62% { opacity: 0.72; transform: translate(calc(var(--pdx, 0px) * 0.8), calc(var(--pdy, 0px) * 0.8)) scale(1); animation-timing-function: steps(2, end); }
+  100% { opacity: 0; transform: translate(var(--pdx, 0px), var(--pdy, 0px)) scale(1.18); }
 }
 @keyframes dtn-impact-flash {
   0% { opacity: 1; }
@@ -990,7 +1068,7 @@ body.alt-mode .dtn-stamp::after {
   body.alt-mode .dtn-stage {
     cursor: default;
   }
-  body.alt-mode .dtn-stage :is(.dtn-flash, .dtn-ring, .dtn-debris, .dtn-rocket, .dtn-alarm, .dtn-siren,
+  body.alt-mode .dtn-stage :is(.dtn-flash, .dtn-ring, .dtn-debris, .dtn-rocket, .dtn-puff, .dtn-alarm, .dtn-siren,
     .dtn-tape, .dtn-blast, .dtn-shock, .dtn-ground-ring, .dtn-mush, .dtn-confetti, .dtn-pb-spark-f1, .dtn-pb-ember) {
     display: none;
   }

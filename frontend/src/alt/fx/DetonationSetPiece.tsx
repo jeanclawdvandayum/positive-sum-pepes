@@ -15,9 +15,11 @@
 //   950–1300   SLAM: 00:00:00 in --time-lit (forced to the critical red)
 //              lands from scale 3.4 with a red glow; square shockwave ring
 //   1000–1500  shake A: ±12px decaying (page + stage)
-//   1450–3160  ESCAPE: each ladder seat's pepe (the real seat art) lights a
-//              flame on its seat and rockets up and away, newest seat first,
-//              90ms apart; the seat empties as it leaves
+//   1450–3160  ESCAPE: each ladder winner (the real seat art) climbs into a
+//              chunky pixel rocket — stepped nose cone, banded steel hull, a
+//              porthole window with the face in it — and arcs up and away to
+//              safety, newest seat first, 90ms apart, trailing the blast's
+//              own pixel smoke puffs; the seat empties as it leaves
 //   1600–3200  shake B: a ±3px launch rumble
 //   3250–3900  BLAST: the bomb bursts into the 3D cloud (its fireball ignites
 //              at the bomb body's exact center and radius), a hard white-out,
@@ -34,16 +36,17 @@
 // (no wobble, no burn), opacity fade ≤1.2s — no shake, no rockets, no
 // particles, no 3D. PhaseEngine keeps its rAF monopoly: everything here is
 // CSS keyframes or element.animate, animating transform/opacity/filter only.
-// Particle groups: ≤10 rockets, 16 debris, 38 confetti — each burst under 50
-// nodes. Timers and Animation handles are all cleaned up on unmount/skip, and
-// the real page (.alt-shell transform, ladder filters, emptied seat art) is
-// restored.
+// Particle groups: ≤10 rockets, the shared smoke (≤48 live exhaust puffs
+// spawned by timer + 12 static blast puffs, every puff self-removing),
+// 16 debris, 38 confetti — each burst under 50 nodes. Timers and Animation
+// handles are all cleaned up on unmount/skip, and the real page (.alt-shell
+// transform, ladder filters, emptied seat art) is restored.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, Ref } from 'react'
 import { PepeConfetti } from './confetti'
-import confettiSheets from './confettiSheets.json'
+import { DECORATIVE_ART_VERSION, renderPepeSvg } from '../../lib/pepeRender'
 import { loadBoom3d } from './boomLoader'
 import type { Boom } from './boom3d'
 
@@ -308,19 +311,30 @@ const DEBRIS = (() => {
 
 // ESCAPE: the ladder's winners rocket away to safety before the blast.
 // Newest seat first (the ladder lists the newest ticket at the top); the last
-// one clears the top of the screen before BLAST_MS.
+// one clears the top of the screen before BLAST_MS. The rocket itself is a
+// chunky pixel capsule drawn in detonation.css at ROCKET_ART grid pixels
+// scaled by --rpx screen px each, with the seat's pepe in the porthole; its
+// exhaust is the blast's own pixel smoke puff (dtn-puff — one smoke system,
+// two emitters), spawned at the nozzle on a timer while it flies.
 const ESCAPE_MS = 1450
 const ESCAPE_STAGGER = 90
 const ESCAPE_MS_EACH = 900 // 260ms on the pad (flame lit, shivering), 640ms of flight
-const HAPPY = confettiSheets.sheets.happy
+// exhaust schedule (ms after a rocket's launch): two ignition puffs on the
+// pad, then a trail puff every PUFF_EVERY from liftoff (29% of the flight)
+// until just before the top of the screen
+const PUFF_PAD_AT = [60, 170]
+const PUFF_FLY_FROM = 300
+const PUFF_EVERY = 80
+const PUFF_DUR = 640 // one exhaust puff's lifetime
+const PUFF_CAP = 48 // live dynamic puffs; + 12 static blast puffs ≤ 60 nodes
 
 interface Escapee {
   x: number
   y: number
-  size: number
-  /** the seat's own art (the ladder's WalletPepeArt markup), else a sprite cell */
-  svg?: string
-  cell: number
+  /** the seat's own pepe (the ladder row's WalletPepeArt svg), else a
+      deterministic decorative pepe so the lab and empty boards still flee
+      as recognizable pepes */
+  svg: string
   /** the real ladder art, hidden once its rocket leaves */
   art?: HTMLElement
   launch: number
@@ -331,7 +345,7 @@ interface Escapee {
 
 /**
  * The seats that flee: the real ladder art when the ladder shows pepes, else
- * (FX lab, an empty board) happy pepe sprites on the ladder rows or, with no
+ * (FX lab, an empty board) generated pepe art on the ladder rows or, with no
  * ladder at all, along the lower third. Seats below the fold launch from the
  * bottom edge so every escape crosses the screen.
  */
@@ -341,33 +355,39 @@ function escapees(): Escapee[] {
   const visible = (el: Element) => el.getBoundingClientRect().width > 0
   const arts = [...document.querySelectorAll<HTMLElement>('.alt-shell .ladder-panel .ladder-row .ladder-art')].filter(visible)
   const rows = [...document.querySelectorAll<HTMLElement>('.alt-shell .ladder-panel .ladder-row')].filter(visible)
-  const seats: { rect: { x: number; y: number; size: number }; svg?: string; art?: HTMLElement }[] = arts.length
+  const rand = lcg(19)
+  // a decorative face for boards without seat art (fx lab, empty ladder):
+  // the same release-2 art lane the site renders when no NFT backs a pepe.
+  // renderPepeSvg decodes any dna (PepePicker feeds it keccak-sized ids), so
+  // any value in the 2**48 draw space yields a valid, distinct face.
+  const pepe = () => {
+    const dna = BigInt(Math.floor(rand() * 2 ** 48))
+    return renderPepeSvg(dna, DECORATIVE_ART_VERSION)
+  }
+  const seats: { x: number; y: number; svg: string; art?: HTMLElement }[] = arts.length
     ? arts.map(art => {
       const r = art.getBoundingClientRect()
-      return { rect: { x: r.left + r.width / 2, y: r.top + r.height / 2, size: r.width }, svg: art.innerHTML, art }
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2, svg: art.innerHTML, art }
     })
     : rows.length
       ? rows.map(row => {
         const r = row.getBoundingClientRect()
-        return { rect: { x: r.left + 58, y: r.top + r.height / 2, size: Math.min(Math.max(r.height - 6, 32), 44) } }
+        return { x: r.left + 58, y: r.top + r.height / 2, svg: pepe() }
       })
-      : Array.from({ length: 8 }, (_, i) => ({ rect: { x: vw * (0.1 + 0.8 * (i / 7)), y: vh * 0.7, size: 40 } }))
-  const rand = lcg(19)
+      : Array.from({ length: 8 }, (_, i) => ({ x: vw * (0.1 + 0.8 * (i / 7)), y: vh * 0.7, svg: pepe() }))
   return seats.slice(0, 10).map((seat, i) => {
-    const size = Math.max(Math.round(seat.rect.size), 32)
-    const y = Math.min(seat.rect.y, vh + size)
-    const away = seat.rect.x < vw / 2 ? -1 : 1
+    const y = Math.min(seat.y, vh + 40)
+    const away = seat.x < vw / 2 ? -1 : 1
     return {
-      x: Math.round(seat.rect.x),
+      x: Math.round(seat.x),
       y: Math.round(y),
-      size,
       svg: seat.svg,
-      cell: Math.floor(rand() * HAPPY.count),
       art: seat.art,
       launch: ESCAPE_MS + i * ESCAPE_STAGGER,
       dx: Math.round(away * vw * (0.06 + 0.16 * rand())),
-      // off the top with its whole exhaust trail (45vh at 1.35×) behind it
-      rise: Math.round(y + vh * 0.65 + size * 3),
+      // off the top with the whole exhaust trail (the rocket is 80px tall)
+      // behind it
+      rise: Math.round(y + vh * 0.65 + 120),
       tilt: Math.round(away * (6 + 10 * rand())),
     }
   })
@@ -419,10 +439,25 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
   // the winners who flee (read off the live ladder at mount); none under
   // reduced motion
   const [rockets] = useState(() => (reduced ? [] : escapees()))
+  // the blast's own smoke emitter: a deterministic base-surge ring of the
+  // SAME pixel puff the rockets trail (dtn-puff), bursting outward around
+  // the bomb as the cloud erupts
+  const [blastPuffs] = useState(() => {
+    const r = lcg(23)
+    return Array.from({ length: 12 }, (_, i) => ({
+      dx: Math.round((r() * 2 - 1) * Math.max(blastAt.flank, 60)),
+      dy: Math.round(-(14 + r() * 60)),
+      size: 26 + Math.round(r() * 20),
+      delay: Math.round(i * 32 + r() * 40),
+      dur: 1100 + Math.round(r() * 300),
+      dark: r() < 0.4,
+    }))
+  })
   const stageRef = useRef<HTMLDivElement | null>(null)
   const quakeRef = useRef<HTMLDivElement | null>(null)
   const clockRef = useRef<HTMLSpanElement | null>(null)
   const boomHostRef = useRef<HTMLDivElement | null>(null)
+  const trailHostRef = useRef<HTMLSpanElement | null>(null)
   const sparkRef = useRef<SVGGElement | null>(null)
 
   // Anchor the stamp to the clock's LAYOUT box (offset* — immune to the slam
@@ -452,6 +487,7 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
     const timers: number[] = []
     const anims: Animation[] = [] // page mutations — cancelled at finish
     const fades: Animation[] = [] // the stage's own exit — kept until unmount
+    const puffRemovals: number[] = [] // exhaust backstops — only unmount cancels
     let finished = false
     // The 3D cloud: created as soon as its chunk lands (shaders compile during
     // the alarm), started just before the blast, disposed on finish/unmount.
@@ -539,6 +575,58 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
       for (const r of rockets) {
         if (r.art) anims.push(r.art.animate([{ opacity: 0 }, { opacity: 0 }], { duration: 1, delay: r.launch, fill: 'forwards' }))
       }
+      // Rocket exhaust: the SAME pixel puff the blast emits (dtn-puff — one
+      // smoke system, two emitters), spawned at each nozzle on a timer while
+      // its rocket sits on the pad and climbs. Live nodes are capped; each
+      // puff removes itself on animationend, with a timeout backstop, so a
+      // skip can never strand smoke.
+      const prand = lcg(31)
+      const puffHost = trailHostRef.current
+      const rocketEls = [...(stageRef.current?.querySelectorAll<HTMLElement>('.dtn-rocket') ?? [])]
+      let livePuffs = 0
+      const spawnPuff = (x: number, y: number) => {
+        if (!puffHost || livePuffs >= PUFF_CAP) return
+        livePuffs++
+        const el = document.createElement('span')
+        el.className = 'dtn-puff'
+        el.style.left = `${Math.round(x)}px`
+        el.style.top = `${Math.round(y)}px`
+        const dur = PUFF_DUR + Math.round(prand() * 160)
+        el.style.setProperty('--pz', `${9 + Math.round(prand() * 8)}px`)
+        el.style.setProperty('--pdx', `${Math.round(prand() * 26 - 13)}px`)
+        el.style.setProperty('--pdy', `${Math.round(6 + prand() * 26)}px`)
+        el.style.animationDuration = `${dur}ms`
+        if (prand() < 0.35) {
+          el.style.setProperty('--pt', 'var(--boom-smoke-1)')
+          el.style.setProperty('--pt-hi', 'var(--boom-smoke-2)')
+        }
+        let gone = false
+        const retire = () => {
+          if (gone) return
+          gone = true
+          livePuffs--
+          el.remove()
+        }
+        el.addEventListener('animationend', retire, { once: true })
+        puffRemovals.push(window.setTimeout(retire, dur + 560))
+        puffHost.appendChild(el)
+      }
+      rockets.forEach((r, i) => {
+        const el = rocketEls[i]
+        if (!el) return
+        for (const pad of PUFF_PAD_AT) {
+          at(r.launch + pad, () => {
+            const b = el.getBoundingClientRect()
+            spawnPuff(b.left + b.width / 2 + (prand() * 8 - 4), b.bottom - 12)
+          })
+        }
+        for (let t = PUFF_FLY_FROM; t <= ESCAPE_MS_EACH - 60; t += PUFF_EVERY) {
+          at(r.launch + t, () => {
+            const b = el.getBoundingClientRect()
+            spawnPuff(b.left + b.width / 2 + (prand() * 10 - 5), b.bottom - 10)
+          })
+        }
+      })
       at(BLAST_MS, () => quake(shakeFrames(18, 12), 800, 'linear'))
       // Ladder lock: grayscale sweep across the real rows, left→right (row
       // order). cancel() on finish restores them.
@@ -569,6 +657,7 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
     at(reduced ? REDUCED_MS : SEQ_MS, finish)
     return () => {
       timers.forEach(clearTimeout)
+      puffRemovals.forEach(clearTimeout)
       window.removeEventListener('keydown', onKey)
       dropBoom()
       anims.forEach(a => a.cancel())
@@ -601,6 +690,29 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
           </div>
         </div>
         {!reduced && <div ref={boomHostRef} className="dtn-boom" />}
+        {/* the blast's smoke emitter: a base-surge ring of the same pixel
+            puff the rockets trail (dtn-puff), bursting outward around the
+            bomb as the cloud erupts */}
+        {!reduced && (
+          <span className="dtn-puffs dtn-puffs-blast">
+            {blastPuffs.map((p, i) => (
+              <span
+                key={`bp${i}`}
+                className="dtn-puff"
+                style={{
+                  left: blastAt.x,
+                  top: blastAt.y,
+                  '--pz': `${p.size}px`,
+                  '--pdx': `${p.dx}px`,
+                  '--pdy': `${p.dy}px`,
+                  ...(p.dark ? { '--pt': 'var(--boom-smoke-1)', '--pt-hi': 'var(--boom-smoke-2)' } : {}),
+                  animationDelay: `${BLAST_MS + 40 + p.delay}ms`,
+                  animationDuration: `${p.dur}ms`,
+                } as CSSProperties}
+              />
+            ))}
+          </span>
+        )}
         {/* the bomb the button promised: it drops onto the blast point after
             the alarm, fuse burning, rocks while the winners flee, goes white
             and bursts into the cloud — whose fireball ignites at its exact
@@ -612,7 +724,9 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
         >
           <PixelBomb sparkRef={sparkRef} />
         </span>
-        {/* the ladder's winners rocket away to safety, newest seat first */}
+        {/* the ladder's winners rocket away to safety, newest seat first:
+            a chunky pixel capsule (stepped nose, banded hull, fins) with the
+            seat's own pepe in the porthole */}
         {rockets.map((r, i) => (
           <span
             key={`r${i}`}
@@ -620,7 +734,6 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
             style={{
               left: r.x,
               top: r.y,
-              '--s': `${r.size}px`,
               '--rx': `${r.dx}px`,
               '--ry': `${-r.rise}px`,
               '--rt': `${r.tilt}deg`,
@@ -628,22 +741,15 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
               animationDelay: `${r.launch}ms`,
             } as CSSProperties}
           >
-            <span className="dtn-rocket-trail" />
+            <span className="dtn-rocket-body">
+              <span className="dtn-rocket-window" dangerouslySetInnerHTML={{ __html: r.svg }} />
+            </span>
             <span className="dtn-rocket-flame" />
-            {r.svg ? (
-              <span className="dtn-rocket-face" dangerouslySetInnerHTML={{ __html: r.svg }} />
-            ) : (
-              <span
-                className="dtn-rocket-face dtn-rocket-sprite"
-                style={{
-                  backgroundImage: `url(${HAPPY.src})`,
-                  '--c': r.cell % confettiSheets.cols,
-                  '--r': Math.floor(r.cell / confettiSheets.cols),
-                } as CSSProperties}
-              />
-            )}
           </span>
         ))}
+        {/* the rockets' exhaust emitter: the TSX spawns dtn-puff nodes here
+            at each nozzle while the rockets fly (capped, self-removing) */}
+        <span ref={trailHostRef} className="dtn-puffs dtn-puffs-trail" />
         <span className="dtn-ring" />
         {/* the stamp rides the slam card, so the blast's knock-back carries both */}
         <div className="dtn-slam">
