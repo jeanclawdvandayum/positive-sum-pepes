@@ -188,25 +188,39 @@ function VictoryDialog({ victory }: { victory: Victory }) {
   const explorer = targetChain.blockExplorers?.default
   const round = `round ${victory.roundId.toString()}${victory.roundName && victory.roundName !== `round ${victory.roundId}` ? ` · ${victory.roundName}` : ''}`
 
-  async function brag() {
-    if (busy) return
-    setBusy(true)
-    let copied = false
+  /** The brag PNG onto the clipboard, racing a hung permission prompt with a
+   *  1.5s timeout so the flow never stalls inside the user gesture. */
+  async function copyArt(): Promise<boolean> {
     try {
       // Write while this page has focus: the PNG is ready before the click,
       // so the clipboard write stays inside the user gesture.
       if (art && typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
-        // Race a hung permission prompt: the gesture must still open X and
-        // show the paste guide (with copy-again) instead of stalling forever.
         const write = navigator.clipboard.write([new ClipboardItem({ 'image/png': art.share })])
-        copied = await Promise.race([write.then(() => true), new Promise<false>(r => setTimeout(() => r(false), 1500))])
+        return await Promise.race([write.then(() => true), new Promise<false>(r => setTimeout(() => r(false), 1500))])
       }
     } catch {
-      copied = false
+      return false
     }
+    return false
+  }
+
+  /** 'brag on X' only copies the PNG and shows the paste guide — the composer
+   *  tab is the guide's own 'open X' button, so it never hides the guide. */
+  async function brag() {
+    if (busy) return
+    setBusy(true)
+    const copied = await copyArt()
     setHint({ copied })
     setBusy(false)
-    window.open(bragUrl({ ...victory, seats }), '_blank', 'noopener,noreferrer')
+  }
+
+  /** 'copy the image again' re-writes the clipboard only — no new tab, and
+   *  the guide stays up however the write lands. */
+  async function recopy() {
+    if (busy) return
+    setBusy(true)
+    await copyArt()
+    setBusy(false)
   }
 
   return createPortal(
@@ -249,11 +263,17 @@ function VictoryDialog({ victory }: { victory: Victory }) {
                 pepe rides the clipboard — make the paste impossible to miss. */}
             <img className="vm-paste-img" src={art?.shareUrl} alt="" />
             <ol className="vm-paste-steps">
-              <li>the post is open in a new tab</li>
+              <li>your pepe is on the clipboard</li>
               <li>click it and press <kbd>{navigator.platform.toLowerCase().includes('mac') ? '⌘V' : 'Ctrl+V'}</kbd> — the pepe above is on your clipboard</li>
               <li>post it 🚀</li>
             </ol>
-            <button type="button" className="vm-paste-copy" onClick={brag}>copy the image again ↻</button>
+            <div className="vm-paste-actions">
+              {/* The composer tab opens only from here, never from the copy;
+                  a plain window.open, so clicking twice may open twice. */}
+              <button type="button" className="vm-paste-open"
+                onClick={() => window.open(bragUrl({ ...victory, seats }), '_blank', 'noopener,noreferrer')}>open X ↗</button>
+              <button type="button" className="vm-paste-copy" onClick={recopy}>copy the image again ↻</button>
+            </div>
           </div>
         )}
         {hint && !hint.copied && art && (

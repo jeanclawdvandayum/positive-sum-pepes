@@ -1321,8 +1321,27 @@ body.alt-mode .vm-paste-steps kbd {
   padding: 0 6px;
   box-shadow: 2px 2px 0 var(--shadow);
 }
-body.alt-mode .vm-paste-copy {
+/* the guide's actions: 'open X' is the site button and the only thing that
+   opens the composer tab; 'copy the image again' re-writes the clipboard */
+body.alt-mode .vm-paste-actions {
   justify-self: start;
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 6px 14px;
+}
+body.alt-mode .vm-paste-open {
+  min-height: 34px;
+  padding: 7px 14px;
+  font: 700 13px/1.2 var(--display);
+  color: #172518;
+  background: var(--vm-gold);
+  border: 1px solid #172518;
+  box-shadow: 3px 3px 0 var(--shadow);
+  cursor: pointer;
+}
+body.alt-mode .vm-paste-open:hover { filter: brightness(1.08); translate: 0 -1px; }
+body.alt-mode .vm-paste-open:active { translate: 1px 2px; box-shadow: 2px 2px 0 var(--shadow); }
+body.alt-mode .vm-paste-open:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+body.alt-mode .vm-paste-copy {
   font: 700 11px var(--mono);
   color: var(--muted);
   background: none;
