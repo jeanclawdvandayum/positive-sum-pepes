@@ -4,8 +4,9 @@
 // it ships no copy.
 
 import { useRef, useState } from 'react'
+import { useAccount } from 'wagmi'
 import { fireFx, type FxKind } from '../lib/actionFx'
-import { pickVictoryMessage, victoryCards } from '../lib/victoryCards'
+import { pickVictoryMessage, victories } from '../lib/victoryCards'
 import { renderPepeSvg } from '../lib/pepeRender'
 import { dnaOfId } from '../components/PepePicker'
 import { PixelIcon } from '../components/PixelIcon'
@@ -29,8 +30,12 @@ const LADDER_ROWS = [0, 1, 2, 3, 4]
 /** The lab hatches release-2 art, like a live round's staker. */
 const LAB_DNA_VERSION = 2n
 const randomPepeId = () => BigInt(Math.floor(Math.random() * 2 ** 40)) + 1n
+/** A connected wallet's own identity pepe, else a fixed demo wallet's. */
+const LAB_WALLET: `0x${string}` = '0x00000000000000000000000000000000006c4b1a'
+const mockHand = (count: number) => Array.from({ length: count }, () => renderPepeSvg(dnaOfId(randomPepeId()), LAB_DNA_VERSION))
 
 export default function FxLab() {
+  const { address } = useAccount()
   const anchors = useRef(new Map<FxKind, HTMLButtonElement>())
   const stage = useRef<HTMLDivElement>(null)
   // The pepe the hatch will reveal, shown in the mock card so QA can match it.
@@ -38,13 +43,15 @@ export default function FxLab() {
 
   const fire = (kind: FxKind, el: Element) => {
     const spec = TARGETS[kind]
-    // The lab's claimPot plays the full celebration AND pushes a real victory
-    // card: demo payout, demo round, no hash (nothing to link to). The message
-    // is picked once so the banner and the card agree.
+    // The lab's claimPot plays the real claim path: the celebration, then the
+    // victory modal with a receipt-style payout (demo round, no hash — nothing
+    // to link to) and the wallet's identity pepe (no staker → no NFTs).
     if (kind === 'claimPot') {
-      const message = pickVictoryMessage()
-      fireFx(kind, { anchor: el, target: spec?.target, detail: message })
-      victoryCards.push({ roundId: 3n, roundName: 'the fx lab round', amountMix: 1234n * 10n ** 16n, message })
+      fireFx(kind, { anchor: el, target: spec?.target })
+      victories.push({
+        source: 'claim', roundId: 3n, roundName: 'the fx lab round', amountMix: 1234n * 10n ** 16n,
+        message: pickVictoryMessage(), seats: 2, account: address ?? LAB_WALLET, delayMs: 900,
+      })
       return
     }
     fireFx(kind, {
@@ -52,6 +59,12 @@ export default function FxLab() {
       pepe: kind === 'claimPredeposit' ? { id: pepeId, dnaVersion: LAB_DNA_VERSION, dna: dnaOfId(pepeId) } : undefined,
     })
   }
+
+  // The settle path: an unclaimed claimablePot-style amount and a mock hand.
+  const settleWin = (pepes: number) => victories.push({
+    source: 'settle', roundId: 3n, roundName: 'the fx lab round', amountMix: 420_690n * 10n ** 13n,
+    message: pickVictoryMessage(), seats: 3, account: address ?? LAB_WALLET, mockPepes: mockHand(pepes),
+  })
 
   // The hatch is an interactive modal, so the staggered run skips it.
   const fireAll = () => {
@@ -83,7 +96,9 @@ export default function FxLab() {
           <button className="st-btn" onClick={e => fireFx('claimPredeposit', { anchor: e.currentTarget })}>
             claimPredeposit (no id)
           </button>
-          <button className="st-btn" onClick={() => victoryCards.clear()}>clear victory cards</button>
+          <button className="st-btn" onClick={() => settleWin(3)}>settle win · 3 pepes</button>
+          <button className="st-btn" onClick={() => settleWin(8)}>settle win · 8 pepes</button>
+          <button className="st-btn" onClick={() => victories.clear()}>clear victories</button>
         </div>
         <div className="fx-lab-states">
           <DetonateState state="armed" />

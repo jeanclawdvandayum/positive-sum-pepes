@@ -246,24 +246,6 @@ body.alt-mode .fx-layer .fx-seal {
   opacity: 0;
   animation: fx-seal-drop .5s cubic-bezier(.3,1.5,.5,1) .55s both;
 }
-/* the claimPot congratulation (Round 4): the chosen victory message floats
-   above the anchor, pixel-set in amber, legible in both themes on panel */
-body.alt-mode .fx-layer .fx-victory-banner {
-  translate: -50% -100%;
-  max-width: min(86vw, 430px);
-  padding: 5px 10px;
-  font: 700 19px/1.35 var(--display);
-  text-align: center;
-  color: var(--amber);
-  text-shadow: 2px 2px 0 var(--shadow);
-  background: color-mix(in srgb, var(--panel) 85%, transparent);
-  border: 1px solid var(--amber);
-  box-shadow: 3px 3px 0 var(--shadow);
-  opacity: 0;
-  animation:
-    fx-victory-pop .42s steps(3) .3s both,
-    fx-victory-float 2.6s ease-in-out .72s infinite;
-}
 
 /* redeem — transmute. */
 body.alt-mode .fx-layer .fx-ember {
@@ -881,16 +863,6 @@ body.alt-mode .fx-lab-stage .instrument .clock { font-size: clamp(32px, 3.2vw, 4
   30% { opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
-@keyframes fx-victory-pop {
-  0% { opacity: 0; scale: .5; }
-  70% { opacity: 1; scale: 1.06; }
-  100% { opacity: 1; scale: 1; }
-}
-/* a gentle float that keeps the banner's centering (translate -50% -100%) */
-@keyframes fx-victory-float {
-  0%, 100% { translate: -50% -100%; }
-  50% { translate: -50% calc(-100% - 6px); }
-}
 @keyframes fx-ember-flicker {
   0% { opacity: 0; transform: translateY(6px); }
   30% { opacity: 1; }
@@ -1127,115 +1099,193 @@ body.alt-mode .fx-lab-stage .instrument .clock { font-size: clamp(32px, 3.2vw, 4
   100% { opacity: 1; filter: brightness(1.3); }
 }
 
-/* ── Round 4: the persistent victory card stack (VictoryCards.tsx, mounted
-   only in AltShell). Cards stay until closed, stack bottom-left under the
-   toasts (9500 < 10000), and use the site card language: panel, line border,
-   hard shadow, square. ── */
-body.alt-mode .victory-stack {
-  position: fixed;
-  left: 12px;
-  bottom: 12px;
-  z-index: 9500;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: min(360px, calc(100vw - 24px));
+/* ── Round 5: the pot victory modal (VictoryModal.tsx, mounted only in
+   AltShell). A dimmed backdrop over the page and the FX layer (9500 > 9000),
+   under the toasts (10000). Site card language — panel, square, hard shadow —
+   with a gold double trim. The hand of pepe cards fans about a pivot
+   --pivot card heights below the card tops (FAN_PIVOT, shared with the PNG
+   composite); every card is a PNG raster drawn pixelated. ── */
+body.alt-mode .vm-backdrop {
+  --vm-gold: #ffbe55;
+  --vm-amount: var(--amber);
+  position: fixed; inset: 0; z-index: 9500;
+  display: grid; place-items: center;
+  padding: 16px;
+  overflow-y: auto;
+  background: rgb(2 9 14 / .74);
+  animation: vm-fade .2s ease-out both;
 }
-body.alt-mode .victory-card {
+/* light: the site's money token is green, so the modal keeps its own amber,
+   darkened to hold contrast on the white panel */
+html[data-theme=light] body.alt-mode .vm-backdrop {
+  --vm-gold: #b87300;
+  --vm-amount: #9a5b00;
+  background: rgb(16 29 35 / .62);
+}
+body.alt-mode .vm-backdrop .fx-pc { pointer-events: none; }
+body.alt-mode .vm-card {
   position: relative;
-  display: flex;
-  gap: 10px;
-  padding: 12px;
+  width: min(500px, 100%);
+  padding: 28px 24px 16px;
+  text-align: center;
   background: var(--panel);
+  border: 3px solid var(--vm-gold);
+  outline: 1px solid var(--vm-gold);
+  outline-offset: -10px;
+  box-shadow: 9px 9px 0 var(--shadow);
+  animation: vm-card-in .34s cubic-bezier(.3,1.4,.5,1) both;
+}
+/* the instrument's corner registration marks, in gold */
+body.alt-mode .vm-card::before,
+body.alt-mode .vm-card::after {
+  content: '+';
+  position: absolute;
+  font: 16px/1 var(--mono);
+  color: var(--vm-gold);
+}
+body.alt-mode .vm-card::before { top: 14px; left: 16px; }
+body.alt-mode .vm-card::after { bottom: 14px; right: 16px; }
+body.alt-mode .vm-card .vm-close {
+  position: absolute; top: 16px; right: 16px; z-index: 3;
+  display: grid; place-items: center;
+  width: 36px; height: 36px; padding: 0;
+  font: 700 22px/1 var(--mono);
+  color: var(--ink);
+  background: var(--raised);
   border: 1px solid var(--line);
-  box-shadow: 5px 5px 0 var(--shadow);
-  animation: victory-card-in .28s steps(3) both;
+  box-shadow: 2px 2px 0 var(--shadow);
 }
-@keyframes victory-card-in {
-  from { opacity: 0; transform: translateY(10px) scale(.96); }
-  to { opacity: 1; transform: none; }
-}
-body.alt-mode .victory-card .victory-pepe { flex: none; width: 46px; }
-body.alt-mode .victory-card .victory-pepe img {
-  display: block;
-  width: 100%;
-  height: auto;
-  image-rendering: pixelated;
-}
-body.alt-mode .victory-card .victory-body {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-body.alt-mode .victory-card .victory-head {
-  font: 700 12px/1.2 var(--display);
-  letter-spacing: .08em;
-  color: var(--muted);
-}
-body.alt-mode .victory-card .victory-amount {
-  font: 700 20px/1.2 var(--display);
-  color: var(--amber);
-}
-body.alt-mode .victory-card .victory-round {
+body.alt-mode .vm-card .vm-close:hover { color: var(--vm-gold); border-color: var(--vm-gold); }
+body.alt-mode .vm-card .vm-close:focus-visible { outline: 2px dashed var(--vm-gold); outline-offset: 2px; }
+body.alt-mode .vm-kicker {
+  margin: 0 44px;
   font: 12px/1.4 var(--mono);
+  letter-spacing: .06em;
   color: var(--muted);
 }
-body.alt-mode .victory-card .victory-message {
-  margin: 4px 0 6px;
-  font: 13px/1.45 var(--display);
+body.alt-mode .vm-head {
+  margin: 8px 0 0;
+  font: 700 clamp(22px, 6vw, 30px)/1.15 var(--display);
+  letter-spacing: .06em;
+  color: var(--vm-gold);
+  text-shadow: 3px 3px 0 var(--shadow);
+}
+html[data-theme=light] body.alt-mode .vm-head { text-shadow: none; }
+body.alt-mode .vm-amount {
+  margin: 10px 0 0;
+  font: 700 clamp(34px, 10vw, 54px)/1.05 var(--display);
+  font-variant-numeric: tabular-nums;
+  color: var(--vm-amount);
+  overflow-wrap: anywhere;
+}
+body.alt-mode .vm-amount .vm-unit { font-size: .4em; letter-spacing: .04em; }
+body.alt-mode .vm-seats {
+  margin: 6px 0 0;
+  font: 13px/1.4 var(--mono);
+  color: var(--muted);
+}
+body.alt-mode .vm-message {
+  max-width: 40ch;
+  margin: 14px auto 0;
+  font: 15px/1.5 var(--display);
   color: var(--ink);
   overflow-wrap: anywhere;
 }
-body.alt-mode .victory-card .victory-links { display: flex; gap: 14px; }
-body.alt-mode .victory-card .victory-links a {
-  font: 700 12px/1.4 var(--display);
-  color: var(--green);
-  text-decoration: underline;
+/* card size and hand height per count: the widest hand (six cards, ±28°) is
+   ~5.1 card widths across, so it must fit a 390px screen at 15vw */
+body.alt-mode .vm-hand {
+  --c: clamp(80px, 26vw, 118px);
+  position: relative;
+  height: calc(var(--c) * 1.2 + 12px);
+  margin: 18px auto 0;
 }
-body.alt-mode .victory-card .victory-close {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-  font: 700 14px/1 var(--display);
-  color: var(--muted);
-  background: none;
-  border: 1px solid transparent;
+body.alt-mode .vm-hand[data-count="1"] {
+  --c: clamp(112px, 34vw, 156px);
+  height: calc(var(--c) + 16px);
 }
-body.alt-mode .victory-card .victory-close:hover { color: var(--ink); border-color: var(--line); }
-body.alt-mode .victory-more {
-  align-self: flex-start;
-  padding: 4px 10px;
-  font: 700 12px/1.4 var(--display);
+body.alt-mode .vm-hand[data-count="4"] {
+  --c: clamp(64px, 20vw, 104px);
+  height: calc(var(--c) * 1.4 + 12px);
+}
+body.alt-mode .vm-hand:is([data-count="5"], [data-count="6"]) {
+  --c: clamp(54px, 15vw, 84px);
+  height: calc(var(--c) * 1.7 + 12px);
+}
+body.alt-mode .vm-pepe {
+  position: absolute; left: 50%; top: 6px;
+  width: var(--c); height: var(--c);
+  margin-left: calc(var(--c) / -2);
+  padding: 5px;
+  background: var(--raised);
+  border: 3px solid var(--vm-gold);
+  box-shadow: 4px 4px 0 var(--shadow);
+  transform-origin: 50% calc(var(--pivot) * 100%);
+  rotate: var(--a);
+  transition: translate .16s steps(3);
+  animation: vm-deal .44s cubic-bezier(.3,1.3,.5,1) backwards;
+  animation-delay: calc(var(--i) * 80ms + 260ms);
+}
+body.alt-mode .vm-pepe:hover { translate: 0 -16px; z-index: 2; }
+body.alt-mode .vm-pepe img {
+  display: block;
+  width: 100%; height: 100%;
+  image-rendering: pixelated;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+body.alt-mode .vm-more {
+  position: absolute; right: 0; bottom: 4px; z-index: 3;
+  padding: 3px 8px;
+  font: 700 12px/1.3 var(--display);
   color: var(--ink);
   background: var(--panel);
-  border: 1px solid var(--line);
-  box-shadow: 3px 3px 0 var(--shadow);
+  border: 1px solid var(--vm-gold);
+  box-shadow: 2px 2px 0 var(--shadow);
 }
-/* the mount-time mini burst: on-palette squares flung from the card edge */
-body.alt-mode .victory-card .victory-bit {
-  position: absolute;
-  left: 24px;
-  top: 50%;
-  width: 5px;
-  height: 5px;
-  margin: -3px 0 0 0;
-  background: var(--amber);
-  pointer-events: none;
-  opacity: 0;
-  animation: victory-bit-fly .6s steps(5) both;
+body.alt-mode .vm-hand-label {
+  margin: 8px 0 0;
+  font: 12px/1.4 var(--mono);
+  color: var(--muted);
 }
-body.alt-mode .victory-card .victory-bit:nth-child(3n) { background: var(--green); }
-body.alt-mode .victory-card .victory-bit:nth-child(3n + 1) { width: 4px; height: 4px; }
-@keyframes victory-bit-fly {
-  0% { translate: 0 0; opacity: 1; }
-  100% { translate: var(--tx) var(--ty); opacity: 0; }
+body.alt-mode .vm-actions {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 10px 18px;
+  margin-top: 16px;
 }
+body.alt-mode .vm-actions .vm-brag {
+  min-width: 170px;
+  min-height: 44px;
+  padding: 10px 18px;
+  font: 700 15px/1.2 var(--display);
+  color: #172518;
+  background: var(--vm-gold);
+  border: 1px solid #172518;
+  box-shadow: 4px 4px 0 var(--shadow);
+  cursor: pointer;
+}
+body.alt-mode .vm-actions .vm-brag:enabled:hover { filter: brightness(1.08); translate: 0 -1px; }
+body.alt-mode .vm-actions .vm-brag:enabled:active { translate: 1px 2px; box-shadow: 2px 2px 0 var(--shadow); }
+body.alt-mode .vm-actions .vm-brag:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+body.alt-mode .vm-actions .vm-brag:disabled { opacity: .5; cursor: progress; }
+body.alt-mode .vm-link {
+  font: 700 13px/1.4 var(--display);
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+body.alt-mode .vm-hint {
+  min-height: 1.4em;
+  margin: 10px 0 0;
+  font: 12px/1.4 var(--mono);
+  color: var(--muted);
+}
+body.alt-mode .vm-hint a { color: var(--green); text-decoration: underline; }
+@keyframes vm-fade { from { opacity: 0; } }
+@keyframes vm-card-in { from { opacity: 0; transform: translateY(18px) scale(.9); } }
+@keyframes vm-deal { from { rotate: 0deg; translate: 0 34px; opacity: 0; } }
+/* Reduced motion: no fade, pop, deal or lift — a static fan; no confetti (TSX). */
 @media (prefers-reduced-motion: reduce) {
-  body.alt-mode .victory-card { animation: none; }
-  body.alt-mode .victory-card .victory-bit { display: none; }
+  body.alt-mode .vm-backdrop,
+  body.alt-mode .vm-backdrop * { animation: none !important; transition: none !important; }
+  body.alt-mode .vm-pepe:hover { translate: none; }
 }

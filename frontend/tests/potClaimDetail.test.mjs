@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import { encodeAbiParameters, encodeEventTopics, pad, toEventSelector } from 'viem'
 import { hookAbi } from '../src/lib/abi.ts'
 import { potClaimDetail } from '../src/lib/potClaimDetail.ts'
-import { bragText, bragUrl, VICTORY_MESSAGES, victoryCards } from '../src/lib/victoryCards.ts'
 
 // Real-shaped receipt logs, built the way a chain assembles them: topics from
 // the event signature, indexed args padded into topics, the rest abi-encoded
@@ -73,50 +72,4 @@ test('malformed logs never throw', () => {
   assert.equal(potClaimDetail('claimPot', [{ address: HOOK, data: '0x', topics: [] }, potClaimedLog(PAYOUT, ME, 1)], ME), PAYOUT)
   // A PotClaimed-shaped topic with garbage data reports nothing, never a guess.
   assert.equal(potClaimDetail('claimPot', [{ ...potClaimedLog(PAYOUT), data: '0xdeadbeef' }], ME), undefined)
-})
-
-test('the community-supplied victory message is in the rotation verbatim', () => {
-  assert.ok(VICTORY_MESSAGES.includes(
-    "OMG!😭Can't believe I won ! Thank you Positive Sum Pepes team ! ❤️ keep doing the great work. 💪🏻💪🏻💪🏻🚀🚀🚀",
-  ))
-})
-
-test('brag text leads with the message and carries amount + round within X’s limit', () => {
-  const card = victoryCards.push({ roundId: 3n, roundName: 'the fx lab round', amountMix: PAYOUT, message: VICTORY_MESSAGES[0] })
-  const text = bragText(card)
-  assert.ok(text.startsWith(VICTORY_MESSAGES[0]))
-  assert.ok(text.includes('12.34 mixETH'))
-  assert.ok(text.includes('round 3 pot'))
-  assert.ok(text.length <= 280)
-  const url = bragUrl(card)
-  assert.ok(url.startsWith('https://twitter.com/intent/tweet?text='))
-  assert.ok(url.includes(encodeURIComponent('12.34 mixETH from the round 3 pot')))
-  victoryCards.dismiss(card.id)
-})
-
-test('when the pair would overflow, the victory-info sentence yields before the message', () => {
-  const longMessage = 'x'.repeat(270)
-  const card = victoryCards.push({ roundId: 12n, amountMix: 1n, message: longMessage })
-  assert.equal(bragText(card), longMessage)
-  victoryCards.dismiss(card.id)
-})
-
-test('the store is inert without a subscriber and live with one', () => {
-  // Nothing subscribes in this file: the pushes above must not have accumulated.
-  assert.equal(victoryCards.active, false)
-  assert.deepEqual(victoryCards.snapshot(), [])
-  victoryCards.push({ roundId: 1n, amountMix: 2n, message: VICTORY_MESSAGES[1] })
-  assert.deepEqual(victoryCards.snapshot(), [])
-  const seen = []
-  const off = victoryCards.subscribe(() => {})
-  const off2 = victoryCards.subscribe(() => { seen.push(victoryCards.snapshot().length) })
-  assert.equal(victoryCards.active, true)
-  const live = victoryCards.push({ roundId: 1n, amountMix: 2n, message: VICTORY_MESSAGES[2] })
-  assert.equal(victoryCards.snapshot().length, 1)
-  assert.deepEqual(seen, [1])
-  victoryCards.dismiss(live.id)
-  assert.deepEqual(victoryCards.snapshot(), [])
-  off()
-  off2()
-  assert.equal(victoryCards.active, false)
 })

@@ -41,6 +41,7 @@ import {
   Scene,
   ShaderMaterial,
   SphereGeometry,
+  Vector2,
   Vector3,
   WebGLRenderer,
 } from 'three'
@@ -61,6 +62,12 @@ export interface BoomOptions {
   clock: () => number
   /** Blast point height as a fraction of the viewport (0 top, 1 bottom). */
   groundFrac: number
+  /**
+   * The DOM pixel bomb the fireball bursts out of, in CSS px: its body
+   * center's height above the blast point and its radius. The core fireball
+   * ignites at exactly that center and size.
+   */
+  ignite: { up: number; radius: number }
 }
 
 export interface Boom {
@@ -71,7 +78,7 @@ export interface Boom {
 }
 
 const CAP = 1050
-const STEM = 300
+const STEM = 420
 const SKIRT = 300
 const PUFFS = 1 + CAP + STEM + SKIRT
 const PAL_SIZE = PALETTE_VARS.length
@@ -139,6 +146,7 @@ varying float vOcc;
 varying float vGlow;
 varying float vShade; // per-puff brightness variety breaks up flat bands
 varying float vFireW; // how strongly this role takes the core's warm light
+uniform vec2 uIgnite; // the pixel bomb's body: center height, radius (world units)
 void main() {
   float t = max(uT, 0.0);
   float role = aP.x;
@@ -155,10 +163,12 @@ void main() {
   vShade = 1.0;
   vFireW = 1.0;
   if (role < 0.5) {
-    // core fireball: flashes out to r=2.7 in ~150ms, rides up with the cap and
-    // shrinks into it as the vortex takes over
-    center = vec3(0.0, max(H * 0.72, 1.1), 0.0);
-    size = mix(0.4, 2.1, easeOut(t / 0.15)) * (1.0 - smoothstep(0.8, 1.8, t)) * mix(1.0, 0.7, smoothstep(0.4, 1.2, t));
+    // core fireball: ignites filling the pixel bomb's body (same center, same
+    // size), flashes out to r=2.7 in ~120ms, lifts to ride up with the cap
+    // and shrinks into it as the vortex takes over
+    center = vec3(0.0, mix(uIgnite.x, max(H * 0.72, 1.1), easeOut(t / 0.3)), 0.0);
+    size = mix(uIgnite.y, 2.7, easeOut(t / 0.12)) * mix(1.0, 0.78, smoothstep(0.12, 0.5, t))
+      * (1.0 - smoothstep(0.8, 1.8, t)) * mix(1.0, 0.7, smoothstep(0.4, 1.2, t));
     // the incandescent core lingers under the cap as it rolls, cooling in place
     heat = max(1.3 - 0.75 * t, 0.2);
   } else if (role < 1.5) {
@@ -187,21 +197,34 @@ void main() {
     vShade = 0.95 + 0.3 * aQ.z;
     vFireW = 1.0;
   } else if (role < 2.5) {
-    // stem: puffs ride up a swirling column into the underside of the cap
-    float top = max(H - r * 0.5, 0.0);
-    float u = fract(aP.y + t * 0.42);
-    float waist = mix(1.3, 0.55, smoothstep(0.0, 0.3, u)) + 1.55 * smoothstep(0.55, 1.0, u);
-    float th = aP.z * 6.2831853 + t * (1.2 + aQ.y);
+    // stem: puffs ride up a twisting column from the ground into the
+    // underside of the cap. The column thickens as the cap rolls, flares at
+    // its foot and into a collar under the cap, and churns as it climbs.
+    float top = max(H - r * 0.35, 0.4);
+    float u = fract(aP.y + t * 0.5);
+    float thick = 0.4 + 0.8 * easeOut(t / 1.6) + 0.1 * max(t - 1.6, 0.0);
+    float shape = 1.0 + 0.8 * (1.0 - smoothstep(0.0, 0.2, u)) + 1.2 * smoothstep(0.6, 1.0, u);
+    float th = aP.z * 6.2831853 + t * (1.1 + aQ.y) + u * 2.4;
     float rr = sqrt(aP.w);
-    heat = 1.15 * exp(-t / 1.1) * (0.3 + 0.7 * u) + 0.4 * exp(-t / 1.8) * u * (1.0 - rr) + 0.1;
-    // the top flares into a collar that fills the underside of the cap
-    size = mix(0.4, 0.7, aQ.x) * smoothstep(0.0, 0.07, u) * smoothstep(0.15, 0.5, t) * mix(0.8, 1.2, rr) * (0.9 + 0.45 * smoothstep(0.55, 1.0, u));
-    vShade = 0.8 + 0.4 * aQ.z;
-    vFireW = 1.3;
+    center = vec3(cos(th), 0.0, sin(th)) * thick * shape * rr + vec3(0.0, u * top, 0.0);
+    vec3 q = vec3(aQ.xyz * 11.0 + vec3(0.0, -t * 1.3, t * 0.4));
+    center += (vec3(noise3(q), noise3(q + 5.3), noise3(q + 9.1)) - 0.5) * vec3(0.7 * thick, 0.6, 0.7 * thick);
+    // hot where it feeds the cap and in its core; the foot and the outer
+    // column cool to dust first, so the column reads as banded smoke
+    heat = 1.15 * exp(-t / 0.9) * (0.25 + 0.75 * u) + 0.5 * exp(-t / 1.6) * u * u * (1.0 - rr) + 0.04;
+    // pops in at the foot (inside the skirt), grows toward the collar
+    size = mix(0.45, 0.8, aQ.x) * (0.75 + 0.45 * thick) * smoothstep(0.0, 0.05, u) * smoothstep(0.0, 0.12, t)
+      * mix(0.85, 1.15, rr) * (0.9 + 0.45 * smoothstep(0.6, 1.0, u));
+    // dust-laden and sunlit: a band brighter than the cap's own smoke so the
+    // column never sinks into the dimmed page behind it
+    vShade = 1.2 + 0.35 * aQ.z;
+    vFireW = 1.0;
     // the top of the collar dips into the cap's shadow: a dark socket where
     // the stem enters the cap
-    occ *= mix(0.45, 1.0, smoothstep(0.72, 0.95, u));
-    occ *= 0.7 + 0.35 * max(dot(normalize(vec3(0.0, 0.001, 0.0) + center - vec3(0.0, H * 0.55, 0.0)), normalize(vec3(-0.5, 0.72, 0.55))), 0.0);
+    occ *= mix(0.55, 1.0, smoothstep(0.75, 0.97, u));
+    // column-scale form: the side facing the light (front-left) reads a band
+    // or two brighter than the far side, so the stem reads round
+    occ *= 0.6 + 0.75 * max(dot(normalize(vec3(center.x, 0.35, center.z)), normalize(vec3(-0.5, 0.72, 0.55))), 0.0);
   } else {
     // skirt: base-surge dust rolling out along the ground
     float front = 1.0 + 8.5 * easeOut((t - 0.08) / 2.2);
@@ -257,9 +280,11 @@ void main() {
   // the fire also floods its neighborhood sideways (skirt inner lip, stem)
   float ambient = exp(-length(vW.xz) / 5.5) * exp(-max(uT, 0.0) / 1.4) * vFireW;
   float lit = (pow(max(dot(n, normalize(vec3(-0.5, 0.72, 0.55))), 0.0), 1.5) * 0.78 + 0.15) * vOcc * vShade;
-  // the cap casts a contact shadow down the top of the stem
+  // the cap casts a contact shadow down the top of the stem (a short band
+  // under the cap, so the column below keeps its light); the cap's upper
+  // half climbs back out of it toward the sky light
   float capBottom = 1.2 + 6.6 * easeOut(max(uT, 0.0) / 2.0) - 1.2 * easeOut(max(uT, 0.0) / 1.5);
-  float shadow = clamp(1.0 - (capBottom - vW.y) / 3.2, 0.0, 1.0);
+  float shadow = smoothstep(capBottom - 1.8, capBottom, vW.y) * (1.0 - 0.55 * smoothstep(capBottom + 0.6, capBottom + 2.6, vW.y));
   lit *= 1.0 - 0.62 * shadow;
   // fire under the cap lights its underside
   float under = max(-n.y, 0.0) * vGlow;
@@ -348,7 +373,7 @@ function puffAttributes(): { p: Float32Array; q: Float32Array } {
  * Build the scene, compile its programs and upload its buffers. Throws when
  * WebGL2 is unavailable (the caller keeps the CSS cloud).
  */
-export function createBoom({ host, clock, groundFrac }: BoomOptions): Boom {
+export function createBoom({ host, clock, groundFrac, ignite }: BoomOptions): Boom {
   const canvas = document.createElement('canvas')
   canvas.className = 'dtn-boom-canvas'
   // Probe the context ourselves: a missing (or software-only) WebGL2 throws
@@ -374,6 +399,7 @@ export function createBoom({ host, clock, groundFrac }: BoomOptions): Boom {
     uT: { value: -1 },
     uFade: { value: 0 },
     uPal: { value: readPalette(host) },
+    uIgnite: { value: new Vector2() },
   }
 
   const base = new IcosahedronGeometry(1, 1)
@@ -424,6 +450,10 @@ export function createBoom({ host, clock, groundFrac }: BoomOptions): Boom {
     // fit the width
     const span = groundFrac - 0.34
     baseDist = Math.max(10.5 / (2 * span * tanV), 8.2 / (tanV * camera.aspect))
+    // CSS px per world unit at the blast point, to size the ignition to the
+    // DOM pixel bomb (the push-in starts from 1 at the blast)
+    const unitPx = (h * pixel) / (2 * tanV * Math.hypot(baseDist, camY))
+    uniforms.uIgnite.value.set(ignite.up / unitPx, ignite.radius / unitPx)
   }
   layout()
   window.addEventListener('resize', layout)

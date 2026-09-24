@@ -372,3 +372,55 @@ The CSS cloud read as child-like. The blast is now a real volumetric explosion.
   blast point from the alarm on (`.dtn-pixel-bomb`), its spark creeping down the fuse, and at the blast
   it flashes away as the cloud erupts from it. Hidden under reduced motion. The ground plane only lights
   after the blast (dust skirt), verified in both themes at alarm, blast−100ms, blast+400ms and +1800ms.
+
+# Round 5 — the pot victory modal
+
+## Feature 13 — every ladder winner gets a modal (replaces Feature 11's corner card)
+
+- `src/lib/victoryCards.ts` is now the `victories` store (same inert-until-subscribed shape; oldest first,
+  the modal shows `queue[0]`). A `Victory` is `{ source: 'claim' | 'settle', roundId, roundName?,
+  amountMix, message, seats?, account?, hook?, staker?, txHash?, mockPepes?, showAt, at }`. The 12
+  messages (the community's "OMG!😭…" entry verbatim) stay; `pickVictoryMessage(random?)`.
+- Claim path: `useConfirmedWrite`'s `victory` hint gains `staker`; a confirmed `claimPot` still decodes the
+  RECEIPT's PotClaimed payout (`potClaimDetail`, never an estimate), drops any pending settle entry for that
+  hook+wallet, and pushes a `claim` victory 900ms out so ClaimPotFx's coin fountain and seal land first.
+  ClaimPotFx is now only that prelude (flash, gold confetti, coins into the wallet chip, seal): the message
+  banner and the pepe bursts moved into the modal. PotBoard and Graveyard pass the round's staker.
+- Settle path (`SettleWatch` inside `src/alt/VictoryModal.tsx`): the shared round lane (useRound, 4s) is the
+  detonation signal. The last round seen Active persists in localStorage (`psp-alt:victory-watch`);
+  `settledRound(lastActive, current)` is the current round once mode ≥ 2, or the remembered Active round once
+  the lane has moved to a newer id (detonate births the next round in the same tx). With a wallet connected,
+  one react-query read (`mode` + `claimablePot(address)` on that hook, 15s refetch, off without a wallet or
+  a settled round) feeds `victories.offerSettled`: one entry per hook+wallet, a grown amount updates it, and
+  a dismissal is remembered per hook+wallet (`psp-alt:victory-dismissed`) so it re-opens only if the amount
+  grows. Settle entries wait 4s and the modal never opens while a `detonate` FX runs (it hides and
+  re-opens after), so the set-piece keeps the stage. Loading after a detonation with no remembered Active
+  round shows no settle modal — the graveyard's claim button still works.
+- The modal (portal, `.vm-backdrop` z 9500: over the FX layer, under the toasts): dimmed page, square panel
+  card with a gold double trim, corner marks and a hard shadow, two happy PepeConfetti bursts rising from
+  the card's top edge behind it, the round, 'POT CLAIMED' / 'YOU WON THE POT' in `--display`, the amount in
+  big amber Pixel type (light theme uses its own darker amber — the site's light money token is green),
+  'from N seats on the final ladder' (N from `readRoundWinners` over the settled hook; the lab passes it),
+  the message, the pepes, 'brag on X ↗', and 'claim in the graveyard ↗' (settle) or 'view tx ↗' (claim).
+  ×, Esc and a click outside the card dismiss it; focus goes to × on open and back on close.
+- Pepes: the wallet's position NFTs in the round's staker (`balanceOf` → `tokenOfOwnerByIndex` for the
+  first six → `dnaOf`, rendered locally with the staker's `PEPE_DNA_VERSION`); `fanHand(total)` caps the
+  hand at 6 and the rest become a '+N more' chip. No NFTs → exactly one `useWalletPepe` identity pepe,
+  labeled 'your wallet pepe'. Several → a hand of cards rotated `fanAngle(i, n)` (≤ 12° apart, ≤ 56°
+  across) about a pivot `FAN_PIVOT` (4) card heights below the tops, dealt in with a stagger, lifting on
+  hover; reduced motion: static fan, no confetti, no deal or lift. Every card is a PNG raster
+  (`referralPepePng`, 828px) drawn `image-rendering: pixelated`.
+- PNG + brag (`src/lib/victoryArt.ts`): one pepe shares its 828px PNG; a fan is composited on a canvas with
+  the same geometry — each pepe rasterized at its native 69×69 first, then drawn ×4 with smoothing off onto
+  gold-trimmed cards with hard shadows, a gold frame and a '+N more' tag. 'brag on X ↗' writes the PNG to
+  the clipboard (ClipboardItem, ReferralShare precedent), then opens the x.com intent; the hint reads
+  'image copied — paste it in your post', or offers a 'save the png' download when the clipboard write is
+  unsupported or refused. Intent text: `<message>\n\ni just {claimed|won} <fmtAmount> mixETH from the round
+  <N> pot with <S> ladder seat(s) on positive sum pepes 🚀` (≤ 280 chars for every message; the info
+  sentence yields first if a message ever ran long).
+- FxLab: the claimPot kind button plays the claim path (prelude + receipt-style 12.34 mixETH, 2 seats,
+  identity pepe); 'settle win · 3 pepes' and 'settle win · 8 pepes' open settle wins with mock hands (the
+  second shows the cap chip); 'clear victories' resets the store. DEV-only as before.
+- Tests: `tests/victory.test.mjs` (message rotation incl. the verbatim entry, brag text/URL and the
+  280-char bound, settle detection, new-win/dismissal memory, store dedupe/grow/resolve, fan cap and arc);
+  `tests/potClaimDetail.test.mjs` keeps the receipt decoding.

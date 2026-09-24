@@ -18,7 +18,7 @@ import { verifyReferralClaim } from './referralRewards'
 import { buyFxDetail } from './buyFxDetail'
 import { hatchFxPepeId } from './hatchFxPepe'
 import { potClaimDetail } from './potClaimDetail'
-import { pickVictoryMessage, victoryCards } from './victoryCards'
+import { pickVictoryMessage, victories } from './victoryCards'
 import { captureAnchor, fireFx, isUserRejection, fxKindFor, type FxKind, type FxPepe } from './actionFx'
 
 function fire(kind: FxKind | undefined, anchor: Element | undefined, detail?: string, pepe?: FxPepe): void {
@@ -30,8 +30,9 @@ function fire(kind: FxKind | undefined, anchor: Element | undefined, detail?: st
  *  confirmation flows — present-but-undefined means "use nothing", absent means
  *  self-capture; `hatch` names the staker (and its DNA version) whose mint a
  *  confirmed predeposit claim reveals; `victory` names the round a confirmed
- *  claimPot payout belongs to (Round 4's persistent victory card). */
-type ConfirmedFx = { mute?: boolean; anchor?: Element; hatch?: { staker: `0x${string}`; dnaVersion: bigint }; victory?: { roundId: bigint; roundName?: string } }
+ *  claimPot payout belongs to, plus its staker for the winner's pepes (Round
+ *  5's victory modal; the hook is the write's own address). */
+type ConfirmedFx = { mute?: boolean; anchor?: Element; hatch?: { staker: `0x${string}`; dnaVersion: bigint }; victory?: { roundId: bigint; roundName?: string; staker?: `0x${string}` } }
 
 /** AUD-4: every UI write simulates, waits for mining, and checks receipt status. */
 export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } | { nftRoundId: bigint | undefined } | { referralClaimRoundId: bigint | undefined } | { referralPurchase: { roundId: bigint; registry?: `0x${string}` } }) {
@@ -144,23 +145,29 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
       }, { ...parameters, account: address, chainId: CHAIN_ID } as typeof parameters, toast?.update)
       // Only buys emit TimeAdded; the chip is the confirmed seconds, never the
       // pre-sign estimate. A claim's hatched pepe comes from its args/receipt.
-      // A confirmed claimPot (Round 4) celebrates with a random victory message
-      // and pushes a persistent card — but only on the receipt's decoded
-      // payout: no decodable PotClaimed, no card (confirmed facts only).
+      // A confirmed claimPot (Round 5) plays its celebration, then opens the
+      // victory modal with a random message — but only on the receipt's
+      // decoded payout: no decodable PotClaimed, no modal (confirmed facts only).
       if (!fx?.mute) {
         const hatch = kind === 'claimPredeposit' ? fx?.hatch : undefined
         const pepeId = hatch && hatchFxPepeId(parameters.functionName, parameters.args, receipt?.logs, address, hatch.staker)
         const amount = fx?.victory ? potClaimDetail(parameters.functionName, receipt?.logs, address) : undefined
-        const message = amount !== undefined ? pickVictoryMessage() : undefined
-        fire(kind, anchor, kind === 'buy' ? buyFxDetail(receipt?.logs) : message,
+        fire(kind, anchor, kind === 'buy' ? buyFxDetail(receipt?.logs) : undefined,
           hatch && pepeId !== undefined ? { id: pepeId, dnaVersion: hatch.dnaVersion, staker: hatch.staker } : undefined)
-        if (amount !== undefined && message !== undefined && fx?.victory) {
-          victoryCards.push({
+        if (amount !== undefined && fx?.victory) {
+          victories.resolveSettled(parameters.address, address)
+          victories.push({
+            source: 'claim',
             roundId: fx.victory.roundId,
             roundName: fx.victory.roundName,
             amountMix: amount,
-            message,
+            message: pickVictoryMessage(),
+            account: address,
+            hook: parameters.address,
+            staker: fx.victory.staker,
             txHash: hash,
+            // the claim burst's coins and seal land before the modal opens
+            delayMs: 900,
           })
         }
       }
