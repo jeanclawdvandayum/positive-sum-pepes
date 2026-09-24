@@ -213,10 +213,10 @@ body.alt-mode .alt-shell .tx-action.alt-detonate[data-state='done'] :is(.dtn-str
 
 /* One of two FX overlays that catch input: click or Esc skips. pointer-events
    auto overrides the FX layer's none. Sits at 9000, below the toast stack
-   (10000). ~6.2s in beats (ms): alarm 0–900, flash 900, slam 950, shake A
-   1000, winners rocket off the ladder 1450–3160, rumble 1600–3200, blast
-   3250 (3D cloud 3250–6200), debris + pepe confetti 3350, lock + stamp
-   4200, settle 5300, fade 5800–6200. Explosions use a fixed fire palette:
+   (10000). ~8.3s in beats (ms): alarm 0–900, flash 900, slam 950, shake A
+   1000, winners lift off their even line-up 1650–5080 (slow rockets), rumble
+   1800–4400, blast 5300 (3D cloud 5300–8300), debris + pepe confetti 5400,
+   lock + stamp 6250, settle 7400, fade 7900–8300. Explosions use a fixed fire palette:
    fire is fire. The 3D cloud (boom3d.ts) reads --boom-*: the fire ramp's
    white/yellow/orange are that fixed fire, its red/ember come from the
    theme's critical --time-lit/--red, and the smoke is mixed from
@@ -260,7 +260,7 @@ body.alt-mode .dtn-stage {
   overflow: hidden;
   cursor: pointer;
   pointer-events: auto;
-  animation: dtn-stage-out 0.4s ease-in 5.8s forwards;
+  animation: dtn-stage-out 0.4s ease-in 7.9s forwards;
 }
 html[data-theme=light] body.alt-mode .dtn-stage { --time-lit: #ff5c3d; }
 @keyframes dtn-stage-out {
@@ -271,7 +271,7 @@ html[data-theme=light] body.alt-mode .dtn-stage { --time-lit: #ff5c3d; }
 body.alt-mode .dtn-quake {
   position: absolute;
   inset: 0;
-  animation: dtn-jolt 0.14s linear 4.2s;
+  animation: dtn-jolt 0.14s linear 6.25s;
 }
 @keyframes dtn-jolt {
   0% { transform: translate(0, 0); }
@@ -291,15 +291,15 @@ body.alt-mode .dtn-dim {
   z-index: 1;
   background: #000;
   opacity: 0;
-  animation: dtn-dim 5.8s linear both;
+  animation: dtn-dim 7.9s linear both;
 }
 @keyframes dtn-dim {
   0% { opacity: 0; }
-  5.2% { opacity: 0.5; }    /* 300ms */
-  15.5% { opacity: 0.5; }   /* 900ms */
-  17.1% { opacity: 0.82; }  /* 990ms */
-  91.4% { opacity: 0.82; }  /* 5300ms */
-  100% { opacity: 0.45; }   /* 5800ms */
+  3.8% { opacity: 0.5; }    /* 300ms */
+  11.4% { opacity: 0.5; }   /* 900ms */
+  12.5% { opacity: 0.82; }  /* 990ms */
+  93.7% { opacity: 0.82; }  /* 7400ms */
+  100% { opacity: 0.45; }   /* 7900ms */
 }
 
 /* 0–900ms ALARM: three red vignette pulses, two siren beams, hazard tape */
@@ -366,16 +366,16 @@ body.alt-mode .dtn-tape::before {
 @keyframes dtn-tape-crawl {
   to { transform: translateX(45.25px); }
 }
-body.alt-mode .dtn-tape-top { top: 0; animation: dtn-tape-top 5.8s linear both; }
-body.alt-mode .dtn-tape-bottom { bottom: 0; animation: dtn-tape-bottom 5.8s linear both; }
+body.alt-mode .dtn-tape-top { top: 0; animation: dtn-tape-top 7.9s linear both; }
+body.alt-mode .dtn-tape-bottom { bottom: 0; animation: dtn-tape-bottom 7.9s linear both; }
 @keyframes dtn-tape-top {
   0% { transform: translateY(-110%); }
-  4%, 91.4% { transform: translateY(0); }
+  3%, 93.7% { transform: translateY(0); }
   100% { transform: translateY(-110%); }
 }
 @keyframes dtn-tape-bottom {
   0% { transform: translateY(110%); }
-  4%, 91.4% { transform: translateY(0); }
+  3%, 93.7% { transform: translateY(0); }
   100% { transform: translateY(110%); }
 }
 
@@ -403,7 +403,7 @@ body.alt-mode .dtn-slam {
   padding-bottom: 18vh;
   pointer-events: none;
   transform-origin: 50% 40%;
-  animation: dtn-knock 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) 3.25s both;
+  animation: dtn-knock 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) 5.3s both;
 }
 /* 3250ms: the blast knocks the clock up and back (the stamp rides along) */
 @keyframes dtn-knock {
@@ -655,7 +655,7 @@ body.alt-mode .dtn-blast {
     #fff 0 9%, var(--fire-white) 16%, var(--fire-yellow) 30%, var(--fire-orange) 48%,
     rgb(232 66 58 / 0.88) 70%, rgb(90 20 20 / 0.75) 100%);
   opacity: 0;
-  animation: dtn-blast 0.8s ease-out 3.25s both;
+  animation: dtn-blast 0.8s ease-out 5.3s both;
 }
 @keyframes dtn-blast {
   0% { opacity: 0; }
@@ -674,7 +674,7 @@ body.alt-mode .dtn-shock {
   border: 8px solid var(--fire-white);
   box-shadow: 0 0 30px var(--fire-yellow), inset 0 0 30px var(--fire-yellow);
   opacity: 0;
-  animation: dtn-shock 0.8s cubic-bezier(0.1, 0.6, 0.3, 1) 3.28s both;
+  animation: dtn-shock 0.8s cubic-bezier(0.1, 0.6, 0.3, 1) 5.33s both;
 }
 @keyframes dtn-shock {
   0% { opacity: 0; transform: scale(0.1); }
@@ -692,7 +692,7 @@ body.alt-mode .dtn-ground-ring {
   border: 6px solid var(--fire-yellow);
   box-shadow: 0 0 24px var(--fire-orange);
   opacity: 0;
-  animation: dtn-ground-ring 1.1s cubic-bezier(0.1, 0.6, 0.3, 1) 3.32s both;
+  animation: dtn-ground-ring 1.1s cubic-bezier(0.1, 0.6, 0.3, 1) 5.37s both;
 }
 @keyframes dtn-ground-ring {
   0% { opacity: 0; transform: scale(0.15); }
@@ -848,7 +848,7 @@ body.alt-mode .dtn-mush {
   height: 0;
   font-size: clamp(9px, 3.2vw, 16px);
   opacity: 0;
-  animation: dtn-mush-life 2.9s linear 3.28s both;
+  animation: dtn-mush-life 2.9s linear 5.33s both;
 }
 @keyframes dtn-mush-life {
   0% { opacity: 0; }
@@ -879,7 +879,7 @@ body.alt-mode .dtn-mush-head {
   bottom: 20em;
   width: 0;
   height: 0;
-  animation: dtn-mush-rise 2.9s cubic-bezier(0.15, 0.7, 0.3, 1) 3.25s both;
+  animation: dtn-mush-rise 2.9s cubic-bezier(0.15, 0.7, 0.3, 1) 5.3s both;
 }
 @keyframes dtn-mush-rise {
   0% { transform: translateY(18em) scale(0.22); }
@@ -894,7 +894,7 @@ body.alt-mode .dtn-mush-glow {
   height: 5.5em;
   border-radius: 50%;
   background: radial-gradient(closest-side, var(--boom-hot), color-mix(in srgb, var(--boom-orange) 70%, transparent) 45%, transparent);
-  animation: dtn-mush-glow 2.9s linear 3.25s both;
+  animation: dtn-mush-glow 2.9s linear 5.3s both;
 }
 @keyframes dtn-mush-glow {
   0% { opacity: 1; }
@@ -913,7 +913,7 @@ body.alt-mode .dtn-mush-cap {
     6.2em 0.3em 0 -0.2em, -1.6em 0.4em 0 0.9em, 2em 0.8em 0 0.6em, -8em 1.6em 0 -0.8em,
     8.2em 1.9em 0 -1em, -5em 2.3em 0 -0.2em, 5.2em 2.5em 0 -0.4em, -2em 2.8em 0 -0.3em,
     1.8em 3em 0 -0.4em;
-  animation: dtn-mush-cool 2.9s linear 3.25s both;
+  animation: dtn-mush-cool 2.9s linear 5.3s both;
 }
 body.alt-mode .dtn-mush-cap::before {
   inset: 0.6em;
@@ -924,7 +924,7 @@ body.alt-mode .dtn-mush-cap::after {
   inset: 1.5em;
   color: var(--boom-yellow);
   transform: translate(-0.7em, -1.2em);
-  animation: dtn-mush-churn 0.55s ease-in-out 3.5s 5 alternate;
+  animation: dtn-mush-churn 0.55s ease-in-out 5.55s 5 alternate;
 }
 @keyframes dtn-mush-churn {
   to { transform: translate(-0.45em, -1.05em) scale(1.07); }
@@ -951,8 +951,8 @@ body.alt-mode .dtn-mush-stem {
     0 -13.5em 0 -0.1em, 0.2em -15em 0 0.3em, 0 -16.3em 0 0.7em;
   transform-origin: 50% 100%;
   animation:
-    dtn-mush-stem 1.4s cubic-bezier(0.2, 0.7, 0.3, 1) 3.35s both,
-    dtn-mush-cool 2.9s linear 3.25s both;
+    dtn-mush-stem 1.4s cubic-bezier(0.2, 0.7, 0.3, 1) 5.4s both,
+    dtn-mush-cool 2.9s linear 5.3s both;
 }
 body.alt-mode .dtn-mush-stem::before {
   inset: 0.45em;
@@ -976,8 +976,8 @@ body.alt-mode .dtn-mush-skirt {
     -9.2em 0.6em 0 -0.2em, 9.2em 0.6em 0 -0.2em, -11.8em 0.8em 0 -0.6em, 11.8em 0.8em 0 -0.6em,
     -14em 1em 0 -1em, 14em 1em 0 -1em;
   animation:
-    dtn-mush-skirt 2.6s cubic-bezier(0.1, 0.6, 0.3, 1) 3.3s both,
-    dtn-mush-cool 2.9s linear 3.25s both;
+    dtn-mush-skirt 2.6s cubic-bezier(0.1, 0.6, 0.3, 1) 5.35s both,
+    dtn-mush-cool 2.9s linear 5.3s both;
 }
 body.alt-mode .dtn-mush-skirt::before {
   inset: 0.4em;
@@ -1039,7 +1039,7 @@ body.alt-mode .dtn-stamp {
   box-shadow: 0 0 24px color-mix(in srgb, var(--time-lit) 45%, transparent);
   transform: rotate(-12deg);
   opacity: 0;
-  animation: dtn-stamp 0.24s cubic-bezier(0.3, 1.4, 0.4, 1) 4.2s both;
+  animation: dtn-stamp 0.24s cubic-bezier(0.3, 1.4, 0.4, 1) 6.25s both;
 }
 body.alt-mode .dtn-stamp::after {
   content: '';
@@ -1047,7 +1047,7 @@ body.alt-mode .dtn-stamp::after {
   inset: 0;
   background: #fff;
   opacity: 0;
-  animation: dtn-impact-flash 0.24s steps(3, jump-none) 4.2s forwards;
+  animation: dtn-impact-flash 0.24s steps(3, jump-none) 6.25s forwards;
 }
 @keyframes dtn-stamp {
   0% { opacity: 0; transform: rotate(-12deg) scale(2.4); }

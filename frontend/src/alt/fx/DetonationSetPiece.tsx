@@ -233,7 +233,7 @@ const EMBERS = [
 // Fuse timeline (ms): the spark sits at the fuse tip from the drop, burns
 // one art pixel at a time down to the collar, and the bomb goes white.
 const FUSE_LIT = 650
-const FUSE_OUT = 3190
+const FUSE_OUT = 5240
 const FUSE_STEP = (FUSE_OUT - FUSE_LIT) / (PIXEL_BOMB.fuse.length - 1)
 
 function PixelBomb({ sparkRef }: { sparkRef: Ref<SVGGElement> }) {
@@ -283,10 +283,10 @@ function PixelBomb({ sparkRef }: { sparkRef: Ref<SVGGElement> }) {
   )
 }
 
-const SEQ_MS = 6200 // stage fade completes at 6200 (CSS: 5800 + 400)
+const SEQ_MS = 8300 // stage fade completes at 8300 (CSS: 7900 + 400)
 const REDUCED_MS = 1150 // static dim+stamp, fade ends 1080; ≤1.2s incl. timer slop
-const BLAST_MS = 3250
-const LOCK_MS = 4200
+const BLAST_MS = 5300
+const LOCK_MS = 6250
 
 // Deterministic LCG so QA screenshots repeat exactly.
 function lcg(seed: number) {
@@ -316,14 +316,14 @@ const DEBRIS = (() => {
 // scaled by --rpx screen px each, with the seat's pepe in the porthole; its
 // exhaust is the blast's own pixel smoke puff (dtn-puff — one smoke system,
 // two emitters), spawned at the nozzle on a timer while it flies.
-const ESCAPE_MS = 1450
-const ESCAPE_STAGGER = 90
-const ESCAPE_MS_EACH = 900 // 260ms on the pad (flame lit, shivering), 640ms of flight
+const ESCAPE_MS = 1650
+const ESCAPE_STAGGER = 170
+const ESCAPE_MS_EACH = 1900 // 520ms on the pad (flame lit, shivering), 1380ms of flight — slow enough to read the faces
 // exhaust schedule (ms after a rocket's launch): two ignition puffs on the
 // pad, then a trail puff every PUFF_EVERY from liftoff (29% of the flight)
 // until just before the top of the screen
 const PUFF_PAD_AT = [60, 170]
-const PUFF_FLY_FROM = 300
+const PUFF_FLY_FROM = 520
 const PUFF_EVERY = 80
 const PUFF_DUR = 640 // one exhaust puff's lifetime
 const PUFF_CAP = 48 // live dynamic puffs; + 12 static blast puffs ≤ 60 nodes
@@ -375,19 +375,24 @@ function escapees(): Escapee[] {
         return { x: r.left + 58, y: r.top + r.height / 2, svg: pepe() }
       })
       : Array.from({ length: 8 }, (_, i) => ({ x: vw * (0.1 + 0.8 * (i / 7)), y: vh * 0.7, svg: pepe() }))
+  // One launch plane level with the bomb, evenly spaced across it: the
+  // escape reads as a squadron line-up, not a scatter of ladder rows.
+  const planeY = Math.round(vh * 0.8)
+  const n = Math.min(seats.length, 10)
+  const inset = vw * (n > 6 ? 0.07 : 0.14)
   return seats.slice(0, 10).map((seat, i) => {
-    const y = Math.min(seat.y, vh + 40)
-    const away = seat.x < vw / 2 ? -1 : 1
+    const x = n === 1 ? vw / 2 : inset + (i * (vw - 2 * inset)) / (n - 1)
+    const away = x < vw / 2 ? -1 : 1
     return {
-      x: Math.round(seat.x),
-      y: Math.round(y),
+      x: Math.round(x),
+      y: planeY,
       svg: seat.svg,
       art: seat.art,
       launch: ESCAPE_MS + i * ESCAPE_STAGGER,
       dx: Math.round(away * vw * (0.06 + 0.16 * rand())),
       // off the top with the whole exhaust trail (the rocket is 80px tall)
       // behind it
-      rise: Math.round(y + vh * 0.65 + 120),
+      rise: Math.round(planeY + vh * 0.65 + 120),
       tilt: Math.round(away * (6 + 10 * rand())),
     }
   })
@@ -569,7 +574,7 @@ export default function DetonationSetPiece({ onDone }: { onDone: () => void }) {
       }
       at(1000, () => quake(shakeFrames(12, 9), 500, 'linear'))
       // the launch rumble under the escape
-      at(1600, () => quake(rumbleFrames(3, 24), 1600, 'linear'))
+      at(1800, () => quake(rumbleFrames(3, 24), 2600, 'linear'))
       // each escaping seat's real ladder art empties as its rocket leaves the
       // pad (restored with the rest of the page on finish)
       for (const r of rockets) {

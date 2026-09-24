@@ -13,7 +13,7 @@ import HatchModal from './fx/HatchModal'
 
 const HARD_STOP_MS = 5500
 /** The set-piece runs ~5.6s; its own timer ends it, this is the backstop. */
-const DETONATE_HARD_STOP_MS = 7000
+const DETONATE_HARD_STOP_MS = 9200
 
 function ActiveFx({ event }: { event: FxEvent }) {
   const onDone = useCallback(() => actionFx.done(event.id), [event.id])
