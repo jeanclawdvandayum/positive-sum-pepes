@@ -194,7 +194,7 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
     setError(null)
     const approvals: Parameters<typeof writeWithApprovals>[1] = []
     try {
-      if (fn === 'lockWithPepe' && (dnaVersion === 1n || dnaVersion === 2n) && round.staker && pickedId !== null) {
+      if (fn === 'lockWithPepe' && (dnaVersion === 1n || dnaVersion === 2n || dnaVersion === 3n) && round.staker && pickedId !== null) {
         const available = await rpcCall(round.staker, stakerAbi, 'isPepeAvailable', [pickedId])
         if (available !== true) {
           setPickedId(null)

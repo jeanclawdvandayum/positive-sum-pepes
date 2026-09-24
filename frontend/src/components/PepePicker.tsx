@@ -59,7 +59,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll, 
 
   const { data: available } = useQuery({
     queryKey: ['pepe-candidates', CHAIN_ID, staker, candidates.map(String)],
-    enabled: !!staker && (dnaVersion === 1n || dnaVersion === 2n),
+    enabled: !!staker && (dnaVersion === 1n || dnaVersion === 2n || dnaVersion === 3n),
     queryFn: () => Promise.all(candidates.map(id => rpcCall(staker!, stakerAbi, 'isPepeAvailable', [id]) as Promise<boolean>)),
     refetchInterval: 6000,
   })
