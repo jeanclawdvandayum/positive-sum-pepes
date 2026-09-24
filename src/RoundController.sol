@@ -48,6 +48,9 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     error ZeroShare(); // L-4: predeposit share rounded to 0 — claim refused, flag not set
     error PredepositOpen(); // window still live and cap not reached — only owner may launch early
     error CapExceeded(); // public predeposit would push total past PREDEPOSIT_CAP
+    error NotGreenlisted(); // green-phase deposit without membership (root or prev-round PSP)
+    error GreenCapExceeded(); // green-phase deposit past 500/N per wallet
+    error WrongPhase(); // deposit outside its phase's window
     error WalletCapExceeded(); // per-wallet predeposit cap (scoopy 2026-08-29 — sybil friction)
     error NotFactory(); // carry seeding is factory-only
 
@@ -84,25 +87,41 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     // ─────────────── Predeposit ───────────────
     struct DepositInfo {
         uint256 mixETHAmount;
+        uint256 greenAmount; // greenlist tranche (first genesis buy)
         bool claimed;
     }
     mapping(address => DepositInfo) public predeposits;
     uint256 public totalPredepositMixETH;
+    uint256 public totalGreenMixETH; // green tranche pool (first genesis buy)
+    uint256 public greenDepositors;
     uint256 public totalPredepositors;
     uint256 public totalInitialPSP; // snapshot of PSP minted at launch
     bool public predepositClosed;
 
-    /// @dev The public IBCO window starts at final factory wiring. Public
-    ///      deposits are capped at PREDEPOSIT_CAP in total (testnet rule,
-    ///      scoopy 2026-09-23: reverses the uncapped v3 IBCO for lifecycle
-    ///      testing). Anyone may launch once the window elapses or the cap is
-    ///      reached. Packed timings preserve shorter windows for playtests.
-    uint256 public immutable PREDEPOSIT_DURATION; // default 3 days
+    /// @dev Greenlist-IBCO (rules v3, scoopy 2026-09-25): the window splits
+    ///      into GREEN (csv root ∪ previous-round PSP holders, per-wallet
+    ///      500/N) then OPEN (everyone, OPEN_PER_WALLET each), sharing the
+    ///      1000 mixETH PREDEPOSIT_CAP. Unused green capacity rolls forward.
+    ///      Genesis launch executes two consecutive curve buys — green pool
+    ///      first, open pool second, both inside launchPooledBuy (atomic, so
+    ///      nobody can frontrun between them).
+    uint256 public immutable GREEN_DURATION; // default 1 day
+    uint256 public immutable OPEN_DURATION; // default 1 day
+    /// @notice Keccak Merkle root of the csv greenlist (empty = zero root).
+    bytes32 public immutable GREEN_ROOT;
+    /// @notice Green-phase per-wallet cap: 500 mixETH / N, N = csv entries ∪
+    ///         prevToken.holderCount() at birth. 0 disables the green phase.
+    uint256 public immutable GREEN_PER_WALLET;
+    /// @notice Open-phase per-wallet cap (default 10 mixETH — whale friction).
+    uint256 public immutable OPEN_PER_WALLET;
+    /// @notice Previous round's PSP token — its frozen holder map is the
+    ///         trustless auto-greenlist (held PSP at THAT round's detonation).
+    PSPToken public immutable PREV_TOKEN;
     /// @notice Total pooled IBCO cap for public deposits. Factory carry is
     ///         exempt from the check but counts toward the total.
     uint256 public constant PREDEPOSIT_CAP = 1000 ether;
     /// @notice Version 2 accepts any positive pooled deposit within the caps.
-    uint256 public constant PREDEPOSIT_RULES_VERSION = 2;
+    uint256 public constant PREDEPOSIT_RULES_VERSION = 3;
     /// @dev Genesis pooled buy routes this share of the boot into the hook's
     ///      ladder pot at launch (mirrors the sine pre-wave fee). The rest
     ///      seeds the curve; predepositors claim their pro-rata of the PSP
@@ -137,6 +156,10 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     ///      the pot: its carve-out pays out live in mixETH, nothing
     ///      accumulates here.
     uint256 public genesisPSPSnapshot;
+    /// @dev Per-tranche PSP at launch: green depositors share greenPSPSnapshot
+    ///      pro-rata, open depositors share the remainder (second buy).
+    uint256 public greenPSPSnapshot;
+    uint256 public openPSPSnapshot;
 
     // ─────────────── Factory round tracking ───────────────
     uint256 public factoryRoundId;
@@ -164,14 +187,21 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         CurveMath.CurveConfig memory _config,
         address _factory,
         address _descriptor,
-        StakerDeployer _stakerDeployer
+        StakerDeployer _stakerDeployer,
+        uint64 _greenSec,
+        uint64 _openSec,
+        bytes32 _greenRoot,
+        uint256 _csvCount,
+        uint256 _openPerWalletWad,
+        PSPToken _prevToken
     ) Ownable(_factory) {
         // Packed profile decode — `_config.timings == 0` → mainnet defaults.
         // Branch form (not per-field fallbacks) keeps the creation code —
         // embedded inside ControllerDeployer — under EIP-170's 24.5kB cap.
         uint256 t = _config.timings;
         if (t == 0) {
-            PREDEPOSIT_DURATION = 3 days;
+            GREEN_DURATION = 1 days;
+            OPEN_DURATION = 1 days;
             VEST_DURATION = 28 days;
             PREDEPOSIT_CAP_PER_WALLET = 0; // uncapped (mainnet)
         } else {
@@ -179,7 +209,8 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             // [0] predeposit, [1] vest, [2] detonation window (hook-owned),
             // [3] wallet cap (whole mixETH). The layout guard + roundtrip
             // test pin the packing (LESSONS 2026-08-24 / 2026-08-18).
-            PREDEPOSIT_DURATION = t & CurveMath.TIMINGS_MASK;
+            GREEN_DURATION = t & CurveMath.TIMINGS_MASK; // slot [0] = green
+            OPEN_DURATION = _openSec == 0 ? 1 days : _openSec;
             VEST_DURATION = (t >> CurveMath.TIMINGS_WIDTH) & CurveMath.TIMINGS_MASK;
             // 4th slot (2026-09-03): per-wallet predeposit cap, whole mixETH
             // (the det window moved to slot [2], consumed by CurveHook)
@@ -191,8 +222,18 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             // = VEST_DURATION / 6 truncates to 0 below six seconds and every
             // epoch path panics 0x11 (division by zero), first inside
             // launchPooledBuy, stranding the predeposit pool with no abort.
-            if (PREDEPOSIT_DURATION == 0 || VEST_DURATION < 6) revert TimingsIncomplete();
+            if (GREEN_DURATION == 0 || OPEN_DURATION == 0 || VEST_DURATION < 6) {
+                revert TimingsIncomplete();
+            }
         }
+        // Greenlist sizing: N = csv entries + previous-round holders (frozen
+        // holderCount of the round that just died). N = 0 → no green phase.
+        uint256 n = _csvCount;
+        if (address(_prevToken) != address(0)) n += _prevToken.holderCount();
+        GREEN_ROOT = _greenRoot;
+        GREEN_PER_WALLET = n == 0 ? 0 : 500 ether / n;
+        OPEN_PER_WALLET = _openPerWalletWad == 0 ? 10 ether : _openPerWalletWad;
+        PREV_TOKEN = _prevToken;
         if (address(_pspToken) == address(0)) revert ZeroAddress();
         if (address(_mixETH) == address(0)) revert ZeroAddress();
         if (_factory == address(0)) revert ZeroAddress();
@@ -301,15 +342,16 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     function predepositWithPepe(uint256 mixETHAmount, uint256 pepeId) external nonReentrant {
         uint256 selected = predepositPepe[msg.sender];
         if (selected != 0 && selected != pepeId) revert PredepositClosed();
-        _predepositFor(msg.sender, mixETHAmount);
+        _predepositFor(msg.sender, mixETHAmount, false, new bytes32[](0));
         if (selected == 0) {
             staker.reserveGenesisPepe(msg.sender, pepeId);
             predepositPepe[msg.sender] = pepeId;
         }
     }
 
+    /// @notice Open-phase deposit (rules v3; the legacy name routes here).
     function predeposit(uint256 mixETHAmount) external nonReentrant {
-        _predepositFor(msg.sender, mixETHAmount);
+        _predepositFor(msg.sender, mixETHAmount, false, new bytes32[](0));
     }
 
     /// @notice Deposit on behalf of a beneficiary (e.g. the ETH zap router:
@@ -319,20 +361,55 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
     ///      (same as ERC-4626 depositFor — depositing FOR someone can only
     ///      credit them, never debit).
     function predepositFor(address beneficiary, uint256 mixETHAmount) external nonReentrant {
-        _predepositFor(beneficiary, mixETHAmount);
+        _predepositFor(beneficiary, mixETHAmount, false, new bytes32[](0));
     }
 
-    function _predepositFor(address beneficiary, uint256 mixETHAmount) internal {
+    /// @notice Greenlist phase deposit (rules v3): csv Merkle proof or
+    ///         previous-round PSP holder (frozen at that round's detonation).
+    function predepositGreen(uint256 mixETHAmount, bytes32[] calldata proof) external nonReentrant {
+        _predepositFor(msg.sender, mixETHAmount, true, proof);
+    }
+
+    /// @notice Greenlist deposit reserving a chosen pepe (art version 2+).
+    function predepositGreenWithPepe(uint256 mixETHAmount, uint256 pepeId, bytes32[] calldata proof)
+        external
+        nonReentrant
+    {
+        uint256 selected = predepositPepe[msg.sender];
+        if (selected != 0 && selected != pepeId) revert PredepositClosed();
+        _predepositFor(msg.sender, mixETHAmount, true, proof);
+        if (selected == 0) {
+            staker.reserveGenesisPepe(msg.sender, pepeId);
+            predepositPepe[msg.sender] = pepeId;
+        }
+    }
+
+    function _predepositFor(address beneficiary, uint256 mixETHAmount, bool green, bytes32[] memory proof)
+        internal
+    {
         if (address(hook) == address(0)) revert NotPredeposit();
         if (predepositClosed) revert PredepositClosed();
         if (mixETHAmount == 0) revert ZeroAmount();
-        // Constructor profiles can retain an optional beneficiary cap for
-        // private playtests. The default profile leaves wallets uncapped.
-        if (
-            PREDEPOSIT_CAP_PER_WALLET != 0
-                && predeposits[beneficiary].mixETHAmount + mixETHAmount > PREDEPOSIT_CAP_PER_WALLET
-        ) {
-            revert WalletCapExceeded();
+        uint8 ph = phase();
+        if (green) {
+            if (ph != 0) revert WrongPhase();
+            if (!_greenlisted(beneficiary, proof)) revert NotGreenlisted();
+            if (predeposits[beneficiary].greenAmount + mixETHAmount > GREEN_PER_WALLET) {
+                revert GreenCapExceeded();
+            }
+        } else {
+            if (ph == 0 && GREEN_PER_WALLET != 0) revert WrongPhase();
+            if (ph == 2) revert WrongPhase();
+            // The 2026-09-03 packed wallet-cap slot retires into the
+            // open-phase cap (10 mixETH default; whale friction, not sybil
+            // resistance).
+            uint256 openCap = OPEN_PER_WALLET;
+            if (openCap != 0
+                && predeposits[beneficiary].mixETHAmount - predeposits[beneficiary].greenAmount
+                    + mixETHAmount > openCap
+            ) {
+                revert WalletCapExceeded();
+            }
         }
         if (totalPredepositMixETH + mixETHAmount > PREDEPOSIT_CAP) revert CapExceeded();
 
@@ -346,7 +423,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         uint256 actualAmount = balAfter - balBefore;
         if (actualAmount == 0) revert ZeroAmount();
 
-        _recordPredeposit(beneficiary, actualAmount);
+        _recordPredeposit(beneficiary, actualAmount, green);
     }
 
     /// @notice Factory-only carry seeding from the factory's own balance.
@@ -361,7 +438,7 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         uint256 actualAmount = balAfter - balBefore;
         if (actualAmount == 0) revert ZeroAmount();
 
-        _recordPredeposit(msg.sender, actualAmount);
+        _recordPredeposit(msg.sender, actualAmount, false);
         emit CarrySeeded(actualAmount);
     }
 
@@ -408,13 +485,18 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         }
     }
 
-    function _recordPredeposit(address depositor, uint256 amount) internal {
+    function _recordPredeposit(address depositor, uint256 amount, bool greenTranche) internal {
         uint256 oldBoot = totalPredepositMixETH + carryBonusMixETH;
         if (amount > type(uint256).max - oldBoot) revert PredepositCapacityExceeded();
         uint256 sharesAfter = totalPredepositMixETH + amount;
         _validateBootstrap(oldBoot + amount, sharesAfter);
         if (predeposits[depositor].mixETHAmount == 0) {
             totalPredepositors++;
+            if (greenTranche) greenDepositors++;
+        }
+        if (greenTranche) {
+            predeposits[depositor].greenAmount += amount;
+            totalGreenMixETH += amount;
         }
         predeposits[depositor].mixETHAmount += amount;
         totalPredepositMixETH += amount;
@@ -429,8 +511,34 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         return totalPredepositMixETH >= PREDEPOSIT_CAP;
     }
 
+    /// @notice IBCO phase: 0 = green, 1 = open, 2 = over.
+    function phase() public view returns (uint8) {
+        if (address(hook) == address(0)) return 0;
+        if (GREEN_PER_WALLET == 0) {
+            // No greenlist members: the whole window is open.
+            return block.timestamp < predepositStartTime + OPEN_DURATION ? 1 : 2;
+        }
+        if (block.timestamp < predepositStartTime + GREEN_DURATION) return 0;
+        if (block.timestamp < predepositStartTime + GREEN_DURATION + OPEN_DURATION) return 1;
+        return 2;
+    }
+
+    /// @dev Greenlist membership: previous round's frozen holder map, or a
+    ///      Merkle proof against GREEN_ROOT (the csv). Round 1: csv only.
+    function _greenlisted(address who, bytes32[] memory proof) internal view returns (bool) {
+        if (address(PREV_TOKEN) != address(0) && PREV_TOKEN.holder(who)) return true;
+        if (GREEN_ROOT == bytes32(0) || proof.length == 0) return false;
+        bytes32 leaf = keccak256(abi.encodePacked(who));
+        for (uint256 i; i < proof.length; ++i) {
+            leaf = leaf < proof[i]
+                ? keccak256(abi.encodePacked(leaf, proof[i]))
+                : keccak256(abi.encodePacked(proof[i], leaf));
+        }
+        return leaf == GREEN_ROOT;
+    }
+
     function _windowOver() internal view returns (bool) {
-        return address(hook) != address(0) && block.timestamp >= predepositStartTime + PREDEPOSIT_DURATION;
+        return address(hook) != address(0) && phase() == 2;
     }
 
     /// @notice Everything a front-end needs about the predeposit phase.
@@ -444,7 +552,11 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             bool closed,
             bool capReached,
             bool windowOver,
-            bool launchable
+            bool launchable,
+            uint8 phaseNow,
+            uint256 greenTotal,
+            uint256 greenPerWallet,
+            uint256 openPerWallet
         )
     {
         capReached = _capReached();
@@ -456,7 +568,11 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             predepositClosed,
             capReached,
             windowOver,
-            (capReached || windowOver) && !predepositClosed
+            (capReached || windowOver) && !predepositClosed,
+            phase(),
+            totalGreenMixETH,
+            GREEN_PER_WALLET,
+            OPEN_PER_WALLET
         );
     }
 
@@ -472,10 +588,14 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // Boot pool = public predeposit + any carry bonus (old-pot deposits).
         uint256 totalBoot = totalPredepositMixETH + carryBonusMixETH;
 
-        // Genesis buy pays the pre-wave fee INTO THE POT (scoopy 2026-09-03:
-        // "a 10% fee from that should have gone to the pot"). The remaining
-        // 90% seeds the curve; initialPSP is computed on the post-fee boot so
-        // the wave anchors to what actually landed on the curve.
+        // TWO CONSECUTIVE GENESIS BUYS (greenlist-IBCO, same tx — nobody can
+        // frontrun between them): buy #1 = the green tranche pool, buy #2 =
+        // the open tranche. Each tranche pays the 10% pre-wave pot fee on its
+        // own boot; the PSP split is the exact curve-integral segmentation
+        // F(greenBoot) then F(totalBoot) − F(greenBoot).
+        uint256 greenBootRaw = totalGreenMixETH + _greenCarry();
+        uint256 greenCurveBoot =
+            greenBootRaw - Math.mulDiv(greenBootRaw, GENESIS_POT_FEE_BPS, 10000);
         uint256 potFee = Math.mulDiv(totalBoot, GENESIS_POT_FEE_BPS, 10000);
         uint256 curveBoot = totalBoot - potFee;
 
@@ -490,6 +610,16 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
             ? hook.sineGenesisPSP(curveBoot)
             : CurveMath.computeBuyOutput(curveBoot, 0, curveConfig);
         if (initialPSP == 0) revert ZeroAmount();
+
+        // Buy #1's PSP: the integral up to the green tranche's curve boot.
+        // Buy #2's: the remainder. Each tranche's depositors share their own
+        // segment pro-rata (see _claimPredepositPSP).
+        greenPSPSnapshot = greenCurveBoot == 0
+            ? 0
+            : (hook.sineConfigured()
+                ? hook.sineGenesisPSP(greenCurveBoot)
+                : CurveMath.computeBuyOutput(greenCurveBoot, 0, curveConfig));
+        openPSPSnapshot = initialPSP - greenPSPSnapshot;
 
         // Snapshot for proportional claims (prevents donation attacks)
         totalInitialPSP = initialPSP;
@@ -518,6 +648,13 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         hook.setMode(CurveHook.Mode.Active);
 
         emit Launched(totalBoot, initialPSP);
+    }
+
+    /// @dev Carry joins the OPEN tranche (factory dust is not a greenlist
+    ///      deposit) — unless the open pool is empty, when it rides buy #1 so
+    ///      a carry-only round still launches.
+    function _greenCarry() internal view returns (uint256) {
+        return totalPredepositMixETH == totalGreenMixETH ? carryBonusMixETH : 0;
     }
 
     function _distributeInitialPSP(uint256 initialPSP) internal {
@@ -565,7 +702,18 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         // claim can be retried later if a larger share ever applies.
         // Denominator is the predeposit pool; numerator is the claimable
         // genesis pool (pot's slice already excluded).
-        uint256 share = Math.mulDiv(genesisPSPSnapshot, dep.mixETHAmount, totalPredepositMixETH);
+        // Rules v3: each depositor owns their tranche's segment — green
+        // depositors the first buy's PSP, open depositors the second's.
+        uint256 share;
+        if (dep.greenAmount > 0) {
+            share += Math.mulDiv(greenPSPSnapshot, dep.greenAmount, totalGreenMixETH);
+        }
+        uint256 openAmount = dep.mixETHAmount - dep.greenAmount;
+        if (openAmount > 0) {
+            share += Math.mulDiv(
+                openPSPSnapshot, openAmount, totalPredepositMixETH - totalGreenMixETH
+            );
+        }
         if (share == 0) revert ZeroShare();
 
         dep.claimed = true;
@@ -607,6 +755,10 @@ contract RoundController is IRoundController, Ownable2Step, ReentrancyGuard {
         CurveHook h = hook;
         if (address(h) == address(0) || h.mode() != CurveHook.Mode.Active) revert NotActive();
         if (block.timestamp < h.detonationAt()) revert ClockStillLive();
+
+        // 0. Freeze the PSP holder map: this round's holders become the next
+        //    round's trustless greenlist (greenlist-IBCO rules v3).
+        pspToken.freezeHolders();
 
         // 1+2. flatten — the pot freezes with the mode change (snapshot for
         // the event before it does)

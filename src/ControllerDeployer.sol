@@ -48,7 +48,13 @@ contract ControllerDeployer {
         CurveMath.CurveConfig calldata config,
         address ownerFactory,
         address descriptor,
-        StakerDeployer stakerDeployer
+        StakerDeployer stakerDeployer,
+        uint64 greenSec,
+        uint64 openSec,
+        bytes32 greenRoot,
+        uint256 csvCount,
+        uint256 openPerWalletWad,
+        PSPToken prevToken
     ) external payable returns (RoundController controller) {
         // EIP-170 shrink (2026-08-19, wave2b): the five params are ABI-
         // decoded on the wire but never touched by the body — the calldata
@@ -99,7 +105,13 @@ contract ControllerDeployer {
         CurveMath.CurveConfig calldata config,
         address ownerFactory,
         address descriptor,
-        StakerDeployer stakerDeployer
+        StakerDeployer stakerDeployer,
+        uint64 greenSec,
+        uint64 openSec,
+        bytes32 greenRoot,
+        uint256 csvCount,
+        uint256 openPerWalletWad,
+        PSPToken prevToken
     ) external payable returns (RoundController controller) {
         // Re-encode from scratch — NOT the raw-calldata trick: a leading
         // static salt word shifts every dynamic-type head offset by 32,

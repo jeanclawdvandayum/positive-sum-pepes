@@ -225,6 +225,17 @@ contract PSPFactory is Ownable2Step {
     // config committed by hash so mid-flight gameCurve changes fail
     // closed with ReservationStale instead of birthing a mismatched set).
 
+    /// @dev Greenlist-IBCO (rules v3): the OPTIONAL csv half of the next
+    ///      round's greenlist. Owner sets before reserve/deploy; the other
+    ///      half (previous round's PSP holders) is read trustlessly at
+    ///      birth from the previous token's frozen holder map. Cleared on
+    ///      successful birth — one shot per round.
+    bytes32 public nextGreenRoot;
+    uint256 public nextGreenCount;
+    /// @dev Open-phase window (default 1 day; the green window rides the
+    ///      packed timings slot [0]).
+    uint64 public openWindowSec = 1 days;
+
     struct SpawnReservation {
         uint128 fromRoundId; // destroyed round whose carry seeds this one (0 = owner genesis)
         uint128 newRoundId;
@@ -234,7 +245,9 @@ contract PSPFactory is Ownable2Step {
         address token;      // predictions — birth verifies each
         address controller;
         address hook;
-        bytes32 contextHash; // keccak(config-with-timings, descriptor, name, symbol)
+        bytes32 contextHash; // keccak(config-with-timings, descriptor, name, symbol, green)
+        bytes32 greenRoot;   // csv greenlist snapshot at reserve time
+        uint256 greenCount;
         bool active;
         string name;        // exact ERC20 naming — birth spans multiple txs now
         string symbol;
@@ -261,6 +274,7 @@ contract PSPFactory is Ownable2Step {
     );
 
     error ReservationActive();
+    error WindowTooShort(); // open-phase window under 60s
     error NoReservation();
     error ReservationStale();
     error PredictMismatch();
@@ -349,6 +363,19 @@ contract PSPFactory is Ownable2Step {
         hookAddr = address(rounds[roundId].hook);
     }
 
+    /// @notice Set the optional csv greenlist for the NEXT round (root +
+    ///         entry count). One shot: cleared on successful birth.
+    function setNextGreenlist(bytes32 root, uint256 count) external onlyOwner {
+        nextGreenRoot = root;
+        nextGreenCount = count;
+    }
+
+    /// @notice Set the open-phase window length (seconds, min 60).
+    function setOpenWindow(uint64 sec) external onlyOwner {
+        if (sec < 60) revert WindowTooShort();
+        openWindowSec = sec;
+    }
+
     /// @notice Owner escape hatch: void a reservation whose committed
     ///         context went stale (gameCurve/descriptor changed mid-
     ///         flight). Re-reserving with the new context follows.
@@ -396,7 +423,11 @@ contract PSPFactory is Ownable2Step {
             token: token,
             controller: controller,
             hook: hook,
-            contextHash: keccak256(abi.encode(cfg, descriptor, name, symbol, useSine, gameSinePL, sineV3Table)),
+            contextHash: keccak256(
+                abi.encode(cfg, descriptor, name, symbol, useSine, gameSinePL, sineV3Table, nextGreenRoot, nextGreenCount)
+            ),
+            greenRoot: nextGreenRoot,
+            greenCount: nextGreenCount,
             active: true,
             name: name,
             symbol: symbol,
@@ -420,7 +451,11 @@ contract PSPFactory is Ownable2Step {
     function _birthContracts() internal {
         SpawnReservation storage r = reservation;
         CurveMath.CurveConfig memory cfg = _configWithTimings();
-        if (keccak256(abi.encode(cfg, descriptor, r.name, r.symbol, useSine, gameSinePL, sineV3Table)) != r.contextHash) {
+        if (
+            keccak256(
+                abi.encode(cfg, descriptor, r.name, r.symbol, useSine, gameSinePL, sineV3Table, r.greenRoot, r.greenCount)
+            ) != r.contextHash
+        ) {
             revert ReservationStale();
         }
 
@@ -439,7 +474,19 @@ contract PSPFactory is Ownable2Step {
         if (address(controller).code.length == 0) {
             address c = address(
                 controllerDeployer.deployControllerAt(
-                    r.controllerSalt, token, mixETH, cfg, address(this), descriptor, stakerDeployer
+                    r.controllerSalt,
+                    token,
+                    mixETH,
+                    cfg,
+                    address(this),
+                    descriptor,
+                    stakerDeployer,
+                    uint64(cfg.timings & CurveMath.TIMINGS_MASK), // green window
+                    openWindowSec,
+                    r.greenRoot,
+                    r.greenCount,
+                    0, // open per-wallet default (10 mixETH) lives in the controller
+                    r.fromRoundId == 0 ? PSPToken(address(0)) : rounds[r.fromRoundId].token
                 )
             );
             if (c != r.controller) revert PredictMismatch();
@@ -554,6 +601,9 @@ contract PSPFactory is Ownable2Step {
         );
 
         reservation.active = false; // record kept for history/UI; slot reused next round
+        // Greenlist csv was consumed by this birth — one shot per round.
+        nextGreenRoot = bytes32(0);
+        nextGreenCount = 0;
         r.phase = 0;
         return (r.newRoundId, hookAddr);
     }
@@ -668,7 +718,8 @@ contract PSPFactory is Ownable2Step {
             string memory name,
             string memory symbol,
             bool destroyed,
-            uint256 predepositDuration,
+            uint256 greenDuration,
+            uint256 openDuration,
             uint256 vestDuration
         )
     {
@@ -684,7 +735,8 @@ contract PSPFactory is Ownable2Step {
             r.name,
             r.symbol,
             r.destroyed,
-            c.PREDEPOSIT_DURATION(),
+            c.GREEN_DURATION(),
+            c.OPEN_DURATION(),
             c.VEST_DURATION()
         );
     }
