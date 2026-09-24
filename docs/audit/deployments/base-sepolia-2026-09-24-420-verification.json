@@ -1,0 +1,711 @@
+{
+  "chainId": 84532,
+  "revision": "2ba518671b47130be73bbeb592f7df45e6b2874d",
+  "contracts": {
+    "sineV3Math": {
+      "address": "0xcc7BBf0028458064e2EE31C5FB79272ba5e9938f",
+      "identifier": "src/SineV3Math.sol:SineV3Math",
+      "verificationId": "1030e79a-89a4-45c6-bbd0-1ab754188159",
+      "matchId": "51811884",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:11Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "1030e79a-89a4-45c6-bbd0-1ab754188159",
+        "jobStartTime": "2026-09-24T15:56:44Z",
+        "jobFinishTime": "2026-09-24T15:57:11Z",
+        "compilationTime": "7690",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "verificationId": "cc7bbf0028458064e2ee31c5fb79272ba5e9938f6ab54857",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=cc7bbf0028458064e2ee31c5fb79272ba5e9938f6ab54857",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0xcc7BBf0028458064e2EE31C5FB79272ba5e9938f",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0xcc7BBf0028458064e2EE31C5FB79272ba5e9938f"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xcc7BBf0028458064e2EE31C5FB79272ba5e9938f",
+          "verifiedAt": "2026-09-24T15:57:11Z",
+          "matchId": "51811884"
+        }
+      }
+    },
+    "sineV3Data0": {
+      "address": "0x57c5Ded5344b519715842C5b2dD2531fD8DF9534",
+      "identifier": "src/SineV3Data.sol:SineV3Data0",
+      "verificationId": "e7284a73-c1d4-464c-8ae2-73678c4251dd",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
+    },
+    "sineV3Data1": {
+      "address": "0xA8d2054ADc7fB804225D9ec16760c4430d063d65",
+      "identifier": "src/SineV3Data.sol:SineV3Data1",
+      "verificationId": "b5e3ebec-f600-425c-96aa-30bc6b5664b3",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
+    },
+    "sineV3Data2": {
+      "address": "0x1627c62bd8F79D0D70C6D4e5cF8D16158Ef104E6",
+      "identifier": "src/SineV3Data.sol:SineV3Data2",
+      "verificationId": "15adcd86-59f7-42a1-ad28-ff6da57361f6",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
+    },
+    "sineV3Data3": {
+      "address": "0x7fe72556DD3c94AB15655C070fdAF972Fa58A990",
+      "identifier": "src/SineV3Data.sol:SineV3Data3",
+      "verificationId": "c458c3af-089c-488d-8fa7-e8a3c6e52648",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
+    },
+    "factory": {
+      "address": "0x614cB7bf611f221F97f5eaE0f231311b9F3e7278",
+      "identifier": "src/PSPFactory.sol:PSPFactory",
+      "verificationId": "b8e69dbd-dd56-4a50-a1f1-a1c2a28a8a85",
+      "matchId": "51811996",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:20Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "b8e69dbd-dd56-4a50-a1f1-a1c2a28a8a85",
+        "jobStartTime": "2026-09-24T15:57:01Z",
+        "jobFinishTime": "2026-09-24T15:57:20Z",
+        "compilationTime": "12684",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max daily rate limit reached. 100000 (100%) of 100000 day/limit"
+          },
+          "blockscout": {
+            "verificationId": "614cb7bf611f221f97f5eae0f231311b9f3e72786ab54861",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=614cb7bf611f221f97f5eae0f231311b9f3e72786ab54861",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x614cB7bf611f221F97f5eaE0f231311b9F3e7278",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x614cB7bf611f221F97f5eaE0f231311b9F3e7278"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x614cB7bf611f221F97f5eaE0f231311b9F3e7278",
+          "verifiedAt": "2026-09-24T15:57:20Z",
+          "matchId": "51811996"
+        }
+      }
+    },
+    "token": {
+      "address": "0x6F022a4E10b6EaD1E444B7110b26D13fEbE0669f",
+      "identifier": "src/PSPToken.sol:PSPToken",
+      "verificationId": "3ea93cad-9438-48a1-9c92-fb25c9649fb9",
+      "matchId": "51811848",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:09Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "3ea93cad-9438-48a1-9c92-fb25c9649fb9",
+        "jobStartTime": "2026-09-24T15:57:07Z",
+        "jobFinishTime": "2026-09-24T15:57:09Z",
+        "compilationTime": "1309",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "verificationId": "6f022a4e10b6ead1e444b7110b26d13febe0669f6ab54855",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=6f022a4e10b6ead1e444b7110b26d13febe0669f6ab54855",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x6F022a4E10b6EaD1E444B7110b26D13fEbE0669f",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x6F022a4E10b6EaD1E444B7110b26D13fEbE0669f"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x6F022a4E10b6EaD1E444B7110b26D13fEbE0669f",
+          "verifiedAt": "2026-09-24T15:57:09Z",
+          "matchId": "51811848"
+        }
+      }
+    },
+    "controller": {
+      "address": "0x77E378146a9cb4da6e7B1747666025A72b9Afc57",
+      "identifier": "src/RoundController.sol:RoundController",
+      "verificationId": "5033f570-c25c-4e69-8f22-14b99d9fc4dd",
+      "matchId": "51811968",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:17Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "5033f570-c25c-4e69-8f22-14b99d9fc4dd",
+        "jobStartTime": "2026-09-24T15:57:12Z",
+        "jobFinishTime": "2026-09-24T15:57:17Z",
+        "compilationTime": "3154",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max daily rate limit reached. 100000 (100%) of 100000 day/limit"
+          },
+          "blockscout": {
+            "verificationId": "77e378146a9cb4da6e7b1747666025a72b9afc576ab5485e",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=77e378146a9cb4da6e7b1747666025a72b9afc576ab5485e",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x77E378146a9cb4da6e7B1747666025A72b9Afc57",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x77E378146a9cb4da6e7B1747666025A72b9Afc57"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x77E378146a9cb4da6e7B1747666025A72b9Afc57",
+          "verifiedAt": "2026-09-24T15:57:17Z",
+          "matchId": "51811968"
+        }
+      }
+    },
+    "hook": {
+      "address": "0x94972b97DF192F78315fAE831a2954BD35c22a88",
+      "identifier": "src/CurveHook.sol:CurveHook",
+      "verificationId": "93768ea6-5b84-4667-bf90-9d844583f76f",
+      "matchId": "51811993",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:20Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "93768ea6-5b84-4667-bf90-9d844583f76f",
+        "jobStartTime": "2026-09-24T15:57:15Z",
+        "jobFinishTime": "2026-09-24T15:57:20Z",
+        "compilationTime": "3757",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "verificationId": "94972b97df192f78315fae831a2954bd35c22a886ab54860",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=94972b97df192f78315fae831a2954bd35c22a886ab54860",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x94972b97DF192F78315fAE831a2954BD35c22a88",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x94972b97DF192F78315fAE831a2954BD35c22a88"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x94972b97DF192F78315fAE831a2954BD35c22a88",
+          "verifiedAt": "2026-09-24T15:57:20Z",
+          "matchId": "51811993"
+        }
+      }
+    },
+    "staker": {
+      "address": "0x9eA18b165c7bEc5184F67fD553801E6850E49a24",
+      "identifier": "src/PSPStaker.sol:PSPStaker",
+      "verificationId": "8774f782-4eb5-4d13-8cf1-4e6a46c6b1ff",
+      "matchId": "51812011",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:23Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "8774f782-4eb5-4d13-8cf1-4e6a46c6b1ff",
+        "jobStartTime": "2026-09-24T15:57:18Z",
+        "jobFinishTime": "2026-09-24T15:57:23Z",
+        "compilationTime": "3805",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max daily rate limit reached. 100000 (100%) of 100000 day/limit"
+          },
+          "blockscout": {
+            "verificationId": "9ea18b165c7bec5184f67fd553801e6850e49a246ab54863",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=9ea18b165c7bec5184f67fd553801e6850e49a246ab54863",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x9eA18b165c7bEc5184F67fD553801E6850E49a24",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x9eA18b165c7bEc5184F67fD553801E6850E49a24"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x9eA18b165c7bEc5184F67fD553801E6850E49a24",
+          "verifiedAt": "2026-09-24T15:57:23Z",
+          "matchId": "51812011"
+        }
+      }
+    },
+    "mix": {
+      "address": "0xa0C616a4744968D65aA979Ae9B4b63986006E384",
+      "identifier": "src/testnet/SepoliaMixETH.sol:SepoliaMixETH",
+      "verificationId": "8c6281d8-023a-4685-bc02-51ace3e70ce2",
+      "matchId": "51812010",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:22Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "8c6281d8-023a-4685-bc02-51ace3e70ce2",
+        "jobStartTime": "2026-09-24T15:57:21Z",
+        "jobFinishTime": "2026-09-24T15:57:22Z",
+        "compilationTime": "911",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max daily rate limit reached. 100000 (100%) of 100000 day/limit"
+          },
+          "blockscout": {
+            "verificationId": "a0c616a4744968d65aa979ae9b4b63986006e3846ab54862",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=a0c616a4744968d65aa979ae9b4b63986006e3846ab54862",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0xa0C616a4744968D65aA979Ae9B4b63986006E384",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0xa0C616a4744968D65aA979Ae9B4b63986006E384"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xa0C616a4744968D65aA979Ae9B4b63986006E384",
+          "verifiedAt": "2026-09-24T15:57:22Z",
+          "matchId": "51812010"
+        }
+      }
+    },
+    "registry": {
+      "address": "0x0DfF96D273CedaE8b4F9703Ef3cD4E84B57b4CDF",
+      "identifier": "src/PSPReferralRegistry.sol:PSPReferralRegistry",
+      "verificationId": "7c8c1cc4-818c-425a-8ecc-733a5ef4fb05",
+      "matchId": "51812015",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:25Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "7c8c1cc4-818c-425a-8ecc-733a5ef4fb05",
+        "jobStartTime": "2026-09-24T15:57:23Z",
+        "jobFinishTime": "2026-09-24T15:57:25Z",
+        "compilationTime": "1780",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "verificationId": "0dff96d273cedae8b4f9703ef3cd4e84b57b4cdf6ab54865",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=0dff96d273cedae8b4f9703ef3cd4e84b57b4cdf6ab54865",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x0DfF96D273CedaE8b4F9703Ef3cD4E84B57b4CDF",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x0DfF96D273CedaE8b4F9703Ef3cD4E84B57b4CDF"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x0DfF96D273CedaE8b4F9703Ef3cD4E84B57b4CDF",
+          "verifiedAt": "2026-09-24T15:57:25Z",
+          "matchId": "51812015"
+        }
+      }
+    },
+    "zapIn": {
+      "address": "0xb755687c329bbE848cA877e60b16F1FEC04f7953",
+      "identifier": "src/PSPZapIn.sol:PSPZapIn",
+      "verificationId": "03ac7c2a-bc2d-4a03-b922-00bdf7ccd117",
+      "matchId": "51812016",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:27Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "03ac7c2a-bc2d-4a03-b922-00bdf7ccd117",
+        "jobStartTime": "2026-09-24T15:57:25Z",
+        "jobFinishTime": "2026-09-24T15:57:27Z",
+        "compilationTime": "1286",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "verificationId": "b755687c329bbe848ca877e60b16f1fec04f79536ab54867",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=b755687c329bbe848ca877e60b16f1fec04f79536ab54867",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0xb755687c329bbE848cA877e60b16F1FEC04f7953",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0xb755687c329bbE848cA877e60b16F1FEC04f7953"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xb755687c329bbE848cA877e60b16F1FEC04f7953",
+          "verifiedAt": "2026-09-24T15:57:27Z",
+          "matchId": "51812016"
+        }
+      }
+    },
+    "zapOut": {
+      "address": "0x999474E856e8De4E0e5A07f9244cf1065E1ABCA6",
+      "identifier": "src/PSPZapOut.sol:PSPZapOut",
+      "verificationId": "9d272954-135f-4cc4-8d47-ba977fd81887",
+      "matchId": "51812017",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:29Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "9d272954-135f-4cc4-8d47-ba977fd81887",
+        "jobStartTime": "2026-09-24T15:57:28Z",
+        "jobFinishTime": "2026-09-24T15:57:29Z",
+        "compilationTime": "946",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "verificationId": "999474e856e8de4e0e5a07f9244cf1065e1abca66ab54869",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=999474e856e8de4e0e5a07f9244cf1065e1abca66ab54869",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x999474E856e8De4E0e5A07f9244cf1065E1ABCA6",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x999474E856e8De4E0e5A07f9244cf1065E1ABCA6"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x999474E856e8De4E0e5A07f9244cf1065E1ABCA6",
+          "verifiedAt": "2026-09-24T15:57:29Z",
+          "matchId": "51812017"
+        }
+      }
+    },
+    "faucet": {
+      "address": "0xf5E7Ee4A56EA9ee6f268F2b40bFDbaD94C347362",
+      "identifier": "src/testnet/MixETHFaucet.sol:MixETHFaucet",
+      "verificationId": "440f1150-2753-4158-a03f-7b069bdff592",
+      "matchId": "51812020",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:32Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "440f1150-2753-4158-a03f-7b069bdff592",
+        "jobStartTime": "2026-09-24T15:57:31Z",
+        "jobFinishTime": "2026-09-24T15:57:32Z",
+        "compilationTime": "617",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "verificationId": "f5e7ee4a56ea9ee6f268f2b40bfdbad94c3473626ab5486c",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=f5e7ee4a56ea9ee6f268f2b40bfdbad94c3473626ab5486c",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0xf5E7Ee4A56EA9ee6f268F2b40bFDbaD94C347362",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0xf5E7Ee4A56EA9ee6f268F2b40bFDbaD94C347362"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xf5E7Ee4A56EA9ee6f268F2b40bFDbaD94C347362",
+          "verifiedAt": "2026-09-24T15:57:32Z",
+          "matchId": "51812020"
+        }
+      }
+    },
+    "reinvestor": {
+      "address": "0x5CcD4D436eEb3Af5E17c5C2dA05f3Da5817a8081",
+      "identifier": "src/PSPReinvestor.sol:PSPReinvestor",
+      "verificationId": "53c19a3f-f359-4119-aec6-7b38cfa6566a",
+      "matchId": "51812022",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:35Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "53c19a3f-f359-4119-aec6-7b38cfa6566a",
+        "jobStartTime": "2026-09-24T15:57:33Z",
+        "jobFinishTime": "2026-09-24T15:57:35Z",
+        "compilationTime": "1600",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max daily rate limit reached. 100000 (100%) of 100000 day/limit"
+          },
+          "blockscout": {
+            "verificationId": "5ccd4d436eeb3af5e17c5c2da05f3da5817a80816ab5486f",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=5ccd4d436eeb3af5e17c5c2da05f3da5817a80816ab5486f",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x5CcD4D436eEb3Af5E17c5C2dA05f3Da5817a8081",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x5CcD4D436eEb3Af5E17c5C2dA05f3Da5817a8081"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x5CcD4D436eEb3Af5E17c5C2dA05f3Da5817a8081",
+          "verifiedAt": "2026-09-24T15:57:35Z",
+          "matchId": "51812022"
+        }
+      }
+    },
+    "descriptor": {
+      "address": "0xBd43137B95f07eD00af1f28cB6Bff470f0654091",
+      "identifier": "src/PepeDescriptor420.sol:PepeDescriptor420",
+      "verificationId": "6cb556ae-fa1c-4cc2-9e63-ea573f9316c4",
+      "error": "Error: compiler_error: Compiler error. Command failed: /home/app/data/compilers/solc/solc-linux-amd64-v0.8.26+commit.8a97fa7a --standard-json\nSegmentation fault\n"
+    },
+    "hookDeployer": {
+      "address": "0x2A0ee8088fc6ec679ccd9d2591479ce2A66bA5e3",
+      "identifier": "src/HookDeployer.sol:HookDeployer",
+      "verificationId": "26d636d9-b2d3-4250-acd0-cca96811eb91",
+      "matchId": "51812292",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:58:15Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "26d636d9-b2d3-4250-acd0-cca96811eb91",
+        "jobStartTime": "2026-09-24T15:57:37Z",
+        "jobFinishTime": "2026-09-24T15:58:15Z",
+        "compilationTime": "11875",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max daily rate limit reached. 100000 (100%) of 100000 day/limit"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x2A0ee8088fc6ec679ccd9d2591479ce2A66bA5e3",
+          "verifiedAt": "2026-09-24T15:58:15Z",
+          "matchId": "51812292"
+        }
+      }
+    },
+    "controllerDeployer": {
+      "address": "0xa6Aa0073b848C3017dBA0302344925ebDF36a997",
+      "identifier": "src/ControllerDeployer.sol:ControllerDeployer",
+      "verificationId": "88f55b3c-573c-4df3-a5a7-5b6e0b9d7f3d",
+      "matchId": "51812117",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:59Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "88f55b3c-573c-4df3-a5a7-5b6e0b9d7f3d",
+        "jobStartTime": "2026-09-24T15:57:39Z",
+        "jobFinishTime": "2026-09-24T15:57:59Z",
+        "compilationTime": "8309",
+        "externalVerifications": {
+          "blockscout": {
+            "verificationId": "a6aa0073b848c3017dba0302344925ebdf36a9976ab54887",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=a6aa0073b848c3017dba0302344925ebdf36a9976ab54887",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0xa6Aa0073b848C3017dBA0302344925ebDF36a997",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0xa6Aa0073b848C3017dBA0302344925ebDF36a997"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xa6Aa0073b848C3017dBA0302344925ebDF36a997",
+          "verifiedAt": "2026-09-24T15:57:59Z",
+          "matchId": "51812117"
+        }
+      }
+    },
+    "stakerDeployer": {
+      "address": "0xA28A5d5a081E46eDa9ae3d4Dd364f8195d441589",
+      "identifier": "src/StakerDeployer.sol:StakerDeployer",
+      "verificationId": "05b99bf2-5724-4b57-bd85-e5a09fb8bcf9",
+      "matchId": "51812045",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:54Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "05b99bf2-5724-4b57-bd85-e5a09fb8bcf9",
+        "jobStartTime": "2026-09-24T15:57:42Z",
+        "jobFinishTime": "2026-09-24T15:57:54Z",
+        "compilationTime": "5750",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "verificationId": "a28a5d5a081e46eda9ae3d4dd364f8195d4415896ab54882",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=a28a5d5a081e46eda9ae3d4dd364f8195d4415896ab54882",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0xA28A5d5a081E46eDa9ae3d4Dd364f8195d441589",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0xA28A5d5a081E46eDa9ae3d4Dd364f8195d441589"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xA28A5d5a081E46eDa9ae3d4Dd364f8195d441589",
+          "verifiedAt": "2026-09-24T15:57:54Z",
+          "matchId": "51812045"
+        }
+      }
+    },
+    "tokenDeployer": {
+      "address": "0x058F0B3D657DE41174a96A0739a6EA48f7f4Fcf4",
+      "identifier": "src/ControllerDeployer.sol:TokenDeployer",
+      "verificationId": "d96efb79-15f8-4103-b865-d0a2c0607ee1",
+      "matchId": "51812039",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:49Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "d96efb79-15f8-4103-b865-d0a2c0607ee1",
+        "jobStartTime": "2026-09-24T15:57:44Z",
+        "jobFinishTime": "2026-09-24T15:57:49Z",
+        "compilationTime": "2305",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x058F0B3D657DE41174a96A0739a6EA48f7f4Fcf4",
+          "verifiedAt": "2026-09-24T15:57:49Z",
+          "matchId": "51812039"
+        }
+      }
+    },
+    "hookInitCode": {
+      "address": "0x030D28A6ceA593220bf912AFC69C639e739F2CCD",
+      "identifier": "src/HookInitCode.sol:HookInitCode",
+      "verificationId": "e4f92a32-69a7-468f-9ec7-85e6baa85c5b",
+      "matchId": "51812185",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:58:03Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "e4f92a32-69a7-468f-9ec7-85e6baa85c5b",
+        "jobStartTime": "2026-09-24T15:57:46Z",
+        "jobFinishTime": "2026-09-24T15:58:03Z",
+        "compilationTime": "6898",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max daily rate limit reached. 100000 (100%) of 100000 day/limit"
+          },
+          "blockscout": {
+            "verificationId": "030d28a6cea593220bf912afc69c639e739f2ccd6ab5488b",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=030d28a6cea593220bf912afc69c639e739f2ccd6ab5488b",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0x030D28A6ceA593220bf912AFC69C639e739F2CCD",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0x030D28A6ceA593220bf912AFC69C639e739F2CCD"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0x030D28A6ceA593220bf912AFC69C639e739F2CCD",
+          "verifiedAt": "2026-09-24T15:58:03Z",
+          "matchId": "51812185"
+        }
+      }
+    },
+    "registryInitCode": {
+      "address": "0xEb70f9aC7c546fa21062F8a804896F3ddb1Bd166",
+      "identifier": "src/ReferralRegistryInitCode.sol:ReferralRegistryInitCode",
+      "verificationId": "3ac88c36-a028-42d0-8dd2-4563756515bb",
+      "matchId": "51812095",
+      "creationMatch": "match",
+      "runtimeMatch": "match",
+      "verifiedAt": "2026-09-24T15:57:58Z",
+      "match": "match",
+      "chainId": "84532",
+      "job": {
+        "isJobCompleted": true,
+        "verificationId": "3ac88c36-a028-42d0-8dd2-4563756515bb",
+        "jobStartTime": "2026-09-24T15:57:48Z",
+        "jobFinishTime": "2026-09-24T15:57:58Z",
+        "compilationTime": "2768",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Max calls per sec rate limit reached (3/sec)"
+          },
+          "blockscout": {
+            "verificationId": "eb70f9ac7c546fa21062f8a804896f3ddb1bd1666ab54886",
+            "statusUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=checkverifystatus&chainid=84532&guid=eb70f9ac7c546fa21062f8a804896f3ddb1bd1666ab54886",
+            "explorerUrl": "https://base-sepolia.blockscout.com//address/0xEb70f9aC7c546fa21062F8a804896F3ddb1Bd166",
+            "contractApiUrl": "https://base-sepolia.blockscout.com/api?module=contract&action=getabi&chainid=84532&address=0xEb70f9aC7c546fa21062F8a804896F3ddb1Bd166"
+          }
+        },
+        "contract": {
+          "match": "match",
+          "creationMatch": "match",
+          "runtimeMatch": "match",
+          "chainId": "84532",
+          "address": "0xEb70f9aC7c546fa21062F8a804896F3ddb1Bd166",
+          "verifiedAt": "2026-09-24T15:57:58Z",
+          "matchId": "51812095"
+        }
+      }
+    }
+  }
+}

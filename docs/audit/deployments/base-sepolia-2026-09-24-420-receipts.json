@@ -1,0 +1,236 @@
+{
+  "chainId": 84532,
+  "revision": "2ba518671b47130be73bbeb592f7df45e6b2874d",
+  "core": {
+    "addresses": {
+      "SepoliaMixETH": {
+        "address": "0xa0c616a4744968d65aa979ae9b4b63986006e384",
+        "transactionHash": "0x9b1de988910f48751a88e757ede32d00692d2903b56d0f2dc80ca780c61f3b6c"
+      },
+      "MixETHFaucet": {
+        "address": "0xf5e7ee4a56ea9ee6f268f2b40bfdbad94c347362",
+        "transactionHash": "0x4b79db654f3892ee0651872de31b6649c13c360db3e899e675b1db66d7358d96"
+      },
+      "SineV3Math": {
+        "address": "0xcc7bbf0028458064e2ee31c5fb79272ba5e9938f",
+        "transactionHash": "0x2d795d90ad6d6fc471f78bd9f8ae6b61197d934c5b4075d5b1b158877e3bb115"
+      },
+      "HookDeployer": {
+        "address": "0x2a0ee8088fc6ec679ccd9d2591479ce2a66ba5e3",
+        "transactionHash": "0x1e82d276cee564b25c2035cd9db5f0dd917c8d0cc7ffed4096348dbfba298e84"
+      },
+      "ControllerDeployer": {
+        "address": "0xa6aa0073b848c3017dba0302344925ebdf36a997",
+        "transactionHash": "0xd28ff102188d113953b146a30b83f177a3379de2641a3522d5fea1dc2dfe9ecc"
+      },
+      "StakerDeployer": {
+        "address": "0xa28a5d5a081e46eda9ae3d4dd364f8195d441589",
+        "transactionHash": "0xfdb1d04139471bcd17b3afaab257e1fc278abfb58e987784e84335b2fa449c04"
+      },
+      "PSPFactory": {
+        "address": "0x614cb7bf611f221f97f5eae0f231311b9f3e7278",
+        "transactionHash": "0x6eafd0ea6cc843694094ce1d387344c138bfd2d70587b64a50b05dfe6e4ac5cb"
+      },
+      "PepeDescriptor420": {
+        "address": "0xbd43137b95f07ed00af1f28cb6bff470f0654091",
+        "transactionHash": "0x1b707a54d55c9e8c09effc19e5c204cd3c8014440a5df7f21ed50dc824b10d1b"
+      },
+      "PSPZapIn": {
+        "address": "0xb755687c329bbe848ca877e60b16f1fec04f7953",
+        "transactionHash": "0x56e2f789748d883a10d388048db33818b68f2624f210bdc6b1125f3aac5ead43"
+      },
+      "PSPZapOut": {
+        "address": "0x999474e856e8de4e0e5a07f9244cf1065e1abca6",
+        "transactionHash": "0x412a377f090bc933a85e38769b130d2f6365bd48a50d382ffe994d03254ccf60"
+      }
+    },
+    "receipts": [
+      {
+        "hash": "0x9b1de988910f48751a88e757ede32d00692d2903b56d0f2dc80ca780c61f3b6c",
+        "block": "47248476",
+        "blockHash": "0xd2a68c7122ef376c913387851dd4c54713a7ff533c108117f7b9200f5220df47",
+        "gasUsed": "640030",
+        "status": "success",
+        "contractAddress": "0xa0c616a4744968d65aa979ae9b4b63986006e384"
+      },
+      {
+        "hash": "0x4b79db654f3892ee0651872de31b6649c13c360db3e899e675b1db66d7358d96",
+        "block": "47248477",
+        "blockHash": "0x8614902b921bd6df33c0266b92503dd640e54361ca72526dd6ecc0e3d68ae8d0",
+        "gasUsed": "136901",
+        "status": "success",
+        "contractAddress": "0xf5e7ee4a56ea9ee6f268f2b40bfdbad94c347362"
+      },
+      {
+        "hash": "0x5480cf77bb1003eddbf8072f442ffb97f19fdab767f332febfaad51e054a8c86",
+        "block": "47248479",
+        "blockHash": "0xf9487a8958e55f83a70a252d1b04cdebe855d6ae550526365c71fef36d506ca3",
+        "gasUsed": "4863980",
+        "status": "success",
+        "contractAddress": "0x57c5ded5344b519715842c5b2dd2531fd8df9534"
+      },
+      {
+        "hash": "0x827ab48ab44b398e33d572eb129883ca5e588a801fb591abd6677fb11e445c0d",
+        "block": "47248480",
+        "blockHash": "0xdedea6a1d30c845d8bb4330d92b9a090f9e150cb957e9efced7041e7a06546b1",
+        "gasUsed": "4880400",
+        "status": "success",
+        "contractAddress": "0xa8d2054adc7fb804225d9ec16760c4430d063d65"
+      },
+      {
+        "hash": "0x595dcc28b4d63764537708f102d31b0df34e5c57eba1f33f0f18c958391adeae",
+        "block": "47248481",
+        "blockHash": "0x8f9b3b7b450c5bacafec02adf78ae8c9588eaf5c24087e4d8be6b8b564e3496d",
+        "gasUsed": "4880604",
+        "status": "success",
+        "contractAddress": "0x1627c62bd8f79d0d70c6d4e5cf8d16158ef104e6"
+      },
+      {
+        "hash": "0x7bfae4183605db75251d32b608f30bb8bdcc0cc75798e21f75beb248a0cf77a7",
+        "block": "47248482",
+        "blockHash": "0xb7aedd32a93cd08762421834cd5166c39d48ad1d3713b41c73aa94a12419478b",
+        "gasUsed": "4157615",
+        "status": "success",
+        "contractAddress": "0x7fe72556dd3c94ab15655c070fdaf972fa58a990"
+      },
+      {
+        "hash": "0x2d795d90ad6d6fc471f78bd9f8ae6b61197d934c5b4075d5b1b158877e3bb115",
+        "block": "47248484",
+        "blockHash": "0xa33099e46159d339c629280d7cc3415da1090787fd9522311436951ab2836578",
+        "gasUsed": "3139697",
+        "status": "success",
+        "contractAddress": "0xcc7bbf0028458064e2ee31c5fb79272ba5e9938f"
+      },
+      {
+        "hash": "0x1e82d276cee564b25c2035cd9db5f0dd917c8d0cc7ffed4096348dbfba298e84",
+        "block": "47248485",
+        "blockHash": "0xb64901352138520de8e665abfc59a99fbedacba00df04fcb6a76c7cb9979760b",
+        "gasUsed": "5620212",
+        "status": "success",
+        "contractAddress": "0x2a0ee8088fc6ec679ccd9d2591479ce2a66ba5e3"
+      },
+      {
+        "hash": "0xd28ff102188d113953b146a30b83f177a3379de2641a3522d5fea1dc2dfe9ecc",
+        "block": "47248486",
+        "blockHash": "0x4d3c949c1326c497619fb59b714189f26e546587b082552d49adcad452bf5473",
+        "gasUsed": "6000148",
+        "status": "success",
+        "contractAddress": "0xa6aa0073b848c3017dba0302344925ebdf36a997"
+      },
+      {
+        "hash": "0xfdb1d04139471bcd17b3afaab257e1fc278abfb58e987784e84335b2fa449c04",
+        "block": "47248487",
+        "blockHash": "0xc1b72a768803eba7cbd47ab0db5f7e5064ac325813151f74fcf073ee04de699a",
+        "gasUsed": "4150085",
+        "status": "success",
+        "contractAddress": "0xa28a5d5a081e46eda9ae3d4dd364f8195d441589"
+      },
+      {
+        "hash": "0x6eafd0ea6cc843694094ce1d387344c138bfd2d70587b64a50b05dfe6e4ac5cb",
+        "block": "47248489",
+        "blockHash": "0x22a7804bf09b5f1c93397e538099713166a7222344e15b061394ed2ef1fe8c4e",
+        "gasUsed": "5696282",
+        "status": "success",
+        "contractAddress": "0x614cb7bf611f221f97f5eae0f231311b9f3e7278"
+      },
+      {
+        "hash": "0x1b707a54d55c9e8c09effc19e5c204cd3c8014440a5df7f21ed50dc824b10d1b",
+        "block": "47248490",
+        "blockHash": "0xe88d51a7fd1ce9fb176661a63e1773d4342f63c9760d991fb3c051e2b8a588f6",
+        "gasUsed": "5362979",
+        "status": "success",
+        "contractAddress": "0xbd43137b95f07ed00af1f28cb6bff470f0654091"
+      },
+      {
+        "hash": "0xb032d903254615e5567e000088a962965b2ec2b8767d0a4954dfdd281aa0766a",
+        "block": "47248491",
+        "blockHash": "0x2760ba82f98dfe9b8dd7f2b7f4f36efa080c073837a47a79ab5ab7f59e1f58f3",
+        "gasUsed": "45906",
+        "status": "success",
+        "contractAddress": null
+      },
+      {
+        "hash": "0xc749fc090a5c96d9563fbdde75d009083adab9dad9c59f4b505e8440bf7a2d6c",
+        "block": "47248492",
+        "blockHash": "0x1aca8600fcccc3ca427d6090715c29464f8b17fde76f8ba0f41230886cb8e10f",
+        "gasUsed": "46537",
+        "status": "success",
+        "contractAddress": null
+      },
+      {
+        "hash": "0x02f67b7ba157b31240410fd36e7fcb3ddb903fb909b299d09abdefd6b9ea2350",
+        "block": "47248494",
+        "blockHash": "0x311cabf5bd53743f4f68752c26496012d8cd2f13f065bee0d180af9d37523823",
+        "gasUsed": "5439373",
+        "status": "success",
+        "contractAddress": null
+      },
+      {
+        "hash": "0x6dbaa1e41d15a1190aaf7dc176a3e464ed42eae4d8bfb8fe2508a734151f5fb0",
+        "block": "47248495",
+        "blockHash": "0xbb636d2a3a774aed625dcd07ca0c49c7c0ce33be424ffcdb93ba3c0e282ebc32",
+        "gasUsed": "9853750",
+        "status": "success",
+        "contractAddress": null
+      },
+      {
+        "hash": "0xf50fef58b3dfbfdebbfa1cd278f2ac75cd1d60a9bad475770dae533f9b700b94",
+        "block": "47248496",
+        "blockHash": "0x68c3153df5acf85a6f3994f3b5442a9067a6cb3798d80f632c45cc71e66b0d51",
+        "gasUsed": "8923103",
+        "status": "success",
+        "contractAddress": null
+      },
+      {
+        "hash": "0x9f61a987e66b7e6230a9084625a1550f714e7cf18fc036ad651bd02d00858e20",
+        "block": "47248497",
+        "blockHash": "0xe2111309ea72df45b22b3f3fa275832fc24febf7cc3ddfcc6592d1d7f9a203e1",
+        "gasUsed": "569575",
+        "status": "success",
+        "contractAddress": null
+      },
+      {
+        "hash": "0x4eabf40677c329bd29704a364313124a2c1e6c8e629033fb90e5ce2a1087aca6",
+        "block": "47248498",
+        "blockHash": "0x4cd693a109e87431e574e8584176f0873520daa11745badff2a7829e1fb93f2c",
+        "gasUsed": "932320",
+        "status": "success",
+        "contractAddress": null
+      },
+      {
+        "hash": "0x56e2f789748d883a10d388048db33818b68f2624f210bdc6b1125f3aac5ead43",
+        "block": "47248499",
+        "blockHash": "0xebea7ab9a942905827ff3c9f0d0de1496ad585c8d69cc91dfe7da307c2f70974",
+        "gasUsed": "1053897",
+        "status": "success",
+        "contractAddress": "0xb755687c329bbe848ca877e60b16f1fec04f7953"
+      },
+      {
+        "hash": "0x412a377f090bc933a85e38769b130d2f6365bd48a50d382ffe994d03254ccf60",
+        "block": "47248500",
+        "blockHash": "0x5bb42e77d34b1de05b6c472449d54b2b1c1e5faabe274430d607b768b097c0b6",
+        "gasUsed": "751754",
+        "status": "success",
+        "contractAddress": "0x999474e856e8de4e0e5a07f9244cf1065e1abca6"
+      }
+    ]
+  },
+  "reinvestor": {
+    "addresses": {
+      "PSPReinvestor": {
+        "address": "0x5ccd4d436eeb3af5e17c5c2da05f3da5817a8081",
+        "transactionHash": "0x97b03217736ef45e7efd2fac8ddf5fe38e203a773a434de043129da03f1d3267"
+      }
+    },
+    "receipts": [
+      {
+        "hash": "0x97b03217736ef45e7efd2fac8ddf5fe38e203a773a434de043129da03f1d3267",
+        "block": "47248513",
+        "blockHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "gasUsed": "1330819",
+        "status": "success",
+        "contractAddress": "0x5ccd4d436eeb3af5e17c5c2da05f3da5817a8081"
+      }
+    ]
+  }
+}
