@@ -8,7 +8,7 @@ import { wnsAbi } from '../src/lib/weiNames.ts'
 import { remoteNameGateAbi } from '../src/lib/namePermit.ts'
 import { nameRegistrarAbi, nameGateAbi } from '../src/lib/nameRegistration.ts'
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..')
-const sources={factoryAbi:'PSPFactory',controllerAbi:'RoundController',hookAbi:'CurveHook',stakerAbi:'PSPStaker',registryAbi:'PSPReferralRegistry',zapInAbi:'PSPZapIn',zapOutAbi:'PSPZapOut',reinvestorAbi:'PSPReinvestor',faucetAbi:'MixETHFaucet',descriptorAbi:'PepeDescriptor',expandedDescriptorAbi:'PepeExpandedDescriptor',descriptor420Abi:'PepeDescriptor420',wnsAbi:'IWeiNames',nameRegistrarAbi:'PSPNameRegistrar',nameGateAbi:'PSPStakeNameGate',remoteNameGateAbi:'PSPRemoteNameGate'}
+const sources={factoryAbi:'PSPFactory',controllerAbi:'RoundController',hookAbi:'CurveHook',stakerAbi:'PSPStaker',registryAbi:'PSPReferralRegistry',zapInAbi:'PSPZapIn',zapOutAbi:'PSPZapOut',reinvestorAbi:'PSPReinvestor',faucetAbi:'MixETHFaucet',descriptorAbi:'PepeDescriptor',expandedDescriptorAbi:'PepeExpandedDescriptor',descriptor420Abi:'PepeDescriptor420',pspTokenAbi:'PSPToken',wnsAbi:'IWeiNames',nameRegistrarAbi:'PSPNameRegistrar',nameGateAbi:'PSPStakeNameGate',remoteNameGateAbi:'PSPRemoteNameGate'}
 const allDeclared = { ...declared, expandedDescriptorAbi: declared.descriptorAbi, descriptor420Abi: declared.descriptorAbi, wnsAbi, nameRegistrarAbi, nameGateAbi, remoteNameGateAbi }
 // Static tuples and flat outputs encode identically. Preserve dynamic tuple
 // boundaries while normalizing static struct return shapes (positions).

@@ -58,10 +58,10 @@ contract B7_Supplemental is BBase {
         RoundController badCtl = RoundController(address(r.controller));
         CurveHook badHook = CurveHook(payable(address(r.hook)));
 
-        // predeposit works
+        // predeposit works (rules v3: fresh round, open phase, 10-mix cap)
         vm.startPrank(alice);
-        IERC20(address(mixETH)).approve(address(badCtl), 100e18);
-        badCtl.predeposit(100e18);
+        IERC20(address(mixETH)).approve(address(badCtl), 10e18);
+        badCtl.predeposit(10e18);
         vm.stopPrank();
 
         // launch reverts: genesis computeBuyOutput overflows (MulWadFailed) or

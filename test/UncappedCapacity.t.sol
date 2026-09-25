@@ -6,6 +6,7 @@ import {SineV3Math} from "src/SineV3Math.sol";
 import {SineV3Data} from "src/SineV3Data.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {Greenlist} from "./helpers/Greenlist.sol";
 import {IPoolManager, SwapParams} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
@@ -38,21 +39,33 @@ contract UncappedCapacityTest is Test {
     function setUp() public {
         mix = new SepoliaMixETH();
         manager = new MockPoolManager();
-        factory = new PSPFactory(IPoolManager(address(manager)), IERC20(address(mix)),
-            new HookDeployer(), new ControllerDeployer(), new StakerDeployer(),
-            address(new SineV3Math(SineV3Data.deploy())),
-            CurveMath.packTimingsCapped(60, 120, 180, 0), address(this));
+        factory = _newFactory();
         factory.configureSineV3(75_000_000_000_000);
         factory.deployRound(PSPFactory.RoundParams("PSP", "PSP", CurveMath.singleCurve(
             0.001e18, 1_000_000e18, 0.0000000046e18, 0.05e18)));
         round = factory.getRound(1);
     }
 
+    /// @dev rules v3: the 500-mix public boot rides the GREEN window via a
+    ///      one-entry csv greenlist (500/N = 500 for the solo member); the
+    ///      public open phase is capped at 10 mixETH per wallet.
+    function _newFactory() private returns (PSPFactory f) {
+        f = new PSPFactory(IPoolManager(address(manager)), IERC20(address(mix)),
+            new HookDeployer(), new ControllerDeployer(), new StakerDeployer(),
+            address(new SineV3Math(SineV3Data.deploy())),
+            CurveMath.packTimingsCapped(60, 120, 180, 0), address(this));
+        address[] memory csv = new address[](1);
+        csv[0] = alice;
+        f.setNextGreenlist(Greenlist.rootOf(csv), 1);
+    }
+
     function _deposit(RoundController ctl, address who, uint256 amount) private {
         mix.mint(who, amount);
         vm.startPrank(who);
         mix.approve(address(ctl), amount);
-        ctl.predeposit(amount);
+        address[] memory csv = new address[](1);
+        csv[0] = alice;
+        ctl.predepositGreen(amount, Greenlist.proofOf(csv, who));
         vm.stopPrank();
     }
 
@@ -68,6 +81,9 @@ contract UncappedCapacityTest is Test {
 
     function _launch() private {
         skip(60);
+        // the factory (the controller's owner) launches — sub-cap boots no
+        // longer permission-launch once the green window alone has passed
+        vm.prank(address(factory));
         round.controller.launchPooledBuy();
     }
 
@@ -98,8 +114,10 @@ contract UncappedCapacityTest is Test {
         _deposit(round.controller, alice, 500e18); // public leg first: carry counts
         _carry(449_500e18); // cap-exempt remainder of the 450k boot
         _launch();
-        uint256 snapshot = round.controller.genesisPSPSnapshot();
-        uint256 expected = Math.mulDiv(snapshot, 500e18, 450_000e18);
+        // rules v3: alice's 500-mix green boot owns buy #1's segment only
+        // (the carry rides buy #2) — her principal is the green snapshot
+        uint256 snapshot = round.controller.greenPSPSnapshot();
+        uint256 expected = snapshot; // sole green depositor: full tranche
         vm.prank(alice);
         round.controller.claimPredepositPSP();
         PSPStaker staker = round.controller.staker();
@@ -113,21 +131,28 @@ contract UncappedCapacityTest is Test {
         round.token.approve(address(round.hook), principal);
         uint256 paid = round.hook.redeemBacking(principal);
         vm.stopPrank();
-        assertApproxEqAbs(paid, 500e18, 1);
+        // rules v3: the flat payout follows PSP ownership, and the green
+        // tranche owns F(450)/F(405000) of the supply (not 500/450000 of a
+        // single buy) — the two-buy segmentation is exactly that
+        uint256 totalPSP = round.controller.genesisPSPSnapshot();
+        assertApproxEqAbs(paid, principal * 450_000e18 / totalPSP, 1);
     }
 
     function test_UnrepresentableDepositRollsBackBeforeItCanPoisonLaunch() public {
         _deposit(round.controller, alice, 500e18);
         uint256 oversized = type(uint256).max / 2;
-        // The public path hits the pooled cap first — before any transfer
+        // rules v3: run in the OPEN window (the premise is capacity, not
+        // phase) — the public path hits the open-phase wallet cap first,
+        // before any transfer or pooled-cap arithmetic
+        skip(round.controller.GREEN_DURATION() + 1);
         mix.mint(bob, oversized);
         vm.startPrank(bob);
         mix.approve(address(round.controller), oversized);
-        vm.expectRevert(RoundController.CapExceeded.selector);
+        vm.expectRevert(RoundController.WalletCapExceeded.selector);
         round.controller.predeposit(oversized);
         vm.stopPrank();
         assertEq(mix.balanceOf(bob), oversized);
-        // The exempt carry path still meets the arithmetic domain guard
+        // the exempt carry path still meets the arithmetic domain guard
         vm.prank(bob);
         mix.transfer(address(factory), oversized); // reuse the funds — no second max/2 mint (supply would overflow)
         vm.startPrank(address(factory));
@@ -154,10 +179,21 @@ contract UncappedCapacityTest is Test {
         assertEq(mix.balanceOf(address(factory)), oversized);
         assertEq(next.controller.totalPredepositMixETH(), 0);
         assertEq(mix.allowance(address(factory), address(next.controller)), 0);
-        _deposit(next.controller, bob, 500e18);
-        skip(60);
+        // rules v3: round 2's green window (round-1 holders) passes, bob
+        // seeds a public open deposit, the factory (owner) launches
+        skip(next.controller.GREEN_DURATION() + 1);
+        _openDeposit(next.controller, bob, 10e18);
+        vm.prank(address(factory));
         next.controller.launchPooledBuy();
         assertEq(uint8(next.hook.mode()), uint8(CurveHook.Mode.Active));
+    }
+
+    function _openDeposit(RoundController ctl, address who, uint256 amount) private {
+        mix.mint(who, amount);
+        vm.startPrank(who);
+        mix.approve(address(ctl), amount);
+        ctl.predeposit(amount);
+        vm.stopPrank();
     }
 
     function test_V4RejectsInputsBeyondSigned128Bits() public {
@@ -213,9 +249,7 @@ contract UncappedCapacityTest is Test {
         assertEq(round.hook.totalSupplyPSP(), supply);
     }
     function _useHighPriceCurve() private {
-        factory = new PSPFactory(IPoolManager(address(manager)), IERC20(address(mix)),
-            factory.hookDeployer(), factory.controllerDeployer(), factory.stakerDeployer(),
-            factory.sineV3Table(), CurveMath.packTimingsCapped(60, 120, 180, 0), address(this));
+        factory = _newFactory();
         factory.configureSineV3(75_000_000_000_000);
         factory.deployRound(PSPFactory.RoundParams("PSP", "PSP", CurveMath.singleCurve(
             0.001e18, 1_000_000e18, 0.0000000046e18, 0.05e18)));

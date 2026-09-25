@@ -4,13 +4,13 @@ import { Link } from 'react-router-dom'
 import { usePurchaseReferral, useReferral } from './ReferralCard'
 import { purchaseReferral } from '../lib/referrals'
 import { purchaseUnits, TIME_PER_UNIT, minimumOutput, minimumBuyInput, assertTicketGuard } from '../lib/gameRules'
-import { usePredepositRules } from '../lib/usePredepositMinimum'
+import { usePredepositRules, usePredepositState } from '../lib/usePredepositMinimum'
 import { capHeadroom, predepositUncapped, predepositLimit, predepositAmountAllowed, predepositProgress, predepositRemainder } from '../lib/predeposit'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { useRpcReads } from '../lib/useRpcReads'
-import { erc20Abi, hookAbi, controllerAbi, registryAbi, zapInAbi, zapOutAbi, buildPoolKey } from '../lib/abi'
+import { erc20Abi, hookAbi, controllerAbi, legacyControllerAbi, registryAbi, zapInAbi, zapOutAbi, buildPoolKey } from '../lib/abi'
 import { rpcCall, rpcBatchCall } from '../lib/rpc'
 import { ADDRESSES } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
@@ -76,20 +76,19 @@ export default function SwapCard({ variant, board }: { variant?: 'alt'; board?: 
   /// between-zero-and-boom state exactly.
   const halted = clockZero && round.mode === 1
   const pdReads = useRpcReads([
-    { to: round.controller, abi: controllerAbi, functionName: 'predepositState' },
     { to: round.controller, abi: controllerAbi, functionName: 'PREDEPOSIT_CAP_PER_WALLET' },
-    { to: round.controller, abi: controllerAbi, functionName: 'predeposits', args: [address ?? ZERO] },
+    { to: round.controller, abi: pdVersion === 3n ? controllerAbi : legacyControllerAbi, functionName: 'predeposits', args: [address ?? ZERO] },
   ], predepositPhase && !!round.controller && !!address, 4000, step === 'done' ? 1 : 0)
-  const pdState = pdReads[0] as [bigint, bigint, bigint, boolean, boolean, boolean, boolean] | undefined
-  const pdWalletCap = pdReads[1] as bigint | undefined
-  const pdDeposit = (pdReads[2] as [bigint, boolean] | undefined)?.[0]
-  const pdTotal = pdState?.[0] ?? round.totalPredeposit
-  const pdCap = pdState?.[1] ?? round.predepositCap
+  const pdState = usePredepositState(round.controller, 4000, step === 'done' ? 1 : 0).state
+  const pdWalletCap = pdReads[0] as bigint | undefined
+  const pdDeposit = (pdReads[1] as [bigint, ...unknown[]] | undefined)?.[0]
+  const pdTotal = pdState?.total ?? round.totalPredeposit
+  const pdCap = pdState?.cap ?? round.predepositCap
   const pdUncapped = pdCap !== undefined && predepositUncapped(pdVersion, pdCap)
   const pdRemaining = !pdUncapped && pdTotal !== undefined && pdCap !== undefined ? capHeadroom(pdTotal, pdCap) : undefined
   const pdMax = mixBal !== undefined && pdState && pdWalletCap !== undefined && pdDeposit !== undefined
-    ? predepositLimit(mixBal, pdState[0], pdState[1], pdWalletCap, pdDeposit, pdVersion) : undefined
-  const pdAllowed = side === 'buy' && !!pdState && !pdState[3]
+    ? predepositLimit(mixBal, pdState.total, pdState.cap, pdWalletCap, pdDeposit, pdVersion) : undefined
+  const pdAllowed = side === 'buy' && !!pdState && !pdState.closed
     && predepositAmountAllowed(amountWad, pdMinimum, pdMax)
 
 

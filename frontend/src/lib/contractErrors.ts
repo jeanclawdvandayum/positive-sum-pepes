@@ -14,7 +14,10 @@ export const curveErrorSignatures = [
   'error DivWadFailed()',
   // v3 (2026-09-14): a guarded purchase route sampled a live ticket price
   // above the caller's quoted maxTicketPrice — nothing moved, refresh.
-  'error TicketPriceMoved()',
+  // greenlist-IBCO (rules v3): phase + membership reverts off the controller
+  'error WrongPhase()',
+  'error NotGreenlisted()',
+  'error GreenCapExceeded()',
   'error SineV3Domain()',
   'error SineV3PriceDomain()',
   'error SineV3PriceOverflow()',
@@ -36,6 +39,9 @@ const messages: Record<string, string> = {
   InvalidParams: 'These values cannot form a valid curve. Check the amount and round configuration.',
   ExpPriceArg: 'This trade reaches beyond the curve’s supported price range. Try a smaller amount.',
   FullMulDivFailed: arithmetic,
+  WrongPhase: 'This deposit window has moved on. Refresh for the current phase and try again.',
+  NotGreenlisted: 'This wallet is not on this round’s greenlist. Your turn comes at the open window.',
+  GreenCapExceeded: 'This deposit passes the greenlist per-wallet cap. Try a smaller amount.',
   MulWadFailed: arithmetic,
   DivWadFailed: arithmetic,
   TicketPriceMoved: 'The ticket price rose past your quoted maximum before the trade landed. Nothing was spent — refresh for a new quote.',

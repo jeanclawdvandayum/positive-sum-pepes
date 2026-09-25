@@ -64,7 +64,8 @@ contract VestingTest is Test {
             CurveMath.singleCurve(0.0001e18, 100_000_000e18, 0.000000046e18, 0.1e18);
         pspToken = new PSPToken("Positive Sum Pepes", "PSP", address(this));
         controller =
-            new RoundController(pspToken, IERC20(address(mixETH)), params, address(mockFactory), address(0), new StakerDeployer());
+            new RoundController(pspToken, IERC20(address(mixETH)), params, address(mockFactory), address(0), new StakerDeployer(),
+                1 days, 1 days, bytes32(0), 0, 0, PSPToken(address(0)));
         stakerV = controller.staker();
         pspToken.setController(address(controller));
 

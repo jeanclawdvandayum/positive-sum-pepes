@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {Script} from "forge-std/Script.sol";
 import {PSPFactory} from "../src/PSPFactory.sol";
+import {PSPToken} from "../src/PSPToken.sol";
 import {PSPStaker} from "../src/PSPStaker.sol";
 import {PSPReferralRegistry} from "../src/PSPReferralRegistry.sol";
 import {PSPZapIn} from "../src/PSPZapIn.sol";
@@ -10,6 +11,7 @@ import {PSPZapOut} from "../src/PSPZapOut.sol";
 import {CurveHook} from "../src/CurveHook.sol";
 import {CurveMath} from "../src/libraries/CurveMath.sol";
 
+import {Greenlist} from "../test/helpers/Greenlist.sol";
 import {Curve1Zones} from "../src/curves/Curve1Zones.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
@@ -35,13 +37,64 @@ abstract contract DeploymentSupport is Script {
         require(pm.code.length != 0, "PoolManager has no code");
     }
 
+    /// @dev Greenlist-IBCO (rules v3): packed slot [0] is the GREEN window
+    ///      (PSP_GREEN_SEC, default 1 day); the open window rides the
+    ///      factory's openWindowSec (PSP_OPEN_SEC, wired by DeployPSP).
+    ///      The old PSP_PREDEPOSIT_SEC knob is RETIRED — setting it fails
+    ///      loudly instead of silently shaping a different window.
     function _testnetTimings() internal view returns (uint256) {
+        require(
+            bytes(vm.envOr("PSP_PREDEPOSIT_SEC", string(""))).length == 0,
+            "PSP_PREDEPOSIT_SEC is retired under predeposit rules v3 (use PSP_GREEN_SEC)"
+        );
         return CurveMath.packTimingsCapped(
-            vm.envOr("PSP_PREDEPOSIT_SEC", uint256(3 days)),
+            vm.envOr("PSP_GREEN_SEC", uint256(1 days)),
             vm.envOr("PSP_VEST_SEC", uint256(28 days)),
             vm.envOr("PSP_DET_SEC", uint256(69 hours + 4 minutes + 20 seconds)),
             vm.envOr("PSP_WALLET_CAP_MIX", uint256(0))
         );
+    }
+
+    /// @dev The csv greenlist env (rules v3): one address per line, blank
+    ///      lines skipped. Returns (0, 0) when PSP_GREEN_CSV is unset —
+    ///      the csv is the OPTIONAL half of the next round's greenlist;
+    ///      previous-round PSP holders are the trustless other half.
+    ///      The tree format is pinned by RoundController._greenlisted and
+    ///      mirrored byte-for-byte by test/helpers/Greenlist.sol:
+    ///        leaf   = keccak256(abi.encodePacked(account))
+    ///        parent = keccak256(left < right ? (left,right) : (right,left))
+    ///      with odd levels duplicate-padded (a lone entry pads to [a,a]).
+    function _greenCsv() internal view returns (bytes32 root, uint256 count) {
+        string memory path = vm.envOr("PSP_GREEN_CSV", string(""));
+        if (bytes(path).length == 0) return (0, 0);
+        string[] memory lines = vm.split(vm.readFile(path), "\n");
+        address[] memory found = new address[](lines.length);
+        for (uint256 i; i < lines.length; ++i) {
+            string memory line = _trimLine(lines[i]);
+            if (bytes(line).length == 0) continue;
+            found[count++] = vm.parseAddress(line);
+        }
+        if (count == 0) return (0, 0);
+        address[] memory csv = new address[](count);
+        for (uint256 i; i < count; ++i) csv[i] = found[i];
+        root = Greenlist.rootOf(csv);
+    }
+
+    /// @dev Strip the whitespace a hand-edited csv line can carry (\r\n
+    ///      line endings, stray spaces/tabs) so parseAddress sees the hex.
+    function _trimLine(string memory s) internal pure returns (string memory) {
+        bytes memory b = bytes(s);
+        uint256 start;
+        uint256 end = b.length;
+        while (start < end && _ws(b[start])) ++start;
+        while (end > start && _ws(b[end - 1])) --end;
+        bytes memory t = new bytes(end - start);
+        for (uint256 i; i < t.length; ++i) t[i] = b[start + i];
+        return string(t);
+    }
+
+    function _ws(bytes1 c) private pure returns (bool) {
+        return c == " " || c == "\t" || c == "\r" || c == "\n";
     }
 
     function _htmlPath(bool testnet) internal view returns (string memory) {
@@ -120,8 +173,27 @@ abstract contract DeploymentSupport is Script {
             "game rules mismatch");
         require(r.hook.sineV3Table() == factory.sineV3Table() && r.hook.sinePL() == factory.gameSinePL(),
             "sine v3 helper or launch price mismatch");
-        require(r.controller.PREDEPOSIT_RULES_VERSION() == 2 && r.controller.PREDEPOSIT_CAP() == 1000 ether,
+        // Greenlist-IBCO rules v3: version, both windows, and the greenlist
+        // sizing must match the deploy env exactly (GREEN_DURATION rides
+        // packed slot [0] = PSP_GREEN_SEC on the testnet profile; the
+        // mainnet timings==0 default is 1 day = the env default, so a
+        // mainnet deploy that sets PSP_GREEN_SEC fails loudly here —
+        // the knob is testnet-profile-only).
+        require(r.controller.PREDEPOSIT_RULES_VERSION() == 3 && r.controller.PREDEPOSIT_CAP() == 1000 ether,
             "predeposit rules mismatch");
+        require(
+            r.controller.GREEN_DURATION() == vm.envOr("PSP_GREEN_SEC", uint256(1 days))
+                && r.controller.OPEN_DURATION() == vm.envOr("PSP_OPEN_SEC", uint256(1 days)),
+            "green/open window mismatch"
+        );
+        // Greenlist sizing: N = csv entries + previous-round holders (0 on
+        // genesis). N == 0 disables the green phase; otherwise the cap is
+        // 500 mixETH / N exactly as the controller computes it at birth.
+        (, uint256 csvCount) = _greenCsv();
+        PSPToken prevToken = r.controller.PREV_TOKEN();
+        uint256 n = csvCount + (address(prevToken) == address(0) ? 0 : prevToken.holderCount());
+        require(r.controller.GREEN_PER_WALLET() == (n == 0 ? 0 : 500 ether / n), "greenlist sizing mismatch");
+        require(r.controller.OPEN_PER_WALLET() == 10 ether, "open per-wallet cap mismatch");
         PSPStaker staker = r.controller.staker();
         require(address(staker).code.length != 0 && address(staker.controller()) == address(r.controller)
             && address(staker.psp()) == address(r.token), "staker wiring mismatch");

@@ -2,16 +2,20 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { encodeFunctionResult, decodeFunctionResult } from 'viem'
-import { controllerAbi, hookAbi } from '../src/lib/abi.ts'
+import { controllerAbi, legacyControllerAbi, hookAbi } from '../src/lib/abi.ts'
 import { predepositResult } from '../src/lib/chainResults.ts'
 
-test('deployed getter bytes preserve deposit amount and genesis claim availability', () => {
+test('deployed getter bytes preserve deposit amount, green tranche and claim availability', () => {
   const abi = JSON.parse(fs.readFileSync(new URL('../../out/RoundController.sol/RoundController.json', import.meta.url))).abi
-  for (const claimed of [false, true]) {
-    const data = encodeFunctionResult({ abi, functionName: 'predeposits', result: [5_000_000_000_000_000n, claimed] })
+  for (const [green, claimed] of [[0n, false], [2_000_000_000_000_000n, true]]) {
+    const data = encodeFunctionResult({ abi, functionName: 'predeposits', result: [5_000_000_000_000_000n, green, claimed] })
     const raw = decodeFunctionResult({ abi: controllerAbi, functionName: 'predeposits', data })
-    assert.deepEqual(predepositResult(raw), { mixETHAmount: 5_000_000_000_000_000n, claimed })
+    assert.deepEqual(predepositResult(raw), { mixETHAmount: 5_000_000_000_000_000n, greenAmount: green, claimed })
   }
+  // legacy v1/v2 controllers answer the same selector with the 2-tuple
+  const legacy = encodeFunctionResult({ abi: legacyControllerAbi, functionName: 'predeposits', result: [5_000_000_000_000_000n, true] })
+  const rawLegacy = decodeFunctionResult({ abi: legacyControllerAbi, functionName: 'predeposits', data: legacy })
+  assert.deepEqual(predepositResult(rawLegacy), { mixETHAmount: 5_000_000_000_000_000n, greenAmount: 0n, claimed: true })
   assert.throws(() => predepositResult(undefined))
 })
 

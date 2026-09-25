@@ -66,35 +66,11 @@ contract C4_Probe is CBase {
     }
 
     function _reservation() internal view returns (PSPFactory.SpawnReservation memory r) {
-        (
-            uint128 fromRoundId,
-            uint128 newRoundId,
-            bytes32 tokenSalt,
-            bytes32 controllerSalt,
-            bytes32 hookSalt,
-            address token,
-            address controller,
-            address hook,
-            bytes32 contextHash,
-            bool active,
-            string memory name,
-            string memory symbol,
-            uint8 phase
-        ) = factory.reservation();
-        r = PSPFactory.SpawnReservation({
-            fromRoundId: fromRoundId,
-            newRoundId: newRoundId,
-            tokenSalt: tokenSalt,
-            controllerSalt: controllerSalt,
-            hookSalt: hookSalt,
-            token: token,
-            controller: controller,
-            hook: hook,
-            contextHash: contextHash,
-            active: active,
-            name: name,
-            symbol: symbol,
-            phase: phase
-        });
+        // two partial reads keep the via-ir frame under the stack limit
+        // (the full 15-field destructure is 1 slot too deep)
+        (r.fromRoundId, r.newRoundId, r.tokenSalt, r.controllerSalt, r.hookSalt, r.token, r.controller, r.hook,,,,,,,) =
+            factory.reservation();
+        (,,,,,,,, r.contextHash, r.greenRoot, r.greenCount, r.active, r.name, r.symbol, r.phase) =
+            factory.reservation();
     }
 }

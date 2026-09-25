@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom'
 import { renderDecorativePepeSvg } from '../lib/pepeRender'
 import { useNow } from '../phase/PhaseEngine'
 import { useRound } from '../lib/useRound'
-import { useRpcReads } from '../lib/useRpcReads'
-import { controllerAbi, faucetAbi } from '../lib/abi'
+import { faucetAbi } from '../lib/abi'
+import { ibcoPhaseAt } from '../lib/predeposit'
 import { ADDRESSES, FAUCET_ENABLED } from '../lib/config'
 import { fmtAmount } from '../lib/format'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
@@ -45,10 +45,12 @@ export function Faucet() {
 }
 export function Instrument() {
   const round=useRound(), board=useLadderBoard(round.hook), now=useNow()
-  const [duration]=useRpcReads([{to:round.controller,abi:controllerAbi,functionName:'PREDEPOSIT_DURATION'}],!!round.controller,15000)
   const pre=round.mode===0
-  const deadline=pre && round.predepositStartTime!==undefined && typeof duration==='bigint' ? round.predepositStartTime+duration : round.detonationAt
-  const live=round.mode===1 && deadline!==undefined && Number(deadline)>now && (board.ticketCount??0n)>0n
+  // rules v3: green phase runs to greenEnd, then the open window to openEnd;
+  // legacy rounds and rootless v3 rounds are a single open window.
+  const phase=ibcoPhaseAt(now,round.greenEnd,round.openEnd)
+  const deadline=pre?(phase===0?round.greenEnd:round.openEnd):round.detonationAt
+  const live=round.mode===1&&deadline!==undefined&&Number(deadline)>now&&(board.ticketCount??0n)>0n
   const count=Number((board.ticketCount??0n)>10n?10n:board.ticketCount??0n)
   const pot=fmtAmount(pre?round.totalPredeposit:round.potBalance,3)
   const potRef=useRef<HTMLElement>(null)
@@ -63,5 +65,6 @@ export function Instrument() {
     const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches
     el.animate(reduced?[{opacity:.35},{opacity:1}]:[{filter:'brightness(2.1)'},{filter:'brightness(1)'}],{duration:reduced?260:600,easing:'ease-out'})
   },[pot])
-  return <div className="instrument"><div className="instrument-top"><strong>round {round.id.toString().padStart(2,'0')}</strong><span className="instrument-status">{pre?'the pooled opening':live?'countdown running':'waiting for the next move'}</span></div><AltClock deadline={deadline} settled={(round.mode??0)>=2}/><div className="instrument-pot"><span>{pre?'pooled for the opening buy':'total pot'}</span><strong ref={potRef}>{pot} <small>mixETH</small></strong></div><div className="instrument-details"><span>{pre?'IBCO':'next ticket'} <b>{pre?(round.predepositCap?`${fmtAmount(round.predepositCap,0)} mixETH cap`:'uncapped'):`${fmtAmount(round.ticketPrice,8)} mixETH`}</b></span><span>clock cap <b>{clockText(Number(round.detWindow??0n))}</b></span></div>{live?<div className="face-podium">{[1,0,2].filter(i=>i<count).map(i=>{const seat=board.seats[i];return seat?<div className={`podium-card podium-rank-${i+1}`} key={i}><WalletPepeArt className="podium-art" address={seat.addr} staker={round.staker}/><small>#{i+1} · <WalletName address={seat.addr}/></small></div>:null})}</div>:<RandomPepe className="hero-random"/>}<div className="instrument-foot"><span>every round starts here.</span><Link to={pre?'/predeposit':'/play'}>{pre?'join the opening':'see the ladder'} ↗</Link></div></div>
+  const status=pre?(phase===0?'the greenlist opening':phase===2?'the opening is closed':'the pooled opening'):live?'countdown running':'waiting for the next move'
+  return <div className="instrument"><div className="instrument-top"><strong>round {round.id.toString().padStart(2,'0')}</strong><span className="instrument-status">{status}</span></div><AltClock deadline={deadline} settled={(round.mode??0)>=2}/><div className="instrument-pot"><span>{pre?'pooled for the opening buy':'total pot'}</span><strong ref={potRef}>{pot} <small>mixETH</small></strong></div><div className="instrument-details"><span>{pre?'IBCO':'next ticket'} <b>{pre?(round.predepositCap?`${fmtAmount(round.predepositCap,0)} mixETH cap`:'uncapped'):`${fmtAmount(round.ticketPrice,8)} mixETH`}</b></span><span>clock cap <b>{clockText(Number(round.detWindow??0n))}</b></span></div>{live?<div className="face-podium">{[1,0,2].filter(i=>i<count).map(i=>{const seat=board.seats[i];return seat?<div className={`podium-card podium-rank-${i+1}`} key={i}><WalletPepeArt className="podium-art" address={seat.addr} staker={round.staker}/><small>#{i+1} · <WalletName address={seat.addr}/></small></div>:null})}</div>:<RandomPepe className="hero-random"/>}<div className="instrument-foot"><span>every round starts here.</span><Link to={pre?'/predeposit':'/play'}>{pre?'join the opening':'see the ladder'} ↗</Link></div></div>
 }

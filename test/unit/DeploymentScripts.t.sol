@@ -84,11 +84,18 @@ contract DeploymentScriptsTest is Test {
     }
 
     function test_TimingOverridesUseCanonicalPackingAndRejectInvalidVest() public {
-        vm.setEnv("PSP_PREDEPOSIT_SEC", "600");
+        // the runner .env still exports the retired knob — isolate it
+        vm.setEnv("PSP_PREDEPOSIT_SEC", "");
+        vm.setEnv("PSP_GREEN_SEC", "600");
         vm.setEnv("PSP_VEST_SEC", "1200");
         vm.setEnv("PSP_DET_SEC", "1800");
         vm.setEnv("PSP_WALLET_CAP_MIX", "25");
         assertEq(harness.timings(), CurveMath.packTimingsCapped(600, 1200, 1800, 25));
+        // rules v3 retired the old predeposit-window knob — loud failure
+        vm.setEnv("PSP_PREDEPOSIT_SEC", "600");
+        vm.expectRevert("PSP_PREDEPOSIT_SEC is retired under predeposit rules v3 (use PSP_GREEN_SEC)");
+        harness.timings();
+        vm.setEnv("PSP_PREDEPOSIT_SEC", "");
         vm.setEnv("PSP_VEST_SEC", "1201");
         vm.expectRevert();
         harness.timings();
@@ -117,10 +124,13 @@ contract DeploymentScriptsTest is Test {
             assertFalse(factory.reservationActive());
             PSPFactory.Round memory round = factory.getRound(1);
             assertEq(round.controller.PREDEPOSIT_CAP_PER_WALLET(), 0);
-            assertEq(round.controller.PREDEPOSIT_DURATION(), 7200);
+            assertEq(round.controller.GREEN_DURATION(), 7200, "green rides slot [0]");
             assertEq(round.controller.VEST_DURATION(), 3600);
             assertEq(round.hook.detWindow(), 7200);
+            // the release validator agrees when the env matches the profile
+            vm.setEnv("PSP_GREEN_SEC", "7200");
             harness.checkRound(factory, 1);
+            vm.setEnv("PSP_GREEN_SEC", "");
             harness.complete(factory);
             assertEq(address(factory.getRound(1).controller), address(round.controller));
         }

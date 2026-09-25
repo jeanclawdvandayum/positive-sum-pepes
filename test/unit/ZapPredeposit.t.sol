@@ -67,7 +67,7 @@ contract ZapPredepositTest is Test {
         vm.deal(alice, 1);
         vm.prank(alice);
         zapIn.zapInPredeposit{value: 1}(controller, 1);
-        (uint256 credited,) = controller.predeposits(alice);
+        (uint256 credited,,) = controller.predeposits(alice);
         assertEq(credited, 1);
     }
 
@@ -80,9 +80,9 @@ contract ZapPredepositTest is Test {
 
         assertEq(shares, 10e18, "1:1 wrap");
         assertEq(alice.balance, ethBefore - 10e18, "ETH spent");
-        (uint256 recorded,) = controller.predeposits(alice);
+        (uint256 recorded,,) = controller.predeposits(alice);
         assertEq(recorded, 10e18, "predeposit credited to alice");
-        (uint256 zapRecorded,) = controller.predeposits(address(zapIn));
+        (uint256 zapRecorded,,) = controller.predeposits(address(zapIn));
         assertEq(zapRecorded, 0, "zap holds no predeposit");
         assertEq(mixETH.balanceOf(address(zapIn)), 0, "zap holds no mixETH");
         assertEq(controller.totalPredepositMixETH(), 10e18, "cap accounting");
@@ -97,7 +97,7 @@ contract ZapPredepositTest is Test {
         uint256 shares = zapIn.zapInPredeposit{value: 10e18}(controller, 4e18);
 
         assertEq(shares, 5e18, "10 ETH at 2:1 = 5 shares");
-        (uint256 recorded,) = controller.predeposits(alice);
+        (uint256 recorded,,) = controller.predeposits(alice);
         assertEq(recorded, 5e18, "credited in shares, not ETH");
     }
 
@@ -117,20 +117,36 @@ contract ZapPredepositTest is Test {
     }
 
     function test_ZapInPredeposit_RespectsTheTotalCap() public {
-        mixETH.approve(address(controller), 400e18);
-        controller.predeposit(400e18);
+        // rules v3: the open phase caps every wallet at 10 mixETH, so the
+        // pooled headroom fills through a crowd of fresh beneficiaries
+        for (uint256 i; i < 99; ++i) {
+            address w = makeAddr(string.concat("zap-crowd-", vm.toString(i)));
+            mixETH.transfer(w, 10e18);
+            vm.startPrank(w);
+            mixETH.approve(address(controller), 10e18);
+            controller.predepositFor(w, 10e18);
+            vm.stopPrank();
+        }
 
         // the zap path fills exactly the remaining headroom
-        vm.deal(alice, 600e18);
+        vm.deal(alice, 10e18);
         vm.prank(alice);
-        zapIn.zapInPredeposit{value: 600e18}(controller, 0);
-        (uint256 recorded,) = controller.predeposits(alice);
-        assertEq(recorded, 600e18);
+        zapIn.zapInPredeposit{value: 10e18}(controller, 0);
+        (uint256 recorded,,) = controller.predeposits(alice);
+        assertEq(recorded, 10e18);
         assertEq(controller.totalPredepositMixETH(), 1000e18);
 
-        // one wrapped wei more reverts through the controller's cap guard
+        // alice is AT her wallet cap: her wrapped wei hits it first
+        // (ruling: per-wallet cap precedes the pooled cap)
         vm.deal(alice, 1);
         vm.prank(alice);
+        vm.expectRevert(RoundController.WalletCapExceeded.selector);
+        zapIn.zapInPredeposit{value: 1}(controller, 0);
+
+        // a FRESH wallet's wei breaches the pooled cap instead
+        address fresh = makeAddr("zap-cap-fresh");
+        vm.deal(fresh, 1);
+        vm.prank(fresh);
         vm.expectRevert(RoundController.CapExceeded.selector);
         zapIn.zapInPredeposit{value: 1}(controller, 0);
     }
@@ -146,9 +162,9 @@ contract ZapPredepositTest is Test {
         controller.predepositFor(alice, 3e18);
         vm.stopPrank();
 
-        (uint256 recorded,) = controller.predeposits(alice);
+        (uint256 recorded,,) = controller.predeposits(alice);
         assertEq(recorded, 3e18, "alice credited");
-        (uint256 randoRecorded,) = controller.predeposits(rando);
+        (uint256 randoRecorded,,) = controller.predeposits(rando);
         assertEq(randoRecorded, 0, "rando not credited");
     }
 

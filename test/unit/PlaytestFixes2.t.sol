@@ -96,9 +96,10 @@ contract PlaytestFixes2 is Test {
         vm.startPrank(alice);
         mixETH.approve(address(c), type(uint256).max);
 
-        // 10 is the ceiling — depositing exactly 10 works
+        // rules v3: the OPEN phase caps every wallet at 10 mixETH —
+        // depositing exactly 10 works
         c.predeposit(10e18);
-        (uint256 aliceDep,) = c.predeposits(alice);
+        (uint256 aliceDep,,) = c.predeposits(alice);
         assertEq(aliceDep, 10e18);
 
         // any further top-up reverts (10 + ε > 10)
@@ -110,7 +111,7 @@ contract PlaytestFixes2 is Test {
         vm.startPrank(bob);
         mixETH.approve(address(c), type(uint256).max);
         c.predeposit(10e18);
-        (uint256 bobDep,) = c.predeposits(bob);
+        (uint256 bobDep,,) = c.predeposits(bob);
         assertEq(bobDep, 10e18);
 
         // overshooting in ONE tx reverts too
@@ -125,7 +126,7 @@ contract PlaytestFixes2 is Test {
         mixETH.approve(address(c), type(uint256).max);
         c.predepositFor(bob, 10e18 - 1);
         c.predepositFor(bob, 1);
-        (uint256 credited,) = c.predeposits(bob);
+        (uint256 credited,,) = c.predeposits(bob);
         assertEq(credited, 10e18);
         vm.expectRevert(RoundController.WalletCapExceeded.selector);
         c.predepositFor(bob, 1);
@@ -144,19 +145,20 @@ contract PlaytestFixes2 is Test {
         vm.stopPrank();
     }
 
-    function test_DefaultProfileHasNoWalletCap() public {
-        // the default (timings == 0) factory has no per-wallet cap — one
-        // wallet may predeposit the whole pooled cap and top up: 1000e18 is
-        // 100x the capped profile's 10e18 wallet ceiling
+    function test_DefaultProfileHasTheTenMixOpenCap() public {
+        // rules v3: the default (timings == 0) profile keeps the packed
+        // wallet slot off but the OPEN phase caps wallets at 10 mixETH —
+        // the pooled 1000 cap needs a crowd, not one whale
         assertEq(controller.PREDEPOSIT_CAP_PER_WALLET(), 0);
+        assertEq(controller.OPEN_PER_WALLET(), 10e18);
         vm.startPrank(alice);
         mixETH.approve(address(controller), type(uint256).max);
-        controller.predeposit(999e18);
-        controller.predeposit(1e18); // top-up to exactly the pooled cap
+        controller.predeposit(10e18);
+        vm.expectRevert(RoundController.WalletCapExceeded.selector);
+        controller.predeposit(1);
         vm.stopPrank();
-        assertEq(controller.totalPredepositMixETH(), 1000e18);
-        (uint256 credited,) = controller.predeposits(alice);
-        assertEq(credited, 1000e18);
+        (uint256 credited,,) = controller.predeposits(alice);
+        assertEq(credited, 10e18);
     }
 
     // ─────────────── #6: factory UI views + rebirth ───────────────
@@ -181,18 +183,10 @@ contract PlaytestFixes2 is Test {
             assertEq(c1, address(mixETH));
         }
 
-        (
-            address token,
-            address ctl,
-            address hk,
-            address stk,
-            address registry,
-            string memory name,
-            string memory symbol,
-            bool destroyed,
-            uint256 pd,
-            uint256 vest
-        ) = factory.roundInfo(1);
+        // split reads keep the via-ir frame shallow
+        (address token, address ctl, address hk, address stk, address registry,,,,,,) = factory.roundInfo(1);
+        (,,,,, string memory name, string memory symbol, bool destroyed, uint256 green, uint256 open, uint256 vest) =
+            factory.roundInfo(1);
         assertEq(token, tok);
         assertEq(ctl, address(ctlR1));
         assertEq(hk, hook);
@@ -201,10 +195,11 @@ contract PlaytestFixes2 is Test {
         assertEq(name, "Positive Sum Pepes");
         assertEq(symbol, "PSP");
         assertFalse(destroyed);
-        // mainnet-default timings (factory constructed with _timings == 0).
-        // CLOCK-REDESIGN §4: the vote + flat-exit slots died with governance
-        // and the exit window — roundInfo carries predeposit/vest only.
-        assertEq(pd, 3 days);
+        // mainnet-default timings (factory constructed with _timings == 0):
+        // rules v3 carries BOTH windows — 1-day green + 1-day open — plus
+        // the vest horizon.
+        assertEq(green, 1 days);
+        assertEq(open, 1 days);
         assertEq(vest, 28 days);
     }
 
@@ -222,16 +217,18 @@ contract PlaytestFixes2 is Test {
     ///      exists as "Positive Sum Pepes 2"/"PSP2" with the carry seeded
     ///      and its own fresh token, starting from ITS predeposit phase.
     function test_Rebirth_Round2IsPSP2_FromPredeposit() public {
-        // ── round 1 lifecycle ──
+        // ── round 1 lifecycle (rules v3: the uncapped-profile open wallet
+        // cap is 10 — the boot amount is immaterial to this test) ──
         vm.startPrank(alice);
-        mixETH.approve(address(controller), 100e18);
-        controller.predeposit(100e18);
+        mixETH.approve(address(controller), 10e18);
+        controller.predeposit(10e18);
         vm.stopPrank();
         vm.prank(address(factory)); // owner may launch before the window closes
         controller.launchPooledBuy();
 
         vm.prank(alice);
         controller.claimPredepositPSP();
+
 
         address psp1Addr = address(psp1);
         (,, CurveHook hook1,,,) = factory.rounds(1);
@@ -266,16 +263,19 @@ contract PlaytestFixes2 is Test {
         assertEq(c2.totalPredepositMixETH(), 0, "no carry - round 2 boots from its own raise");
 
         // roundInfo(2) exposes everything the UI needs
-        (,,,,, string memory n2, string memory s2, bool destroyed2,,) = factory.roundInfo(2);
+        (,,,,, string memory n2, string memory s2, bool destroyed2,,,) = factory.roundInfo(2);
         assertEq(n2, "Positive Sum Pepes 2");
         assertEq(s2, "PSP2");
         assertFalse(destroyed2);
 
         // ...and round 1 is flagged destroyed in the same view
-        (,,,,,,, bool destroyed1,,) = factory.roundInfo(1);
+        (,,,,,,, bool destroyed1,,,) = factory.roundInfo(1);
         assertTrue(destroyed1);
 
-        // a wallet can predeposit into round 2 immediately (per-wallet cap fresh)
+        // rules v3: round 2 opens with a GREEN window for round-1 holders —
+        // bob never held PSP, so he waits it out and predeposits in the
+        // open phase (per-wallet cap fresh)
+        skip(c2.GREEN_DURATION() + 1);
         vm.startPrank(bob);
         mixETH.approve(address(c2), type(uint256).max);
         c2.predeposit(10e18);

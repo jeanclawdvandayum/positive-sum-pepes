@@ -400,7 +400,19 @@ contract PSPFactory is Ownable2Step {
 
         address token = tokenDeployer.predictToken(tokenSalt, name, symbol, address(this));
         address controller = controllerDeployer.predictController(
-            controllerSalt, PSPToken(token), mixETH, cfg, address(this), descriptor, stakerDeployer
+            controllerSalt,
+            PSPToken(token),
+            mixETH,
+            cfg,
+            address(this),
+            descriptor,
+            stakerDeployer,
+            uint64(cfg.timings & CurveMath.TIMINGS_MASK), // green window
+            openWindowSec,
+            nextGreenRoot,
+            nextGreenCount,
+            0, // open per-wallet default (10 mixETH) lives in the controller
+            fromRoundId == 0 ? PSPToken(address(0)) : rounds[fromRoundId].token
         );
         // staker + registry salts derive from the predicted controller —
         // the same derivation the controller's own constructor applies.
@@ -538,7 +550,11 @@ contract PSPFactory is Ownable2Step {
     function _birthWire() internal returns (uint256 roundId, address hookAddr) {
         SpawnReservation storage r = reservation;
         CurveMath.CurveConfig memory cfg = _configWithTimings();
-        if (keccak256(abi.encode(cfg, descriptor, r.name, r.symbol, useSine, gameSinePL, sineV3Table)) != r.contextHash) {
+        if (
+            keccak256(
+                abi.encode(cfg, descriptor, r.name, r.symbol, useSine, gameSinePL, sineV3Table, r.greenRoot, r.greenCount)
+            ) != r.contextHash
+        ) {
             revert ReservationStale();
         }
 

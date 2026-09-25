@@ -101,7 +101,7 @@ sort_pair() { # sort_pair <a> <b> → echoes "low high"
 echo "▪ DeployPSP (PSP_ANVIL=1 PSP_CURVE=$CURVE)"
 DEPLOY_LOG=/tmp/psp-e2e-deploy.log
 PSP_ANVIL=1 PSP_CURVE="$CURVE" \
-PSP_PREDEPOSIT_SEC=$PRE_SEC PSP_VEST_SEC=$VEST_SEC \
+PSP_GREEN_SEC=$PRE_SEC PSP_OPEN_SEC=$PRE_SEC PSP_VEST_SEC=$VEST_SEC \
 PSP_WALLET_CAP_MIX=10 \
   forge script DeployPSP --rpc-url "$RPC" --broadcast --private-key "$K_OWNER" 2>&1 | tee "$DEPLOY_LOG" >/dev/null
 FACTORY=$(grep -o 'factory: 0x[0-9a-fA-F]*' "$DEPLOY_LOG" | tail -1 | awk '{print $2}')
@@ -224,6 +224,9 @@ MODE=$(cast call "$R2_HOOK" "mode()(uint8)" --rpc-url "$RPC")
 echo "  R2 hook mode=$MODE (0 = Predeposit expected)"
 
 # ── 9. round 2 is ALIVE: drive its lifecycle — predeposit → launch → buy ────
+# rules v3: round 2 opens with a GREEN window (round-1 holders only) —
+# alice never held PSP, so wait it out before her open-phase deposit
+warp_to $(( $(TS) + PRE_SEC + 1 ))
 send "R2 predeposit alice (10 mix)" "$K_ALICE" "$ZAPIN" --value 10ether "zapInPredeposit(address,uint256)" "$R2_CTRL" 0
 warp_to $(( $(TS) + PRE_SEC + 5 ))
 send "R2 launchPooledBuy (rando)" "$K_RANDO" "$R2_CTRL" "launchPooledBuy()"

@@ -70,8 +70,13 @@ contract C1_HookSquatDoS is CBase {
         _launchRound1();
         _stageNextRound();
 
-        (,,,,, address token, address controller, address hook,, bool active,,,) = factory.reservation();
-        assertTrue(active, "reservation live after finalize");
+                // field-wise read into a struct: plain destructures overflow via-ir
+        PSPFactory.SpawnReservation memory res0;
+        (res0.fromRoundId, res0.newRoundId, res0.tokenSalt, res0.controllerSalt, res0.hookSalt, res0.token, res0.controller, res0.hook, res0.contextHash, res0.greenRoot, res0.greenCount, res0.active, res0.name, res0.symbol, res0.phase) = factory.reservation();
+        assertTrue(res0.active, "reservation live after finalize");
+        address token = res0.token;
+        address controller = res0.controller;
+        address hook = res0.hook;
 
         factory.birthRound();
 
@@ -152,22 +157,17 @@ contract C1_HookSquatDoS is CBase {
         _launchRound1();
         _stageNextRound();
 
-        (
-            ,
-            ,
-            bytes32 tokenSalt, // slot 3 — was misread as hookSalt (the C-1 miss)
-            bytes32 controllerSalt,
-            bytes32 hookSalt,
-            address token,
-            address controller,
-            address hook,
-            ,
-            bool active,
-            ,
-            ,
-
-        ) = factory.reservation();
-        assertTrue(active, "committed");
+        assertTrue(factory.reservationActive(), "committed");
+                // field-wise read (slot 3 is tokenSalt — was misread as hookSalt in
+        // the original C-1 miss; destructures overflow via-ir — see above)
+        PSPFactory.SpawnReservation memory r;
+        (r.fromRoundId, r.newRoundId, r.tokenSalt, r.controllerSalt, r.hookSalt, r.token, r.controller, r.hook, r.contextHash, r.greenRoot, r.greenCount, r.active, r.name, r.symbol, r.phase) = factory.reservation();
+        bytes32 tokenSalt = r.tokenSalt;
+        bytes32 controllerSalt = r.controllerSalt;
+        bytes32 hookSalt = r.hookSalt;
+        address token = r.token;
+        address controller = r.controller;
+        address hook = r.hook;
 
         // byte-identical config by construction: deployRound stored exactly
         // CBase's _curve() into gameCurve (the hook's stored zones are
@@ -175,22 +175,56 @@ contract C1_HookSquatDoS is CBase {
         CurveMath.CurveConfig memory cfg = _curve();
 
         // predicted sibling addresses, same derivations the factory used
-        bytes32 stakerSalt = keccak256(abi.encode(controller, "psp-staker"));
-        address staker = factory.stakerDeployer().predictStaker(
-            stakerSalt, IERC20(token), IRoundController(controller), factory.descriptor()
-        );
-        assertEq(staker.code.length, 0, "staker not yet born");
-        bytes32 registrySalt = keccak256(abi.encode(controller, "psp-registry"));
-        address registry = factory.controllerDeployer().predictRegistry(
-            registrySalt, staker, factory.REFERRAL_MIN_STAKE()
-        );
+        // (scoped: salts die before the deploy legs — liveness is what
+        // via-ir's stack budget counts)
+        address registry;
+        {
+            bytes32 stakerSalt = keccak256(abi.encode(controller, "psp-staker"));
+            address staker = factory.stakerDeployer().predictStaker(
+                stakerSalt, IERC20(token), IRoundController(controller), factory.descriptor()
+            );
+            assertEq(staker.code.length, 0, "staker not yet born");
+            bytes32 registrySalt = keccak256(abi.encode(controller, "psp-registry"));
+            registry = factory.controllerDeployer().predictRegistry(
+                registrySalt, staker, factory.REFERRAL_MIN_STAKE()
+            );
+        }
 
-        // ---- (a) hostile variant: same committed salt, DIFFERENT args.
-        // The hook's ctor has no external legs, but the variant's target
-        // address was never flag-mined — the salt was mined ONLY for the
-        // identical initcode. Best case for the attacker, the variant lands
-        // at a different address (inert orphan); usually the ctor's own
-        // flag self-check rejects the un-mined address outright.
+        // ---- (a) hostile variant: same committed salt, DIFFERENT args
+        //      (in its own helper — the inline try/catch was the frame that
+        //      pushed this test past via-ir's stack limit).
+        _tryRogueVariant(hookSalt, registry, cfg, hook);
+
+        // ---- (b) helpful path: identical controller first, then the hook
+        // (each leg lives in its own helper: one frame, one concern — the
+        // combined test function is several slots too deep for via-ir)
+        vm.prank(attacker);
+        assertEq(
+            _helpController(controllerSalt, token, controller, cfg),
+            controller,
+            "attacker could only deploy the identical controller"
+        );
+        vm.prank(attacker);
+        assertEq(_helpRegistry(controller), registry, "identical registry");
+        vm.prank(attacker);
+        assertEq(_helpHook(hookSalt, controller, registry, cfg), hook, "attacker could only deploy the identical hook");
+
+        // birth completes around the pre-deployed, identical contracts
+        _completeBirthAround(controller, hook);
+    }
+
+    /// @dev (a) hostile variant: same committed salt, DIFFERENT args. The
+    ///      hook's ctor has no external legs, but the variant's target
+    ///      address was never flag-mined — the salt was mined ONLY for the
+    ///      identical initcode. Best case for the attacker, the variant
+    ///      lands at a different address (inert orphan); usually the ctor's
+    ///      own flag self-check rejects the un-mined address outright.
+    function _tryRogueVariant(
+        bytes32 hookSalt,
+        address registry,
+        CurveMath.CurveConfig memory cfg,
+        address hook
+    ) internal {
         vm.prank(attacker);
         try hookDeployer.deployHookAt(
             hookSalt, IPoolManager(address(poolManager)), makeAddr("rogue-controller"), registry, cfg, address(this)
@@ -199,36 +233,9 @@ contract C1_HookSquatDoS is CBase {
         } catch {
             // the variant could not even deploy at this salt — even stronger
         }
+    }
 
-        // ---- (b) helpful path: identical controller first, then the hook
-        vm.prank(attacker);
-        address helpedController = address(
-            factory.controllerDeployer().deployControllerAt(
-                controllerSalt,
-                PSPToken(token),
-                IERC20(address(mixETH)),
-                cfg,
-                address(factory),
-                factory.descriptor(),
-                factory.stakerDeployer()
-            )
-        );
-        assertEq(helpedController, controller, "attacker could only deploy the identical controller");
-
-        // registry: self-contained ctor (stores staker + min stake)
-        vm.prank(attacker);
-        address helpedRegistry = factory.controllerDeployer().deployRegistryAt(
-            registrySalt, IRoundController(controller).stakerAddress(), factory.REFERRAL_MIN_STAKE()
-        );
-        assertEq(helpedRegistry, registry, "identical registry");
-
-        vm.prank(attacker);
-        address helpedHook = hookDeployer.deployHookAt(
-            hookSalt, IPoolManager(address(poolManager)), controller, registry, cfg, address(this)
-        );
-        assertEq(helpedHook, hook, "attacker could only deploy the identical hook");
-
-        // birth completes around the pre-deployed, identical contracts
+    function _completeBirthAround(address controller, address hook) internal {
         vm.prank(rando);
         factory.birthRound();
         assertEq(address(factory.getRound(2).controller), controller, "reserved controller wired");
@@ -237,6 +244,52 @@ contract C1_HookSquatDoS is CBase {
     }
 
     // ---- plumbing ----
+    /// @dev The identical-args "helpful" deploy from the reservation's own
+    ///      committed context (green window from the timings slot, the
+    ///      factory's open window + greenlist, round 1 as the prev token).
+    function _helpController(
+        bytes32 salt,
+        address token,
+        address controller,
+        CurveMath.CurveConfig memory cfg
+    ) internal returns (address) {
+        return address(
+            factory.controllerDeployer().deployControllerAt(
+                salt,
+                PSPToken(token),
+                IERC20(address(mixETH)),
+                cfg,
+                address(factory),
+                factory.descriptor(),
+                factory.stakerDeployer(),
+                uint64(cfg.timings & CurveMath.TIMINGS_MASK),
+                factory.openWindowSec(),
+                factory.nextGreenRoot(),
+                factory.nextGreenCount(),
+                0,
+                PSPToken(factory.pspRoundToken(1))
+            )
+        );
+    }
+
+    function _helpRegistry(address controller) internal returns (address) {
+        bytes32 salt = keccak256(abi.encode(controller, "psp-registry"));
+        return factory.controllerDeployer().deployRegistryAt(
+            salt, IRoundController(controller).stakerAddress(), factory.REFERRAL_MIN_STAKE()
+        );
+    }
+
+    function _helpHook(
+        bytes32 salt,
+        address controller,
+        address registry,
+        CurveMath.CurveConfig memory cfg
+    ) internal returns (address) {
+        return hookDeployer.deployHookAt(
+            salt, IPoolManager(address(poolManager)), controller, registry, cfg, address(this)
+        );
+    }
+
     function _key() internal view returns (PoolKey memory) {
         address c0 = address(mixETH);
         address c1 = address(psp1);

@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {Greenlist} from "../../helpers/Greenlist.sol";
 import {SineV3Math} from "../../../src/SineV3Math.sol";
 import {SineV3TestData as SineV3Data} from "../../helpers/SineV3TestData.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -63,8 +64,14 @@ contract CBase is Test {
             0,
             address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );
+        // Greenlist-IBCO (rules v3): round 1 carries a csv greenlist of
+        // the harness depositors (500/N = 250 each — the 200-mix boots
+        // fit); the public open phase is capped at 10 mixETH per wallet.
+        address[] memory csv = new address[](2);
+        csv[0] = alice;
+        csv[1] = bob;
+        factory.setNextGreenlist(Greenlist.rootOf(csv), 2);
         swapper = new CSwapper(IPoolManager(address(poolManager)), IERC20(address(mixETH)));
-
         _deployRound1();
         mixETH.transfer(alice, 1_000e18);
         mixETH.transfer(bob, 1_000e18);
@@ -91,9 +98,9 @@ contract CBase is Test {
     ///      NO terminal warp. The old shape ended with a warp past
     ///      detonationAt (lock-liveness under governance) — every post-launch
     ///      buy/sell then reverted TradingHalted (the dead-clock wall).
-    ///      Warping to the epoch-1 boundary BEFORE the predeposit anchors the
-    ///      claims in a nonzero epoch AND leaves block.timestamp == launch
-    ///      ts, so the clock is armed and ALIVE for the next 72h of test
+    ///      Deposits ride the round-1 GREEN window right after wiring
+    ///      (rules v3); the epoch-1 warp then anchors the claims AND
+    ///      leaves block.timestamp == launch
     ///      time. Timeline is explicit from here on:
     ///        - detonation: _detonateRound1() (warps to zero, one-tx kill);
     ///        - staker weight LIVE (epoch+1): skip to the next 7-day
@@ -102,18 +109,22 @@ contract CBase is Test {
     ///      Same shape as ClockDetonation's _launchLive (now delegating
     ///      here); returns the launch ts.
     function _launchRound1() internal returns (uint256 launchTs) {
-        vm.warp(7 days + 1); // epoch 1 — staker anchors cleanly (never epoch 0)
-        launchTs = block.timestamp;
-
+        // rules v3: the round-1 boot rides the GREEN window (csv greenlist
+        // of alice+bob, set at birth) right after wiring — deposits happen
+        // BEFORE the epoch-1 anchor so the claims' nonzero-epoch anchoring
+        // and the live-clock posture are exactly what they were.
         vm.startPrank(alice);
         mixETH.approve(address(controller1), 200e18);
-        controller1.predeposit(200e18);
+        controller1.predepositGreen(200e18, _greenProof(alice));
         vm.stopPrank();
 
         vm.startPrank(bob);
         mixETH.approve(address(controller1), 200e18);
-        controller1.predeposit(200e18);
+        controller1.predepositGreen(200e18, _greenProof(bob));
         vm.stopPrank();
+
+        vm.warp(7 days + 1); // epoch 1 — staker anchors cleanly (never epoch 0)
+        launchTs = block.timestamp;
 
         vm.prank(address(factory));
         controller1.launchPooledBuy();
@@ -123,6 +134,14 @@ contract CBase is Test {
         vm.prank(bob);
         controller1.claimPredepositPSP();
         // no terminal warp: detonationAt == launchTs + 72h stays in the future
+    }
+
+    /// @dev Greenlist proof for a harness depositor (round 1's csv).
+    function _greenProof(address who) internal view returns (bytes32[] memory) {
+        address[] memory csv = new address[](2);
+        csv[0] = alice;
+        csv[1] = bob;
+        return Greenlist.proofOf(csv, who);
     }
 
     /// @dev CLOCK-REDESIGN §4 kill: warp past the hook's detonation clock

@@ -121,7 +121,10 @@ contract ControllerDeployer {
         // bit-identical to predictController's initCode hash.
         bytes memory initCode = bytes.concat(
             type(RoundController).creationCode,
-            abi.encode(token, mixETH, config, ownerFactory, descriptor, stakerDeployer)
+            abi.encode(
+                token, mixETH, config, ownerFactory, descriptor, stakerDeployer,
+                greenSec, openSec, greenRoot, csvCount, openPerWalletWad, prevToken
+            )
         );
         assembly ("memory-safe") {
             controller := create2(callvalue(), add(initCode, 0x20), mload(initCode), salt)
@@ -148,7 +151,13 @@ contract ControllerDeployer {
         CurveMath.CurveConfig calldata config,
         address ownerFactory,
         address descriptor,
-        StakerDeployer stakerDeployer
+        StakerDeployer stakerDeployer,
+        uint64 greenSec,
+        uint64 openSec,
+        bytes32 greenRoot,
+        uint256 csvCount,
+        uint256 openPerWalletWad,
+        PSPToken prevToken
     ) external view returns (address) {
         return address(uint160(uint256(keccak256(abi.encodePacked(
             bytes1(0xff),
@@ -156,7 +165,10 @@ contract ControllerDeployer {
             salt,
             keccak256(abi.encodePacked(
                 type(RoundController).creationCode,
-                abi.encode(token, mixETH, config, ownerFactory, descriptor, stakerDeployer)
+                abi.encode(
+                    token, mixETH, config, ownerFactory, descriptor, stakerDeployer,
+                    greenSec, openSec, greenRoot, csvCount, openPerWalletWad, prevToken
+                )
             ))
         )))));
     }

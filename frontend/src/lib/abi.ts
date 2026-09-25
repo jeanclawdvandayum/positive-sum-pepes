@@ -20,37 +20,64 @@ export const factoryAbi = parseAbi([
   'function currentRound() view returns (uint256)',
   'function pspRoundToken(uint256 roundId) view returns (address)',
   'function roundPool(uint256 roundId) view returns (address currency0, address currency1, uint24 fee, int24 spacing, address hook)',
-  'function roundInfo(uint256 roundId) view returns (address token, address controller, address hook, address staker, address referralRegistry, string name, string symbol, bool destroyed, uint256 predepositDuration, uint256 vestDuration)',
-])
+  'function roundInfo(uint256 roundId) view returns (address token, address controller, address hook, address staker, address referralRegistry, string name, string symbol, bool destroyed, uint256 greenDuration, uint256 openDuration, uint256 vestDuration)',
+  // greenlist-IBCO (rules v3): csv tree for the next round + open window knob
+  'function setNextGreenlist(bytes32 root, uint256 count)',
+  'function nextGreenRoot() view returns (bytes32)',
+  'function nextGreenCount() view returns (uint256)',
+  'function setOpenWindow(uint64 sec)',
+  'function openWindowSec() view returns (uint64)',
+ ])
 
 export const controllerAbi = parseAbi([
   ...curveErrorSignatures,
-  'error ERC20InsufficientAllowance(address spender, uint256 allowance, uint256 needed)',
-  'error PepeDnaTaken()',
-  'error BadPepeId()',
-  'error PredepositClosed()',
-  'error CapExceeded()',
-  'error WalletCapExceeded()', 
   'function staker() view returns (address)',
-  'function predepositState() view returns (uint256 total, uint256 cap, uint256 startTime, bool closed, bool capReached, bool windowOver, bool launchable)',
+  'function predepositState() view returns (uint256 total, uint256 cap, uint256 startTime, bool closed, bool capReached, bool windowOver, bool launchable, uint8 phase, uint256 greenTotal, uint256 greenPerWallet, uint256 openPerWallet)',
   'function claimPredepositPSP()',
   'function claimPredepositPSPWithPepe(uint256 pepeId)',
   'function PREDEPOSIT_ART_VERSION() view returns (uint256)',
   'function predeposit(uint256 mixETHAmount)',
   'function predepositWithPepe(uint256 mixETHAmount, uint256 pepeId)',
+  // greenlist-IBCO (rules v3): green-phase entry points + phase facts.
+  // Membership = prev-round frozen PSP holder OR csv merkle proof.
+  'function predepositGreen(uint256 mixETHAmount, bytes32[] proof)',
+  'function predepositGreenWithPepe(uint256 mixETHAmount, uint256 pepeId, bytes32[] proof)',
+  'function phase() view returns (uint8)',
+  'function GREEN_DURATION() view returns (uint256)',
+  'function OPEN_DURATION() view returns (uint256)',
+  'function GREEN_PER_WALLET() view returns (uint256)',
+  'function OPEN_PER_WALLET() view returns (uint256)',
+  'function GREEN_ROOT() view returns (bytes32)',
+  'function PREV_TOKEN() view returns (address)',
   'function predepositPepe(address user) view returns (uint256)',
   'function launchPooledBuy()',
   'function PREDEPOSIT_RULES_VERSION() view returns (uint256)',
-  'function PREDEPOSIT_DURATION() view returns (uint256)',
   'function PREDEPOSIT_CAP_PER_WALLET() view returns (uint256)',
   'function totalPredepositors() view returns (uint256)',
-  'function predeposits(address) view returns (uint256 mixETHAmount, bool claimed)',
+  'function predeposits(address) view returns (uint256 mixETHAmount, uint256 greenAmount, bool claimed)',
   // CLOCK-REDESIGN §4: the clock replaced carpet-bomb governance — detonate
   // is the one-tx kill (flatten + open locks + mark destroyed + spawn)
   'function detonate()',
   'function flatTime() view returns (uint256)',
   'function VEST_DURATION() view returns (uint256)',
   'event Detonated(address indexed by, uint256 potDistributed, address nextRound)',
+])
+
+/// Decode-only selectors for rules-v1/v2 controllers still serving the old
+/// shapes (same selectors, different return arity). check-abi skips these —
+/// they intentionally target LEGACY deployed bytecode.
+export const legacyControllerAbi = parseAbi([
+  'function predepositState() view returns (uint256 total, uint256 cap, uint256 startTime, bool closed, bool capReached, bool windowOver, bool launchable)',
+  'function predeposits(address) view returns (uint256 mixETHAmount, bool claimed)',
+  'function PREDEPOSIT_DURATION() view returns (uint256)',
+  'function PREDEPOSIT_RULES_VERSION() view returns (uint256)',
+])
+
+/// PSPToken — greenlist facts (rules v3): the frozen holder map is the next
+/// round's trustless greenlist; holderCount feeds greenPerWallet = 500/N.
+export const pspTokenAbi = parseAbi([
+  'function holder(address) view returns (bool)',
+  'function holderCount() view returns (uint256)',
 ])
 
 /// PSPStaker — ERC-721 staking positions + pepe art (2026-08-22).

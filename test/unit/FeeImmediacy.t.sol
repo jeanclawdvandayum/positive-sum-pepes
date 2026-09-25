@@ -73,9 +73,10 @@ contract FeeImmediacyTest is Test {
             CurveMath.singleCurve(0.0001e18, 100_000_000e18, 0.000000046e18, 0.1e18);
         pspToken = new PSPToken("Positive Sum Pepes", "PSP", address(this));
         controller =
-            new RoundController(pspToken, IERC20(address(mixETH)), params, address(mockFactory), address(0), new StakerDeployer());
-        stakerV = controller.staker();
+            new RoundController(pspToken, IERC20(address(mixETH)), params, address(mockFactory), address(0), new StakerDeployer(),
+                1 days, 1 days, bytes32(0), 0, 0, PSPToken(address(0)));
         pspToken.setController(address(controller));
+        stakerV = controller.staker();
 
         vm.startPrank(address(controller));
         pspToken.mint(alice, 10_000e18);

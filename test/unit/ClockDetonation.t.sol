@@ -639,16 +639,21 @@ contract ClockDetonationBoom is CBase {
         CurveHook hook2 = r2.hook;
         PSPToken psp2 = r2.token;
 
+        // rules v3: round 2 opens with a GREEN window for round-1 holders —
+        // alice bought on the curve so she rides it rootlessly; bob waits
+        // out the green window and deposits in the open phase (10-mix cap).
         vm.startPrank(alice);
         mixETH.approve(address(c2), 200e18);
-        c2.predeposit(200e18);
+        c2.predepositGreen(200e18, new bytes32[](0));
         vm.stopPrank();
+        skip(c2.GREEN_DURATION());
         vm.startPrank(bob);
-        mixETH.approve(address(c2), 200e18);
-        c2.predeposit(200e18);
+        mixETH.approve(address(c2), 10e18);
+        c2.predeposit(10e18);
         vm.stopPrank();
-        // early launch (400 < 500 cap, window still open) is owner-only —
-        // the factory owns the spawned controller. rando would revert.
+        // early launch (210 < the 1000 pooled cap, window still open) is
+        // owner-only — the factory owns the spawned controller. rando would
+        // revert.
         vm.prank(address(factory));
         c2.launchPooledBuy();
 
@@ -795,10 +800,14 @@ contract DetWindowTunable is CBase {
         mixETH.depositETH{value: 1000e18}();
         mixETH.approve(address(first.controller), 10e18);
         first.controller.predeposit(10e18);
-        skip(2 hours);
+        skip(first.controller.GREEN_DURATION() + first.controller.OPEN_DURATION() + 1);
         vm.prank(bob);
         first.controller.launchPooledBuy();
-        assertEq(first.hook.detonationAt(), block.timestamp + 30 minutes);
+        assertEq(
+            first.hook.detonationAt(),
+            first.controller.predepositStartTime()
+                + first.controller.GREEN_DURATION() + first.controller.OPEN_DURATION() + 1 + 30 minutes
+        );
 
         skip(30 minutes);
         // Capped-chain detonation leaves successor birth to later callers.
@@ -811,23 +820,33 @@ contract DetWindowTunable is CBase {
         f.birthStep();
         skip(1 hours);
         f.birthStep();
-
         PSPFactory.Round memory second = f.getRound(2);
         assertEq(second.controller.predepositStartTime(), block.timestamp);
-        assertEq(second.controller.PREDEPOSIT_DURATION(), 2 hours);
+        assertEq(second.controller.GREEN_DURATION(), 2 hours);
         assertEq(second.controller.VEST_DURATION(), 1 hours);
         assertEq(second.hook.detWindow(), 30 minutes);
-        (,,,, bool capReached, bool windowOver, bool launchable) = second.controller.predepositState();
+        (,,,, bool capReached, bool windowOver, bool launchable,,,,) = second.controller.predepositState();
         assertFalse(capReached);
         assertFalse(windowOver);
         assertFalse(launchable);
 
+        // rules v3: round 2's green window covers the frozen round-1
+        // holders only — wait it out, deposit in the open phase, and let
+        // anyone launch once the green+open window closes.
+        skip(second.controller.GREEN_DURATION() + 1);
         mixETH.approve(address(second.controller), 10e18);
         second.controller.predeposit(10e18);
-        skip(2 hours);
+        skip(second.controller.OPEN_DURATION() + 1);
         vm.prank(bob);
         second.controller.launchPooledBuy();
-        assertEq(second.hook.detonationAt(), second.controller.predepositStartTime() + 2 hours + 30 minutes);
+        // via-ir CSE caches block.timestamp reads — anchor on the round's
+        // own start: launch lands at start + green + 1 + open + 1
+        assertEq(
+            second.hook.detonationAt(),
+            second.controller.predepositStartTime()
+                + second.controller.GREEN_DURATION() + 1
+                + second.controller.OPEN_DURATION() + 1 + 30 minutes
+        );
         assertEq(second.hook.TIME_PER_UNIT(), 69);
     }
 

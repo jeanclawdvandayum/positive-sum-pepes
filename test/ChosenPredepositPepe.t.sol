@@ -9,9 +9,12 @@ import {RoundController} from "../src/RoundController.sol";
 /// @notice Selected art must preserve pooled principal, fees and retryable claims.
 contract ChosenPredepositPepeTest is PredepositPrecisionTest {
     function _reserveDeposit(uint256 id) private {
+        // rules v3: deposits ride the round-1 GREEN window — the harness
+        // clock sits at a mature epoch, so step back inside it first.
+        vm.warp(controller.predepositStartTime() + 1);
         vm.startPrank(bob);
         mixETH.approve(address(controller), 100e18);
-        controller.predepositWithPepe(10e18, id);
+        controller.predepositGreenWithPepe(10e18, id, _greenProof(bob));
         vm.stopPrank();
     }
 
@@ -41,12 +44,12 @@ contract ChosenPredepositPepeTest is PredepositPrecisionTest {
     function test_ReservedChoiceSurvivesTopupsAndRejectsReplacement() public {
         _reserveDeposit(6000);
         vm.startPrank(bob);
-        controller.predepositWithPepe(1e18, 6000);
-        controller.predeposit(1e18);
+        controller.predepositGreenWithPepe(1e18, 6000, _greenProof(bob));
+        controller.predepositGreen(1e18, _greenProof(bob));
         vm.expectRevert(RoundController.PredepositClosed.selector);
-        controller.predepositWithPepe(1e18, 6001);
+        controller.predepositGreenWithPepe(1e18, 6001, _greenProof(bob));
         vm.stopPrank();
-        (uint256 amount,) = controller.predeposits(bob);
+        (uint256 amount,,) = controller.predeposits(bob);
         assertEq(amount, 12e18);
         _launch(100e18);
         vm.prank(bob);
@@ -64,12 +67,11 @@ contract ChosenPredepositPepeTest is PredepositPrecisionTest {
         vm.startPrank(alice);
         mixETH.approve(address(controller), 10e18);
         vm.expectRevert(PSPStaker.PepeDnaTaken.selector);
-        controller.predepositWithPepe(10e18, 5249);
+        controller.predepositGreenWithPepe(10e18, 5249, _greenProof(alice));
         vm.stopPrank();
         assertEq(mixETH.balanceOf(alice), balance);
         assertEq(controller.totalPredepositMixETH(), total);
-        assertEq(controller.predepositPepe(alice), 0);
-        (uint256 amount,) = controller.predeposits(alice);
+        (uint256 amount,,) = controller.predeposits(alice);
         assertEq(amount, 0);
     }
 
@@ -86,9 +88,10 @@ contract ChosenPredepositPepeTest is PredepositPrecisionTest {
     }
 
     function _prepareChosenClaim() private {
+        vm.warp(controller.predepositStartTime() + 1); // inside the green window
         vm.startPrank(bob);
         mixETH.approve(address(controller), 10e18);
-        controller.predeposit(10e18);
+        controller.predepositGreen(10e18, _greenProof(bob));
         vm.stopPrank();
         _launch(100e18);
     }
@@ -118,7 +121,7 @@ contract ChosenPredepositPepeTest is PredepositPrecisionTest {
         vm.prank(bob);
         vm.expectRevert(PSPStaker.BadPepeId.selector);
         controller.claimPredepositPSPWithPepe(id);
-        (, bool claimed) = controller.predeposits(bob);
+        (,, bool claimed) = controller.predeposits(bob);
         assertFalse(claimed);
         assertEq(stakerV.totalLocked(), total);
         vm.prank(bob);
@@ -145,7 +148,7 @@ contract ChosenPredepositPepeTest is PredepositPrecisionTest {
         vm.prank(bob);
         vm.expectRevert(PSPStaker.PepeDnaTaken.selector);
         controller.claimPredepositPSPWithPepe(5249);
-        (, bool claimed) = controller.predeposits(bob);
+        (,, bool claimed) = controller.predeposits(bob);
         assertFalse(claimed);
         vm.prank(bob);
         controller.claimPredepositPSPWithPepe(6000);
@@ -197,15 +200,15 @@ contract ChosenPredepositPepeTest is PredepositPrecisionTest {
         vm.expectRevert(RoundController.PredepositClosed.selector);
         controller.claimPredepositPSP();
     }
-
     function test_ChosenClaimBeforeLaunchPreservesDeposit() public {
+        vm.warp(controller.predepositStartTime() + 1); // inside the green window
         vm.startPrank(bob);
         mixETH.approve(address(controller), 10e18);
-        controller.predeposit(10e18);
+        controller.predepositGreen(10e18, _greenProof(bob));
         vm.expectRevert(RoundController.ZeroShare.selector);
         controller.claimPredepositPSPWithPepe(1234);
         vm.stopPrank();
-        (uint256 amount, bool claimed) = controller.predeposits(bob);
+        (uint256 amount,, bool claimed) = controller.predeposits(bob);
         assertEq(amount, 10e18);
         assertFalse(claimed);
         _launch(100e18);

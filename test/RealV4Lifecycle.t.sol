@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test, console} from "forge-std/Test.sol";
+import {Greenlist} from "./helpers/Greenlist.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
@@ -65,7 +66,11 @@ abstract contract RealV4Base is Test {
         zapOut = new PSPZapOut(IMixETH(address(mixETH)), poolManager);
 
         factory.configureSineV3(75_000_000_000_000);
-        // Deploy a round
+        // Deploy a round — the csv greenlist must be committed BEFORE the
+        // reservation snapshots it (rules v3)
+        address[] memory csv = new address[](1);
+        csv[0] = bob;
+        factory.setNextGreenlist(Greenlist.rootOf(csv), 1);
         PSPFactory.RoundParams memory params = PSPFactory.RoundParams({
             name: "Positive Sum Pepes",
             symbol: "PSP",
@@ -83,11 +88,13 @@ abstract contract RealV4Base is Test {
         if (c0 > c1) (c0, c1) = (c1, c0);
         poolKey = PoolKey({currency0: c0, currency1: c1, fee: 0x800000, tickSpacing: 60, hooks: hook});
 
-        // Bob bootstraps: predeposit + launch
+        // Greenlist-IBCO (rules v3): bob's whole 100-mix boot rides the
+        // round-1 GREEN window via the one-entry csv greenlist committed
+        // before the deploy above (500/N = 500 for the solo member).
         mixETH.transfer(bob, 100e18);
         vm.startPrank(bob);
         mixETH.approve(address(controller), 100e18);
-        controller.predeposit(100e18);
+        controller.predepositGreen(100e18, Greenlist.proofOf(csv, bob));
         vm.stopPrank();
 
         vm.prank(address(factory));
@@ -297,6 +304,9 @@ contract RealV4LifecycleTest is RealV4Base {
         for (uint256 i; i < 3; ++i) factory.birthStep{gas: 12_000_000}();
         assertEq(factory.currentRoundId(), 2);
         PSPFactory.Round memory next = factory.getRound(2);
+        // round 2 opens with a GREEN window for round-1 holders; the
+        // tester never held PSP — wait out green, then deposit in open
+        skip(next.controller.GREEN_DURATION() + 1);
         mixETH.approve(address(next.controller), 1e18);
         next.controller.predeposit(1e18);
         vm.prank(address(factory));
@@ -385,7 +395,7 @@ contract RealV4LifecycleTest is RealV4Base {
         // The oversized donation rides the cap-exempt carry: it counts
         // toward the pooled total (round launchable early) without
         // shortening the public window.
-        (,,,, bool capReached, bool windowOver, bool launchable) = next.predepositState();
+        (,,,, bool capReached, bool windowOver, bool launchable,,,,) = next.predepositState();
         assertTrue(capReached, "carry counts toward the cap");
         assertFalse(windowOver, "carry does not shorten the window");
         assertTrue(launchable);

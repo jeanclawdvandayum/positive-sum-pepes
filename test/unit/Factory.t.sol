@@ -18,6 +18,7 @@ import {CurveHook} from "../../src/CurveHook.sol";
 import {PSPFactory} from "../../src/PSPFactory.sol";
 import {HookDeployer} from "../../src/HookDeployer.sol";
 import {ControllerDeployer} from "../../src/ControllerDeployer.sol";
+import {Greenlist} from "../helpers/Greenlist.sol";
 import {CurveMath} from "../../src/libraries/CurveMath.sol";
 import {PSPStaker} from "../../src/PSPStaker.sol";
 import {PSPZapIn} from "../../src/PSPZapIn.sol";
@@ -57,6 +58,10 @@ contract FactoryTest is Test {
         poolManager = new MockPoolManager();
         factory = new PSPFactory(IPoolManager(address(poolManager)), IERC20(address(mixETH)), new HookDeployer(), new ControllerDeployer(), new StakerDeployer(), address(new SineV3Math(SineV3Data.deploy())), 0, address(this));
 
+        // rules v3: the harness boots ride the round-1 GREEN window via a
+        // csv greenlist of the depositors (500/N = 250 each — fits both the
+        // 100-mix and 2x200-mix boots); the open phase caps wallets at 10.
+        _greenCsvCommit();
         _deployRound1();
     }
 
@@ -159,10 +164,28 @@ contract FactoryTest is Test {
     /// 2026-09-03: the genesis pooled buy routes 10% of the boot into the
     /// hook's ladder pot; the remaining 90% seeds the curve and mints the
     /// pro-rata genesis supply.
+    /// @dev Commit the harness csv greenlist (alice + bob) to the factory.
+    function _greenCsvCommit() internal {
+        address[] memory csv = new address[](2);
+        csv[0] = alice;
+        csv[1] = bob;
+        factory.setNextGreenlist(Greenlist.rootOf(csv), 2);
+    }
+
+    function _greenProof(address who) internal view returns (bytes32[] memory) {
+        address[] memory csv = new address[](2);
+        csv[0] = alice;
+        csv[1] = bob;
+        return Greenlist.proofOf(csv, who);
+    }
+
     function test_GenesisLaunch_PotFee() public {
         mixETH.depositETH{value: 200e18}();
+        mixETH.transfer(alice, 100e18);
+        vm.startPrank(alice); // green proofs bind to the depositor
         mixETH.approve(address(controller), 100e18);
-        controller.predeposit(100e18);
+        controller.predepositGreen(100e18, _greenProof(alice));
+        vm.stopPrank();
 
         assertEq(hook.potBalance(), 0, "pot empty pre-launch");
         vm.prank(address(factory)); // the factory is the controller's owner
@@ -221,12 +244,12 @@ contract FactoryTest is Test {
 
         vm.startPrank(alice);
         mixETH.approve(address(controller), 200e18);
-        controller.predeposit(200e18);
+        controller.predepositGreen(200e18, _greenProof(alice));
         vm.stopPrank();
 
         vm.startPrank(bob);
         mixETH.approve(address(controller), 200e18);
-        controller.predeposit(200e18);
+        controller.predepositGreen(200e18, _greenProof(bob));
         vm.stopPrank();
 
         vm.prank(address(factory));
@@ -257,7 +280,7 @@ contract FactoryTest is Test {
         assertGt(mixETH.balanceOf(address(hook)), 0, "dying hook keeps the backing");
         assertEq(mixETH.balanceOf(address(factory)), 0, "factory drained");
         assertFalse(r2.controller.predepositClosed(), "round 2 awaiting its own window");
-        (uint256 factoryDeposit,) = r2.controller.predeposits(address(factory));
+        (uint256 factoryDeposit,,) = r2.controller.predeposits(address(factory));
         assertEq(
             factoryDeposit,
             carried,

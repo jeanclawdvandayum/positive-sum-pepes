@@ -96,7 +96,8 @@ contract BaseSepoliaReleaseTest is Test {
         assertEq(c.registry.traderRefNftOf(address(this)), c.idB);
         assertEq(c.mix.balanceOf(c.b), beforeB, "first buy escrows its referral");
         assertGt(c.registry.claimableReferral(c.b), 0);
-        assertEq(c.r.hook.ticketCount(), 2000, "100-mix pool pots 10 mix; 2-mix buy = 2000 spots at 0.001");
+        // 20-mix pool pots 2 mix -> spot 2e14; the 2-mix buy = 10,000 spots
+        assertEq(c.r.hook.ticketCount(), 10_000, "20-mix pool pots 2 mix; 2-mix buy = 10k spots at 0.0002");
         (address leader,,,) = c.r.hook.board(0);
         assertEq(leader, address(this), "registry buy credits the purchaser");
         c.registry.buyWithMix(c.key, 0.005e18, 1, block.timestamp, c.idA);
@@ -136,19 +137,39 @@ contract BaseSepoliaReleaseTest is Test {
         assertEq(c.r.hook.FEE_BPS_ABOVE_WAVE(), 250);
         assertEq(c.r.hook.STAKER_BPS(), 6000);
         assertEq(c.r.hook.POT_BPS(), 3500);
-        assertEq(c.r.controller.PREDEPOSIT_RULES_VERSION(), 2);
+        assertEq(c.r.controller.PREDEPOSIT_RULES_VERSION(), 3);
         assertEq(c.staker.PEPE_DNA_VERSION(), 3);
         assertEq(c.registry.PURCHASE_REFERRAL_VERSION(), 1);
         assertEq(c.reinvestor.ATTRIBUTION_VERSION(), 1);
         assertTrue(c.staker.supportsInterface(0x80ac58cd));
         assertEq(c.r.controller.PREDEPOSIT_CAP(), 1000e18);
         assertEq(c.r.controller.PREDEPOSIT_CAP_PER_WALLET(), vm.envOr("PSP_WALLET_CAP_MIX", uint256(0)) * 1e18);
-        assertEq(c.r.controller.PREDEPOSIT_DURATION(), vm.envOr("PSP_PREDEPOSIT_SEC", uint256(259200)));
+        // rules v3: the two-window getters (green rides packed slot [0] =
+        // PSP_GREEN_SEC, open rides the factory's openWindowSec =
+        // PSP_OPEN_SEC; 1-day defaults on both paths)
+        assertEq(c.r.controller.GREEN_DURATION(), vm.envOr("PSP_GREEN_SEC", uint256(86400)));
+        assertEq(c.r.controller.OPEN_DURATION(), vm.envOr("PSP_OPEN_SEC", uint256(86400)));
+        assertEq(c.r.controller.OPEN_PER_WALLET(), 10e18);
         assertEq(c.r.controller.VEST_DURATION(), vm.envOr("PSP_VEST_SEC", uint256(2419200)));
         assertEq(c.r.hook.detWindow(), vm.envOr("PSP_DET_SEC", uint256(248660)));
     }
 
     function _freshGenesis(ReleaseContext memory c) internal returns (uint256 idA, uint256 idB) {
+        RoundController ctl = c.r.controller;
+        // rules v3 lifecycle: a green phase (csv ∪ previous-round holders)
+        // only exists when the deploy armed a greenlist — these fresh
+        // makeAddr wallets are never in it, so green deposits revert and
+        // the flow waits the green window out before its open deposits.
+        if (ctl.GREEN_PER_WALLET() != 0) {
+            vm.startPrank(c.a);
+            c.mix.approve(address(ctl), 1);
+            vm.expectRevert(RoundController.NotGreenlisted.selector);
+            ctl.predepositGreen(1, new bytes32[](0));
+            vm.stopPrank();
+            skip(ctl.GREEN_DURATION()); // open begins
+        }
+        uint256 deposit = _releaseOpenDeposit(ctl);
+
         // These distinct IDs are a pinned collision in the 420 release-3 art
         // decoder. Mint before genesis claims so seeded art cannot occupy them.
         assertTrue(c.staker.isPepeAvailable(10806));
@@ -159,35 +180,40 @@ contract BaseSepoliaReleaseTest is Test {
 
         uint256 preview = c.staker.genesisPepeDna(c.a);
         assertTrue(preview != uint256(keccak256(abi.encode(uint256(uint160(c.a))))), "round seed changes address art");
-        uint256 deposit = _releaseDeposit(c.r.controller);
         vm.startPrank(c.a);
-        c.mix.approve(address(c.r.controller), deposit);
-        c.r.controller.predeposit(1);
-        (uint256 dustDeposit,) = c.r.controller.predeposits(c.a);
+        c.mix.approve(address(ctl), deposit);
+        ctl.predeposit(1);
+        (uint256 dustDeposit,,) = ctl.predeposits(c.a);
         assertEq(dustDeposit, 1, "public predeposit accepts one wei");
-        c.r.controller.predeposit(deposit - 1);
+        ctl.predeposit(deposit - 1);
         vm.stopPrank();
         vm.startPrank(c.b);
-        c.mix.approve(address(c.r.controller), deposit);
-        c.r.controller.predepositWithPepe(deposit, 6000);
-        assertEq(c.r.controller.predepositPepe(c.b), 6000);
+        c.mix.approve(address(ctl), deposit);
+        ctl.predepositWithPepe(deposit, 6000);
+        assertEq(ctl.predepositPepe(c.b), 6000);
         assertFalse(c.staker.isPepeAvailable(6000));
         vm.stopPrank();
-        skip(c.r.controller.PREDEPOSIT_DURATION());
+        skip(ctl.GREEN_DURATION() + ctl.OPEN_DURATION());
         assertEq(c.staker.genesisPepeDna(c.a), preview, "claim delay keeps available preview stable");
-        c.r.controller.launchPooledBuy();
-        vm.prank(c.a); c.r.controller.claimPredepositPSP();
+        ctl.launchPooledBuy();
+        vm.prank(c.a); ctl.claimPredepositPSP();
         idA = c.staker.primaryOf(c.a);
         assertEq(idA, uint256(uint160(c.a)));
         assertEq(c.staker.dnaOf(idA), preview);
         uint256 previewB = uint256(keccak256(abi.encode(uint256(6000))));
-        vm.prank(c.b); c.r.controller.claimPredepositPSP();
+        vm.prank(c.b); ctl.claimPredepositPSP();
         idB = c.staker.primaryOf(c.b);
         assertEq(idB, 6000);
         assertEq(c.staker.dnaOf(idB), previewB);
         assertTrue(PepeDna.key(preview, 3) != PepeDna.key(previewB, 3), "genesis art stays unique");
         assertTrue(PepeDna.key(preview, 3) != PepeDna.key(c.staker.dnaOf(10806), 3), "all mint paths share reservations");
         assertEq(uint8(c.r.hook.mode()), uint8(CurveHook.Mode.Active));
+    }
+
+    /// @dev The fresh round's open-phase per-wallet budget (rules v3).
+    function _releaseOpenDeposit(RoundController ctl) internal view returns (uint256) {
+        uint256 cap = ctl.OPEN_PER_WALLET();
+        return cap == 0 || cap > 10e18 ? 10e18 : cap;
     }
 
     function _individualReinvestAndSafeTransfer(ReleaseContext memory c) internal {
@@ -239,12 +265,16 @@ contract BaseSepoliaReleaseTest is Test {
         PSPReferralRegistry nextRegistry = PSPReferralRegistry(c.factory.referralRegistryOf(2));
         assertTrue(address(nextRegistry) != address(c.registry));
         assertEq(nextRegistry.traderRefNftOf(address(this)), 0, "fresh round clears wallet attribution");
-        assertFalse(nextRegistry.attributed(address(this)));
+        // round 2 is a rebirth: its green window covers the frozen round-1
+        // holder map (curve buyers + the staker; genesis claims park PSP
+        // in the staker, so c.b is NOT a holder) — wait the green window
+        // out, then deposit in the open phase like every non-member.
+        skip(next.controller.GREEN_DURATION());
         vm.startPrank(c.b);
-        c.mix.approve(address(next.controller), _releaseDeposit(next.controller));
-        next.controller.predeposit(_releaseDeposit(next.controller));
+        c.mix.approve(address(next.controller), _releaseOpenDeposit(next.controller));
+        next.controller.predeposit(_releaseOpenDeposit(next.controller));
         vm.stopPrank();
-        skip(next.controller.PREDEPOSIT_DURATION());
+        skip(next.controller.GREEN_DURATION() + next.controller.OPEN_DURATION());
         next.controller.launchPooledBuy();
         uint256 preview = nextStaker.genesisPepeDna(c.b);
         vm.prank(c.b); next.controller.claimPredepositPSP();
@@ -257,6 +287,8 @@ contract BaseSepoliaReleaseTest is Test {
         assertEq(c.registry.traderRefNftOf(address(this)), c.idB, "old round entry stays immutable");
     }
 
+    /// @dev The OLD deployed (rules-v2) round's per-wallet budget — v2 had
+    /// no open-phase cap, only the optional packed wallet slot.
     function _releaseDeposit(RoundController controller) internal view returns (uint256) {
         uint256 cap = controller.PREDEPOSIT_CAP_PER_WALLET();
         return cap == 0 || cap > 50e18 ? 50e18 : cap;
@@ -306,7 +338,7 @@ contract BaseSepoliaReleaseTest is Test {
         mix.approve(address(r.controller), _releaseDeposit(r.controller));
         r.controller.predeposit(_releaseDeposit(r.controller));
         vm.stopPrank();
-        skip(r.controller.PREDEPOSIT_DURATION());
+        skip(vm.envOr("PSP_PREDEPOSIT_SEC", uint256(259200))); // v2 round: env-pinned window
         r.controller.launchPooledBuy();
         vm.prank(a); r.controller.claimPredepositPSP();
         uint256 idA = staker.primaryOf(a);
@@ -341,7 +373,7 @@ contract BaseSepoliaReleaseTest is Test {
         PSPFactory.Round memory next = factory.getRound(2);
         mix.approve(address(next.controller), 0.005e18);
         next.controller.predeposit(0.005e18);
-        skip(next.controller.PREDEPOSIT_DURATION());
+        skip(vm.envOr("PSP_PREDEPOSIT_SEC", uint256(259200))); // v2 round: env-pinned window
         next.controller.launchPooledBuy();
         assertEq(uint8(next.hook.mode()), uint8(CurveHook.Mode.Active));
         assertEq(next.hook.TIME_PER_UNIT(), 69);

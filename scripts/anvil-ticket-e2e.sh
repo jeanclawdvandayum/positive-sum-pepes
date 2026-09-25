@@ -14,7 +14,7 @@ for _ in {1..30}; do
   if cast block-number --rpc-url "$RPC" >/dev/null 2>&1; then break; fi
   sleep 0.2
 done
-PSP_ANVIL=1 PSP_TESTNET=0 PSP_PREDEPOSIT_SEC=259200 PSP_VEST_SEC=2419200 PSP_DET_SEC=248660 PSP_WALLET_CAP_MIX=0 \
+PSP_ANVIL=1 PSP_TESTNET=0 PSP_GREEN_SEC=259200 PSP_OPEN_SEC=259200 PSP_VEST_SEC=2419200 PSP_DET_SEC=248660 PSP_WALLET_CAP_MIX=0 \
   forge script script/DeployPSP.s.sol --rpc-url "$RPC" --broadcast --slow \
   --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
   > /tmp/psp-ticket-anvil-deploy.log 2>&1

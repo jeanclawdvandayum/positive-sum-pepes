@@ -241,7 +241,7 @@ contract FableBreakAttempts is RealV4Base {
     }
 
     function _dep(address a) internal view returns (bool claimed, uint256 amt) {
-        (amt, claimed) = controller.predeposits(a);
+        (amt,, claimed) = controller.predeposits(a);
     }
 
     // ───────────────────────── family B: brick attempts ─────────────────────────
@@ -414,19 +414,26 @@ contract FableBreakAttempts is RealV4Base {
     }
 
     /// B7: a stuck-in-predeposit successor (nobody deposits) is not a
-    /// dead end: any 1-wei deposit after the window lets anyone launch.
+    /// dead end: a 1-wei deposit during the open window lets anyone
+    /// launch once the window closes.
     function test_B7_EmptySuccessorIsRecoverableByAnyone() public {
         vm.warp(hook.detonationAt());
         controller.detonate();
         PSPFactory.Round memory r2 = factory.getRound(2);
-        skip(r2.controller.PREDEPOSIT_DURATION() + 1);
-        vm.expectRevert(); // zero boot cannot launch
-        r2.controller.launchPooledBuy();
+        RoundController c2 = r2.controller;
+        // zero boot cannot launch even after the window
+        skip(c2.GREEN_DURATION() + c2.OPEN_DURATION() + 1);
+        vm.expectRevert();
+        c2.launchPooledBuy();
+        // rules v3: deposits end with the window — step back into the
+        // open phase, seed one wei, then ride the window out
+        vm.warp(c2.predepositStartTime() + c2.GREEN_DURATION() + 1);
         vm.startPrank(dave);
-        mixETH.approve(address(r2.controller), 1);
-        r2.controller.predeposit(1);
-        r2.controller.launchPooledBuy();
+        mixETH.approve(address(c2), 1);
+        c2.predeposit(1);
         vm.stopPrank();
+        skip(c2.OPEN_DURATION() + 1);
+        c2.launchPooledBuy();
         assertEq(uint8(r2.hook.mode()), uint8(CurveHook.Mode.Active));
     }
 

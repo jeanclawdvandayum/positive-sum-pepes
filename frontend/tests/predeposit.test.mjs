@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { parseAmountToWad, wadToExact } from '../src/lib/format.ts'
 import { MIN_BUY_INPUT } from '../src/lib/gameRules.ts'
-import { capHeadroom, predepositUncapped, predepositLimit, predepositMinimum, predepositAmountAllowed, predepositProgress, predepositRemainder } from '../src/lib/predeposit.ts'
+import { capHeadroom, predepositUncapped, predepositLimit, predepositMinimum, predepositAmountAllowed, predepositProgress, predepositRemainder, ibcoPhaseAt, ibcoEnds, greenWalletHeadroom, greenPhaseLimit, openPhaseLimit } from '../src/lib/predeposit.ts'
 const cap = 500n * 10n ** 18n
 
 test('499.9999999 stays visibly below 500 and MAX preserves its exact dust remainder', () => {
@@ -85,4 +85,55 @@ test('zero means unlimited only with the exact on-chain version capability', () 
   // Historical caps stay enforced even if a new version is misconfigured.
   assert.equal(predepositUncapped(2n, cap), false)
   assert.equal(predepositLimit(cap, cap - 1n, cap, 0n, 0n, 2n), 1n)
+})
+
+
+/// ── greenlist-IBCO (rules v3): phase boundaries, window ends, cap math ──
+
+const mix = (n) => parseAmountToWad(String(n))
+
+test('phase flips exactly at the green and open boundaries the contract uses', () => {
+  const start = 1000n, greenSec = 86400n, openSec = 86400n
+  const greenEnd = start + greenSec, openEnd = greenEnd + openSec
+  assert.equal(ibcoPhaseAt(Number(greenEnd) - 1, greenEnd, openEnd), 0)
+  assert.equal(ibcoPhaseAt(Number(greenEnd), greenEnd, openEnd), 1)
+  assert.equal(ibcoPhaseAt(Number(openEnd) - 1, greenEnd, openEnd), 1)
+  assert.equal(ibcoPhaseAt(Number(openEnd), greenEnd, openEnd), 2)
+  assert.equal(ibcoPhaseAt(Number(openEnd) + 987654, greenEnd, openEnd), 2)
+  // no ends decoded yet → unknown, never a wrong phase
+  assert.equal(ibcoPhaseAt(Number(greenEnd), undefined, undefined), undefined)
+  assert.equal(ibcoPhaseAt(Number(greenEnd), undefined, openEnd), 1)
+})
+
+test('window ends follow the era: legacy single window, v3 two windows, rootless v3 one open window', () => {
+  const start = 5000n
+  assert.deepEqual(ibcoEnds(start, undefined, undefined, 7200n, undefined), { greenEnd: undefined, openEnd: start + 7200n })
+  assert.deepEqual(ibcoEnds(start, 60n, 30n, undefined, 50n), { greenEnd: start + 60n, openEnd: start + 90n })
+  // greenPerWallet = 0: no members, the whole window is one OPEN_DURATION
+  assert.deepEqual(ibcoEnds(start, 60n, 30n, undefined, 0n), { greenEnd: undefined, openEnd: start + 30n })
+  assert.deepEqual(ibcoEnds(undefined, 60n, 30n, undefined, 50n), { greenEnd: undefined, openEnd: undefined })
+})
+
+test('green-phase MAX respects the 500/N per-wallet cap, the shared round cap and balance', () => {
+  assert.equal(greenPhaseLimit(mix(1000), mix(200), mix(1000), mix(50), mix(12)), mix(38))
+  assert.equal(greenPhaseLimit(mix(10), mix(200), mix(1000), mix(50), mix(12)), mix(10))
+  assert.equal(greenPhaseLimit(mix(1000), mix(990), mix(1000), mix(50), mix(0)), mix(10))
+  assert.equal(greenPhaseLimit(mix(1000), mix(200), mix(1000), mix(50), mix(50)), 0n)
+  assert.equal(greenWalletHeadroom(mix(50), mix(12)), mix(38))
+  assert.equal(greenWalletHeadroom(mix(50), mix(77)), 0n)
+  // a zero green cap (rootless round) leaves nothing to commit in green
+  assert.equal(greenWalletHeadroom(0n, mix(50)), 0n)
+})
+
+test('open-phase MAX prices only open money against the 10-mix cap — green never eats open headroom', () => {
+  const openCap = mix(10)
+  // 12 committed, 12 of it green → open spend 0 → full 10 available
+  assert.equal(openPhaseLimit(mix(1000), mix(200), mix(1000), openCap, mix(12), mix(12)), openCap)
+  // 12 committed, 5 green → open spend 7 → 3 left
+  assert.equal(openPhaseLimit(mix(1000), mix(200), mix(1000), openCap, mix(12), mix(5)), mix(3))
+  // already at the cap
+  assert.equal(openPhaseLimit(mix(1000), mix(200), mix(1000), openCap, mix(10), 0n), 0n)
+  // balance and the shared round cap still clamp
+  assert.equal(openPhaseLimit(mix(4), mix(200), mix(1000), openCap, mix(0), 0n), mix(4))
+  assert.equal(openPhaseLimit(mix(1000), mix(998), mix(1000), openCap, mix(0), 0n), mix(2))
 })

@@ -82,14 +82,16 @@ contract StagedGenesisTest is Test {
         factory.birthStep();
         RoundController c = factory.getRound(1).controller;
         assertEq(c.predepositStartTime(), wiredAt);
-        (,,,,, bool windowOver, bool launchable) = c.predepositState();
+        // genesis round: no csv, no previous holders — the whole window is
+        // the open phase, over exactly at start + OPEN_DURATION
+        (,,,,, bool windowOver, bool launchable,,,,) = c.predepositState();
         assertFalse(windowOver);
         assertFalse(launchable);
-        skip(c.PREDEPOSIT_DURATION() - 1);
-        (,,,,, windowOver,) = c.predepositState();
+        skip(c.OPEN_DURATION() - 1);
+        (,,,,, windowOver,,,,,) = c.predepositState();
         assertFalse(windowOver);
         skip(1);
-        (,,,,, windowOver, launchable) = c.predepositState();
+        (,,,,, windowOver, launchable,,,,) = c.predepositState();
         assertTrue(windowOver);
         assertTrue(launchable);
     }
@@ -130,7 +132,7 @@ contract StagedGenesisTest is Test {
         assertEq(address(PSPToken(address(r.token)).controller()), address(c), "token wired");
         assertTrue(c.stakerAddress() != address(0), "staker born");
         assertTrue(factory.referralRegistryOf(1) != address(0), "registry born");
-        assertGt(c.PREDEPOSIT_DURATION(), 0, "timings landed");
+        assertGt(c.OPEN_DURATION(), 0, "timings landed");
 
         // no leftover state blocks the next reservation
         factory.reserveGenesis(_params());
@@ -247,7 +249,7 @@ contract StagedGenesisTest is Test {
         assertEq(factory.currentRoundId(), 2, "round 2 born");
         PSPFactory.Round memory r2 = factory.getRound(2);
         assertEq(r2.controller.predepositStartTime(), wiredAt, "full window after delayed rebirth");
-        (,,,,, bool expired,) = r2.controller.predepositState();
+        (,,,,, bool expired,,,,,) = r2.controller.predepositState();
         assertFalse(expired);
         assertEq(r2.name, "Positive Sum Pepes 2", "round 2 name");
         assertEq(r2.symbol, "PSP2", "round 2 symbol");

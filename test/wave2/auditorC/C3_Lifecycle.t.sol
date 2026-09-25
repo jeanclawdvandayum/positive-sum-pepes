@@ -127,7 +127,8 @@ contract C3_Lifecycle is CBase {
 
         PSPToken fakeToken = new TokenDeployer().deployToken("Fake", "FK", rando);
         RoundController fakeController =
-            controllerDeployer.deployController(fakeToken, IERC20(address(mixETH)), _curve(), rando, address(0), new StakerDeployer());
+            controllerDeployer.deployController(fakeToken, IERC20(address(mixETH)), _curve(), rando, address(0), new StakerDeployer(),
+                1 days, 1 days, bytes32(0), 0, 0, PSPToken(address(0)));
 
         assertEq(factory.currentRoundId(), roundsBefore, "registry untouched");
         PSPFactory.Round memory r1 = factory.getRound(1);
@@ -159,7 +160,8 @@ contract C3_Lifecycle is CBase {
             cfg.timings = 3 days | (v << 64);
             vm.expectRevert(RoundController.TimingsIncomplete.selector);
             controllerDeployer.deployController(
-                vestToken, IERC20(address(mixETH)), cfg, rando, address(0), sd
+                vestToken, IERC20(address(mixETH)), cfg, rando, address(0), sd,
+                1 days, 1 days, bytes32(0), 0, 0, PSPToken(address(0))
             );
         }
 
@@ -168,7 +170,8 @@ contract C3_Lifecycle is CBase {
         CurveMath.CurveConfig memory ok = _curve();
         ok.timings = 3 days | (6 << 64);
         RoundController c = controllerDeployer.deployController(
-            vestToken, IERC20(address(mixETH)), ok, rando, address(0), sd
+            vestToken, IERC20(address(mixETH)), ok, rando, address(0), sd,
+            1 days, 1 days, bytes32(0), 0, 0, PSPToken(address(0))
         );
         assertEq(c.VEST_DURATION(), 6, "vest=6 boundary accepted");
     }

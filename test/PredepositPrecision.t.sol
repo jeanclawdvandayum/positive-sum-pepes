@@ -29,10 +29,16 @@ contract PredepositPrecisionTest is BBase {
     }
 
     function _tinyDepositorLaunch(uint256 amount) internal {
+        // rules v3: the deposit must land inside the round-1 green window
+        // (csv [alice, bob] from BBase) — setUp's mature-epoch warp is far
+        // past it, so step back to deposit and restore the clock after.
+        uint256 mature = block.timestamp;
+        vm.warp(controller.predepositStartTime() + 1);
         vm.startPrank(bob);
         mixETH.approve(address(controller), amount);
-        controller.predeposit(amount);
+        controller.predepositGreen(amount, _greenProof(bob));
         vm.stopPrank();
+        vm.warp(mature);
         _launch(100e18);
         uint256 preview = stakerV.genesisPepeDna(bob);
         vm.prank(bob);
@@ -46,11 +52,12 @@ contract PredepositPrecisionTest is BBase {
     }
 
     function testOneWeiWholePoolCanLaunchAndClaim() public {
+        vm.warp(controller.predepositStartTime() + 1); // inside the green window
         vm.startPrank(alice);
         mixETH.approve(address(controller), 1);
-        controller.predeposit(1);
+        controller.predepositGreen(1, _greenProof(alice));
         vm.stopPrank();
-        skip(controller.PREDEPOSIT_DURATION());
+        vm.warp(controller.predepositStartTime() + controller.GREEN_DURATION() + controller.OPEN_DURATION());
         controller.launchPooledBuy();
         vm.prank(alice);
         controller.claimPredepositPSP();

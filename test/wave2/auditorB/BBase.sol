@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {Greenlist} from "../../helpers/Greenlist.sol";
 import {SineV3Math} from "../../../src/SineV3Math.sol";
 import {SineV3TestData as SineV3Data} from "../../helpers/SineV3TestData.sol";
 import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
@@ -56,7 +57,14 @@ abstract contract BBase is Test {
         , address(new SineV3Math(SineV3Data.deploy())), 0,
             address(this) // deployerCutTo (CLOCK-REDESIGN §3)
         );
-
+        // Greenlist-IBCO (rules v3): round 1 carries a csv greenlist of
+        // the harness depositors so the boot can ride the GREEN window
+        // (500/N each — 250 for the pair, far above every boot used here);
+        // the public open phase is capped at 10 mixETH per wallet.
+        address[] memory csv = new address[](2);
+        csv[0] = alice;
+        csv[1] = bob;
+        factory.setNextGreenlist(Greenlist.rootOf(csv), 2);
         PSPFactory.RoundParams memory params =
             PSPFactory.RoundParams({name: "B", symbol: "AUD", curveConfig: _curve()});
         (uint256 roundId,) = factory.deployRound(params);
@@ -87,14 +95,27 @@ abstract contract BBase is Test {
 
     // ─────────────── lifecycle helpers ───────────────
 
+    /// @dev Greenlist proof for a harness depositor (round 1's csv).
+    function _greenProof(address who) internal view returns (bytes32[] memory) {
+        address[] memory csv = new address[](2);
+        csv[0] = alice;
+        csv[1] = bob;
+        return Greenlist.proofOf(csv, who);
+    }
+
     function _launch(uint256 bootAmount) internal {
         // Anchor before launch so subsequent trades use the live clock.
         uint256 epoch = controller.staker().epochSize();
-        skip((((block.timestamp / epoch) + 1) * epoch + 1) - block.timestamp);
+        uint256 anchorTs = (((block.timestamp / epoch) + 1) * epoch) + 1;
+        // rules v3: deposits must land INSIDE the round-1 green window
+        // (setUp parked the clock at a mature epoch, long past it) — warp
+        // back to deposit, then restore the anchor for launch + claims.
+        vm.warp(controller.predepositStartTime() + 1);
         vm.startPrank(alice);
         mixETH.approve(address(controller), bootAmount);
-        controller.predeposit(bootAmount);
+        controller.predepositGreen(bootAmount, _greenProof(alice));
         vm.stopPrank();
+        vm.warp(anchorTs);
         vm.prank(address(factory));
         controller.launchPooledBuy();
         vm.prank(alice);

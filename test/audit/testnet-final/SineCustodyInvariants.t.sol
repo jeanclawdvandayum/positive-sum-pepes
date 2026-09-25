@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Greenlist} from "../../helpers/Greenlist.sol";
 import {IPoolManager, SwapParams} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
@@ -95,9 +96,16 @@ contract SineCustodyInvariants is CBase {
         mix = IERC20(address(mixETH));
         seller = new SellSwapper(IPoolManager(address(poolManager)), mix);
 
-        // Deploy a SINE round (the live Base-Sepolia flavor) as round 2.
+        // Deploy a SINE round (the live Base-Sepolia flavor) as round 2 —
+        // rules v3: a csv greenlist of the traders carries the whole boot
+        // (500/N = 250 each) through the GREEN window right after birth.
         vm.prank(address(this));
         factory.configureSineV3(75_000_000_000_000);
+        address[] memory csv = new address[](2);
+        csv[0] = trader1;
+        csv[1] = trader2;
+        vm.prank(address(this));
+        factory.setNextGreenlist(Greenlist.rootOf(csv), 2);
         vm.prank(address(this));
         (uint256 roundId,) = factory.deployRound(
             PSPFactory.RoundParams({
@@ -111,18 +119,20 @@ contract SineCustodyInvariants is CBase {
         sineController = round.controller;
         sinePSP = IERC20(address(round.token));
 
-        // Launch with a real boot inside the validated range (AUD-8 domain).
-        vm.warp(7 days + 1);
+        // Launch with a real boot inside the validated range (AUD-8 domain):
+        // 250 + 110 keeps the 360-mix gross boot. Deposits ride the green
+        // window at birth; the epoch-1 anchor then applies to launch.
         mix.transfer(trader1, 400e18);
-        mix.transfer(trader2, 100e18);
+        mix.transfer(trader2, 200e18);
         vm.startPrank(trader1);
-        mix.approve(address(sineController), 300e18);
-        sineController.predeposit(300e18);
+        mix.approve(address(sineController), 250e18);
+        sineController.predepositGreen(250e18, Greenlist.proofOf(csv, trader1));
         vm.stopPrank();
         vm.startPrank(trader2);
-        mix.approve(address(sineController), 60e18);
-        sineController.predeposit(60e18);
+        mix.approve(address(sineController), 110e18);
+        sineController.predepositGreen(110e18, Greenlist.proofOf(csv, trader2));
         vm.stopPrank();
+        vm.warp(7 days + 1);
         sineController.launchPooledBuy();
         vm.prank(trader1);
         sineController.claimPredepositPSP();

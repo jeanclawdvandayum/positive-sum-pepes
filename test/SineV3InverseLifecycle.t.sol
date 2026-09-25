@@ -30,6 +30,9 @@ contract SineV3InverseLifecycleTest is RealV4Base {
         poolKey = PoolKey({currency0: c0, currency1: c1, fee: 0x800000, tickSpacing: 60, hooks: hook});
 
         uint256 grossDeposit = 1_111_111_111_111;
+        // rules v3: round 2 opens with a GREEN window (round-1 holders);
+        // the tester never held PSP — wait it out, then deposit in open
+        skip(controller.GREEN_DURATION() + 1);
         mixETH.approve(address(controller), grossDeposit);
         controller.predeposit(grossDeposit);
         vm.prank(address(factory));

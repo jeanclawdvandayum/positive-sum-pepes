@@ -130,7 +130,8 @@ contract DeployGasSpread is Test {
             cfg.timings = 0; // matches factory roundTimings in this setUp
             g0 = gasleft();
             RoundController ctl = factory.controllerDeployer().deployController(
-                tok, IERC20(address(mixETH)), cfg, address(factory), factory.descriptor(), factory.stakerDeployer()
+                tok, IERC20(address(mixETH)), cfg, address(factory), factory.descriptor(), factory.stakerDeployer(),
+                1 days, 1 days, bytes32(0), 0, 0, PSPToken(address(0))
             );
             uint256 gCtl = g0 - gasleft();
             if (gCtl < loCtl) loCtl = gCtl;

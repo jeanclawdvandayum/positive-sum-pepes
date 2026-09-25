@@ -72,3 +72,21 @@ html[data-theme=light] .alt-shell :is(.tx-action, .btn, .st-btn, .btn-primary, .
 .alt-shell *::after {
   border-radius: 0 !important;
 }
+
+/* greenlist-IBCO (rules v3): the green phase reads differently — the panel
+   keeps its bones but the accents go green, the fill gains a greenlist
+   share track, and the proof-upload gate sits flat inside the commit box. */
+.alt-predeposit .pd-green-state { border-bottom-color: var(--green); }
+.alt-predeposit .pd-green-state .alt-clock {
+  box-shadow: 5px 5px 0 var(--shadow), 0 0 0 1px var(--green) inset;
+}
+.alt-predeposit .pd-green-state + * h2 { color: var(--green-ink); }
+.alt-predeposit .pd-green-share { margin-top: 3px; height: 6px; }
+.alt-predeposit .pd-green-share > div { background: var(--green); }
+.alt-predeposit .pd-green-upload {
+  border: 1px dashed var(--line);
+  background: var(--panel);
+  padding: 8px 10px;
+}
+.alt-predeposit .pd-green-upload input[type="file"] { color: var(--muted); font: inherit; }
+.alt-predeposit .pd-green-upload label { color: var(--muted); }

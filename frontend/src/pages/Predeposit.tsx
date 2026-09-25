@@ -1,19 +1,22 @@
 import AmountSlider from '../components/AmountSlider'
 import { AltClock } from '../alt/AltCommon'
 import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
-import { capHeadroom, predepositUncapped, predepositLimit, predepositAmountAllowed, predepositProgress, predepositRemainder } from '../lib/predeposit'
-import { usePredepositRules } from '../lib/usePredepositMinimum'
-import { predepositResult } from '../lib/chainResults'
+import { capHeadroom, predepositUncapped, predepositLimit, predepositAmountAllowed, predepositProgress, predepositRemainder, ibcoPhaseAt, ibcoEnds, greenWalletHeadroom, openPhaseLimit, greenPhaseLimit } from '../lib/predeposit'
+import { usePredepositRules, usePredepositState } from '../lib/usePredepositMinimum'
+import { predepositResult, type PredepositEntry } from '../lib/chainResults'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from 'wagmi'
-import { controllerAbi, erc20Abi, stakerAbi } from '../lib/abi'
+import { controllerAbi, erc20Abi, legacyControllerAbi, pspTokenAbi, stakerAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
-import { CHAIN_ID, FAUCET_ENABLED, NATIVE_ETH_FAUCET_URL, TESTNET_ETH_FAUCET } from '../lib/config'
+import { useRpcReads } from '../lib/useRpcReads'
+import { ADDRESSES, CHAIN_ID, FAUCET_ENABLED, NATIVE_ETH_FAUCET_URL, TESTNET_ETH_FAUCET } from '../lib/config'
 import { useRound, useBalances } from '../lib/useRound'
 import { useNow } from '../phase/PhaseEngine'
 import { fmtAmount, parseAmountToWad, wadToExact } from '../lib/format'
+import { bundledGreenlist, treeMatchesRoot } from '../lib/greenlistTrees'
+import { parseGreenlistTree, type GreenlistTree } from '../lib/greenlist'
 import { RefBanner } from '../components/ReferralCard'
 import { FaucetButton } from '../components/Topbar'
 import MixLogo from '../components/MixLogo'
@@ -25,16 +28,6 @@ import { renderPepeSvg } from '../lib/pepeRender'
 import { dnaOfId } from '../components/PepePicker'
 
 type Step = 'idle' | 'approve' | 'tx' | 'done'
-
-interface PdState {
-  total: bigint
-  cap: bigint
-  startTime: bigint
-  closed: boolean
-  capReached: boolean
-  windowOver: boolean
-  launchable: boolean
-}
 
 
 export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
@@ -64,46 +57,31 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
   useEffect(() => { setSelectedPepe(null); setStep('idle'); setError(null) }, [address, round.controller])
   const depositPepe = reservedPepe && reservedPepe > 0n ? reservedPepe : selectedPepe
 
-  /// predepositState + duration + depositor count + own deposit, polled like
-  /// every other read in this app (useReadContracts sits idle on custom chains)
-  const [pd, setPd] = useState<PdState | undefined>(undefined)
-  const [duration, setDuration] = useState<bigint | undefined>(undefined)
-  const [depositors, setDepositors] = useState<bigint | undefined>(undefined)
-  const [myDep, setMyDep] = useState<{ mixETHAmount: bigint; claimed: boolean } | undefined>(undefined)
-  const [allowance, setAllowance] = useState<bigint | undefined>(undefined)
+  /// Era-aware predepositState + window facts, polled like every other read
+  /// in this app (useReadContracts sits idle on custom chains). Legacy v2
+  /// rounds decode the 7-tuple; rules v3 the 11-tuple with phase/green.
   const [nonce, setNonce] = useState(0)
+  const { state: pd, facts } = usePredepositState(round.controller, 4000, nonce)
+  const rules3 = pd !== undefined && pd.phase !== undefined
+  const [depositors, setDepositors] = useState<bigint | undefined>(undefined)
+  const [myDep, setMyDep] = useState<PredepositEntry | undefined>(undefined)
+  const [allowance, setAllowance] = useState<bigint | undefined>(undefined)
 
   useEffect(() => {
     setMyDep(undefined)
-    setPd(undefined)
-    setDuration(undefined)
     setDepositors(undefined)
     if (!round.controller) return
     let dead = false
+    const entryAbi = predepositVersion === 3n ? controllerAbi : legacyControllerAbi
     async function tick() {
       try {
-        const [st, dur, cnt] = await Promise.all([
-          rpcCall(round.controller!, controllerAbi, 'predepositState') as Promise<
-            [bigint, bigint, bigint, boolean, boolean, boolean, boolean]
-          >,
-          rpcCall(round.controller!, controllerAbi, 'PREDEPOSIT_DURATION') as Promise<bigint>,
+        const [cnt, dep] = await Promise.all([
           rpcCall(round.controller!, controllerAbi, 'totalPredepositors') as Promise<bigint>,
+          address
+            ? rpcCall(round.controller!, entryAbi, 'predeposits', [address]).then(predepositResult)
+            : Promise.resolve(undefined),
         ])
-        let dep: { mixETHAmount: bigint; claimed: boolean } | undefined
-        if (address) {
-          dep = predepositResult(await rpcCall(round.controller!, controllerAbi, 'predeposits', [address]))
-        }
         if (dead) return
-        setPd({
-          total: st[0],
-          cap: st[1],
-          startTime: st[2],
-          closed: st[3],
-          capReached: st[4],
-          windowOver: st[5],
-          launchable: st[6],
-        })
-        setDuration(dur)
         setDepositors(cnt)
         setMyDep(dep)
       } catch {
@@ -116,7 +94,7 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
       dead = true
       clearInterval(iv)
     }
-  }, [round.controller, address, nonce])
+  }, [round.controller, address, nonce, predepositVersion])
 
   /// mixETH allowance toward the controller (mix path)
   useEffect(() => {
@@ -145,6 +123,49 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
   /// one app-wide heartbeat instead of a per-page setInterval)
   const nowSec = useNow()
 
+  /// ── greenlist-IBCO (rules v3) ─────────────────────────────────────────
+  /// Phase ends + live phase, then membership: the previous round's frozen
+  /// PSP holder map first (rootless auto-greenlist), else the csv merkle
+  /// tree — bundled per factory at build time, with a manual upload fallback.
+  const ZERO = '0x0000000000000000000000000000000000000000' as const
+  const { greenEnd, openEnd } = ibcoEnds(pd?.startTime, facts?.greenSec, facts?.openSec, facts?.legacySec, pd?.greenPerWallet)
+  const phaseNow = rules3 ? ibcoPhaseAt(nowSec, greenEnd, openEnd) : undefined
+  const [prevTokenRaw, greenRootRaw] = useRpcReads([
+    { to: round.controller, abi: controllerAbi, functionName: 'PREV_TOKEN' },
+    { to: round.controller, abi: controllerAbi, functionName: 'GREEN_ROOT' },
+  ], rules3 && !!round.controller, 30000)
+  const prevToken = prevTokenRaw as `0x${string}` | undefined
+  const greenRoot = greenRootRaw as `0x${string}` | undefined
+  const hasPrevToken = !!prevToken && !/^0x0+$/.test(prevToken)
+  const [holderRaw] = useRpcReads([
+    { to: hasPrevToken ? prevToken : undefined, abi: pspTokenAbi, functionName: 'holder', args: [address ?? ZERO] },
+  ], rules3 && hasPrevToken && !!address, 15000)
+  const prevHolder = holderRaw as boolean | undefined
+  const [uploadedTree, setUploadedTree] = useState<GreenlistTree | undefined>(undefined)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  useEffect(() => { setUploadedTree(undefined); setUploadError(null) }, [round.controller])
+  const bundledTree = rules3 ? bundledGreenlist(ADDRESSES.factory) : undefined
+  const activeTree = treeMatchesRoot(uploadedTree, greenRoot) ? uploadedTree
+    : treeMatchesRoot(bundledTree, greenRoot) ? bundledTree : undefined
+  const proof = address && activeTree ? activeTree.proofs[address.toLowerCase()] : undefined
+  const isMember = prevHolder === true || proof !== undefined
+  const hasCsvRoot = !!greenRoot && !/^0x0+$/.test(greenRoot)
+  /// green-phase gates: proven member, proven outsider, or unknown (needs
+  /// the tree file / the holder read to land).
+  const greenGate = phaseNow === 0
+    ? isMember ? 'member' as const
+      : prevHolder === false || activeTree !== undefined ? 'closed' as const
+      : 'unknown' as const
+    : undefined
+
+  function onGreenlistFile(file: File | undefined) {
+    setUploadError(null)
+    if (!file) return
+    file.text()
+      .then((text) => setUploadedTree(parseGreenlistTree(JSON.parse(text))))
+      .catch((e) => setUploadError(e instanceof Error ? e.message : 'could not read that greenlist file'))
+  }
+
   const [amount, setAmount] = useState('')
   const [step, setStep] = useState<Step>('idle')
   const [launchStep, setLaunchStep] = useState<'idle' | 'tx' | 'done'>('idle')
@@ -169,11 +190,31 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
   }, [round.controller])
 
   const myDepAmount = myDep?.mixETHAmount ?? 0n
-  const walletCapExceeded =
-    walletCap !== undefined && walletCap > 0n && amountWad > 0n && myDepAmount + amountWad > walletCap
-  /// the most THIS wallet can still deposit: balance ∧ wallet headroom ∧ global headroom
-  const maxDeposit = mixBal !== undefined && pd && walletCap !== undefined && myDep !== undefined
-    ? predepositLimit(mixBal, pd.total, pd.cap, walletCap, myDepAmount, predepositVersion) : undefined
+  const myGreen = myDep?.greenAmount ?? 0n
+  const myOpen = myDepAmount - myGreen
+  /// per-wallet cap of the CURRENT phase: green 500/N on the green tranche,
+  /// open 10 mix priced off open-phase deposits only (green money never
+  /// eats open headroom). Legacy rounds keep the packed wallet-cap slot.
+  const phaseWalletHeadroom = phaseNow === 0 && pd?.greenPerWallet !== undefined
+    ? greenWalletHeadroom(pd.greenPerWallet, myGreen)
+    : phaseNow === 1 && pd?.openPerWallet !== undefined && pd.openPerWallet > 0n
+      ? capHeadroom(myOpen, pd.openPerWallet)
+      : undefined
+  const walletCapExceeded = rules3
+    ? phaseWalletHeadroom !== undefined && amountWad > 0n && amountWad > phaseWalletHeadroom
+    : walletCap !== undefined && walletCap > 0n && amountWad > 0n && myDepAmount + amountWad > walletCap
+  /// the most THIS wallet can still deposit: balance ∧ phase wallet headroom
+  /// ∧ global headroom (phase 2 = window over, nothing left to commit)
+  const maxDeposit = rules3 && pd
+    ? mixBal === undefined || myDep === undefined
+      ? undefined
+      : phaseNow === 0
+        ? greenPhaseLimit(mixBal, pd.total, pd.cap, pd.greenPerWallet ?? 0n, myGreen)
+        : phaseNow === 1
+          ? openPhaseLimit(mixBal, pd.total, pd.cap, pd.openPerWallet ?? 0n, myDepAmount, myGreen)
+          : 0n
+    : mixBal !== undefined && pd && walletCap !== undefined && myDep !== undefined
+      ? predepositLimit(mixBal, pd.total, pd.cap, walletCap, myDepAmount, predepositVersion) : undefined
   const uncapped = !!pd && predepositUncapped(predepositVersion, pd.cap)
   const globalRemaining = pd && !uncapped ? capHeadroom(pd.total, pd.cap) : undefined
   const globalCapExceeded = globalRemaining !== undefined && amountWad > globalRemaining
@@ -202,12 +243,16 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
     el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' })
   }
 
-  const endTime = pd && duration !== undefined ? pd.startTime + duration : undefined
+  /// phase-aware deadline: green counts to the open window, open/legacy to
+  /// the window end (rules v3; legacy rounds keep the single window)
+  const endTime = pd ? (phaseNow === 0 ? greenEnd : openEnd) : undefined
   const remaining = endTime !== undefined ? Math.max(0, Number(endTime - BigInt(nowSec))) : undefined
   const mode = round.mode
   const launched = pd?.closed === true && (mode ?? 0) >= 1
+  const greenLocked = greenGate !== undefined && greenGate !== 'member'
   const canSubmit =
-    isConnected && !artLoading && !!round.controller && predepositAmountAllowed(amountWad, minimum, maxDeposit) && balanceOk && !walletCapExceeded && !busy && !pd?.closed && (artVersion !== 2n || (reservedPepe !== undefined && depositPepe !== null))
+    isConnected && !artLoading && !!round.controller && predepositAmountAllowed(amountWad, minimum, maxDeposit) && balanceOk && !walletCapExceeded && !busy && !pd?.closed && !(rules3 && phaseNow === 2) && !greenLocked && (artVersion !== 2n || (reservedPepe !== undefined && depositPepe !== null))
+
 
   async function fail(e: unknown) {
     setError(e instanceof Error ? e.message.slice(0, 140) : 'transaction failed')
@@ -238,11 +283,16 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
         })
       }
       setStep('tx')
+      // rules v3 routing: green phase + membership goes through the proof-
+      // carrying entry points (holder-proven members pass an empty proof).
+      const green = rules3 && phaseNow === 0
       await writeWithApprovals({
         address: round.controller,
         abi: controllerAbi,
-        functionName: artVersion === 2n ? 'predepositWithPepe' : 'predeposit',
-        args: artVersion === 2n ? [amountWad, depositPepe!] : [amountWad],
+        functionName: artVersion === 2n ? (green ? 'predepositGreenWithPepe' : 'predepositWithPepe') : green ? 'predepositGreen' : 'predeposit',
+        args: artVersion === 2n
+          ? green ? [amountWad, depositPepe!, proof ?? []] : [amountWad, depositPepe!]
+          : green ? [amountWad, proof ?? []] : [amountWad],
       }, approvals)
       if (latestDepositSession.current !== depositSession) return
       if (artVersion === 2n) await refreshPepe()
@@ -286,6 +336,10 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
 
   const cta = !isConnected
     ? 'connect wallet'
+    : greenLocked
+      ? 'greenlist only'
+    : rules3 && phaseNow === 2
+      ? 'window over'
     : amountWad <= 0n
       ? 'enter an amount'
       : belowMinimum
@@ -334,7 +388,19 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
       `}</style>
 
       {pd && !pd.closed && endTime !== undefined && (
-        variant === "alt" ? <section className="predeposit-state"><p>the opening is public.</p><h1>get in on the ground floor.</h1><AltClock deadline={endTime}/><p>choose your pepe. join the pooled first buy.</p></section> : <ClockBand label="predeposit clock" className="pd-clock">
+        phaseNow === 0 ? (
+          variant === "alt" ? <section className="predeposit-state pd-green-state">
+            <p>the greenlist is open.</p><h1>greenlisted frogs go first.</h1><AltClock deadline={greenEnd}/>
+            {greenGate === 'member'
+              ? <p>choose your pepe. everyone else joins at the open.</p>
+              : <p>the greenlist phase is closed to new faces. the open window follows.</p>}
+          </section> : <ClockBand label="greenlist clock" className="pd-clock pd-green-clock">
+            <h1 className="mb-3 w-full max-w-4xl text-center font-display text-2xl leading-tight text-[#e8f0f7] sm:mb-3 sm:text-3xl">
+              {remaining !== undefined && remaining > 0 ? 'greenlist window ends in:' : 'greenlist window elapsed'}
+            </h1>
+            <Clock key={round.controller} deadlineMs={Number(endTime) * 1000} label="time until the greenlist window ends" />
+          </ClockBand>
+        ) : variant === "alt" ? <section className="predeposit-state"><p>the opening is public.</p><h1>get in on the ground floor.</h1><AltClock deadline={endTime}/><p>choose your pepe. join the pooled first buy.</p></section> : <ClockBand label="predeposit clock" className="pd-clock">
           <h1 className="mb-3 w-full max-w-4xl text-center font-display text-2xl leading-tight text-[#e8f0f7] sm:mb-3 sm:text-3xl">
             {remaining !== undefined && remaining > 0 ? 'predeposit window ends in:' : 'predeposit window elapsed'}
           </h1>
@@ -364,7 +430,13 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
                 style={{ width: `${pct}%` }}
               />
             </div>}
-            {pd && <p className="mt-2 break-all text-xs text-slate-500">{predepositRemainder(pd.total, pd.cap, predepositVersion)}</p>}
+            {rules3 && pd && pd.greenTotal !== undefined && !uncapped && <div className="pd-green-share h-1.5 overflow-hidden rounded-full bg-sky-100" aria-hidden="true">
+              <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, Number((pd.greenTotal * 10000n) / (pd.cap > 0n ? pd.cap : 1n)) / 100)}%` }} />
+            </div>}
+            {pd && <p className="mt-2 break-all text-xs text-slate-500">
+              {predepositRemainder(pd.total, pd.cap, predepositVersion)}
+              {rules3 && pd.greenTotal !== undefined ? ` · ${wadToExact(pd.greenTotal)} greenlist mixETH` : ''}
+            </p>}
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="pd-stat rounded-2xl bg-white/80 shadow-sm">
                 <div className="text-lg font-black text-slate-900">
@@ -412,6 +484,12 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
               </div>
             </div>
 
+            {greenGate === 'member' && (
+              <p className="mt-2 text-xs font-bold text-emerald-600">
+                {prevHolder === true ? 'you held PSP last round — the green door is open.' : 'you are on this round’s greenlist.'}
+              </p>
+            )}
+
             <div className="mt-3 rounded-2xl border border-sky-100 bg-sky-50/60 p-3">
               <div className="flex items-center justify-between text-xs font-bold text-slate-400">
                 <span>commit</span>
@@ -438,11 +516,38 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
                 aria-invalid={variant === 'alt' && amountInvalid ? true : undefined}
               />
               <AmountSlider amount={amount} maximum={maxDeposit} onChange={setAmount} disabled={busy || !!pd?.closed} label="share of your available deposit" />
-              {walletCap !== undefined && walletCap > 0n && myDep !== undefined && (
+              {rules3 && phaseWalletHeadroom !== undefined && pd && myDep !== undefined ? (
+                <div className="mt-1 break-words text-[11px] font-bold text-slate-400">
+                  {phaseNow === 0
+                    ? `greenlist cap ${wadToExact(pd.greenPerWallet ?? 0n)} mix · yours ${wadToExact(myGreen)} · ${wadToExact(phaseWalletHeadroom)} left`
+                    : `open cap ${wadToExact(pd.openPerWallet ?? 0n)} mix per wallet · yours ${wadToExact(myOpen)} · ${wadToExact(phaseWalletHeadroom)} left`}
+                </div>
+              ) : walletCap !== undefined && walletCap > 0n && myDep !== undefined && (
                 <div className="mt-1 break-words text-[11px] font-bold text-slate-400">
                   per-wallet cap {wadToExact(walletCap)} mix · yours {wadToExact(myDep.mixETHAmount)} ·{' '}
                   {wadToExact(capHeadroom(myDep.mixETHAmount, walletCap))} left
                 </div>
+              )}
+              {greenGate === 'unknown' && hasCsvRoot && (
+                <div className="pd-green-upload mt-2">
+                  <label className="block text-[11px] font-bold text-slate-400" htmlFor="pd-greenlist-file">
+                    on the greenlist? load the round's greenlist file to prove it:
+                  </label>
+                  <input
+                    id="pd-greenlist-file"
+                    className="mt-1 w-full text-xs"
+                    type="file"
+                    accept="application/json,.json"
+                    disabled={busy}
+                    onChange={(e) => onGreenlistFile(e.target.files?.[0])}
+                  />
+                  {uploadError && <p role="alert" className="mt-1 text-xs font-bold text-rose-500">{uploadError}</p>}
+                </div>
+              )}
+              {greenGate === 'closed' && (
+                <p className="mt-2 break-words text-xs font-bold text-slate-500">
+                  the greenlist phase is closed to new faces. the open window starts when the green clock hits zero — {wadToExact(pd?.openPerWallet ?? 10n * 10n ** 18n)} mixETH per wallet.
+                </p>
               )}
               {globalCapExceeded && <p className="mt-1 break-words text-xs font-bold text-rose-500">
                 {wadToExact(globalRemaining)} mixETH remaining in this round

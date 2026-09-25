@@ -140,13 +140,17 @@ contract FableAuditPoC is RealV4Base {
         assertEq(r2.hook.ticketPrice(), 0.005 ether, "F4: pre-launch spot = 0.005");
         assertEq(r2.hook.MIN_BUY_INPUT(), 0.005 ether, "F4: pre-launch minimum = 0.005");
 
+        // rules v3: carol is not a round-1 holder — the green window
+        // (previous-round holders only) passes before her open deposits
+        skip(r2.controller.GREEN_DURATION() + 1);
+
         vm.startPrank(carol);
         mixETH.approve(address(r2.controller), type(uint256).max);
         uint256 g0 = gasleft();
-        r2.controller.predeposit(10e18);
+        r2.controller.predeposit(5e18);
         uint256 firstDeposit = g0 - gasleft();
         g0 = gasleft();
-        r2.controller.predeposit(10e18);
+        r2.controller.predeposit(5e18);
         uint256 secondDeposit = g0 - gasleft();
         vm.stopPrank();
         emit log_named_uint("F4: first predeposit gas", firstDeposit);
@@ -154,7 +158,7 @@ contract FableAuditPoC is RealV4Base {
         assertLt(secondDeposit, 3_000_000, "F4: predeposit stays under 3M gas");
 
         // launch after the window and confirm pot-priced spots take over
-        skip(r2.controller.PREDEPOSIT_DURATION() + 1);
+        skip(r2.controller.GREEN_DURATION() + r2.controller.OPEN_DURATION() + 1);
         r2.controller.launchPooledBuy();
         uint256 pot = r2.hook.potBalance();
         uint256 expected = pot / 10_000 + (pot % 10_000 == 0 ? 0 : 1);
@@ -206,11 +210,12 @@ contract FableAuditPoC is RealV4Base {
         skip(hook.detWindow() + 1);
         controller.detonate();
         PSPFactory.Round memory r2 = factory.getRound(2);
+        skip(r2.controller.GREEN_DURATION() + 1); // carol: open phase only
         vm.startPrank(carol);
         mixETH.approve(address(r2.controller), type(uint256).max);
         r2.controller.predeposit(0.05e18);
         vm.stopPrank();
-        skip(r2.controller.PREDEPOSIT_DURATION() + 1);
+        skip(r2.controller.OPEN_DURATION() + 1);
         r2.controller.launchPooledBuy();
         CurveHook h = r2.hook;
         PoolKey memory key = _keyFor(address(r2.token), h);

@@ -19,6 +19,7 @@ import {ControllerDeployer} from "../src/ControllerDeployer.sol";
 import {StakerDeployer} from "../src/StakerDeployer.sol";
 import {PSPStaker} from "../src/PSPStaker.sol";
 import {PSPReferralRegistry} from "../src/PSPReferralRegistry.sol";
+import {Greenlist} from "./helpers/Greenlist.sol";
 import {Curve1Zones} from "../src/curves/Curve1Zones.sol";
 import {SineMath} from "../src/libraries/SineMath.sol";
 
@@ -79,6 +80,12 @@ contract SineFee is Test {
             symbol: "PSP",
             curveConfig: Curve1Zones.config() // creation-code shape only
         });
+        // rules v3: alice's boot rides the GREEN window (csv [alice] →
+        // 500/N = 500 for the solo member); the public open phase is capped
+        // at 10 mixETH per wallet.
+        address[] memory csv = new address[](1);
+        csv[0] = alice;
+        factory.setNextGreenlist(Greenlist.rootOf(csv), 1);
         (uint256 roundId,) = factory.deployRound(p);
         PSPToken token = factory.getRound(roundId).token;
         psp1 = token;
@@ -88,9 +95,11 @@ contract SineFee is Test {
 
     function _launch(uint256 boot) internal {
         mixETH.transfer(alice, boot);
+        address[] memory csv = new address[](1);
+        csv[0] = alice;
         vm.startPrank(alice);
         mixETH.approve(address(controller1), boot);
-        controller1.predeposit(boot);
+        controller1.predepositGreen(boot, Greenlist.proofOf(csv, alice));
         vm.stopPrank();
         vm.prank(address(factory));
         controller1.launchPooledBuy();

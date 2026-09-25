@@ -19,7 +19,7 @@ contract SkillLifecycleReviewTest is RealV4Base {
         vm.prank(address(controller));
         factory.markDestroyed(1);
         factory.reserveSpawn(1);
-        (,,,,,token,ctl,h,,,,,) = factory.reservation();
+        (,,,,,token,ctl,h,,,,,,,) = factory.reservation();
     }
 
     function test_EarlyCanonicalStakerDoesNotBlockBirth() public {

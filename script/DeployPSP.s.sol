@@ -27,10 +27,13 @@ import {StakerDeployer} from "../src/StakerDeployer.sol";
 /// @title DeployPSP
 /// @notice Fresh staged deployment. PSP_TESTNET selects Base Sepolia 84532,
 /// a new free-mint practice mixETH/faucet and a read-only embedded status page.
-/// Testnet defaults: 24h predeposit, 1h vest, 4h20m clock, uncapped per-wallet
-/// predeposit (global cap 1000 mixETH). PSP_* timing and sine overrides apply.
-/// Run a local fork rehearsal first. Broadcast with --slow, then read the
-/// actual round from the factory in the separate DeployReinvestor pass.
+/// Testnet profile: 1-day green window + 1-day open window (PSP_GREEN_SEC /
+/// PSP_OPEN_SEC), 1h vest, 4h20m clock, 10 mixETH open-phase wallet cap
+/// (global cap 1000 mixETH). An optional PSP_GREEN_CSV (one address per
+/// line) becomes round 1's merkle greenlist; later rounds add the previous
+/// round's frozen PSP holders trustlessly. PSP_* timing and sine overrides
+/// apply. Run a local fork rehearsal first. Broadcast with --slow, then read
+/// the actual round from the factory in the separate DeployReinvestor pass.
 contract DeployPSP is DeploymentSupport {
     address constant PM_BASE = 0x000000000004444c5dc75cB358380D2e3dE08A90;
 
@@ -41,6 +44,17 @@ contract DeployPSP is DeploymentSupport {
         // Parse and validate all configuration before spending deployment gas.
         uint128 sinePL = _sinePL();
         uint256 timings = (testnet || anvil) ? _testnetTimings() : 0;
+        // Greenlist-IBCO (rules v3): two windows + the optional csv. The
+        // green window rides packed timing slot [0] (the old predeposit
+        // slot); the open window is the factory's openWindowSec. The csv
+        // (one address per line) becomes the next round's merkle root —
+        // the other half of the greenlist (previous-round PSP holders)
+        // is read trustlessly at birth.
+        uint256 greenSec = vm.envOr("PSP_GREEN_SEC", uint256(1 days));
+        uint256 openSec = vm.envOr("PSP_OPEN_SEC", uint256(1 days));
+        require(greenSec >= 1, "PSP_GREEN_SEC must be positive");
+        require(openSec >= 60, "PSP_OPEN_SEC under the factory's 60s floor");
+        (bytes32 greenRoot, uint256 greenCount) = _greenCsv();
         string memory htmlPath = _htmlPath(testnet);
         string memory htmlSource = vm.readFile(htmlPath);
         address deployerCut = vm.envOr("PSP_DEPLOYER_CUT_TO", msg.sender);
@@ -139,6 +153,19 @@ contract DeployPSP is DeploymentSupport {
         // every cap. Addresses stay entropy-salted: the sim's values differ
         // from the chain's — read real state from the RPC after broadcast.
         // Fixed budget: block entropy changes the hook-mining work after simulation.
+        //
+        // rules v3: the greenlist + open window must land BEFORE the genesis
+        // reservation — _reserve snapshots both into the reservation
+        // (contextHash + the one-shot greenRoot/greenCount fields).
+        if (greenCount != 0) {
+            factory.setNextGreenlist(greenRoot, greenCount);
+            console.log("greenlist csv entries:", greenCount);
+            console.log("greenlist merkle root:");
+            console.logBytes32(greenRoot);
+        }
+        factory.setOpenWindow(uint64(openSec));
+        console.log("green window (packed slot 0, sec):", greenSec);
+        console.log("open window (sec):", openSec);
         factory.reserveGenesis{gas: GENESIS_RESERVATION_GAS}(_roundParams(timings));
         vm.stopBroadcast();
         vm.startBroadcast();

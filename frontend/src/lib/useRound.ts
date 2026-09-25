@@ -5,6 +5,8 @@ import { factoryAbi, controllerAbi, hookAbi, erc20Abi, stakerAbi, reinvestorAbi 
 import { ADDRESSES, REINVEST_ENABLED } from './config'
 import { createRoundMetadataReader } from './roundMetadata'
 import { rpcCall } from './rpc'
+import { ibcoEnds } from './predeposit'
+import { readPredepositLane } from './predepositState'
 import type { CurveConfig } from './curve'
 import { loadSineCurve, SineCurveData } from './sine'
 
@@ -37,6 +39,17 @@ export interface RoundInfo {
   predepositStartTime: bigint | undefined
   totalPredeposit: bigint | undefined
   predepositCap: bigint | undefined
+  /// greenlist-IBCO (rules v3) lane: live phase 0 green | 1 open | 2 over,
+  /// per-tranche totals/caps, and the window ends (legacy rounds only get
+  /// openEnd = start + PREDEPOSIT_DURATION; green fields stay undefined).
+  predepositPhase: number | undefined
+  greenTotal: bigint | undefined
+  greenPerWallet: bigint | undefined
+  openPerWallet: bigint | undefined
+  greenEnd: bigint | undefined
+  openEnd: bigint | undefined
+  /// the whole IBCO window's length in seconds, both eras.
+  predepositDuration: bigint | undefined
   curve: CurveConfig | undefined
   /// tilted-sine flavor: cached geometry extends locally with the live reserve;
   /// null when the hook runs the legacy zone curve or the RPC failed.
@@ -62,6 +75,8 @@ const EMPTY: RoundInfo = {
   predepositCap: undefined, curve: undefined, flatTime: undefined, sine: null,
   detonationAt: undefined,
   detWindow: undefined,
+  predepositPhase: undefined, greenTotal: undefined, greenPerWallet: undefined, openPerWallet: undefined,
+  greenEnd: undefined, openEnd: undefined, predepositDuration: undefined,
 }
 
 const F = ADDRESSES.factory as `0x${string}`
@@ -112,9 +127,7 @@ function startRoundLoop() {
         rpcCall(rHook, hookAbi, 'reserveMixETH') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'totalSupplyPSP') as Promise<bigint>,
         rpcCall(rStaker, stakerAbi, 'totalLocked') as Promise<bigint>,
-        rpcCall(rController, controllerAbi, 'predepositState') as Promise<
-          [bigint, bigint, bigint, boolean, boolean, boolean, boolean]
-        >,
+        readPredepositLane(rController),
         rpcCall(rController, controllerAbi, 'flatTime') as Promise<bigint>,
         rpcCall(rHook, hookAbi, 'potBalance') as Promise<bigint>,
         (rpcCall(rHook, hookAbi, 'sineActive') as Promise<boolean>).catch(() => false),
@@ -142,6 +155,9 @@ function startRoundLoop() {
           rpcCall(rHook, hookAbi, 'detonationAt') as Promise<bigint>
         ).catch(() => undefined)
       }
+      // greenlist-IBCO: phase facts + window ends off the era-aware lane —
+      // legacy rounds collapse to a single openEnd off PREDEPOSIT_DURATION.
+      const windowEnds = ibcoEnds(pd?.state?.startTime, pd?.facts?.greenSec, pd?.facts?.openSec, pd?.facts?.legacySec, pd?.state?.greenPerWallet)
       shared = {
         readError: undefined,
         reinvestorReady,
@@ -152,12 +168,17 @@ function startRoundLoop() {
         ticketRules,
         swapFeeBps,
         totalLocked,
-        predepositClosed: pd[3], predepositStartTime: pd[2], totalPredeposit: pd[0], predepositCap: pd[1],
-        flatTime,
-        curve: { p0: cfg[0], zones: zones.map((z) => ({ ...z })) },
+        predepositClosed: pd?.state?.closed, predepositStartTime: pd?.state?.startTime,
+        totalPredeposit: pd?.state?.total, predepositCap: pd?.state?.cap,
+        predepositPhase: pd?.state?.phase, greenTotal: pd?.state?.greenTotal,
+        greenPerWallet: pd?.state?.greenPerWallet, openPerWallet: pd?.state?.openPerWallet,
+        ...windowEnds,
+        predepositDuration: windowEnds.openEnd !== undefined && pd?.state?.startTime !== undefined ? windowEnds.openEnd - pd.state.startTime : undefined,
         sine: shared.hook === rHook ? shared.sine : null,
         detonationAt,
         detWindow,
+        flatTime,
+        curve: { p0: cfg[0], zones: zones.map((z) => ({ ...z })) },
       }
       backoffMs = 0
       listeners.forEach((l) => l(shared))

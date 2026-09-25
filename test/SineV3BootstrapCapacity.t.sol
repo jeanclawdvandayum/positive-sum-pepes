@@ -89,7 +89,7 @@ contract SineV3BootstrapCapacityTest is Test {
         uint256 pooled = round.controller.totalPredepositMixETH();
         uint256 count = round.controller.totalPredepositors();
         uint256 controllerBalance = mix.balanceOf(address(round.controller));
-        (uint256 contribution, bool claimed) = round.controller.predeposits(who);
+        (uint256 contribution,, bool claimed) = round.controller.predeposits(who);
         vm.startPrank(who);
         mix.approve(address(round.controller), amount);
         vm.expectRevert(err);
@@ -99,7 +99,7 @@ contract SineV3BootstrapCapacityTest is Test {
         assertEq(mix.balanceOf(address(round.controller)), controllerBalance);
         assertEq(round.controller.totalPredepositMixETH(), pooled);
         assertEq(round.controller.totalPredepositors(), count);
-        (uint256 afterContribution, bool afterClaimed) = round.controller.predeposits(who);
+        (uint256 afterContribution,, bool afterClaimed) = round.controller.predeposits(who);
         assertEq(afterContribution, contribution);
         assertEq(afterClaimed, claimed);
     }
@@ -112,7 +112,7 @@ contract SineV3BootstrapCapacityTest is Test {
         uint256 held = mix.balanceOf(address(factory));
         uint256 pooled = round.controller.totalPredepositMixETH();
         uint256 controllerBalance = mix.balanceOf(address(round.controller));
-        (uint256 contribution, bool claimed) = round.controller.predeposits(address(factory));
+        (uint256 contribution,, bool claimed) = round.controller.predeposits(address(factory));
         vm.startPrank(address(factory));
         mix.approve(address(round.controller), amount);
         vm.expectRevert(RoundController.PredepositCapacityExceeded.selector);
@@ -121,7 +121,7 @@ contract SineV3BootstrapCapacityTest is Test {
         assertEq(mix.balanceOf(address(factory)), held, "rejected carry was transferred");
         assertEq(mix.balanceOf(address(round.controller)), controllerBalance);
         assertEq(round.controller.totalPredepositMixETH(), pooled);
-        (uint256 afterContribution, bool afterClaimed) = round.controller.predeposits(address(factory));
+        (uint256 afterContribution,, bool afterClaimed) = round.controller.predeposits(address(factory));
         assertEq(afterContribution, contribution);
         assertEq(afterClaimed, claimed);
     }
@@ -206,7 +206,7 @@ contract SineV3BootstrapCapacityTest is Test {
         vm.stopPrank();
         assertEq(mix.balanceOf(address(factory)), 1);
         assertEq(round.controller.totalPredepositMixETH(), 9);
-        (uint256 factoryShares,) = round.controller.predeposits(address(factory));
+        (uint256 factoryShares,,) = round.controller.predeposits(address(factory));
         assertEq(factoryShares, 0);
         _launch();
         (uint256 id, uint256 principal) = _claim(alice);
@@ -231,23 +231,27 @@ contract SineV3BootstrapCapacityTest is Test {
     }
 
     function test_ZeroGenesisQuoteCannotAdmitFunds() public {
+        // 10-mix public deposit => 9-mix net boot: zero quote must refuse
         vm.mockCall(address(round.hook),
-            abi.encodeWithSelector(CurveHook.sineGenesisPSP.selector, 450e18), abi.encode(uint256(0)));
-        _rejectDeposit(alice, 500e18);
+            abi.encodeWithSelector(CurveHook.sineGenesisPSP.selector, 9e18), abi.encode(uint256(0)));
+        _rejectDeposit(alice, 10e18);
         vm.clearMockedCalls();
         _deposit(alice, 1);
         _launch();
     }
 
     function test_OpeningPriceCapacityRejectsAllFactoryPriceExtremes() public {
+        // rules v3: the public path hits the 10-mix open wallet cap before
+        // any pooled-cap arithmetic; the carry path still meets the
+        // capacity domain guard itself.
         _newRound(1e9);
-        _rejectDeposit(alice, 24_000_000e18, RoundController.CapExceeded.selector);
+        _rejectDeposit(alice, 24_000_000e18, RoundController.WalletCapExceeded.selector);
         _rejectCarry(24_000_000e18);
         _newRound(75e12);
-        _rejectDeposit(alice, 210_000_000e18, RoundController.CapExceeded.selector);
+        _rejectDeposit(alice, 210_000_000e18, RoundController.WalletCapExceeded.selector);
         _rejectCarry(210_000_000e18);
         _newRound(1e18);
-        _rejectDeposit(alice, 800_000_000e18, RoundController.CapExceeded.selector);
+        _rejectDeposit(alice, 800_000_000e18, RoundController.WalletCapExceeded.selector);
         _rejectCarry(800_000_000e18);
     }
 

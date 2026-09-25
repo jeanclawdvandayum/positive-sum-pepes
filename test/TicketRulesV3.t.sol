@@ -73,12 +73,20 @@ contract TicketRulesV3Test is RealV4Base {
             PSPFactory.Round memory next = factory.getRound(factory.currentRoundId());
             // Public leg fills the pooled cap exactly; the remainder rides
             // the factory's cap-exempt carry so the table still spans a
-            // 2,000-mix launch.
+            // 2,000-mix launch. Rules v3: the tester is not a round-N
+            // holder — wait out the green window, then fill the open
+            // tranche through 10-cap beneficiary wallets.
             uint256 size = gross[i + 1];
             uint256 cap = next.controller.PREDEPOSIT_CAP();
             uint256 publicLeg = size > cap ? cap : size;
-            mixETH.approve(address(next.controller), publicLeg);
-            next.controller.predeposit(publicLeg);
+            skip(next.controller.GREEN_DURATION() + 1);
+            mixETH.approve(address(next.controller), type(uint256).max);
+            uint256 wallets = publicLeg / 10e18;
+            for (uint256 w; w < wallets; ++w) {
+                next.controller.predepositFor(makeAddr(string.concat("tr-", vm.toString(i), "-", vm.toString(w))), 10e18);
+            }
+            uint256 tail = publicLeg - wallets * 10e18;
+            if (tail > 0) next.controller.predepositFor(makeAddr(string.concat("tr-tail-", vm.toString(i))), tail);
             uint256 carryLeg = size - publicLeg;
             if (carryLeg > 0) {
                 mixETH.transfer(address(factory), carryLeg);
@@ -226,6 +234,7 @@ contract TicketRulesV3Test is RealV4Base {
         factory.reserveSpawn(factory.currentRoundId());
         for (uint256 s; s < 3; ++s) factory.birthStep{gas: 16_000_000}();
         PSPFactory.Round memory next = factory.getRound(factory.currentRoundId());
+        skip(next.controller.GREEN_DURATION() + 1); // tester: open phase only
         mixETH.approve(address(next.controller), 0.01e18);
         next.controller.predeposit(0.01e18);
         vm.prank(address(factory));

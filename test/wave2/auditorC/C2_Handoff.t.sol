@@ -46,7 +46,7 @@ contract C2_Handoff is CBase {
 
         PSPFactory.Round memory r2 = factory.getRound(2);
         assertEq(r2.controller.totalPredepositMixETH(), 0, "no carry - round 2 starts from its own raise");
-        (uint256 factoryDeposit,) = r2.controller.predeposits(address(factory));
+        (uint256 factoryDeposit,,) = r2.controller.predeposits(address(factory));
         assertEq(factoryDeposit, 0, "nothing earmarked to factory");
 
         // v5.1: the referral graph resets — round 2 runs a FRESH registry
