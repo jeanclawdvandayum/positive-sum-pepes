@@ -62,7 +62,7 @@
       try {
         const res = await fetch('/api/apply', { method: 'POST', body })
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'submission failed')
-        note.textContent = 'received. one meme per address — re-submitting replaces it.'
+        note.textContent = 'received. one meme per address — that\'s the one that counts.'
         chosen = null; picker.value = ''
         preview.hidden = true
         hint.innerHTML = 'drop an image here<br>or'

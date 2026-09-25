@@ -92,3 +92,9 @@ body { margin: 0; min-height: 100dvh; display: flex; flex-direction: column }
 .gl-sub.denied { border-color: var(--red); opacity: .75 }
 
 html[data-theme='light'] .gl-head .brand strong { color: var(--green) }
+/* the landing page's marker-paint highlight, on the hero words */
+html[data-theme='light'] .gl-hero h1 span {
+  color: var(--ink);
+  background: var(--action);
+  box-shadow: 7px 0 0 var(--action), -3px 0 0 var(--action);
+}

@@ -19,7 +19,7 @@ import { extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url))
-const DATA = join(ROOT, 'data')
+const DATA = process.env.GREENLIST_DATA || join(ROOT, 'data')
 const MEMES = join(DATA, 'memes')
 const PUBLIC = join(ROOT, 'public')
 const ALT = join(ROOT, '..', 'frontend', 'public', 'alt')
@@ -144,23 +144,17 @@ createServer((req, res) => {
       if (!isEth(address)) return json(res, 400, { error: 'a valid ethereum address is required' })
       const kind = meme?.data?.length ? sniff(meme.data) : null
       if (!kind) return json(res, 400, { error: 'attach a png, jpg or jpeg image' })
+      // One submission per address, permanently: an anonymous resubmit
+      // must never be able to replace a meme or reset a decision (a
+      // replaced-and-pending row drops out of the approved export).
+      const existing = db.prepare('SELECT 1 FROM submissions WHERE address = ?').get(address)
+      if (existing) return json(res, 409, { error: 'this address has already submitted a meme' })
       const ext = kind === 'image/png' ? '.png' : '.jpg'
       const name = address.slice(2, 14) + '-' + randomBytes(4).toString('hex') + ext
       writeFileSync(join(MEMES, name), meme.data, { mode: 0o600 })
-      // one submission per address: re-applying replaces the meme and
-      // resets the decision.
-      const old = db.prepare('SELECT meme_file FROM submissions WHERE address = ?').get(address)
       db.prepare(
-        `INSERT INTO submissions (address, meme_file, meme_type, status)
-         VALUES (?, ?, ?, 'pending')
-         ON CONFLICT(address) DO UPDATE SET
-           meme_file = excluded.meme_file,
-           meme_type = excluded.meme_type,
-           status = 'pending'`,
-      ).run(address, name, kind)
-      if (old?.meme_file && old.meme_file !== name) {
-        try { unlinkSync(join(MEMES, old.meme_file)) } catch {}
-      }
+        'INSERT INTO submissions (address, meme_file, meme_type, status) VALUES (?, ?, ?, ?)',
+      ).run(address, name, kind, 'pending')
       json(res, 200, { ok: true })
     })
   }
