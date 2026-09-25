@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>greenlist — positive sum pepes</title>
+<link rel="stylesheet" href="/alt/style.css">
+<link rel="stylesheet" href="/alt/theme.css">
+<link rel="stylesheet" href="/alt/editorial.css">
+<link rel="stylesheet" href="/alt/live.css">
+<link rel="stylesheet" href="/app.css">
+<script>
+// match the alt UI's theme + urgency lanes so the page feels native
+const setTheme = () => document.documentElement.dataset.theme =
+  localStorage.getItem('psp-theme') === 'light' ? 'light' : 'dark'
+setTheme(); addEventListener('storage', setTheme)
+</script>
+</head>
+<body>
+<header class="gl-head">
+  <span class="brand">positive sum<br><strong>pepes</strong></span>
+  <button class="icon-button" id="theme" aria-label="switch theme">☼</button>
+</header>
+
+<main class="gl-main">
+  <section class="gl-hero">
+    <p class="small-heading">the greenlist</p>
+    <h1>earn your<br><span>early seat.</span></h1>
+    <p class="lead">the first day of every IBCO is greenlist-only — the
+    people who get first position on the curve.</p>
+    <p class="gl-copy">two ways in:</p>
+    <ul class="gl-copy">
+      <li><strong>hold PSP when a round detonates.</strong> you are automatically
+      greenlisted for the very next round. nothing to do, nothing to claim.</li>
+      <li><strong>make the team laugh.</strong> submit your wallet and one meme.
+      the best memes earn a spot on the next round's greenlist.</li>
+    </ul>
+    <p class="gl-copy">greenlist members deposit up to 500 ÷ N mixETH on day
+    one; the next day opens to everyone at 10 mixETH per wallet. no personal
+    information is collected — just your address and your meme.</p>
+  </section>
+
+  <section class="gl-form card" id="apply">
+    <h2>submit a meme.</h2>
+    <form id="form">
+      <label class="input-label" for="address">your ethereum address</label>
+      <input id="address" class="amount-field" name="address" spellcheck="false"
+             autocomplete="off" placeholder="0x…" required>
+      <p class="gl-err" id="addr-err" hidden>that doesn't look like an ethereum address.</p>
+
+      <label class="input-label" for="meme">your meme (png · jpg · jpeg, 8MB max)</label>
+      <div class="gl-drop" id="drop">
+        <img id="preview" alt="" hidden>
+        <span id="drop-hint">drop an image here<br>or</span>
+        <button type="button" class="st-btn" id="pick">choose a file</button>
+        <input type="file" id="meme" name="meme" accept=".png,.jpg,.jpeg,image/png,image/jpeg" hidden>
+      </div>
+      <p class="gl-err" id="meme-err" hidden>only png, jpg and jpeg images are accepted.</p>
+
+      <button class="btn" type="submit" id="send">send it in ↗</button>
+      <p class="gl-note" id="note" role="status"></p>
+    </form>
+  </section>
+</main>
+
+<footer class="gl-foot">one meme per address. re-submitting replaces it.
+nothing else is stored.</footer>
+<script src="/app.js"></script>
+</body>
+</html>

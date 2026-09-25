@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>greenlist review — positive sum pepes</title>
+<link rel="stylesheet" href="/alt/style.css">
+<link rel="stylesheet" href="/alt/theme.css">
+<link rel="stylesheet" href="/alt/editorial.css">
+<link rel="stylesheet" href="/alt/live.css">
+<link rel="stylesheet" href="/app.css">
+<script>
+const setTheme = () => document.documentElement.dataset.theme =
+  localStorage.getItem('psp-theme') === 'light' ? 'light' : 'dark'
+setTheme(); addEventListener('storage', setTheme)
+</script>
+</head>
+<body class="gl-admin">
+<header class="gl-head">
+  <span class="brand">positive sum<br><strong>pepes</strong></span>
+  <span class="small-heading">greenlist review</span>
+</header>
+
+<main class="gl-main">
+  <section id="login" class="card gl-login">
+    <h2>admin.</h2>
+    <label class="input-label" for="token">admin token</label>
+    <input id="token" class="amount-field" type="password" autocomplete="off">
+    <button class="btn" id="go">open the pile ↗</button>
+    <p class="gl-note" id="login-err" role="status"></p>
+  </section>
+
+  <section id="desk" hidden>
+    <div class="gl-toolbar">
+      <span id="counts" class="small-heading"></span>
+      <span class="gl-spacer"></span>
+      <button class="st-btn" id="refresh">refresh ↻</button>
+      <a class="btn" id="export" download="greenlist.csv">export approved csv ↘</a>
+    </div>
+    <div id="grid" class="gl-grid"></div>
+    <p class="gl-note" id="desk-note" role="status"></p>
+  </section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>
