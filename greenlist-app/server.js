@@ -194,6 +194,10 @@ createServer((req, res) => {
 
   if (url.pathname === '/') return serveFile(res, join(PUBLIC, 'index.html'))
   if (url.pathname === '/collection') return serveFile(res, join(PUBLIC, 'collection.html'))
+  if (url.pathname === '/paper' || url.pathname === '/rolling-paper.html') {
+    // the tandem release: the rolling paper, served beside the application
+    return serveFile(res, join(ROOT, '..', 'frontend', 'public', 'rolling-paper.html'))
+  }
   if (url.pathname.startsWith('/420/')) {
     const rel = url.pathname.slice('/420/'.length)
     // only the byte-exact compiler + the embedded 420 art state
