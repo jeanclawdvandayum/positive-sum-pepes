@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pepe collection — positive sum pepes</title>
+<link rel="stylesheet" href="/alt/style.css">
+<link rel="stylesheet" href="/alt/theme.css">
+<link rel="stylesheet" href="/alt/editorial.css">
+<link rel="stylesheet" href="/alt/live.css">
+<link rel="stylesheet" href="/app.css">
+<script>
+const setTheme = () => document.documentElement.dataset.theme =
+  localStorage.getItem('psp-theme') === 'light' ? 'light' : 'dark'
+setTheme(); addEventListener('storage', setTheme)
+</script>
+</head>
+<body>
+<header class="gl-head">
+  <span class="brand">positive sum<br><strong>pepes</strong></span>
+  <nav><a class="text-link" href="/">← back to the greenlist</a></nav>
+</header>
+
+<main class="gl-main gl-gallery">
+  <section class="gl-hero">
+    <p class="small-heading">the collection</p>
+    <h1>pick your<br><span>fighter.</span></h1>
+    <p class="lead">every pepe below is a real 420-edition combination. see
+    one you like? right-click it (or long-press on mobile) to copy or save
+    the image, then bring it into your meme.</p>
+  </section>
+  <div class="gl-toolbar">
+    <span id="gallery-sub" class="small-heading"></span>
+    <span class="gl-spacer"></span>
+    <button class="btn" id="reroll">randomize ↻</button>
+  </div>
+  <div id="grid" class="gl-pepes"></div>
+</main>
+
+<script src="/420/compiler.js"></script>
+<script src="/420/defaults.js"></script>
+<script>
+(() => {
+  const C = globalThis.PSPCompiler
+  const ART = globalThis.PSP_DEFAULTS
+  const N = 69
+  const $ = id => document.getElementById(id)
+
+  // identical to the studio's compose: expr/eyes always drawn, stamp id 0 = NONE
+  function compose(art, ids) {
+    const g = art.axes.head[0].grid.map(r => r.slice())
+    const ov = src => { for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (src[y][x]) g[y][x] = src[y][x] }
+    const flat = (axis, id) => { const a = art.axes[axis][id]; if (a) ov(a.grid) }
+    flat('expressions', ids.expr); flat('eyes', ids.eyes)
+    const stamp = (axis, id) => { if (id > 0) { const a = art.axes[axis][id - 1]; if (a) ov(a.grid) } }
+    stamp('hats', ids.hat); stamp('eyewear', ids.wear); stamp('items', ids.item)
+    return g
+  }
+  function palFor(art, p) {
+    const P = art.palettes
+    return C.resolvePalette(P, Math.min(p.skin, P.skins.length - 1),
+      Math.min(p.iris, P.irises.length - 1), Math.min(p.bg, P.backgrounds.length - 1))
+  }
+  function draw(art, ids, scale) {
+    const pal = palFor(art, ids)
+    const grid = compose(art, ids)
+    const cvs = document.createElement('canvas')
+    const px = N * scale
+    cvs.width = px; cvs.height = px
+    const c = cvs.getContext('2d')
+    const bgc = pal[15]
+    c.fillStyle = `rgb(${bgc[0]},${bgc[1]},${bgc[2]})`
+    c.fillRect(0, 0, px, px)
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const v = grid[y][x]
+      if (!v) continue
+      const rgb = pal[v]
+      c.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`
+      c.fillRect(x * scale, y * scale, scale, scale)
+    }
+    return cvs
+  }
+  const rng = seed => { let a = seed >>> 0; return () => {
+    a = (a + 0x6D2B79F5) >>> 0; let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  } }
+
+  const COUNT = 60
+  let seed = Math.floor(Math.random() * 1e9)
+  function render() {
+    const grid = $('grid')
+    grid.innerHTML = ''
+    const r = rng(seed)
+    const ri = n => Math.floor(r() * n)
+    const A = ART.axes, P = ART.palettes
+    const lower = s => s.toLowerCase()
+    for (let k = 0; k < COUNT; k++) {
+      const ids = {
+        expr: ri(A.expressions.length), eyes: ri(A.eyes.length),
+        hat: ri(A.hats.length + 1), wear: ri(A.eyewear.length + 1), item: ri(A.items.length + 1),
+        skin: ri(P.skins.length), iris: ri(P.irises.length), bg: ri(P.backgrounds.length),
+      }
+      const card = document.createElement('div')
+      card.className = 'gl-pepe'
+      card.appendChild(draw(ART, ids, 3))
+      const nm = (axis, id) => lower(A[axis][id - 1]?.name ?? '-')
+      const lbl = document.createElement('div')
+      lbl.className = 'lbl'
+      lbl.textContent = `${lower(A.expressions[ids.expr].name)} · ${nm('hats', ids.hat)} · ${nm('items', ids.item)}`
+      card.appendChild(lbl)
+      grid.appendChild(card)
+    }
+    $('gallery-sub').textContent = `${COUNT} random pepes · seed ${seed}`
+  }
+  $('reroll').addEventListener('click', () => { seed = Math.floor(Math.random() * 1e9); render() })
+  render()
+})()
+</script>
+</body>
+</html>

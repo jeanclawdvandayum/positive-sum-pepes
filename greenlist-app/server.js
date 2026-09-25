@@ -23,6 +23,7 @@ const DATA = process.env.GREENLIST_DATA || join(ROOT, 'data')
 const MEMES = join(DATA, 'memes')
 const PUBLIC = join(ROOT, 'public')
 const ALT = join(ROOT, '..', 'frontend', 'public', 'alt')
+const STUDIO = join(ROOT, '..', 'studio-420')
 const PORT = Number(process.env.PORT || 8421)
 const MAX_BODY = 8 * 1024 * 1024
 
@@ -192,6 +193,15 @@ createServer((req, res) => {
   }
 
   if (url.pathname === '/') return serveFile(res, join(PUBLIC, 'index.html'))
+  if (url.pathname === '/collection') return serveFile(res, join(PUBLIC, 'collection.html'))
+  if (url.pathname.startsWith('/420/')) {
+    const rel = url.pathname.slice('/420/'.length)
+    // only the byte-exact compiler + the embedded 420 art state
+    if (!/^\w+\.js$/.test(rel) || !['compiler.js', 'defaults.js'].includes(rel)) {
+      res.writeHead(404); return res.end()
+    }
+    return serveFile(res, join(STUDIO, rel === 'compiler.js' ? rel : join('src', rel)))
+  }
   if (url.pathname === '/admin') return serveFile(res, join(PUBLIC, 'admin.html'))
   if (url.pathname === '/app.css') return serveFile(res, join(PUBLIC, 'app.css'))
   if (url.pathname === '/app.js') return serveFile(res, join(PUBLIC, 'app.js'))
