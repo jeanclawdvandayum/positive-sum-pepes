@@ -110,3 +110,12 @@ html[data-theme='light'] .gl-hero h1 span {
 }
 .gl-pepe canvas { width: 100%; height: auto; image-rendering: pixelated; display: block }
 .gl-pepe .lbl { margin-top: 8px; font: 700 10px var(--mono); color: var(--muted); text-align: center }
+
+/* prominent collection CTA */
+.gl-collection-btn { margin-top: 22px }
+.gl-strong-link {
+  color: var(--green); font-weight: 700;
+  text-decoration: underline; text-underline-offset: 3px;
+  white-space: nowrap;
+}
+html[data-theme='light'] .gl-strong-link { color: #0c5a34 }
