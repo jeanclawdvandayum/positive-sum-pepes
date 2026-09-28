@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { FlipClock, clockText } from './AltCommon'
+import { FlipClock, clockText, FaucetDripButton } from './AltCommon'
 import { useNow } from '../phase/PhaseEngine'
 import { renderPepeSvg } from '../lib/pepeRender'
 import { dnaOfId } from '../components/PepePicker'
@@ -59,8 +59,12 @@ export default function AltIbcoView(m: AltIbcoModel) {
   const green = m.phaseNow === 0
   const windowSec = m.facts?.greenSec ?? m.facts?.openSec ?? m.facts?.legacySec ?? 0n
   const picked = m.reservedId && m.reservedId > 0n ? m.reservedId : m.pickedId
-  const sharePct = m.amountWad > 0n && total + m.amountWad > 0n
-    ? Number((m.amountWad * 100_000n) / (total + m.amountWad)) / 1000
+  // "your share if it fills" = this wallet's ownership when the pool reaches
+  // the cap — prior deposits + this commit over CAP (mock: 250/1000 = 25%),
+  // never the immediate pool fraction.
+  const ownedIfFilled = (m.myDep?.mixETHAmount ?? 0n) + m.amountWad
+  const sharePct = cap > 0n
+    ? Math.min(100, Number((ownedIfFilled * 100_000n) / cap) / 1000)
     : 0
   const potCut = m.amountWad * POT_BPS / 10_000n
   const curveCut = m.amountWad - potCut
@@ -183,14 +187,17 @@ export default function AltIbcoView(m: AltIbcoModel) {
               {m.error && <p className="slip-error" role="alert">{m.error}</p>}
               {m.launchable && m.onLaunch && <button type="button" className="btn slip-launch" onClick={m.onLaunch}>launch the pooled buy ↗</button>}
               <button type="button" className="btn slip-submit" disabled={!m.canSubmit} onClick={m.onSubmit}>
-                {m.busy ? 'confirm in wallet…' : picked != null && amt
-                  ? `commit ${wadToExact(m.amountWad)} mixETH · book suspect #${fmtPepeId(picked)}`
-                  : m.stepLabel}
+                {m.busy ? 'confirm in wallet…'
+                  // decorative wording ONLY in the valid ready state; every
+                  // blocking/approval state keeps its authoritative label
+                  : m.canSubmit && picked != null && amt
+                    ? `commit ${wadToExact(m.amountWad)} mixETH · book suspect #${fmtPepeId(picked)}`
+                    : m.stepLabel}
               </button>
               <div className="slip-frog-money">
                 <span>✂ short on frog money?</span>
                 <span className="frog-actions">
-                  <button type="button" className="st-btn">get mixETH</button>
+                  <FaucetDripButton className="st-btn" />
                   <a href="https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet" target="_blank" rel="noreferrer">get base sepolia ETH ↗</a>
                 </span>
               </div>

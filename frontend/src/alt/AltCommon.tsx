@@ -50,17 +50,27 @@ export function FlipClock({ text, className = '' }: { text: string; className?: 
   )
 }
 export function Faucet() {
+  if (!FAUCET_ENABLED) return null
+  return <div className="alt-faucet"><span>need mixETH?</span><FaucetDripButton className="tx-action"/></div>
+}
+
+/** The confirmed faucet write as a standalone button (the IBCO slip's
+ *  "get mixETH" reuses it; gated by FAUCET_ENABLED). */
+export function FaucetDripButton({ className = 'st-btn' }: { className?: string }) {
   const { isConnected } = useAccount()
   const { writeContractAsync } = useConfirmedWrite()
-  const [busy,setBusy] = useState(false)
-  const [error,setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   if (!FAUCET_ENABLED) return null
-  return <div className="alt-faucet"><span>need mixETH?</span><button className="tx-action" disabled={!isConnected || busy} onClick={async()=>{
-    setBusy(true); setError('')
-    try { await writeContractAsync({address:ADDRESSES.faucet,abi:faucetAbi,functionName:'drip',args:[1000n*10n**18n]}) }
-    catch(e) { setError(e instanceof Error ? e.message : 'Request failed.') }
-    finally { setBusy(false) }
-  }}>{busy?'confirming…':'get mixETH ↗'}</button>{error&&<p role="alert">{error}</p>}</div>
+  return <>
+    <button className={className} disabled={!isConnected || busy} onClick={async () => {
+      setBusy(true); setError('')
+      try { await writeContractAsync({ address: ADDRESSES.faucet, abi: faucetAbi, functionName: 'drip', args: [1000n * 10n ** 18n] }) }
+      catch (e) { setError(e instanceof Error ? e.message : 'Request failed.') }
+      finally { setBusy(false) }
+    }}>{busy ? 'confirming…' : 'get mixETH'}</button>
+    {error && <p role="alert" className="slip-error">{error}</p>}
+  </>
 }
 export function Instrument() {
   const round=useRound(), board=useLadderBoard(round.hook), now=useNow()
