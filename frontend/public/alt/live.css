@@ -232,7 +232,7 @@ html[data-theme=light] .alt-shell :is(.alt-stake,.alt-graveyard) button.stc-btn-
 
 /* ── stake page ── */
 .stv-body{display:flex;flex-direction:column;gap:22px;padding-bottom:56px}
-.stv-overview{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:18px 22px;background:var(--surface);border:1.5px solid var(--line-strong)}
+.stv-overview{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:18px 22px;background:var(--surface);border:1.5px solid var(--line-strong);box-shadow:5px 5px 0 var(--shadow)}
 .stv-stats{display:flex;gap:clamp(18px,3.4vw,44px);flex-wrap:wrap;font-family:var(--mono)}
 .stv-stat{display:flex;flex-direction:column;gap:2px}
 .stv-stat-num{font-size:20px;color:var(--ink)}
@@ -400,7 +400,7 @@ html[data-theme=light] .grv-winner-pot{color:var(--ink)}
 .grv-paperwork-head{display:flex;justify-content:space-between;align-items:baseline;gap:18px;flex-wrap:wrap}
 .grv-paperwork-head h2{margin:0;font-size:clamp(28px,3.2vw,40px)}
 .grv-forms{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start}
-.grv-form{background:var(--surface);border:1.5px solid var(--line-strong);display:flex;flex-direction:column}
+.grv-form{background:var(--surface);border:1.5px solid var(--line-strong);box-shadow:5px 5px 0 var(--shadow);display:flex;flex-direction:column}
 .grv-form-head{padding:12px 18px;border-bottom:1.5px solid var(--line-strong);display:flex;justify-content:space-between;font:12px var(--mono);color:var(--muted)}
 .grv-form-body{padding:18px;display:flex;flex-direction:column;gap:12px;flex-grow:1}
 .grv-form-body h3{margin:0;font-size:clamp(20px,1.9vw,26px)}
@@ -421,7 +421,10 @@ html[data-theme=light] .grv-winner-pot{color:var(--ink)}
 .grv-dead-art{position:relative;width:72px}
 .grv-dead-art .grv-thumb-art{width:72px;height:72px;filter:grayscale(1) sepia(.2)}
 .grv-dead-tag{position:absolute;right:-6px;bottom:-8px;font:10px var(--mono);padding:3px 6px;background:color-mix(in srgb,var(--amber) 30%,var(--panel));border:1px solid var(--line-strong);transform:rotate(-8deg)}
-.grv-next{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 20px;border:2px dashed var(--line-strong);color:var(--ink);text-decoration:none;transform:rotate(-.6deg)}
+/* the deposit slip is a paper card like the others — carries the hard
+   shadow (the .alt-shell .card reset kills tailwind's soft one) */
+.alt-shell .ibco-slip.card{box-shadow:5px 5px 0 var(--shadow)}
+.grv-next{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:28px;padding:16px 20px;border:2px dashed var(--line-strong);color:var(--ink);text-decoration:none;transform:rotate(-.6deg)}
 .grv-next:hover{color:var(--ink)}
 .grv-next-label{font:14px var(--mono)}
 .grv-next-cta{font-size:14px;color:var(--good)}
@@ -502,7 +505,7 @@ html:not([data-urgency=idle]) .clockbox{box-shadow:6px 6px 0 var(--time-lit)}
 
 /* ── referral chain illustration + link row (mockup F-2/3 · G-7/8) ── */
 .stv-ref{display:flex;flex-direction:column;gap:14px;min-width:0}
-.stv-refchart{position:relative;height:180px;background:var(--raised);border:1.5px solid var(--line-strong);overflow:hidden}
+.stv-refchart{position:relative;height:180px;background:var(--raised);border:1.5px solid var(--line-strong);box-shadow:5px 5px 0 var(--shadow);overflow:hidden}
 .stv-ref-path{position:absolute;inset:0;width:100%;height:100%}
 .stv-ref-path path{stroke:var(--red);stroke-width:2;fill:none}
 .stv-ref-chip{position:absolute;display:flex;flex-direction:column;align-items:center;gap:6px;font:11px var(--mono);color:var(--ink)}
