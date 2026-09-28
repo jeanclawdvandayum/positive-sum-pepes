@@ -2,7 +2,7 @@ import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 import { useEffect, useState } from 'react'
 import { fmtPepeId } from '../lib/format'
 import { useAccount } from 'wagmi'
-import { stakerAbi, descriptorAbi } from '../lib/abi'
+import { stakerAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
 import { renderPepeSvg, renderDecorativePepeSvg } from '../lib/pepeRender'
 import type { RoundInfo } from '../lib/useRound'
@@ -43,16 +43,8 @@ export default function PepePanel({ round, refreshKey = 0 }: Props) {
         const d = (await rpcCall(staker!, stakerAbi, 'dnaOf', [id])) as bigint
         if (dead) return
         setDna(d)
-        const desc = (await rpcCall(staker!, stakerAbi, 'descriptor')) as `0x${string}`
-        if (dead) return
-        if (!isZero(desc)) {
-          const art = (await rpcCall(desc, descriptorAbi, 'renderSVG', [d])) as string
-          if (dead) return
-          setSvg(art)
-          setArtOnline(true)
-        } else {
-          setArtOnline(false)
-        }
+        // art renders locally from the bundled data (dna on-chain, image off)
+        setArtOnline(true)
       } catch {
         /* staker not resolvable — keep last */
       }

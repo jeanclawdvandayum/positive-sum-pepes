@@ -1,5 +1,5 @@
 import { keccak256, toHex } from 'viem'
-import { descriptorAbi, stakerAbi } from './abi.ts'
+import { stakerAbi } from './abi.ts'
 
 type Address = `0x${string}`
 type Read = (to: Address, abi: readonly unknown[], name: string, args?: readonly unknown[]) => Promise<unknown>
@@ -17,7 +17,6 @@ export const walletPepeKey = (address: Address, staker?: Address) =>
 /** Recheck ownership every poll; cache only immutable art for the same renderer
  * and DNA. Failed reads are retried instead of becoming a permanent "no NFT". */
 export function createWalletPepeReader(read: Read) {
-  let art: { key: string; svg: string } | undefined
   return async (address: Address, staker?: Address): Promise<WalletPepe> => {
     const fallback = { dna: addressPepeDna(address) }
     if (!staker || /^0x0*$/.test(staker)) return fallback
@@ -28,24 +27,15 @@ export function createWalletPepeReader(read: Read) {
       try { return { dna: await read(staker, stakerAbi, 'genesisPepeDna', [address]) as bigint } }
       catch { return fallback }
     }
-    const [owner, dna, descriptor] = await Promise.all([
+    const [owner, dna] = await Promise.all([
       read(staker, stakerAbi, 'ownerOf', [tokenId]) as Promise<Address>,
       read(staker, stakerAbi, 'dnaOf', [tokenId]) as Promise<bigint>,
-      (read(staker, stakerAbi, 'descriptor') as Promise<Address>).catch(() => undefined),
     ])
     // A transfer between the primary lookup and the ownership read invalidates it.
     if (owner.toLowerCase() !== address.toLowerCase()) return fallback
-    const nft = { tokenId, dna }
-    if (!descriptor || /^0x0*$/.test(descriptor)) return nft
-    const key = `${staker.toLowerCase()}:${descriptor.toLowerCase()}:${dna}`
-    if (art?.key === key) return { ...nft, svg: art.svg }
-    try {
-      const svg = await read(descriptor, descriptorAbi, 'renderSVG', [dna]) as string
-      art = { key, svg }
-      return { ...nft, svg }
-    } catch {
-      // Keep the owned NFT's DNA when the renderer is temporarily unavailable.
-      return nft
-    }
+    // The chain is the source of truth for the DNA only; the pepe image is
+    // rendered locally from the bundled art data (no descriptor/renderSVG
+    // RPC per NFT) — useWalletPepe resolves the art by the round's version.
+    return { tokenId, dna }
   }
 }

@@ -17,7 +17,7 @@ import Stake from '../pages/Stake'
 import Predeposit from '../pages/Predeposit'
 import ActionFxLayer from './ActionFxLayer'
 import VictoryModal from './VictoryModal'
-import { RandomPepe, clockText } from './AltCommon'
+import { RandomPepe, clockText, FlipClock } from './AltCommon'
 
 // Dev-only QA stage for the FX catalog; the DEV guard (plus lazy import) keeps
 // it out of production builds entirely.
@@ -35,7 +35,23 @@ export default function AltShell() {
  const {resolved,setMode}=useTheme(), round=useRound(), now=useNow(), location=useLocation()
  const [menu,setMenu]=useState(false)
  // Feature 2 (10): the wallet pepe chip breathes only while a tx is in flight.
- const toasts=useSyncExternalStore(transactionToasts.subscribe,transactionToasts.snapshot)
+ /** Top-bar countdown: a pocket flip board (same tiles, smaller) that shows
+ *  the live round's deadline while you're anywhere BUT the play page — on
+ *  play itself the big clock owns the countdown, so the mini retires. */
+function MiniClock({ round, hidden }: { round: ReturnType<typeof useRound>, hidden: boolean }) {
+  const now = useNow()
+  // mode 1: the detonation clock. mode 0: the IBCO window (green counts to
+  // the open phase, open/legacy to the window end) — same lane as Instrument.
+  const deadline = round.mode === 0
+    ? (round.greenEnd !== undefined && now < Number(round.greenEnd)
+        ? round.greenEnd
+        : round.openEnd)
+    : round.detonationAt
+  if (hidden || (round.mode ?? 1) >= 2 || deadline === undefined || round.mode === undefined && round.detonationAt === undefined) return null
+  return <span className="mini-flip" aria-label={round.mode === 0 ? 'countdown to the IBCO window close' : 'countdown to detonation'}><FlipClock text={clockText(Math.max(0, Number(deadline) - now))} /></span>
+}
+
+const toasts=useSyncExternalStore(transactionToasts.subscribe,transactionToasts.snapshot)
  const txPending=toasts.some(t=>TX_PENDING_STAGES.includes(t.stage))
  const navigate=useNavigate()
  const slideNav=(to:string)=>SLIDE_NAV?{onClick:(event:ReactMouseEvent<HTMLAnchorElement>)=>{
@@ -58,5 +74,5 @@ export default function AltShell() {
    ?urgencyFor(Math.max(0,Number(round.openEnd)-now),Number(round.openEnd-(round.greenEnd??round.predepositStartTime)))
    :'idle'
  useEffect(()=>{document.documentElement.dataset.urgency=urgency},[urgency])
- return <div className="alt-shell">{['style','theme','diagrams','editorial','live','polish','fx','detonation'].map(name=><link key={name} rel="stylesheet" href={`/alt/${name}.css`}/>)}<header className="site-header"><Link className="brand" to="/"><RandomPepe/><span><span className="brand-mark">positive</span> sum<br/><strong>pepes</strong></span></Link><nav className={menu?'open':''} aria-label="Main navigation">{[['/','explainer'],['/play','play'],['/stake','stake'],['/graveyard','graveyard']].map(([to,label])=><NavLink key={to} to={to} end {...slideNav(to)}>{label}<span className="nav-underline" aria-hidden="true"/></NavLink>)}{round.mode===0&&<NavLink to="/predeposit" {...slideNav('/predeposit')}>IBCO<span className="nav-underline" aria-hidden="true"/></NavLink>}</nav><div className="header-tools"><span className="mini-clock">{round.mode===1?clockText(remaining):''}</span><button className="icon-button" aria-label={`Switch to ${resolved==='dark'?'light':'dark'} theme`} onClick={()=>setMode(resolved==='dark'?'light':'dark')}>☼</button><ConnectButton.Custom>{({account,chain,openConnectModal,openAccountModal,openChainModal,mounted})=><button className="wallet-button" data-tx-pending={txPending||undefined} disabled={!mounted} onClick={!account?openConnectModal:chain?.unsupported?openChainModal:openAccountModal}>{account?<><WalletPepeArt className="wallet-art" address={account.address as `0x${string}`} staker={round.staker}/><span className="wallet-label"><WalletName address={account.address as `0x${string}`}/></span></>:'connect wallet'}<span>↗</span></button>}</ConnectButton.Custom><button className="icon-button menu-toggle" aria-label="Toggle navigation" aria-expanded={menu} onClick={()=>setMenu(v=>!v)}>☰</button></div></header><main id="app">{round.readError&&<p className="notice" role="status">{round.readError}</p>}<Routes><Route path="/" element={<AltLanding/>}/><Route path="/play" element={<AltPlay/>}/><Route path="/stake" element={<Stake variant="alt"/>}/><Route path="/predeposit" element={<Predeposit variant="alt"/>}/><Route path="/graveyard" element={<AltGraveyard/>}/>{FxLab&&<Route path="/fx-lab" element={<Suspense fallback={null}><FxLab/></Suspense>}/>}<Route path="*" element={<AltLanding/>}/></Routes></main><footer><Link className="footer-wordmark" to="/">positive sum pepes<span>the frogs have a pot problem.</span></Link><div className="footer-links"><a href="/rolling-paper.html">rolling paper ↗</a><Link to="/graveyard">past rounds ↗</Link><a href={`${targetChain.blockExplorers?.default.url??''}/address/${ADDRESSES.factory}`} target="_blank" rel="noreferrer">contracts ↗</a></div><span className="footer-bottom">made of pixels and math.<span>round {round.id.toString()}</span></span></footer><ActionFxLayer/><VictoryModal/></div>
+ return <div className="alt-shell">{['style','theme','diagrams','editorial','live','polish','fx','detonation'].map(name=><link key={name} rel="stylesheet" href={`/alt/${name}.css`}/>)}<header className="site-header"><Link className="brand" to="/"><RandomPepe/><span><span className="brand-mark">positive</span> sum<br/><strong>pepes</strong></span></Link><nav className={menu?'open':''} aria-label="Main navigation">{[['/','explainer'],['/play','play'],['/stake','stake'],['/graveyard','graveyard']].map(([to,label])=><NavLink key={to} to={to} end {...slideNav(to)}>{label}<span className="nav-underline" aria-hidden="true"/></NavLink>)}{round.mode===0&&<NavLink to="/predeposit" {...slideNav('/predeposit')}>IBCO<span className="nav-underline" aria-hidden="true"/></NavLink>}</nav><div className="header-tools"><MiniClock round={round} hidden={location.pathname==="/play" || location.pathname==="/trade"} /><span className="mini-clock">{round.mode===1?clockText(remaining):''}</span><button className="icon-button" aria-label={`Switch to ${resolved==='dark'?'light':'dark'} theme`} onClick={()=>setMode(resolved==='dark'?'light':'dark')}>☼</button><ConnectButton.Custom>{({account,chain,openConnectModal,openAccountModal,openChainModal,mounted})=><button className="wallet-button" data-tx-pending={txPending||undefined} disabled={!mounted} onClick={!account?openConnectModal:chain?.unsupported?openChainModal:openAccountModal}>{account?<><WalletPepeArt className="wallet-art" address={account.address as `0x${string}`} staker={round.staker}/><span className="wallet-label"><WalletName address={account.address as `0x${string}`}/></span></>:'connect wallet'}<span>↗</span></button>}</ConnectButton.Custom><button className="icon-button menu-toggle" aria-label="Toggle navigation" aria-expanded={menu} onClick={()=>setMenu(v=>!v)}>☰</button></div></header><main id="app">{round.readError&&<p className="notice" role="status">{round.readError}</p>}<Routes><Route path="/" element={<AltLanding/>}/><Route path="/play" element={<AltPlay/>}/><Route path="/stake" element={<Stake variant="alt"/>}/><Route path="/predeposit" element={<Predeposit variant="alt"/>}/><Route path="/graveyard" element={<AltGraveyard/>}/>{FxLab&&<Route path="/fx-lab" element={<Suspense fallback={null}><FxLab/></Suspense>}/>}<Route path="*" element={<AltLanding/>}/></Routes></main><footer><Link className="footer-wordmark" to="/">positive sum pepes<span>the frogs have a pot problem.</span></Link><div className="footer-links"><a href="/rolling-paper.html">rolling paper ↗</a><Link to="/graveyard">past rounds ↗</Link><a href={`${targetChain.blockExplorers?.default.url??''}/address/${ADDRESSES.factory}`} target="_blank" rel="noreferrer">contracts ↗</a></div><span className="footer-bottom">made of pixels and math.<span>round {round.id.toString()}</span></span></footer><ActionFxLayer/><VictoryModal/></div>
 }

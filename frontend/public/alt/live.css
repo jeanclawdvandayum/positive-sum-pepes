@@ -353,7 +353,11 @@ html[data-theme=light] .stv-lineup [data-pepe-grid]>button::after{color:var(--pa
 .grv-status{padding:8px 0;font-size:14px;color:var(--muted)}
 .grv-round{display:flex;flex-direction:column;gap:20px}
 .grv-hero{padding:34px 38px 38px;background:var(--raised);border:1.5px solid var(--line-strong);display:grid;grid-template-columns:minmax(280px,420px) minmax(0,1fr);gap:44px}
-.grv-receipt{position:relative;display:flex;flex-direction:column;transform:rotate(-1.5deg);filter:drop-shadow(6px 6px 0 var(--shadow))}
+.grv-receipt{position:relative;display:flex;flex-direction:column;transform:rotate(-1.5deg)}
+/* hard shadow on the PAPER only: a filter drop-shadow traced the zigzag
+   teeth too, pushing the bottom shadow one tooth lower than the mock and
+   breaking the torn edge illusion. */
+.grv-receipt-paper{box-shadow:6px 6px 0 var(--shadow)}
 .grv-receipt-paper{background:var(--surface);padding:24px 26px 16px;display:flex;flex-direction:column;gap:8px;font:13px var(--mono)}
 html[data-theme=dark] .grv-receipt-paper,html:not([data-theme]) .grv-receipt-paper{background:color-mix(in srgb,var(--raised) 55%,var(--bg))}
 .grv-receipt-title{text-align:center;font-family:var(--display);font-size:clamp(19px,1.8vw,26px);line-height:1.15}
@@ -367,7 +371,8 @@ html[data-theme=dark] .grv-receipt-paper,html:not([data-theme]) .grv-receipt-pap
 .grv-total{display:flex;justify-content:space-between;font-weight:600;font-size:16px}
 .grv-receipt-meta{display:flex;justify-content:space-between;color:var(--muted)}
 .grv-barcode{margin-top:8px;color:var(--ink)}
-.grv-receipt-teeth{height:14px;background:linear-gradient(45deg,transparent 7px,var(--raised) 0) 0 0/14px 14px,linear-gradient(-45deg,transparent 7px,var(--raised) 0) 0 0/14px 14px}
+.grv-receipt-teeth{height:14px;background:linear-gradient(45deg,transparent 7px,var(--surface) 0) 0 0/14px 14px,linear-gradient(-45deg,transparent 7px,var(--surface) 0) 0 0/14px 14px;margin-top:-1px}
+html[data-theme=dark] .grv-receipt-teeth,html:not([data-theme]) .grv-receipt-teeth{background:linear-gradient(45deg,transparent 7px,color-mix(in srgb,var(--raised) 55%,var(--bg)) 0) 0 0/14px 14px,linear-gradient(-45deg,transparent 7px,color-mix(in srgb,var(--raised) 55%,var(--bg)) 0) 0 0/14px 14px}
 .grv-stamp{position:absolute;right:-20px;top:160px;padding:8px 14px;border:4px solid var(--red);color:var(--red);transform:rotate(-18deg);font:600 22px var(--mono);letter-spacing:.24em;background:color-mix(in srgb,var(--panel) 60%,transparent);pointer-events:none}
 .grv-hall{display:flex;flex-direction:column;gap:24px;min-width:0}
 .grv-hall-head{display:flex;flex-direction:column;gap:8px}

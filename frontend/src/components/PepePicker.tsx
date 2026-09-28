@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { keccak256, toHex } from 'viem'
-import { stakerAbi, descriptorAbi } from '../lib/abi'
+import { stakerAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
 import { renderPepeSvg } from '../lib/pepeRender'
 import type { RoundInfo } from '../lib/useRound'
@@ -9,8 +9,6 @@ import { PixelIcon } from './PixelIcon'
 import { CHAIN_ID } from '../lib/config'
 import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 import { fmtPepeId } from '../lib/format'
-
-const isZero = (a: string | undefined) => !a || /^0x0+$/.test(a)
 
 /// DNA of an unminted candidate ID. Owned NFTs must read dnaOf on-chain:
 /// automatic mints can receive different available art after a collision.
@@ -31,17 +29,15 @@ interface Props {
   attention?: boolean
 }
 
-/// The art randomizer — 6 candidate pepes rendered by the ON-CHAIN descriptor
-/// (eth_call renderSVG(keccak(id))). What you see is exactly what you'll mint:
-/// lockWithPepe(amount, id) commits that id, and its dna is the previewed dna.
+/// The art randomizer — 6 candidate pepes rendered LOCALLY from the bundled
+/// art data (dna = keccak(id), the exact dna the round will mint). The chain
+/// is consulted only for availability (isPepeAvailable) and the round's DNA
+/// version; no per-tile renderSVG eth_calls.
 /// Refresh rolls 6 fresh ids. This is the "choose your accomplice" step of staking.
 export default function PepePicker({ round, selected, onSelect, seed, onReroll, disabled = false, actionLabel = 'stake', attention }: Props) {
   const staker = round.staker
   const dnaVersion = usePepeDnaVersion(staker)
-  const [descriptorResult, setDescriptor] = useState<{ staker: string; value: string }>()
-  const descriptor = descriptorResult?.staker === staker ? descriptorResult?.value : undefined
   const [svgs, setSvgs] = useState<Record<string, string>>({})
-  const [localMode, setLocalMode] = useState(false)
 
   // candidate ids: random uints in a range that never collides with the
   // sequential counter's early ids — user-entropy territory.
@@ -63,55 +59,18 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll, 
     queryFn: () => Promise.all(candidates.map(id => rpcCall(staker!, stakerAbi, 'isPepeAvailable', [id]) as Promise<boolean>)),
     refetchInterval: 6000,
   })
+  // render all candidates locally (bundled art data, round DNA version)
   useEffect(() => {
-    if (!disabled && selected !== null && (!candidates.includes(selected) || available?.[candidates.indexOf(selected)] === false)) onSelect(null)
-  }, [selected, available, candidates, onSelect, disabled])
-
-  useEffect(() => {
-    if (!staker || isZero(staker)) return
-    let active = true
-    rpcCall(staker, stakerAbi, 'descriptor')
-      .then((d) => { if (active) setDescriptor({ staker, value: d as string }) })
-      .catch(() => { if (active) setDescriptor(undefined) })
-    return () => { active = false }
-  }, [staker])
-
-  // no descriptor / chain down? render locally from the same art data the
-  // contract renders — the picker never shows empty tiles
-  useEffect(() => {
-    if (descriptor && !isZero(descriptor)) {
-      setLocalMode(false)
-      return
-    }
     if (dnaVersion === undefined) { setSvgs({}); return }
     const next: Record<string, string> = {}
     for (const id of candidates) next[id.toString()] = renderPepeSvg(dnaOfId(id), dnaVersion)
     setSvgs(next)
-    setLocalMode(true)
-  }, [descriptor, candidates, dnaVersion])
+  }, [candidates, dnaVersion])
 
   useEffect(() => {
-    if (!descriptor || isZero(descriptor)) return
-    let dead = false
-    const next: Record<string, string> = {}
-    const descAddr = descriptor as `0x${string}`
-    Promise.all(
-      candidates.map(async (id) => {
-        const dna = dnaOfId(id)
-        const svg = (await rpcCall(descAddr, descriptorAbi, 'renderSVG', [dna])) as string
-        next[id.toString()] = svg
-      }),
-    )
-      .then(() => {
-        if (!dead) setSvgs(next)
-      })
-      .catch(() => {
-        /* keep whatever rendered */
-      })
-    return () => {
-      dead = true
-    }
-  }, [descriptor, candidates, dnaVersion])
+    if (!disabled && selected !== null && (!candidates.includes(selected) || available?.[candidates.indexOf(selected)] === false)) onSelect(null)
+  }, [selected, available, candidates, onSelect, disabled])
+
 
   return (
     <div className="rounded-2xl border border-line bg-bg-1 p-4" data-attention={attention === undefined ? undefined : String(attention)}>
@@ -119,9 +78,7 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll, 
         <div className="min-w-0">
           <h2 className="font-display text-lg text-text-hi">choose your accomplice</h2>
           <p className="text-xs leading-relaxed text-text-lo">
-            {localMode
-              ? 'local preview · pick the pepe you’ll mint'
-              : 'pick a face for your financial decisions. this is the pepe you’ll mint.'}
+            {'pick a face for your financial decisions. this is the pepe you’ll mint.'}
           </p>
         </div>
         <button
