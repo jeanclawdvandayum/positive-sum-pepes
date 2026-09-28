@@ -40,6 +40,12 @@ function FlipTile({ ch }: { ch: string }) {
   const [flipping, setFlipping] = useState(false)
   useEffect(() => {
     if (ch === prev) return
+    // reduced motion: no flap sequence — both halves show the new digit at
+    // once (a flip state would tear top-new/bottom-old for its duration)
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setPrev(ch)
+      return
+    }
     setFlipping(true)
     const t = setTimeout(() => { setPrev(ch); setFlipping(false) }, 300)
     return () => clearTimeout(t)
@@ -65,7 +71,7 @@ function FlipTile({ ch }: { ch: string }) {
  *  reduced-motion falls back to the static mock. */
 export function FlipClock({ text, className = '' }: { text?: string; className?: string }) {
   return (
-    <div className={`clock alt-clock flip-clock ${className}`.trim()} role="timer" aria-label="countdown">
+    <div className={`clock alt-clock flip-clock ${className}`.trim()} role="timer" aria-label={`countdown ${text ?? '--:--:--'}`}>
       {(text ?? '--:--:--').split('').map((ch, i) => <FlipTile key={i} ch={ch} />)}
     </div>
   )
