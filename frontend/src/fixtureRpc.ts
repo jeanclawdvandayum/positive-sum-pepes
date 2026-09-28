@@ -62,6 +62,10 @@ const state: Record<string, unknown> = {
   ownerOf: seatAddress(0),
   dnaOf: 0x0123456789abcdefn,
   PEPE_DNA_VERSION: 3n,
+  SINE_RULES_VERSION: 3n,
+  // the seven-field v3 shape pinned by tests/sine-chart.test.mjs
+  sineV3Info: [3n, 75000000000000n, 450n * 10n ** 18n, 955n * 10n ** 18n,
+    10000n * 10n ** 18n, 7711482365186207164818799n, '0x0000000000000000000000000000000000000001'],
 }
 
 export const rpcCall = async (

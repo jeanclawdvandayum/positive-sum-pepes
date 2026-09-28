@@ -7,9 +7,9 @@ import { logTicks } from '../lib/chartTicks'
 
 type YMode = 'price' | 'supply'
 
-const W = 640
-const H = 440
-const PAD = { l: 64, r: 16, t: 16, b: 40 }
+const GEO_CLASSIC = { W: 640, H: 440, PAD: { l: 64, r: 16, t: 16, b: 40 } }
+// the refined-play board: the mock's wide 1136×330 panel (F-Play)
+const GEO_ALT = { W: 1136, H: 330, PAD: { l: 70, r: 6, t: 30, b: 50 } }
 
 // Large reserve ranges can span many price decades; keep labels inside the plot.
 const chartPrice = (wad: bigint | undefined) => wad !== undefined && wad >= 10_000n * 10n ** 18n
@@ -23,6 +23,9 @@ type ChartProps = {
   /** alt shell: stretch the plot to fill its (short, wide) band instead of
    *  letterboxing the square viewBox — the refined mocks' pulse band. */
   fillBand?: boolean
+  /** 'alt' renders the refined-play skin: fixed aspect (no font stretch)
+   *  and the rotated YOU ARE HERE stamp at the live point. */
+  variant?: 'classic' | 'alt'
 }
 
 export default function CurveChart(props: ChartProps) {
@@ -30,7 +33,8 @@ export default function CurveChart(props: ChartProps) {
   return <CurveChartView {...props} round={round} />
 }
 
-export function CurveChartView({ round, hasTrades = true, entryPrice, fillBand = false }: ChartProps & { round: RoundInfo }) {
+export function CurveChartView({ round, hasTrades = true, entryPrice, fillBand = false, variant = 'classic' }: ChartProps & { round: RoundInfo }) {
+  const { W, H, PAD } = variant === 'alt' ? GEO_ALT : GEO_CLASSIC
   const [yMode, setYMode] = useState<YMode>('price')
   // axis default by curve family (2026-08-29): zone teeth read literally on
   // LINEAR axes; the tilted sine spans 4 decades — the staircase of plateaus
@@ -159,8 +163,12 @@ export function CurveChartView({ round, hasTrades = true, entryPrice, fillBand =
   // (anchor crosshairs removed 2026-08-19 — decade x-ticks carry the ladder)
 
   function onMove(e: React.MouseEvent<SVGSVGElement>) {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const px = ((e.clientX - rect.left) / rect.width) * W
+    // CTM mapping (not rect ratios): letterboxed or scaled boards resolve
+    // the pointer through the SVG's own user-space transform
+    const ctm = e.currentTarget.getScreenCTM()
+    const px = ctm
+      ? new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse()).x
+      : (() => { const rect = e.currentTarget.getBoundingClientRect(); return ((e.clientX - rect.left) / rect.width) * W })()
     const frac = (px - PAD.l) / (W - PAD.l - PAD.r)
     const r = lin
       ? frac * xMax
@@ -221,7 +229,7 @@ export function CurveChartView({ round, hasTrades = true, entryPrice, fillBand =
       {pts.length > 0 ? (
         <svg
           viewBox={`0 0 ${W} ${H}`}
-          preserveAspectRatio={fillBand ? 'none' : undefined}
+          preserveAspectRatio={fillBand && variant !== 'alt' ? 'none' : undefined}
           className="mt-3 w-full touch-none select-none"
           onMouseMove={onMove}
           onMouseLeave={() => setHover(null)}
@@ -338,6 +346,12 @@ export function CurveChartView({ round, hasTrades = true, entryPrice, fillBand =
                 stroke="var(--text-hi)"
                 strokeWidth="1.5"
               />
+              {variant === 'alt' && (
+                <g className="curve-stamp" transform={`translate(${liveX - 180} ${PAD.t + 86}) rotate(-7)`}>
+                  <rect x="0" y="0" width="160" height="40" className="curve-stamp-box" />
+                  <text x="80" y="26" textAnchor="middle" className="curve-stamp-text">YOU ARE HERE</text>
+                </g>
+              )}
             </g>
           )}
 
@@ -394,6 +408,7 @@ export function CurveChartView({ round, hasTrades = true, entryPrice, fillBand =
 /// correctly in linear and log modes without touching scale math. Renders
 /// only while the price is inside the visible y window.
 function EntryMark({ price, sy }: { price: number; sy: (v: number) => number }) {
+  const { W, H, PAD } = GEO_CLASSIC
   const y = sy(price)
   if (!Number.isFinite(y) || y < PAD.t + 6 || y > H - PAD.b - 2) return null
   return (

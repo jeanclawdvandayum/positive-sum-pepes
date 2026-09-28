@@ -659,3 +659,21 @@ body.alt-mode .tx-toast{box-shadow:5px 5px 0 var(--amber)!important;background:v
 body.alt-mode .tx-toast--success{box-shadow:5px 5px 0 var(--green)!important;--tx-ink:var(--green)}
 body.alt-mode .tx-toast--failed{box-shadow:5px 5px 0 var(--red)!important;--tx-ink:var(--red)}
 body.alt-mode .tx-toast--unknown{--tx-ink:var(--amber)}
+
+/* ── the curve panel, to the mock's spec (F: green-ink curve on cream,
+   G: lime curve on surface; mono 11 axis labels; red marker + stamp) ── */
+.alt-play .curve-fill{--accent:var(--green);--chart-grid:var(--raised);--chart-grid-minor:var(--raised)}
+.alt-play .curve-fill svg text.fill-text-lo{font-family:var(--mono)!important;font-size:11px!important;fill:var(--muted)!important}
+.alt-play .curve-fill svg path[style]{stroke:var(--green)!important;stroke-width:2.5!important;filter:none!important}
+.alt-play .curve-fill svg path[fill="var(--accent)"]{display:none}
+/* live marker: the red lane (dashed spine + dot), halos off */
+.alt-play .curve-fill svg line[stroke-dasharray]{stroke:var(--red)!important;opacity:1!important;stroke-dasharray:5 6!important;stroke-width:1.5!important}
+.alt-play .curve-fill svg circle[fill-opacity]{display:none}
+.alt-play .curve-fill svg g circle:not([fill-opacity]):not([r="5"]){fill:var(--red)!important;r:7px;stroke:none!important}
+/* YOU ARE HERE stamp */
+.alt-play .curve-fill .curve-stamp-box{fill:var(--bg);stroke:var(--red);stroke-width:2.5}
+.alt-play .curve-fill .curve-stamp-text{font-family:var(--mono);font-size:13px;font-weight:600;fill:var(--red)}
+/* toggles: square segmented rails like the mock */
+.alt-play .curve-fill .font-semibold{border-radius:0!important}
+
+.alt-play .curve-fill svg{aspect-ratio:1136/330;width:100%;height:auto}

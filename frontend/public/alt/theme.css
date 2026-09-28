@@ -150,7 +150,7 @@ html[data-theme=light] .prototype-strip { background: var(--raised); }
 @media (prefers-reduced-motion: reduce){.flip-tile .flip-flap-top,.flip-tile .flip-flap-bot{animation:none;opacity:0}}
 .alt-shell .flip-tile{border-radius:3px!important}
 .flip-tile .flip-hinge{
-  position:absolute;left:0;right:0;top:calc(50% + 1px);height:calc(3 / 78 * 1em);
+  position:absolute;left:0;right:0;top:50%;height:calc(3 / 78 * 1em);
   background:var(--shadow);
 }
 .flip-tile.flip-colon{background:transparent;width:calc(24 / 78 * 1em)}
