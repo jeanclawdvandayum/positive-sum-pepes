@@ -23,6 +23,7 @@ import ReferralsCard from './stake/ReferralsCard'
 import NameRegistrationCard from './stake/NameRegistrationCard'
 import { useNftVersion } from '../lib/useNftVersion'
 import { useNftReinvestment } from '../lib/useNftReinvestment'
+import AltStakeView from '../alt/stake-view'
 import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -440,12 +441,42 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
     </div>
   ) : null
 
+  // ── refined alt presentation (branch refined-redesign): every value and
+  // write above flows into the view unchanged; this is a pure layout seam.
+  if (variant === 'alt') {
+    const earnedOf = new Map<bigint, bigint | undefined>()
+    ids.forEach((id, i) => {
+      const pos = detailResults[i * 3] as [bigint, bigint, bigint, bigint, bigint] | undefined
+      const pending = detailResults[i * 3 + 1] as bigint | undefined
+      if (pos) earnedOf.set(id, positionFeesEarned(pos[4], pending))
+    })
+    return (
+      <AltStakeView
+        model={{
+          round, isConnected, address,
+          entries, pendings, earnedOf, vest, nftVersion, reinvestApproved, pspBal, refresh,
+          totalStaked, sharePct, totalEarned, totalPending, parked,
+          multiclaim, reinvestAll, multiStep,
+          reinvestorReady: !!round.reinvestorReady,
+          ticketPrice: round.ticketPrice, reinvestPending, stakeableCount: stakeableIds.length,
+          withdrawingCount: withdrawingEntries.length, withdrawingFees,
+          amount, setAmount, busy, approved, hasPepes, canSubmit, mainLabel,
+          run, hatch, step, pickedId, setPickedId, pickerSeed,
+          reroll: () => setPickerSeed(s => s + 1),
+          claimable, myDep, canChooseGenesis, genesisPepe, setGenesisPepe, genesisSeed,
+          rerollGenesis: () => setGenesisSeed(s => s + 1),
+          claimStep, claimGenesis, drip, dripStep, error, tickerItems,
+        }}
+      />
+    )
+  }
+
+
   return (
-    <div className={`st-page font-body text-text-hi ${variant === "alt" ? "alt-stake" : ""}`}>
-      {variant === "alt" && <div className="page-heading"><h1>put your bags to work.</h1><p>your pepes. your lePSP. your share of the fees.</p></div>}
+    <div className="st-page font-body text-text-hi">
       <StakeStyles />
 
-      <div className="alt-stake-layout grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:grid-rows-[auto_1fr]">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:grid-rows-[auto_1fr]">
         {/* ── left: identity and earned fees ── */}
         <div className="flex min-w-0 flex-col gap-4">
           {claimable && (
@@ -569,7 +600,7 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
         </div>
 
         {/* ── below the overview on desktop; after the form on mobile ── */}
-        <div className="alt-identity-row flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-2">
           <ReferralsCard />
 
           <NameRegistrationCard />

@@ -1,54 +1,126 @@
-/* The rolling paper supplies the print palette and editorial details. */
-html[data-theme=light] {
- --bg:#f2f0e7; --panel:#faf9f2; --raised:#e7e9dd;
- --ink:#20231c; --muted:#565b4e; --line:#b7bca9;
- --green:#334b2e; --green-ink:#fff; --amber:#334b2e;
- --action:#d5f56b; --action-ink:#20231c; --shadow:#20231c;
- --clock-housing:#20231c; --clock-raised:#33382b; --clock-line:#727768;
- --clock-money:#d5f56b; --clock-ink:#f2f0e7; --clock-muted:#bfc4b1;
- --ladder-fill:#dfe5cc; --ladder-lead:#d5dfb8;
-}
-::selection{background:var(--action);color:var(--action-ink)}
-.hero .lead{font-family:Georgia,serif;font-style:italic;line-height:1.4}
+/* Editorial voice for the refined identity: serif-italic accents, the
+   admit-one ticket hero, the archive strip's zigzag edges, the trade receipt,
+   and the light theme's accent flips. Palette tokens live in style.css. */
+
+.hero .lead{font-family:Georgia,'Instrument Serif',serif;font-style:italic;line-height:1.35}
 .small-heading,.consequence-label,.input-label,.instrument-top,.board-note,.chart-caption,.footer-bottom{font-family:var(--mono)}
-.opening-flow .small-heading {letter-spacing:.08em;text-transform:uppercase;font-size:11px}
-.opening-flow>article:last-child {border-left:5px solid var(--action);padding-left:25px}
-.under-hero {border-top-color:var(--ink);border-bottom:1px solid var(--ink)}
-.under-hero b {font-family:Georgia,serif;font-style:italic;font-size:17px}
-.mechanisms-heading {display:flex;justify-content:space-between;gap:24px;align-items:end;margin-top:58px}
-.mechanisms-heading h2 {font-size:34px}
-.mechanisms-heading .text-link {flex-shrink:0}
-.support-grid {grid-template-columns:repeat(4,minmax(0,1fr));gap:36px 24px;counter-reset:mechanism}
-.support-item {position:relative;border-top-color:var(--ink);counter-increment:mechanism}
-.support-item:before{content:'0' counter(mechanism);position:absolute;top:25px;right:0;font:italic 28px Georgia,serif;color:var(--muted)}
-.support-item h3{font-size:25px;line-height:1.2;max-width:235px}
-.support-item p{font-size:14px;line-height:1.7}
-.support-diagram{padding:12px 0 22px}
-.xd-stage{border-color:var(--ink);box-shadow:3px 3px 0 var(--shadow)}
-.footer-links{flex-wrap:wrap}
-html[data-theme=light] :is(.trade-box,.position-example,.story-panel,.modal){border-color:var(--ink)}
-html[data-theme=light] .story-panel.redemption{--green:#d5f56b;background:#20231c;color:#f2f0e7;border-color:#20231c}
-html[data-theme=light] .story-panel.redemption h2{color:#d5f56b}
-html[data-theme=light] .story-panel.redemption :is(p,.small-heading){color:#bfc4b1}
-html[data-theme=light] .section{border-top-color:var(--ink)}
-html[data-theme=light] .prototype-strip{background:var(--action);color:var(--ink);border-color:var(--ink)}
-html[data-theme=light] .site-header{border-bottom-color:var(--ink)}
-html[data-theme=light] .btn{box-shadow:3px 3px 0 var(--ink);clip-path:none;border:1px solid var(--ink)}
-html[data-theme=light] .btn.secondary{box-shadow:none}
+.opening-flow>article:last-child{border-left:2px solid var(--action);padding-left:24px}
+.opening-flow p strong,.support-item p strong{color:var(--ink);font-weight:600}
+
+/* ── hero ticket ─────────────────────────────────────────────────────────── */
+.hero-ticket{position:relative;padding:34px 8px 40px 26px;min-height:420px}
+.hero-ticket:before{content:'';position:absolute;left:52px;top:88px;right:26px;height:64%;background:var(--raised);border:1.5px solid var(--line-strong);transform:rotate(4deg)}
+.hero-ticket .instrument{position:relative;z-index:1}
+.no-insiders{position:absolute;right:6px;top:10px;z-index:2;width:116px;height:116px;border-radius:50%;border:3px solid var(--red);color:var(--red);display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(12deg);font:600 12px/1.3 var(--mono);text-align:center;background:color-mix(in srgb,var(--bg) 85%,transparent);pointer-events:none}
+.ticket-spine{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:16px 0;font:11px var(--mono)}
+.ticket-title{font-family:var(--display);font-size:26px;writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:1px;line-height:1}
+.ticket-body{border-left:3px dashed var(--bg);padding:18px 20px;display:flex;gap:16px;min-width:0}
+.ticket-body>.hero-random{width:150px;flex-shrink:0;align-self:flex-start}
+.ticket-data{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0}
+
+/* ── archive strip ───────────────────────────────────────────────────────── */
+.under-hero:before,.under-hero:after{content:'';position:absolute;left:0;right:0;height:12px;background:linear-gradient(135deg,var(--bg) 6px,transparent 0) 0 0/12px 12px,linear-gradient(-135deg,var(--bg) 6px,var(--panel) 0) 0 0/12px 12px}
+.under-hero:before{top:-12px}
+.under-hero:after{bottom:-12px;background:linear-gradient(45deg,var(--bg) 6px,transparent 0) 0 0/12px 12px,linear-gradient(-45deg,var(--bg) 6px,var(--panel) 0) 0 0/12px 12px}
+.under-hero b{font-family:Georgia,'Instrument Serif',serif;font-style:italic;font-size:20px;margin-right:6px}
+.under-hero>.editorial-pepe{width:32px;height:32px;flex-shrink:0}
+
+/* ── mechanisms grid ─────────────────────────────────────────────────────── */
+.mechanisms-heading{display:flex;justify-content:space-between;gap:24px;align-items:end;margin:64px 0 30px}
+.mechanisms-heading h2{font-size:clamp(30px,3vw,40px)}
+.mechanisms-heading .text-link{flex-shrink:0}
+.support-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.support-head .support-diagram{padding:0}
+.support-num{font:italic 26px Georgia,'Instrument Serif',serif;color:var(--muted);flex-shrink:0;line-height:1}
+.support-item h3{font-size:20px;line-height:1.2;max-width:none}
+.support-item p{font-size:13px;line-height:1.65}
+.xd-stage{border:1.5px solid var(--line-strong);box-shadow:3px 3px 0 var(--shadow)}
+
+/* ── where the money goes ────────────────────────────────────────────────── */
+.money-section{display:grid;grid-template-columns:420px minmax(0,1fr);gap:56px;align-items:start}
+.trade-receipt{display:flex;flex-direction:column;filter:drop-shadow(6px 6px 0 var(--shadow))}
+.trade-receipt>div{background:var(--surface);padding:28px 30px 20px;display:flex;flex-direction:column;gap:10px;font:14px var(--mono)}
+.trade-receipt .receipt-title{text-align:center;font-family:var(--display);font-size:26px}
+.trade-receipt .receipt-sub{text-align:center;font-size:12px;color:var(--muted)}
+.trade-receipt .rule{border-top:1.5px dashed var(--line);margin:6px 0}
+.trade-receipt .row{display:flex;justify-content:space-between;gap:16px}
+.trade-receipt .row span:last-child{font-variant-numeric:tabular-nums}
+.trade-receipt .row.leg{padding-left:16px}
+.trade-receipt .row.sub{padding-left:32px;font-size:12px;color:var(--muted)}
+.trade-receipt .row.stakers{color:var(--green)}
+.trade-receipt .row.pot{color:var(--red)}
+.trade-receipt .row.total{font-weight:600}
+.trade-receipt .receipt-note{text-align:center;font-size:12px;color:var(--muted);line-height:1.6}
+.trade-receipt>.zig{height:14px;background:linear-gradient(45deg,transparent 7px,var(--panel) 0) 0 0/14px 14px,linear-gradient(-45deg,transparent 7px,var(--panel) 0) 0 0/14px 14px}
+
+/* ── light theme accent flips (contract F: money = burnt orange) ─────────── */
+html[data-theme=light] .bar>span{background:var(--action-ink)}
+html[data-theme=light] .payout-control output{color:var(--action-ink)}
+html[data-theme=light] .redemption-note{border-left-color:var(--action-ink)}
+html[data-theme=light] .trade-receipt{filter:drop-shadow(6px 6px 0 rgba(25,32,46,.18))}
+html[data-theme=light] .trade-receipt .row.stakers{color:#33452a}
+html[data-theme=light] .story-panel.redemption{background:#22271f;color:#f2f0ea;border-color:#22271f;--green:#d9f27a;--green-ink:#22271f}
+html[data-theme=light] .story-panel.redemption h2{color:#d9f27a}
+html[data-theme=light] .story-panel.redemption :is(p,.small-heading){color:#b9bdb0}
+html[data-theme=light] :is(.trade-box,.position-example,.modal){border-color:var(--line-strong)}
+html[data-theme=light] .section{border-top-color:var(--line-soft)}
+html[data-theme=light] .prototype-strip{color:var(--ink);border-color:var(--line-strong)}
+html[data-theme=light] .site-header{border-bottom-color:var(--line-strong)}
 html[data-theme=light] .ladder-row:before{border-right-color:var(--green)}
-html[data-theme=light] .actual-curve{border-top-color:var(--ink)}
-html[data-theme=light] .curve-axis-title{border-bottom:1px solid var(--line);padding-bottom:12px}
+html[data-theme=light] .actual-curve{border-top-color:var(--line-soft)}
+html[data-theme=light] .curve-axis-title{border-bottom:1px solid var(--line-soft);padding-bottom:12px}
 html[data-theme=light] .playing-card{box-shadow:4px 5px 0 var(--shadow)}
-@media(max-width:1199px){.support-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:38px}.support-item h3{max-width:none}}
+html[data-theme=light] .under-hero{border-left-color:var(--line-strong);border-right-color:var(--line-strong)}
+html[data-theme=light] .no-insiders{border-color:#b8420e;color:#b8420e}
+html[data-theme=light] .ticket-body{border-left-color:var(--bg)}
+
+.footer-links{flex-wrap:wrap}
+
+/* Diagram palette hooks (diagrams.css lane reads these). */
+:root{--diagram-pot:var(--amber);--diagram-steep:var(--amber)}
+html[data-theme=light]{--diagram-pot:var(--green);--diagram-steep:var(--ink)}
+
+@media(max-width:1199px){
+ .support-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:38px 28px}
+ .money-section{grid-template-columns:minmax(0,1fr);gap:40px}
+ .trade-receipt{max-width:440px}
+}
+@media(max-width:980px){
+ .hero{grid-template-columns:1fr;gap:44px}
+ .hero-ticket{min-height:0}
+}
 @media(max-width:580px){
  .support-grid{grid-template-columns:1fr;gap:32px}
- .mechanisms-heading{align-items:start;flex-direction:column;gap:14px;margin-top:40px}
+ .mechanisms-heading{align-items:start;flex-direction:column;gap:14px;margin:44px 0 24px}
  .mechanisms-heading h2{font-size:30px}
- .support-item{display:block}
- .support-item:before{right:8px}
+ .support-head{flex-direction:column}
+ .support-num{order:-1}
  .opening-flow>article:last-child{padding-left:18px}
+ .money-section{grid-template-columns:1fr;gap:32px}
  .footer-links{justify-content:flex-start;gap:18px 24px}
+ .no-insiders{width:96px;height:96px;font-size:11px}
+ .hero-ticket{padding:22px 0 30px 8px}
+ .hero-ticket:before{left:24px;right:10px}
 }
 
-:root{--diagram-pot:var(--amber);--diagram-steep:var(--amber)}
-html[data-theme=light]{--diagram-pot:var(--action);--diagram-steep:var(--ink)}
+/* M3: the torn edge is 14px of teeth, not a padded card */
+.trade-receipt>.zig{padding:0}
+/* M4: the mock's stamp is a transparent circle; round id stays on one line */
+.alt-shell .no-insiders{border-radius:50%!important;background:transparent}
+.instrument-top strong{white-space:nowrap}
+/* H3: mobile hero ticket stacks instead of overflowing */
+@media (max-width:480px){
+  .ticket-body{flex-direction:column}
+  .hero-random{width:96px}
+  .ticket-data{min-width:0}
+  .instrument-details b{overflow-wrap:anywhere}
+  .no-insiders{width:72px;height:72px;top:-8px;right:-4px}
+}
+
+/* L2: the money headline reads green-ink in light, per mock-0 */
+html[data-theme=light] .payout-copy .money{color:var(--green-ink)}
+html[data-theme=light] input[type=range]{accent-color:var(--green-ink)}
+/* L3: the mocks keep section labels lowercase */
+.story-panel .small-heading, .micro-label{text-transform:none}
+.under-hero a{text-decoration:underline;text-underline-offset:3px}
+.stc-good{color:var(--green)}

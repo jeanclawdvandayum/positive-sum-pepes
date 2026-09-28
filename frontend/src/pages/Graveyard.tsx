@@ -1,3 +1,4 @@
+import AltGraveyardView from '../alt/grave-view'
 import GravePositionDetails from '../alt/GravePositionDetails'
 import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
@@ -263,9 +264,11 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
   )
 }
 
-export default function Graveyard() {
+export default function Graveyard({ variant }: { variant?: 'alt' } = {}) {
   const { rounds, checked, error } = useGraveyard()
   const { isConnected } = useAccount()
+
+  if (variant === 'alt') return <AltGraveyardView rounds={rounds} checked={checked} error={error} connected={isConnected} />
 
   return (
     <div className="pl-page font-body text-text-hi">
