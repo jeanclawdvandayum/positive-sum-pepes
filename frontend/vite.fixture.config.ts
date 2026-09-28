@@ -31,6 +31,13 @@ export default defineConfig(({ mode }) => {
           find: /^(?:\.\.\/|\.\/)+(?:lib\/)?rpc$/,
           replacement: fileURLToPath(new URL('./src/fixtureRpc.ts', import.meta.url)),
         },
+        {
+          // fail-closed writes: the confirmed-write hook rejects before any
+          // wallet client can sign — the harness stays read-only even with a
+          // real wallet connected
+          find: /^(?:\.\.\/|\.\/)+(?:lib\/)?useConfirmedWrite$/,
+          replacement: fileURLToPath(new URL('./src/fixtureWrites.ts', import.meta.url)),
+        },
       ],
     },
     server: {

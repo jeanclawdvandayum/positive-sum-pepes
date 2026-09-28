@@ -32,20 +32,41 @@ export function AltClock({ deadline, settled = false }: { deadline?: bigint; set
   return <FlipClock text={text} />
 }
 
-/** The refined mocks' flip board, verbatim: fixed-width mono tiles (IBM
- *  Plex Mono 600), a 3px hinge bar across each tile (digits AND colons),
- *  tile = the theme's raised clock face, digits ride the urgency lanes
- *  (--time-lit: green/yellow/red). Static like the mock — PhaseEngine's
- *  per-second tick is the only motion. */
-export function FlipClock({ text, className = '' }: { text: string; className?: string }) {
+/** One split-flap tile. Static halves always show the live digit; on change
+ *  a flap carrying the OLD digit folds down past the hinge while a second
+ *  flap with the NEW digit's bottom unfolds up — the airport-board flip. */
+function FlipTile({ ch }: { ch: string }) {
+  const [prev, setPrev] = useState(ch)
+  const [flipping, setFlipping] = useState(false)
+  useEffect(() => {
+    if (ch === prev) return
+    setFlipping(true)
+    const t = setTimeout(() => { setPrev(ch); setFlipping(false) }, 300)
+    return () => clearTimeout(t)
+  }, [ch, prev])
+  return (
+    <span className={ch === ':' ? 'flip-tile flip-colon' : 'flip-tile'}>
+      <span className="flip-glyph flip-half-top" aria-hidden="true">{ch}</span>
+      <span className="flip-glyph flip-half-bot" aria-hidden="true">{flipping ? prev : ch}</span>
+      {flipping && <>
+        <span className="flip-glyph flip-flap-top" aria-hidden="true">{prev}</span>
+        <span className="flip-glyph flip-flap-bot" aria-hidden="true">{ch}</span>
+      </>}
+      <span className="flip-live" aria-hidden="true" />
+      <span className="flip-hinge" aria-hidden="true" />
+    </span>
+  )
+}
+
+/** The refined mocks' flip board: fixed-width mono tiles (IBM Plex Mono
+ *  600), a 3px hinge bar across each tile (digits AND colons), tile = the
+ *  theme's raised clock face, digits ride the urgency lanes (--time-lit:
+ *  green/yellow/red). Digits flip split-flap style when they change;
+ *  reduced-motion falls back to the static mock. */
+export function FlipClock({ text, className = '' }: { text?: string; className?: string }) {
   return (
     <div className={`clock alt-clock flip-clock ${className}`.trim()} role="timer" aria-label="countdown">
-      {text.split('').map((ch, i) => (
-        <span key={i} className={ch === ':' ? 'flip-tile flip-colon' : 'flip-tile'}>
-          <span className="flip-glyph">{ch}</span>
-          <span className="flip-hinge" aria-hidden="true" />
-        </span>
-      ))}
+      {(text ?? '--:--:--').split('').map((ch, i) => <FlipTile key={i} ch={ch} />)}
     </div>
   )
 }
