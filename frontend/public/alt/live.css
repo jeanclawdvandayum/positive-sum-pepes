@@ -144,7 +144,7 @@ html[data-theme=light] .alt-play .ladder-row:first-child{--seat-fill:#cfdcb2;--s
 html[data-theme=light] .alt-play .ladder-row.you{--seat-fill:#d9f27a;--seat-edge:#33452a}
 /* the share fill lives INSIDE the identity cell (mock geometry): never
    under the rank or payout columns */
-.alt-play .ladder-id::before{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--share);max-width:100%;background:var(--seat-fill);box-shadow:inset -1.5px 0 0 var(--seat-edge);z-index:0;transition:width .35s}
+.alt-play .ladder-id::before{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--share);max-width:100%;background:var(--seat-fill);box-shadow:inset -1.5px 0 0 var(--seat-edge);z-index:0}
 .alt-play .ladder-id>*{position:relative;z-index:1}
 .alt-play .ladder-row .rank{display:flex;align-items:center;justify-content:center;height:100%;font-family:var(--mono);font-size:13px;color:var(--ink);border-right:2px dashed var(--rank-rule)}
 .alt-play .ladder-row:first-child .rank{font-size:18px}

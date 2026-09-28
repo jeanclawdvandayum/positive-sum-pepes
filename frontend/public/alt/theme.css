@@ -103,8 +103,6 @@ html[data-urgency=critical] :is(.instrument,.play-clockband>.clock,.predeposit-s
 
 /* Flat fills remain legible behind the ladder's text. */
 .ladder-row { background: var(--panel); }
-.ladder-row:before { background: var(--ladder-fill); border-right: 2px solid var(--amber); }
-.ladder-row:first-child:before { background: var(--ladder-lead); }
 .ladder-row:first-child .rank { color: var(--ink); }
 .bar>span { opacity: 1; }
 
