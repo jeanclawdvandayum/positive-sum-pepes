@@ -578,9 +578,10 @@ html[data-theme=dark] .step-dot.done{border-color:var(--green)}
 .step strong{display:block;font-size:14px;font-weight:600}
 .step span:not(.step-dot){display:block;font-size:12px;color:var(--muted)}
 
-/* suspects = the pepe picker card */
+/* suspects = the SAME lineup as the stake page (stv-lineup supplies the
+   lined-paper, ruler, numbered plates and picked treatment) */
 .ibco-suspects{padding:0}
-.ibco-suspects>div{border:0;background:none;padding:18px 20px}
+.ibco-suspects>div>div:first-child{padding:16px 22px}
 
 /* bottom: slip + receipt */
 .ibco-bottom{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,0.9fr);gap:22px;align-items:start}
@@ -635,3 +636,6 @@ html[data-theme=dark] .receipt-teeth{background:linear-gradient(45deg,transparen
   .slip-grid{grid-template-columns:1fr}
   .slip-tile{border-right:0;border-bottom:1.5px solid var(--line-strong)}
 }
+
+/* the IBCO hero clock is the play page's size (mock 5/11) */
+.ibco-hero .clockbox .flip-clock{font-size:clamp(40px,4.4vw,88px)}

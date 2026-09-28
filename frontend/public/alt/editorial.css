@@ -108,6 +108,10 @@ html[data-theme=light]{--diagram-pot:var(--green);--diagram-steep:var(--ink)}
 /* M4: the mock's stamp is a transparent circle; round id stays on one line */
 .alt-shell .no-insiders{border-radius:50%!important;background:transparent}
 .instrument-top strong{white-space:nowrap}
+/* the round/status row must not run under the NO INSIDERS stamp circle
+   (116px at the ticket's top-right) — reserve it in both themes */
+.instrument-top{padding-right:126px}
+.instrument-status{max-width:100%;overflow-wrap:anywhere}
 /* H3: mobile hero ticket stacks instead of overflowing */
 @media (max-width:480px){
   .ticket-body{flex-direction:column}

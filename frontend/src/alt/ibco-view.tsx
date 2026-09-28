@@ -142,7 +142,7 @@ export default function AltIbcoView(m: AltIbcoModel) {
     </section>
 
     {/* ── suspects ──────────────────────────────────────────────────────── */}
-    <section className="ibco-suspects card" aria-label="choose your accomplice">
+    <section className="ibco-suspects stv-lineup" aria-label="choose your accomplice">
       {m.picker}
     </section>
 
