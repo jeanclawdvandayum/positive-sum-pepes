@@ -1,4 +1,3 @@
-import { descriptorAbi, stakerAbi } from './abi.ts'
 
 export const REFERRAL_QUIPS = [
   'my frog has a staking position and a pot problem. come make it worse.',
@@ -43,17 +42,24 @@ export function referralXIntent(text: string, link: string): string {
   return `https://x.com/intent/tweet?${new URLSearchParams({ text, url: link })}`
 }
 
+type Renderer = (dna: bigint, version: bigint) => string
+/** bundled art renderer; tests inject a stub instead of importing the art. */
+let renderPepe: Renderer = () => { throw new Error('renderer not set') }
+export function setReferralPepeRenderer(r: Renderer) { renderPepe = r }
+
 type Address = `0x${string}`
 type Read = (to: Address, abi: readonly unknown[], name: string, args?: readonly unknown[]) => Promise<unknown>
 
-export async function loadReferralPepe(staker: Address, tokenId: bigint, read: Read): Promise<string> {
-  const [dna, descriptor] = await Promise.all([
-    read(staker, stakerAbi, 'dnaOf', [tokenId]) as Promise<bigint>,
-    read(staker, stakerAbi, 'descriptor') as Promise<Address>,
-  ])
-  // Minted art comes from the selected position's on-chain DNA and renderer.
-  // Address-based previews and keccak(tokenId) may depict a different Pepe.
-  return read(descriptor, descriptorAbi, 'renderSVG', [dna]) as Promise<string>
+export async function loadReferralPepe(
+  staker: Address,
+  tokenId: bigint,
+  read: Read,
+  dnaVersion: bigint = 2n,
+): Promise<string> {
+  // The chain supplies the DNA; the image renders locally from the bundled
+  // art data in the round's release (no descriptor/renderSVG eth_calls).
+  const dna = await read(staker, [['function dnaOf(uint256) view returns (uint256)']], 'dnaOf', [tokenId]) as bigint
+  return renderPepe(dna, dnaVersion)
 }
 
 export async function referralPepePng(svg: string): Promise<Blob> {

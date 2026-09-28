@@ -361,17 +361,18 @@ export default function Predeposit({ variant }: { variant?: 'alt' } = {}) {
 
   if (variant === 'alt') return <AltIbcoView
     state={pd} facts={facts} phaseNow={phaseNow} greenEnd={greenEnd} openEnd={openEnd}
-    depositors={depositors} myDep={myDep} minimum={minimum}
-    roundId={round.id} roundName={''} walletCap={walletCap}
-    mixBalance={mixBal} greenMember={greenGate === 'member'} connected={isConnected}
-    artVersion={artVersion ?? 2n} pickedId={selectedPepe} reservedId={reservedPepe && reservedPepe > 0n ? reservedPepe : undefined}
+    depositors={depositors} myDep={myDep}
+    roundId={round.id} walletCap={walletCap}
+    mixBalance={mixBal} connected={isConnected}
+    dnaVersion={dnaVersion ?? 2n} pickedId={selectedPepe} reservedId={reservedPepe && reservedPepe > 0n ? reservedPepe : undefined}
     picker={<PepePicker round={round} selected={selectedPepe} onSelect={setSelectedPepe}
       seed={pickerSeed} onReroll={() => { setSelectedPepe(null); setPickerSeed(s => s + 1) }}
       disabled={busy} actionLabel="deposit" attention={needsPepe} />}
-    amount={amount} onAmount={setAmount}
-    onMax={() => { if (maxDeposit !== undefined) setAmount(wadToExact(maxDeposit)) }}
+    amount={amount} amountWad={amountWad} maxDeposit={maxDeposit}
+    onAmount={setAmount}
     canSubmit={canSubmit} busy={busy} stepLabel={cta} onSubmit={runDeposit} error={error}
     launched={launched} onLaunch={pd?.launchable ? launch : undefined} launchable={!!pd?.launchable}
+    myClaimed={myDep?.claimed}
   />
   return (
     <div className={`pd-page space-y-4 ${variant === "alt" ? "alt-predeposit" : ""}`}>

@@ -545,53 +545,93 @@ html[data-theme=light] .balance-max small{color:var(--green)}
 .alt-play .curve-fill{width:100%}
 .alt-play .curve-fill svg{width:100%;height:300px;display:block}
 
-/* ── the refined IBCO page (mock "IBCO (predeposit)") ─────────────────── */
-.alt-ibco{display:flex;flex-direction:column;gap:22px;width:min(var(--max),100% - 32px);margin:26px auto;padding:0}
+/* ── the refined IBCO page (mocks 5/11 "IBCO (predeposit)") ───────────── */
+.alt-ibco{display:flex;flex-direction:column;gap:26px;width:min(var(--max),100% - 32px);margin:26px auto;padding:0}
 .ibco-hero{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
 .ibco-hero h1{margin:0;font:400 clamp(30px,4.4vw,52px)/1.1 var(--display);text-transform:lowercase}
 .ibco-hero .ibco-lead{color:var(--muted)}
-.ibco-hero .clockbox{min-width:min(560px,100%)}
-.ibco-grid{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:22px;align-items:start}
-@media (max-width:900px){.ibco-grid{grid-template-columns:1fr}}
-/* THE POOL ticket stub */
-.ibco-pool{display:grid;grid-template-columns:auto 1fr;padding:0;overflow:hidden}
-.pool-tag{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px 16px;border-right:2px dashed var(--bg)}
-.pool-label{font:600 10px var(--mono);letter-spacing:2px}
-.pool-round{font:400 24px/1 var(--display);text-transform:lowercase}
-.pool-body{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+
+/* pool strip: one wide panel */
+.ibco-pool{display:grid;grid-template-columns:180px minmax(0,1fr);border:1.5px solid var(--line-strong);box-shadow:6px 6px 0 var(--shadow);background:var(--surface)}
+.pool-tag{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px 14px;background:var(--clock-housing);color:var(--clock-ink);border-right:2px dashed var(--surface)}
+.pool-label{font:600 10px var(--mono);letter-spacing:2px;color:var(--clock-muted)}
+.pool-round{font:400 26px/1 var(--display);text-transform:lowercase}
+.pool-body{padding:16px 20px;display:flex;flex-direction:column;gap:9px}
 .pool-fill-head{display:flex;justify-content:space-between;font:500 11px var(--mono);letter-spacing:1px}
 .pool-bar{position:relative;height:22px;background:var(--line-soft);border:1.5px solid var(--line-strong)}
 .pool-bar>span{display:block;height:100%;background:repeating-linear-gradient(135deg,var(--action) 0 6px,color-mix(in srgb,var(--action) 82%,var(--ink)) 6px 12px)}
 .pool-note{color:var(--muted);font:12px var(--mono);margin:0}
-.pool-stats{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);padding-top:10px}
-.pool-stat{display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line);padding:4px 10px}
+.pool-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);padding-top:9px}
+.pool-stat{display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line);padding:4px 12px}
 .pool-stat:first-child{border-left:0;padding-left:0}
-.pool-stat strong{font:600 18px var(--mono)}
+.pool-stat strong{font:600 22px var(--mono)}
 .pool-stat span{font:600 9px var(--mono);letter-spacing:1px;color:var(--muted)}
-.pool-steps{display:flex;gap:8px;flex-wrap:wrap;padding-top:6px}
-.pool-step{font:600 11px var(--mono);color:var(--muted);border:1px dashed var(--line);padding:4px 8px}
-.pool-step.done{color:var(--green);border-color:var(--green)}
-.pool-step.now{color:var(--ink);border-color:var(--line-strong)}
-/* suspect section = the pepe picker card, restyled by the shell */
+
+/* steps row */
+.ibco-steps{display:grid;grid-template-columns:300px minmax(0,1fr);gap:30px;align-items:end}
+.ibco-steps h2{margin:0;font:400 clamp(34px,4vw,52px)/1 var(--display);text-transform:lowercase}
+.steps-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.step{display:flex;align-items:center;gap:12px}
+.step-dot{flex-shrink:0;width:44px;height:44px;border-radius:50%;border:2.5px solid var(--line);background:transparent;color:var(--muted);display:grid;place-items:center;font:400 20px var(--display)}
+.step-dot.done{border-color:var(--green-ink);background:var(--action);color:var(--action-ink);transform:rotate(-6deg)}
+html[data-theme=dark] .step-dot.done{border-color:var(--green)}
+.step strong{display:block;font-size:14px;font-weight:600}
+.step span:not(.step-dot){display:block;font-size:12px;color:var(--muted)}
+
+/* suspects = the pepe picker card */
 .ibco-suspects{padding:0}
 .ibco-suspects>div{border:0;background:none;padding:18px 20px}
-/* deposit slip */
-.ibco-slip{padding:0;display:flex;flex-direction:column}
-.slip-head{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1.5px solid var(--line-strong)}
-.slip-head h2{margin:0;font:400 30px/1 var(--display);text-transform:lowercase}
-.slip-status{font:600 11px var(--mono);letter-spacing:1px;color:var(--muted);background:var(--line-soft);padding:6px 10px}
-.slip-picked{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--line)}
-.slip-picked>div{display:flex;flex-direction:column;gap:2px}
-.slip-picked strong{font-size:14px;font-weight:600}
-.slip-picked span:not(.slip-face){font-size:12px;color:var(--muted)}
-.slip-face{width:56px;height:56px;display:grid;place-items:center;border:1.5px solid var(--line-strong);background:var(--raised);image-rendering:pixelated;flex-shrink:0}
-.slip-face.empty{font:700 22px var(--mono);color:var(--muted)}
+
+/* bottom: slip + receipt */
+.ibco-bottom{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,0.9fr);gap:22px;align-items:start}
+.slip-grid{display:grid;grid-template-columns:190px minmax(0,1fr);gap:0}
+.slip-tile{position:relative;display:flex;flex-direction:column;gap:6px;padding:16px;border-right:1.5px solid var(--line-strong);border-bottom:1.5px solid var(--line-strong)}
+.slip-face{width:100%;aspect-ratio:1;display:grid;place-items:center;border:1.5px solid var(--line-strong);background:var(--raised);image-rendering:pixelated}
+.slip-face.empty{font:700 26px var(--mono);color:var(--muted)}
 .slip-face svg{width:100%;height:100%}
-.ibco-slip .input-label{padding:0 20px;margin:14px 0 6px}
-.slip-amount{display:flex;gap:10px;padding:0 20px;align-items:stretch}
-.slip-amount input{flex:1;min-width:0;background:var(--raised);border:1.5px solid var(--line-strong);padding:12px;font:15px var(--mono);color:var(--ink)}
-.slip-range{margin:14px 20px 0;width:calc(100% - 40px)}
-.slip-error{color:var(--red);font:600 12px var(--mono);padding:8px 20px 0;margin:0}
-.ibco-slip .btn{margin:14px 20px 0;justify-content:center;text-align:center}
-.slip-note{padding:10px 20px 16px;margin:0;color:var(--muted);font-size:12px}
-@media (max-width:640px){.ibco-pool{grid-template-columns:1fr}.pool-tag{border-right:0;border-bottom:2px dashed var(--bg);flex-direction:row;gap:10px}.pool-round{font-size:20px}}
+.slip-tile-cap{display:flex;flex-direction:column;gap:2px;font:11px var(--mono);border-top:1.5px solid var(--line-strong);padding-top:6px}
+.slip-tile-cap .dim{color:var(--muted)}
+.slip-stamp{position:absolute;left:22px;top:22px;padding:3px 9px;border:3px solid var(--red);color:var(--red);transform:rotate(-8deg);font:600 12px var(--mono);letter-spacing:2px;background:color-mix(in srgb,var(--surface) 80%,transparent)}
+.slip-form{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.slip-head{display:flex;justify-content:space-between;align-items:center}
+.slip-head h2{margin:0;font:400 30px/1 var(--display);text-transform:lowercase}
+.slip-chip{display:inline-flex;align-items:center;gap:6px;font:600 13px var(--body);padding:7px 10px;background:var(--line-soft)}
+.slip-commit-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.slip-commit-row .input-label{margin:0}
+.slip-amount{display:flex;align-items:baseline;gap:8px;border:1.5px solid var(--line-strong);background:var(--raised);padding:10px 14px}
+.slip-amount input{flex:1;min-width:0;background:none;border:0;color:var(--ink);font:400 clamp(26px,3vw,36px)/1 var(--display);outline:none}
+.slip-unit{font:600 12px var(--mono);color:var(--muted)}
+.slip-range{display:flex;flex-direction:column;gap:6px}
+.slip-range output{font:600 12px var(--mono)}
+.slip-range input{width:100%}
+.range-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.slip-error{color:var(--red);font:600 12px var(--mono);margin:0}
+.ibco-slip .btn{justify-content:center;text-align:center}
+.slip-frog-money{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:12px;border-top:1.5px dashed var(--line-strong);font-size:12px;color:var(--muted);flex-wrap:wrap}
+.frog-actions{display:flex;gap:14px;align-items:center}
+.frog-actions a{color:var(--green)}
+.slip-launched{color:var(--muted);margin:0}
+
+/* pool receipt: paper + teeth */
+.ibco-receipt{display:flex;flex-direction:column;filter:drop-shadow(6px 6px 0 var(--shadow))}
+.receipt-paper{background:var(--surface);padding:26px 26px 18px;display:flex;flex-direction:column;gap:9px;font:13px var(--mono)}
+html[data-theme=dark] .receipt-paper{background:color-mix(in srgb,var(--raised) 55%,var(--bg))}
+.receipt-title{text-align:center;font:400 24px/1 var(--display);text-transform:lowercase}
+.receipt-sub{text-align:center;font-size:11px;color:var(--muted)}
+.receipt-rule{border-top:1.5px dashed var(--line-strong);margin:4px 0}
+.receipt-row{display:flex;justify-content:space-between;gap:10px}
+.receipt-row.fee{padding-left:14px;color:var(--amber)}
+.receipt-note{margin:4px 0 0;font-style:italic;font-size:11px;color:var(--muted)}
+.receipt-teeth{height:14px;background:linear-gradient(45deg,transparent 7px,var(--surface) 0) 0 0/14px 14px,linear-gradient(-45deg,transparent 7px,var(--surface) 0) 0 0/14px 14px}
+html[data-theme=dark] .receipt-teeth{background:linear-gradient(45deg,transparent 7px,color-mix(in srgb,var(--raised) 55%,var(--bg)) 0) 0 0/14px 14px,linear-gradient(-45deg,transparent 7px,color-mix(in srgb,var(--raised) 55%,var(--bg)) 0) 0 0/14px 14px}
+
+@media (max-width:900px){
+  .ibco-pool{grid-template-columns:1fr}
+  .pool-tag{border-right:0;border-bottom:2px dashed var(--surface);flex-direction:row;gap:10px}
+  .pool-round{font-size:20px}
+  .ibco-steps{grid-template-columns:1fr;gap:16px}
+  .steps-grid{grid-template-columns:1fr}
+  .ibco-bottom{grid-template-columns:1fr}
+  .slip-grid{grid-template-columns:1fr}
+  .slip-tile{border-right:0;border-bottom:1.5px solid var(--line-strong)}
+}

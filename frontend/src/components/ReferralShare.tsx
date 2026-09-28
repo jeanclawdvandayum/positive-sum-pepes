@@ -5,11 +5,17 @@ import { CHAIN_ID, TESTNET_ETH_FAUCET } from '../lib/config'
 import { fmtPepeId } from '../lib/format'
 import { rpcCall } from '../lib/rpc'
 import { useRound } from '../lib/useRound'
+import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
+import { renderPepeSvg } from '../lib/pepeRender'
 import {
+  setReferralPepeRenderer,
   loadReferralPepe, pickReferralQuip, referralPepePng, referralPostText,
   referralXIntent, REFERRAL_QUIPS,
 } from '../lib/referralShare'
 import { fireFx } from '../lib/actionFx'
+
+// bundled art renderer for the share image (dna read on-chain, image local)
+setReferralPepeRenderer(renderPepeSvg)
 
 const button = 'inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 py-2 text-sm font-semibold transition hover:bg-bg-2 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40'
 
@@ -28,6 +34,7 @@ export default function ReferralShare({ tokenId, link, enabled }: {
 }
 
 function SharePanel({ staker, tokenId, link }: { staker: `0x${string}`; tokenId: bigint; link: string }) {
+  const dnaVersion = usePepeDnaVersion(staker)
   const panelId = useId()
   const [open, setOpen] = useState(false)
   const [quip, setQuip] = useState(() => pickReferralQuip())
@@ -41,9 +48,9 @@ function SharePanel({ staker, tokenId, link }: { staker: `0x${string}`; tokenId:
   }, [])
 
   const art = useQuery({
-    queryKey: ['referral-share-art', CHAIN_ID, staker, tokenId.toString()],
+    queryKey: ['referral-share-art', CHAIN_ID, staker, tokenId.toString(), String(dnaVersion)],
     enabled: open,
-    queryFn: async () => referralPepePng(await loadReferralPepe(staker, tokenId, rpcCall)),
+    queryFn: async () => referralPepePng(await loadReferralPepe(staker, tokenId, rpcCall, dnaVersion ?? 2n)),
     staleTime: Infinity,
   })
   useEffect(() => {
