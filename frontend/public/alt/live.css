@@ -279,7 +279,7 @@ html[data-theme=light] .stc-vest-cell.now{border-color:var(--line-strong)}
 .stv-lineup>div>div:first-child{padding:16px 22px;border-bottom:1.5px solid var(--line-strong);align-items:center}
 .stv-lineup h2{font-size:clamp(22px,2.6vw,34px)}
 .stv-lineup p{font-size:13px}
-.alt-shell .stv-lineup button.st-btn.st-btn{min-height:0;width:auto;padding:10px 14px;font-size:0;background:var(--action);border:1.5px solid var(--line-strong);clip-path:none}
+.alt-shell .stv-lineup button.st-btn.st-btn{min-height:0;width:auto;padding:10px 14px;font-size:0;background:var(--action);border:1.5px solid var(--line-strong);clip-path:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
 html[data-theme=light] .alt-shell .stv-lineup button.st-btn.st-btn{box-shadow:3px 3px 0 var(--shadow)}
 .alt-shell .stv-lineup button.st-btn.st-btn::after{content:'bring in new suspects ↻';font-size:13px;font-weight:600;position:static;width:auto;transform:none;background:none}
 .alt-shell .stv-lineup button.st-btn.st-btn:disabled{background:var(--raised);color:var(--muted);border-color:var(--line);box-shadow:none}

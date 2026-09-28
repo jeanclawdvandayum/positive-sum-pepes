@@ -5,7 +5,7 @@ import { stakerAbi } from '../lib/abi'
 import { rpcCall } from '../lib/rpc'
 import { renderPepeSvg } from '../lib/pepeRender'
 import type { RoundInfo } from '../lib/useRound'
-import { PixelIcon } from './PixelIcon'
+import Dice3D from './Dice3D'
 import { CHAIN_ID } from '../lib/config'
 import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 import { fmtPepeId } from '../lib/format'
@@ -89,8 +89,8 @@ export default function PepePicker({ round, selected, onSelect, seed, onReroll, 
             onReroll()
           }}
         >
-          {/* key=seed: alt CSS spins the die (polish.css) each time the set re-rolls */}
-          <PixelIcon name="die" size={16} key={seed} /> refresh
+          {/* seed change = re-roll click: the die tumbles and lands on a random face */}
+          <Dice3D size={20} seed={seed} /> refresh
         </button>
       </div>
 
