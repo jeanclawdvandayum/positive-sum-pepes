@@ -96,12 +96,10 @@ html[data-urgency=critical] .instrument-status {
 }
 html[data-urgency=critical] :is(.instrument,.play-clockband>.clock,.predeposit-state>.clock,.mini-clock,.strip-clock) {
   border-color: var(--time-lit);
-  animation: clock-alarm 1.8s ease-in-out infinite;
 }
 @media(max-width:800px) {
   .instrument-top { gap: 8px; flex-wrap: wrap; }
 }
-@keyframes clock-alarm { 50% { outline: 2px solid color-mix(in srgb,var(--time-lit) 47%,transparent); outline-offset: 3px; } }
 
 /* Flat fills remain legible behind the ladder's text. */
 .ladder-row { background: var(--panel); }

@@ -106,10 +106,9 @@ body.alt-mode {--bg-0:var(--bg);--bg-1:var(--panel);--bg-2:var(--raised);--text-
 .alt-shell .clockbox{position:relative;width:fit-content;max-width:100%;margin:0 auto;padding:18px 24px 16px;border-radius:4px;background:var(--clock-housing);border:1px solid var(--clock-line);box-shadow:6px 6px 0 var(--shadow);display:flex;flex-direction:column;gap:10px}
 html:not([data-urgency=idle]) .alt-shell .clockbox{box-shadow:6px 6px 0 var(--time-lit)}
 .alt-shell .clockbox{border-radius:4px!important}
-html[data-urgency=critical] .alt-shell .clockbox{border-color:var(--time-lit);animation:clock-alarm 1.8s ease-in-out infinite}
+html[data-urgency=critical] .alt-shell .clockbox{border-color:var(--time-lit)}
 .alt-shell .clockbox-strip{display:flex;justify-content:space-between;gap:24px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .alt-play .clockbox .alt-clock{margin:0;line-height:1.05}
-@media(prefers-reduced-motion:reduce){html[data-urgency=critical] .alt-shell .clockbox{animation:none;outline:2px solid color-mix(in srgb,var(--time-lit) 47%,transparent);outline-offset:2px}}
 
 .alt-play .pot-line{font-size:16px;color:var(--ink)}
 .alt-play .pot-line strong{font-family:var(--mono);font-size:28px;color:var(--amber);margin:0 4px}
