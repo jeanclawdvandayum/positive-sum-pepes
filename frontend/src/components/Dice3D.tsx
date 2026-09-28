@@ -40,9 +40,9 @@ const FACE_PLACEMENT: { value: number; transform: (half: number) => string }[] =
 
 const CSS = `
 .d3d-scene{display:inline-block;perspective:calc(var(--d3d-size) * 7);width:var(--d3d-size);height:var(--d3d-size);vertical-align:middle}
-.d3d-cube{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform 1.05s cubic-bezier(.18,.7,.22,1)}
-.d3d-face{position:absolute;inset:0;border-radius:22%;background:#F6F2E7;border:1px solid #1d2732;display:grid;grid-template-rows:repeat(3,1fr);grid-template-columns:repeat(3,1fr);padding:14%}
-.d3d-pip{border-radius:50%;background:#1d2732;align-self:center;justify-self:center;width:62%;height:62%}
+.d3d-cube{display:block;width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform 1.05s cubic-bezier(.18,.7,.22,1)}
+.d3d-face{position:absolute;inset:0;border-radius:22%!important;background:#F6F2E7;border:1px solid #1d2732;display:grid;grid-template-rows:repeat(3,1fr);grid-template-columns:repeat(3,1fr);padding:14%}
+.d3d-pip{border-radius:50%!important;background:#1d2732;align-self:center;justify-self:center;width:62%;height:62%}
 @media (prefers-reduced-motion: reduce){.d3d-cube{transition:none}}
 `
 
