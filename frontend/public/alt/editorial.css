@@ -128,3 +128,6 @@ html[data-theme=light] input[type=range]{accent-color:var(--green-ink)}
 .story-panel .small-heading, .micro-label{text-transform:none}
 .under-hero a{text-decoration:underline;text-underline-offset:3px}
 .stc-good{color:var(--green)}
+
+/* text selection carries the tagline's lime marker */
+::selection{background:var(--action);color:var(--action-ink)}

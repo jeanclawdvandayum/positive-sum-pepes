@@ -103,11 +103,11 @@ body.alt-mode {--bg-0:var(--bg);--bg-1:var(--panel);--bg-2:var(--raised);--text-
 
 /* the clock housing: strip + digits in one dark box, hard action shadow
    while a window is actually running (idle = flat round) */
-.alt-play .clockbox{position:relative;width:fit-content;max-width:100%;margin:0 auto;padding:18px 24px 16px;background:var(--clock-housing);border:1px solid var(--clock-line);box-shadow:6px 6px 0 var(--shadow);display:flex;flex-direction:column;gap:10px}
+.alt-shell .clockbox{position:relative;width:fit-content;max-width:100%;margin:0 auto;padding:18px 24px 16px;background:var(--clock-housing);border:1px solid var(--clock-line);box-shadow:6px 6px 0 var(--shadow);display:flex;flex-direction:column;gap:10px}
 html:not([data-urgency=idle]) .alt-play .clockbox{box-shadow:6px 6px 0 var(--action)}
 html[data-urgency=critical] .alt-play .clockbox{border-color:var(--time-lit);animation:clock-alarm 1.8s ease-in-out infinite}
 .alt-play .clockbox-strip{display:flex;justify-content:space-between;gap:24px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.alt-play .clockbox .alt-clock{font-size:clamp(64px,7vw,88px);margin:0;line-height:1.05}
+.alt-play .clockbox .alt-clock{margin:0;line-height:1.05}
 @media(prefers-reduced-motion:reduce){html[data-urgency=critical] .alt-play .clockbox{animation:none;outline:2px solid color-mix(in srgb,var(--time-lit) 47%,transparent);outline-offset:2px}}
 
 .alt-play .pot-line{font-size:16px;color:var(--ink)}
@@ -178,7 +178,7 @@ html[data-theme=light] .alt-play .curve-readout strong{color:var(--green-ink)}
   .alt-play .play-clockband{padding:32px 0 28px;gap:14px}
   .alt-play .clockbox{padding:12px 14px 10px;gap:6px;box-shadow:4px 4px 0 var(--shadow)}
   html:not([data-urgency=idle]) .alt-play .clockbox{box-shadow:4px 4px 0 var(--action)}
-  .alt-play .clockbox .alt-clock{font-size:clamp(40px,11vw,56px)}
+  .clockbox .flip-clock{font-size:clamp(40px,11vw,56px)}
   .alt-play .pot-line strong{font-size:22px}
   .alt-play .ladder-row{grid-template-columns:38px minmax(0,1fr) 96px;height:44px;min-height:44px}
   .alt-play .ladder-row:first-child{height:56px;min-height:56px}
@@ -636,6 +636,3 @@ html[data-theme=dark] .receipt-teeth{background:linear-gradient(45deg,transparen
   .slip-grid{grid-template-columns:1fr}
   .slip-tile{border-right:0;border-bottom:1.5px solid var(--line-strong)}
 }
-
-/* the IBCO hero clock is the play page's size (mock 5/11) */
-.ibco-hero .clockbox .flip-clock{font-size:clamp(40px,4.4vw,88px)}
