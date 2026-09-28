@@ -20,6 +20,9 @@ type ChartProps = {
   hasTrades?: boolean
   /** connected user's vw avg buy price (mixETH per PSP) — from the Buy log lane */
   entryPrice?: number
+  /** alt shell: stretch the plot to fill its (short, wide) band instead of
+   *  letterboxing the square viewBox — the refined mocks' pulse band. */
+  fillBand?: boolean
 }
 
 export default function CurveChart(props: ChartProps) {
@@ -27,7 +30,7 @@ export default function CurveChart(props: ChartProps) {
   return <CurveChartView {...props} round={round} />
 }
 
-export function CurveChartView({ round, hasTrades = true, entryPrice }: ChartProps & { round: RoundInfo }) {
+export function CurveChartView({ round, hasTrades = true, entryPrice, fillBand = false }: ChartProps & { round: RoundInfo }) {
   const [yMode, setYMode] = useState<YMode>('price')
   // axis default by curve family (2026-08-29): zone teeth read literally on
   // LINEAR axes; the tilted sine spans 4 decades — the staircase of plateaus
@@ -218,6 +221,7 @@ export function CurveChartView({ round, hasTrades = true, entryPrice }: ChartPro
       {pts.length > 0 ? (
         <svg
           viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio={fillBand ? 'none' : undefined}
           className="mt-3 w-full touch-none select-none"
           onMouseMove={onMove}
           onMouseLeave={() => setHover(null)}

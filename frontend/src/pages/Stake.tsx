@@ -2,7 +2,7 @@ import AmountSlider from '../components/AmountSlider'
 import { positionFeesEarned } from '../lib/positionFees'
 import { minimumOutput } from '../lib/gameRules'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
-import { predepositResult } from '../lib/chainResults'
+import { readPredeposit } from '../lib/predepositState'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { ADDRESSES, FAUCET_ENABLED, REINVEST_ENABLED } from '../lib/config'
@@ -337,7 +337,7 @@ export default function Stake({ variant }: { variant?: 'alt' } = {}) {
     const who = address
     async function tick() {
       try {
-        const d = predepositResult(await rpcCall(c, controllerAbi, 'predeposits', [who]))
+        const d = await readPredeposit(c, who)
         if (!dead) setMyDep(d)
       } catch { /* keep last */ }
     }

@@ -2,6 +2,7 @@ import { readPositions, mapBatched } from '../../lib/positions'
 import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { factoryAbi, controllerAbi, hookAbi, erc20Abi } from '../../lib/abi'
+import { readPredeposit } from '../../lib/predepositState'
 import { rpcCall } from '../../lib/rpc'
 import { ADDRESSES } from '../../lib/config'
 
@@ -94,8 +95,11 @@ export function useGraveyard(): {
             gr.pspAllowance = alw
 
             gr.claimablePot = await rpcCall(hook, hookAbi, 'claimablePot', [me]) as bigint
-            const deposit = await rpcCall(controller, controllerAbi, 'predeposits', [me]) as [bigint, boolean]
-            gr.unclaimedPredeposit = deposit[0] > 0n && !deposit[1]
+            // era-aware read: v3 controllers return a 3-tuple (claimed is
+            // last); older ones the 2-tuple. Hand-decoding blocked connected
+            // loads on the deployed v2 round.
+            const deposit = await readPredeposit(controller, me)
+            gr.unclaimedPredeposit = deposit.mixETHAmount > 0n && !deposit.claimed
             if (staker) gr.positions = await readPositions(staker, me, true)
           }
           found.push(gr)

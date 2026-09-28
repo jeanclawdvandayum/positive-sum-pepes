@@ -1,6 +1,7 @@
 import { rpcCall } from './rpc'
 import { controllerAbi, legacyControllerAbi } from './abi'
 import { normalizePredepositState, type PredepositStateView } from './predeposit'
+import { predepositResult, type PredepositEntry } from './chainResults'
 import type { Address } from 'viem'
 
 /// Era-aware reads around predepositState: decode with the ABI the round's
@@ -72,4 +73,24 @@ export async function readPredepositLane(controller: Address): Promise<{ facts: 
   const facts = await controllerFacts(controller)
   const state = await readPredepositState(controller, facts.rules).catch(() => undefined)
   return { facts, state }
+}
+
+/** Read one wallet's predeposit entry from any controller era. The ABI is
+ *  selected by the controller's PREDEPOSIT_RULES_VERSION (v3 grew the
+ *  greenAmount field; older rounds return the 2-tuple) and the result is
+ *  normalized through predepositResult — never decoded by hand.
+ *  Version per controller is cached for the session. */
+const versionCache = new Map<string, bigint>()
+
+export async function readPredeposit(
+  controller: `0x${string}`,
+  who: `0x${string}`,
+): Promise<PredepositEntry> {
+  let version = versionCache.get(controller.toLowerCase())
+  if (version === undefined) {
+    version = await rpcCall(controller, legacyControllerAbi, 'PREDEPOSIT_RULES_VERSION') as bigint
+    versionCache.set(controller.toLowerCase(), version)
+  }
+  const abi = version === 3n ? controllerAbi : legacyControllerAbi
+  return predepositResult(await rpcCall(controller, abi, 'predeposits', [who]))
 }

@@ -28,7 +28,26 @@ export function RandomPepe({ className = '' }: { className?: string }) {
 }
 export function AltClock({ deadline, settled = false }: { deadline?: bigint; settled?: boolean }) {
   const now = useNow()
-  return <div className="clock alt-clock" role="timer" aria-label="countdown">{settled ? '--:--:--' : deadline === undefined ? '--:--:--' : clockText(Math.max(0, Number(deadline)-now))}</div>
+  const text = settled || deadline === undefined ? '--:--:--' : clockText(Math.max(0, Number(deadline) - now))
+  return <FlipClock text={text} />
+}
+
+/** The refined mocks' flip board, verbatim: fixed-width mono tiles (IBM
+ *  Plex Mono 600), a 3px hinge bar across each tile (digits AND colons),
+ *  tile = the theme's raised clock face, digits ride the urgency lanes
+ *  (--time-lit: green/yellow/red). Static like the mock — PhaseEngine's
+ *  per-second tick is the only motion. */
+export function FlipClock({ text, className = '' }: { text: string; className?: string }) {
+  return (
+    <div className={`clock alt-clock flip-clock ${className}`.trim()} role="timer" aria-label="countdown">
+      {text.split('').map((ch, i) => (
+        <span key={i} className={ch === ':' ? 'flip-tile flip-colon' : 'flip-tile'}>
+          <span className="flip-glyph">{ch}</span>
+          <span className="flip-hinge" aria-hidden="true" />
+        </span>
+      ))}
+    </div>
+  )
 }
 export function Faucet() {
   const { isConnected } = useAccount()

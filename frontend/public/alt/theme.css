@@ -128,3 +128,31 @@ html[data-theme=light] .prototype-strip { background: var(--raised); }
 }
 
 .play-clockband h1 span.money { color: var(--amber); }
+
+/* ── the refined mocks' flip board (exact spec) ────────────────────────────
+   tile 72×112 @ 88px IBM Plex Mono 600 · hinge 3px at 55px · G: tile
+   #192832 hinge #03090D · F: tile #2A3242 hinge #19202E · digits --time-lit */
+.clock.flip-clock{display:inline-flex;gap:calc(7 / 88 * 1em);align-items:center;font-family:'IBM Plex Mono',var(--mono)!important;font-weight:600;line-height:1;text-shadow:none}
+.flip-tile{
+  position:relative;display:flex;align-items:center;justify-content:center;
+  width:calc(72 / 88 * 1em);height:calc(112 / 88 * 1em);
+  background:var(--clock-face,#192832);color:var(--time-lit);
+  font-size:1em;border-radius:3px;
+}
+.flip-tile .flip-glyph{font-variant-numeric:tabular-nums}
+.flip-tile .flip-hinge{
+  position:absolute;left:0;right:0;top:calc(55 / 112 * 100% - 1.5px);height:calc(3 / 88 * 1em);
+  background:var(--shadow);
+}
+.flip-tile.flip-colon{background:transparent;width:calc(26 / 88 * 1em)}
+/* theme clock faces: G raised #192832; F mock navy #2A3242 */
+:root{--clock-face:#192832}
+html[data-theme=light]{--clock-face:#2A3242}
+/* scale per context (mock play = 88px) */
+.alt-play .clockbox .flip-clock{font-size:clamp(40px,6.2vw,88px)}
+.predeposit-state .flip-clock{font-size:clamp(34px,4.6vw,64px)}
+.instrument .flip-clock{font-size:clamp(20px,2vw,28px)}
+@media (prefers-reduced-motion:reduce){
+  .flip-tile .flip-top,.flip-tile .flip-bottom{animation:none}
+  .flip-colon{animation:none}
+}
