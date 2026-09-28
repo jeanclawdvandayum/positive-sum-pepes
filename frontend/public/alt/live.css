@@ -421,6 +421,8 @@ html[data-theme=light] .grv-winner-pot{color:var(--ink)}
 .grv-dead-art{position:relative;width:72px}
 .grv-dead-art .grv-thumb-art{width:72px;height:72px;filter:grayscale(1) sepia(.2)}
 .grv-dead-tag{position:absolute;right:-6px;bottom:-8px;font:10px var(--mono);padding:3px 6px;background:color-mix(in srgb,var(--amber) 30%,var(--panel));border:1px solid var(--line-strong);transform:rotate(-8deg)}
+/* the curve chart's classic card joins the paper language on the play page */
+.alt-shell .actual-curve .rounded-xl{border-radius:0;box-shadow:5px 5px 0 var(--shadow)}
 /* the deposit slip is a paper card like the others — carries the hard
    shadow (the .alt-shell .card reset kills tailwind's soft one) */
 .alt-shell .ibco-slip.card{box-shadow:5px 5px 0 var(--shadow)}
