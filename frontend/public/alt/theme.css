@@ -132,14 +132,15 @@ html[data-theme=light] .prototype-strip { background: var(--raised); }
 /* ── the refined mocks' flip board (exact spec) ────────────────────────────
    tile 72×112 @ 88px IBM Plex Mono 600 · hinge 3px at 55px · G: tile
    #192832 hinge #03090D · F: tile #2A3242 hinge #19202E · digits --time-lit */
-.clock.flip-clock{display:inline-flex;gap:calc(7 / 88 * 1em);align-items:center;font-family:'IBM Plex Mono',var(--mono)!important;font-weight:600;line-height:1;text-shadow:none}
+.alt-shell .clock.flip-clock{display:inline-flex!important;gap:calc(7 / 88 * 1em);align-items:center;font-family:'IBM Plex Mono',var(--mono)!important;font-weight:600;line-height:1;text-shadow:none}
 .flip-tile{
   position:relative;display:flex;align-items:center;justify-content:center;
   width:calc(72 / 88 * 1em);height:calc(112 / 88 * 1em);
   background:var(--clock-face,#192832);color:var(--time-lit);
-  font-size:1em;border-radius:3px;
+  font-size:1em;border-radius:3px!important;
 }
 .flip-tile .flip-glyph{font-variant-numeric:tabular-nums}
+.alt-shell .flip-tile{border-radius:3px!important}
 .flip-tile .flip-hinge{
   position:absolute;left:0;right:0;top:calc(55 / 112 * 100% - 1.5px);height:calc(3 / 88 * 1em);
   background:var(--shadow);
