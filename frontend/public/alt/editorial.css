@@ -110,8 +110,8 @@ html[data-theme=light]{--diagram-pot:var(--green);--diagram-steep:var(--ink)}
 .instrument-top strong{white-space:nowrap}
 /* the round/status row must not run under the NO INSIDERS stamp circle
    (116px at the ticket's top-right) — reserve it in both themes */
-.instrument-top{padding-right:126px}
-.instrument-status{max-width:100%;overflow-wrap:anywhere}
+.instrument-top{padding-right:110px;flex-wrap:wrap}
+.instrument-status{flex:1 1 100%;white-space:normal;overflow-wrap:normal}
 /* H3: mobile hero ticket stacks instead of overflowing */
 @media (max-width:480px){
   .ticket-body{flex-direction:column}
@@ -119,6 +119,7 @@ html[data-theme=light]{--diagram-pot:var(--green);--diagram-steep:var(--ink)}
   .ticket-data{min-width:0}
   .instrument-details b{overflow-wrap:anywhere}
   .no-insiders{width:72px;height:72px;top:-8px;right:-4px}
+  .instrument-top{padding-right:0}
 }
 
 /* L2: the money headline reads green-ink in light, per mock-0 */

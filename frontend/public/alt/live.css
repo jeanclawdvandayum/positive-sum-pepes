@@ -103,12 +103,13 @@ body.alt-mode {--bg-0:var(--bg);--bg-1:var(--panel);--bg-2:var(--raised);--text-
 
 /* the clock housing: strip + digits in one dark box, hard action shadow
    while a window is actually running (idle = flat round) */
-.alt-shell .clockbox{position:relative;width:fit-content;max-width:100%;margin:0 auto;padding:18px 24px 16px;background:var(--clock-housing);border:1px solid var(--clock-line);box-shadow:6px 6px 0 var(--shadow);display:flex;flex-direction:column;gap:10px}
-html:not([data-urgency=idle]) .alt-play .clockbox{box-shadow:6px 6px 0 var(--action)}
-html[data-urgency=critical] .alt-play .clockbox{border-color:var(--time-lit);animation:clock-alarm 1.8s ease-in-out infinite}
-.alt-play .clockbox-strip{display:flex;justify-content:space-between;gap:24px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.alt-shell .clockbox{position:relative;width:fit-content;max-width:100%;margin:0 auto;padding:18px 24px 16px;border-radius:4px;background:var(--clock-housing);border:1px solid var(--clock-line);box-shadow:6px 6px 0 var(--shadow);display:flex;flex-direction:column;gap:10px}
+html:not([data-urgency=idle]) .alt-shell .clockbox{box-shadow:6px 6px 0 var(--time-lit)}
+.alt-shell .clockbox{border-radius:4px!important}
+html[data-urgency=critical] .alt-shell .clockbox{border-color:var(--time-lit);animation:clock-alarm 1.8s ease-in-out infinite}
+.alt-shell .clockbox-strip{display:flex;justify-content:space-between;gap:24px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .alt-play .clockbox .alt-clock{margin:0;line-height:1.05}
-@media(prefers-reduced-motion:reduce){html[data-urgency=critical] .alt-play .clockbox{animation:none;outline:2px solid color-mix(in srgb,var(--time-lit) 47%,transparent);outline-offset:2px}}
+@media(prefers-reduced-motion:reduce){html[data-urgency=critical] .alt-shell .clockbox{animation:none;outline:2px solid color-mix(in srgb,var(--time-lit) 47%,transparent);outline-offset:2px}}
 
 .alt-play .pot-line{font-size:16px;color:var(--ink)}
 .alt-play .pot-line strong{font-family:var(--mono);font-size:28px;color:var(--amber);margin:0 4px}
@@ -176,9 +177,11 @@ html[data-theme=light] .alt-play .curve-readout strong{color:var(--green-ink)}
 @media(max-width:900px){.alt-play .play-grid{grid-template-columns:1fr;gap:30px}}
 @media(max-width:480px){
   .alt-play .play-clockband{padding:32px 0 28px;gap:14px}
-  .alt-play .clockbox{padding:12px 14px 10px;gap:6px;box-shadow:4px 4px 0 var(--shadow)}
-  html:not([data-urgency=idle]) .alt-play .clockbox{box-shadow:4px 4px 0 var(--action)}
+  .alt-shell .clockbox{padding:12px 14px 10px;gap:6px;box-shadow:4px 4px 0 var(--shadow)}
+  html:not([data-urgency=idle]) .alt-shell .clockbox{box-shadow:4px 4px 0 var(--time-lit)}
   .clockbox .flip-clock{font-size:clamp(40px,11vw,56px)}
+  .slip-grid{grid-template-columns:minmax(0,1fr)}
+  .ibco-slip{max-width:100%}
   .alt-play .pot-line strong{font-size:22px}
   .alt-play .ladder-row{grid-template-columns:38px minmax(0,1fr) 96px;height:44px;min-height:44px}
   .alt-play .ladder-row:first-child{height:56px;min-height:56px}
@@ -488,8 +491,8 @@ html[data-theme=light] .grv-winner-pot{color:var(--ink)}
 .site-header nav a{font:15px var(--body)}
 /* L4: light clock strip readable on the dark housing */
 html[data-theme=light] .clockbox-strip{color:var(--clock-muted,#8B929E)}
-/* L5: the clockbox shadow follows the urgency band */
-.clockbox{box-shadow:6px 6px 0 var(--time-lit)}
+/* L5: the clockbox shadow follows the urgency band (flat at idle) */
+html:not([data-urgency=idle]) .clockbox{box-shadow:6px 6px 0 var(--time-lit)}
 /* L6: no wrapping wallet button on phones */
 @media (max-width:480px){ .wallet-button, .header-tools button{white-space:nowrap} }
 
@@ -627,12 +630,15 @@ html[data-theme=dark] .receipt-paper{background:color-mix(in srgb,var(--raised) 
 html[data-theme=dark] .receipt-teeth{background:linear-gradient(45deg,transparent 7px,color-mix(in srgb,var(--raised) 55%,var(--bg)) 0) 0 0/14px 14px,linear-gradient(-45deg,transparent 7px,color-mix(in srgb,var(--raised) 55%,var(--bg)) 0) 0 0/14px 14px}
 
 @media (max-width:900px){
-  .ibco-pool{grid-template-columns:1fr}
+  .ibco-pool{grid-template-columns:minmax(0,1fr)}
+  .ibco-bottom{grid-template-columns:minmax(0,1fr)}
+  .ibco-slip{width:100%}
+  .slip-face,.slip-face *{max-width:100%}
+  .slip-amount input,#ibco-amount{min-width:0;width:100%}
+  .slip-grid{grid-template-columns:minmax(0,1fr)}
   .pool-tag{border-right:0;border-bottom:2px dashed var(--surface);flex-direction:row;gap:10px}
   .pool-round{font-size:20px}
   .ibco-steps{grid-template-columns:1fr;gap:16px}
-  .steps-grid{grid-template-columns:1fr}
-  .ibco-bottom{grid-template-columns:1fr}
-  .slip-grid{grid-template-columns:1fr}
+  .steps-grid{grid-template-columns:minmax(0,1fr)}
   .slip-tile{border-right:0;border-bottom:1.5px solid var(--line-strong)}
 }
