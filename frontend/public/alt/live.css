@@ -591,11 +591,11 @@ html[data-theme=dark] .step-dot.done{border-color:var(--green)}
 /* bottom: slip + receipt */
 .ibco-bottom{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,0.9fr);gap:22px;align-items:start}
 .slip-grid{display:grid;grid-template-columns:190px minmax(0,1fr);gap:0}
-.slip-tile{position:relative;display:flex;flex-direction:column;gap:6px;padding:16px;border-right:1.5px solid var(--line-strong);border-bottom:1.5px solid var(--line-strong)}
+.slip-tile{position:relative;display:flex;flex-direction:column;gap:8px;padding:16px}
 .slip-face{width:100%;aspect-ratio:1;display:grid;place-items:center;border:1.5px solid var(--line-strong);background:var(--raised);image-rendering:pixelated}
 .slip-face.empty{font:700 26px var(--mono);color:var(--muted)}
 .slip-face svg{width:100%;height:100%}
-.slip-tile-cap{display:flex;flex-direction:column;gap:2px;font:11px var(--mono);border-top:1.5px solid var(--line-strong);padding-top:6px}
+.slip-tile-cap{display:flex;flex-direction:column;gap:2px;font:11px var(--mono);padding-top:2px}
 .slip-tile-cap .dim{color:var(--muted)}
 .slip-stamp{position:absolute;left:22px;top:22px;padding:3px 9px;border:3px solid var(--red);color:var(--red);transform:rotate(-8deg);font:600 12px var(--mono);letter-spacing:2px;background:color-mix(in srgb,var(--surface) 80%,transparent)}
 .slip-form{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
@@ -642,7 +642,6 @@ html[data-theme=dark] .receipt-teeth{background:linear-gradient(45deg,transparen
   .pool-round{font-size:20px}
   .ibco-steps{grid-template-columns:1fr;gap:16px}
   .steps-grid{grid-template-columns:minmax(0,1fr)}
-  .slip-tile{border-right:0;border-bottom:1.5px solid var(--line-strong)}
 }
 
 /* every boxed control carries the hard shadow (mock: 2px inline, 3px

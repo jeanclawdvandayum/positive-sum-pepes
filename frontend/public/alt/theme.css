@@ -159,7 +159,7 @@ html[data-theme=light] .clockbox{background:var(--ink);border:0;padding:18px 25p
 }
 
 /* pocket flip board in the top bar */
-.mini-flip{display:inline-flex;align-items:center;margin-right:10px}
+.mini-flip{display:inline-flex;align-items:center;margin-right:10px;background:var(--clock-housing,var(--ink));padding:4px 8px;border:1px solid var(--clock-line,var(--line-strong));border-radius:4px}
 .mini-flip .flip-clock{font-size:13px}
 .mini-flip .flip-tile{width:calc(72 / 88 * 1em);height:calc(112 / 88 * 1em)}
 @media (max-width:800px){ .mini-flip{display:none} }
