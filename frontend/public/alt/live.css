@@ -140,8 +140,8 @@ html[data-theme=light] .alt-play .live-tape .text-accent{color:var(--green-ink)}
 html[data-theme=light] .alt-play .ladder-row{--rank-rule:var(--ink);--seat-fill:#e3e8d6;--seat-edge:#8b9577;border-color:#c9c6bb}
 .alt-play .ladder-row:first-child{--seat-fill:#383a37;--seat-edge:#f5c168;height:64px;min-height:64px;border:1.5px solid #f5c168}
 html[data-theme=light] .alt-play .ladder-row:first-child{--seat-fill:#cfdcb2;--seat-edge:#33452a;border-color:#19202e}
-.alt-play .ladder-row.you{--seat-fill:#2f4128;--seat-edge:#c3ea98}
-html[data-theme=light] .alt-play .ladder-row.you{--seat-fill:#d9f27a;--seat-edge:#33452a}
+.alt-play .ladder-row.you{--seat-fill:#2f4128;--seat-edge:#8795a0}
+html[data-theme=light] .alt-play .ladder-row.you{--seat-fill:#c2d3a0;--seat-edge:#33452a}
 /* the share fill lives INSIDE the identity cell (mock geometry): never
    under the rank or payout columns */
 .alt-play .ladder-id::before{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--share);max-width:100%;background:var(--seat-fill);box-shadow:inset -1.5px 0 0 var(--seat-edge);z-index:0}
