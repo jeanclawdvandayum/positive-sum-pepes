@@ -174,18 +174,6 @@
   .alt-shell .tabs button.active { background: transparent; color: var(--action-ink); }
 }
 
-/* Item 6 — ladder rows: hover brightens the row and grows the share bar 4%;
-   own rows shimmer once when they first appear. */
-.alt-shell .ladder-row { transition: filter var(--t-base) var(--ease-out); }
-.alt-shell .ladder-row:hover { filter: brightness(1.13); }
-.alt-shell .ladder-row:hover::before { width: calc(var(--share) + 4%); }
-.alt-shell .ladder-row.you::after {
-  content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
-  background: linear-gradient(100deg, transparent 42%, color-mix(in srgb, var(--green) 30%, transparent) 50%, transparent 58%);
-  transform: translateX(-100%);
-  animation: you-shimmer 1.5s ease .15s 1 both;
-}
-@keyframes you-shimmer { from { transform: translateX(-100%) } to { transform: translateX(100%) } }
 
 /* Item 7 — amount inputs: a green underline grows from the caret (left) side on
    focus; invalid input shakes 2px with a flicker (aria-invalid is set by
@@ -245,7 +233,6 @@ html[data-theme='light'] .alt-shell .icon-button[aria-label$='theme'] { transfor
   .alt-shell [data-pepe-grid] button[aria-pressed='true'] > div,
   .alt-shell [data-pepe-grid] button[aria-pressed='true'] > span:last-child,
   .alt-shell .st-btn svg,
-  .alt-shell .ladder-row.you::after,
   .alt-shell .ladder-row,
   .alt-shell :is(.tx-action, .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button),
   .alt-shell :is(.tx-action, .btn, .st-btn, .btn-primary, .alt-graveyard button:not([aria-expanded]), .pd-deposit button:not(.balance-max), .inline-input button)::before,
