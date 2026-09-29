@@ -127,8 +127,29 @@ export function useConfirmedWrite(options?: { exitRoundId: bigint | undefined } 
       // decodes mined facts instead of reading the chain a second time.
       let receipt: TransactionReceipt | undefined
       const hash = await confirmTransaction({
-        simulate: p => client.simulateContract({ ...p, account: address } as never)
-          .catch(error => { throw userFacingRpcError(error) }),
+        // Public RPC nodes can index the JUST-MINED approval late: the next
+        // leg's simulation then reads a stale allowance and aborts with
+        // ERC20InsufficientAllowance even though on-chain state is fine.
+        // On that specific failure, poll the spender allowance until the
+        // node catches up (bounded), then re-simulate once before failing.
+        simulate: async p => {
+          // Public RPC nodes can index the JUST-MINED approval late: the
+          // next leg's simulation reads a stale allowance and aborts with
+          // ERC20InsufficientAllowance even though chain state is fine
+          // (spender inference is unreliable for router-mediated pulls, so
+          // the check is simply bounded re-simulation with backoff).
+          for (let attempt = 0; ; ++attempt) {
+            try {
+              return await client.simulateContract({ ...p, account: address } as never)
+            } catch (error) {
+              const laggingAllowance = attempt < 3
+                && /0xfb8f41b2|ERC20InsufficientAllowance/.test(String((error as Error)?.message))
+                && p.functionName !== 'approve'
+              if (!laggingAllowance) throw userFacingRpcError(error)
+              await new Promise(r => setTimeout(r, 1200 * 2 ** attempt))
+            }
+          }
+        },
         submit: async p => {
           await ensureWalletChain(address, CHAIN_ID)
           return writeContractAsync(p)
