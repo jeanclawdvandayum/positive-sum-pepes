@@ -31,15 +31,7 @@ const SLIDE_NAV = typeof document !== 'undefined' && 'startViewTransition' in do
   && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
 const TX_PENDING_STAGES: readonly TxStage[] = ['preparing', 'simulating', 'wallet', 'pending']
 
-const ALT_SHEETS = ['style', 'theme', 'diagrams', 'editorial', 'live', 'polish', 'fx', 'detonation']
-/// one id per page lifetime (survives vite HMR module re-evaluation)
-const BOOT_ID = ((globalThis as Record<string, unknown>).__pspAltSheetBoot ??= Date.now().toString(36)) as string
-
-export default function AltShell() {
- const {resolved,setMode}=useTheme(), round=useRound(), now=useNow(), location=useLocation()
- const [menu,setMenu]=useState(false)
- // Feature 2 (10): the wallet pepe chip breathes only while a tx is in flight.
- /** Top-bar countdown: a pocket flip board (same tiles, smaller) that shows
+/** Top-bar countdown: a pocket flip board (same tiles, smaller) that shows
  *  the live round's deadline while you're anywhere BUT the play page — on
  *  play itself the big clock owns the countdown, so the mini retires. */
 function MiniClock({ round, hidden }: { round: ReturnType<typeof useRound>, hidden: boolean }) {
@@ -55,6 +47,15 @@ function MiniClock({ round, hidden }: { round: ReturnType<typeof useRound>, hidd
   return <span className="mini-flip" aria-label={round.mode === 0 ? 'countdown to the IBCO window close' : 'countdown to detonation'}><FlipClock text={clockText(Math.max(0, Number(deadline) - now))} /></span>
 }
 
+const ALT_SHEETS = ['style', 'theme', 'diagrams', 'editorial', 'live', 'polish', 'fx', 'detonation']
+/// one id per page lifetime (survives vite HMR module re-evaluation)
+const BOOT_ID = ((globalThis as Record<string, unknown>).__pspAltSheetBoot ??= Date.now().toString(36)) as string
+
+export default function AltShell() {
+ const {resolved,setMode}=useTheme(), round=useRound(), now=useNow(), location=useLocation()
+ const [menu,setMenu]=useState(false)
+ // Feature 2 (10): the wallet pepe chip breathes only while a tx is in flight.
+ 
 const toasts=useSyncExternalStore(transactionToasts.subscribe,transactionToasts.snapshot)
  const txPending=toasts.some(t=>TX_PENDING_STAGES.includes(t.stage))
  const navigate=useNavigate()

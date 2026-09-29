@@ -170,7 +170,7 @@ html[data-theme=light] .alt-play .ladder-payout strong{color:var(--ink)}
 .alt-play .ladder-row:first-child .ladder-person strong{font-size:16px}
 .alt-play .ladder-payout small{font-size:10px;color:var(--muted)}
 .alt-play .ladder-row .open-seat{padding:0 12px;font-size:11px}
-.alt-play .notch{position:absolute;left:52px;width:12px;height:12px;border-radius:50%!important;background:var(--bg);z-index:2;pointer-events:none}
+.alt-play .notch{position:absolute;left:58px;width:12px;height:12px;border-radius:50%!important;background:var(--bg);z-index:2;pointer-events:none}
 .alt-play .notch-t{top:-7px;border-bottom:1px solid var(--line-strong)}
 .alt-play .notch-b{bottom:-7px;border-top:1px solid var(--line-strong)}
 .alt-play .empty-ladder{border:1px dashed var(--line);background:var(--surface);padding:45px 20px;text-align:center}
