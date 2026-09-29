@@ -41,7 +41,9 @@ interface GraveStakerExtended {
 ///         PSP allowance, then PSPGraveZap.exit — and asserts the receipt
 ///         path: principal unlocked, fees + pot + redemption paid to the
 ///         holder in ONE transaction, zap holds nothing afterwards.
-/// Run: forge test --match-contract GraveZapLiveExit --fork-url $BASE_SEPOLIA_RPC
+/// Opt-in: PSP_LIVE_EXIT=1 FORK_RPC_URL=<url> [FORK_BLOCK] forge test
+///         --match-contract GraveZapLiveExit — default runs SKIP so the
+///         plain suite never needs a live network.
 contract GraveZapLiveExit is Test {
     using SafeERC20 for IERC20;
 
@@ -55,10 +57,15 @@ contract GraveZapLiveExit is Test {
     IERC20 psp;
 
     function setUp() public {
-        // fork env supplies the URL: BASE_SEPOLIA_RPC_URL or FORK_RPC_URL
-        string memory url = vm.envOr("FORK_RPC_URL", string(""));
-        if (bytes(url).length == 0) url = vm.envString("BASE_SEPOLIA_RPC_URL");
-        vm.createSelectFork(url);
+        // OPT-IN live-network replay; the default suite stays deterministic.
+        // Pinning the block keeps the reproduction stable once the holder
+        // has actually exited on-chain.
+        //   PSP_LIVE_EXIT=1 FORK_RPC_URL=<base-sepolia-rpc> [FORK_BLOCK=<n>]
+        if (!vm.envOr("PSP_LIVE_EXIT", false)) {
+            vm.skip(true);
+            return;
+        }
+        vm.createSelectFork(vm.envString("FORK_RPC_URL"), vm.envOr("FORK_BLOCK", uint256(0)));
         psp = IERC20(GraveStaker(STAKER).psp());
         // the mix pin, read off the round's factory (same token the zap holds)
         mix = IERC20(Factory(0x614cB7bf611f221F97f5eaE0f231311b9F3e7278).mixETH());

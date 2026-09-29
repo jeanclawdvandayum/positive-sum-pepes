@@ -198,6 +198,7 @@ function AltDeadRound({ round, connected }: { round: GraveyardRound; connected: 
 
   return (
     <div className="grv-round">
+      <h2 className="grv-round-title">round {round.roundId.toString()}</h2>
       <section className="grv-hero" aria-label={`round ${round.roundId.toString()} final receipt`}>
         <div className="grv-receipt">
           <div className="grv-receipt-paper">
@@ -277,7 +278,6 @@ function AltDeadRound({ round, connected }: { round: GraveyardRound; connected: 
           {exitErr && <p role="alert" className="stc-note stc-crit">{exitErr}</p>}
         </div>
       )}
-      <ReferralRewards roundId={round.roundId} className="grv-referrals" />
 
       <section className="grv-paperwork" aria-label={`your paperwork for round ${round.roundId.toString()}`}>
         <div className="grv-paperwork-head">
@@ -383,6 +383,8 @@ function AltDeadRound({ round, connected }: { round: GraveyardRound; connected: 
         </div>
         {unlockErr && <p role="alert" className="stc-note stc-crit">{unlockErr}</p>}
       </section>
+
+      <ReferralRewards roundId={round.roundId} className="grv-referrals" />
     </div>
   )
 }

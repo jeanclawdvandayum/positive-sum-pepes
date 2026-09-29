@@ -699,3 +699,8 @@ body.alt-mode .tx-toast--failed{box-shadow:5px 5px 0 var(--red)!important;--tx-i
 .alt-play .ladder-row:first-child .ladder-payout strong{font-size:23px}
 .alt-play .ladder-row:first-child .ladder-person strong{font-size:16px}
 .alt-play .ladder-payout small{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+/* graveyard: each round reads as one unit — pixel title, hall + paperwork
+   adjacent, referrals last, and a hard divider before the next round */
+.grv-round-title{font-family:var(--display);font-size:clamp(34px,3.6vw,56px);line-height:1;margin:0 0 26px;color:var(--ink)}
+.grv-round + .grv-round{border-top:2px dashed var(--line-strong);margin-top:60px;padding-top:60px}
