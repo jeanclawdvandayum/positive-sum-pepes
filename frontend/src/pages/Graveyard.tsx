@@ -102,8 +102,11 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
   //    deployed (VITE_GRAVE_ZAP) and there is something to exit.
   const GZ = ADDRESSES.graveZap
   const staked = round.positions.filter(p => p.amount > 0n)
+  // withdrawn husks can still hold deferred fees — they cannot ride the zap
+  // (withdrawFor reverts on zero principal), so their claim runs first
+  const husks = round.positions.filter(p => p.amount === 0n && p.pendingFees > 0n)
   const unlockY = staked.reduce((s, p) => s + p.amount, 0n)
-  const feesDue = staked.reduce((s, p) => s + p.pendingFees, 0n)
+  const feesDue = round.positions.reduce((s, p) => s + p.pendingFees, 0n)
   const claimX = round.claimablePot + feesDue
   const convertP = unlockY + round.pspBal
   const mixZ = convertP > 0n && round.supply > 0n
@@ -114,7 +117,7 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
     ...(unlockY > 0n ? [`unlock ${fmtAmount(unlockY)} PSP`] : []),
     ...(convertP > 0n ? [`convert ${fmtAmount(convertP)} PSP → ${fmtAmount(mixZ)} mixETH`] : []),
   ].join(' · ')
-  const exitReady = GZ !== '0x' && !!round.staker && !!round.hook && isConnected && (claimX > 0n || unlockY > 0n)
+  const exitReady = GZ !== '0x' && !!round.staker && !!round.hook && isConnected && (claimX > 0n || convertP > 0n)
   const [exitStep, setExitStep] = useState<'idle' | 'sign' | 'done'>('idle')
   const [exitErr, setExitErr] = useState<string | null>(null)
 
@@ -128,6 +131,7 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
                BigInt(Math.floor(Date.now() / 1000) + 600)],
       }
       const approvals: Write[] = [
+        ...(husks.length > 0n ? [{ address: round.staker, abi: stakerAbi, functionName: 'claimAllTo', args: [husks.map(p => p.id), address] } as Write] : []),
         { address: round.staker, abi: stakerAbi, functionName: 'setApprovalForAll', args: [GZ, true] },
         ...(convertP > 0n ? [{ address: round.token, abi: erc20Abi, functionName: 'approve', args: [GZ, convertP] } as Write] : []),
       ]
