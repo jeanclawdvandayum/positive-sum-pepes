@@ -279,7 +279,7 @@ function AltDeadRound({ round, connected }: { round: GraveyardRound; connected: 
           <p className="stv-copy">
             {exitLine} — all in one transaction. approvals are bundled: atomic wallets sign once.
           </p>
-          <button type="button" className="stc-btn" disabled={exitStep === 'sign'} data-pending={exitStep === 'sign' || undefined} onClick={() => { void exitRound() }}>
+          <button type="button" className="stc-btn stc-btn-primary" disabled={exitStep === 'sign'} data-pending={exitStep === 'sign' || undefined} onClick={() => { void exitRound() }}>
             {exitStep === 'sign' ? 'exiting…' : exitStep === 'done' ? '✓ exited' : 'exit round — one transaction'}
           </button>
           {exitErr && <p role="alert" className="stc-note stc-crit">{exitErr}</p>}
