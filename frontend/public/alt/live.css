@@ -127,7 +127,7 @@ html[data-theme=light] .alt-play .live-tape .text-accent{color:var(--green-ink)}
 
 /* make-your-move zone: the trade card keeps its own bones, the page gives
    it the mockup's panel home (390px column, hard shadow) */
-.alt-play .play-grid{display:grid;grid-template-columns:390px minmax(0,1fr);gap:28px;align-items:start;padding:28px 0 0}
+.alt-play .play-grid{display:grid;grid-template-columns:390px minmax(0,1fr);gap:28px;align-items:stretch;padding:28px 0 0}
 .alt-play .trade-box{background:var(--surface);border:1.5px solid var(--line-strong);box-shadow:5px 5px 0 var(--shadow);padding:22px}
 .alt-play .trade-box-head h2{font-size:26px;letter-spacing:0}
 
@@ -135,30 +135,33 @@ html[data-theme=light] .alt-play .live-tape .text-accent{color:var(--green-ink)}
    notch circles punching the rank divider */
 .alt-play .board-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin:0 0 8px;padding-bottom:6px}
 .alt-play .board-head p{font-size:11px;color:var(--muted);text-align:right;max-width:200px}
-.alt-play .ladder{display:flex;flex-direction:column;gap:8px}
-.alt-play .ladder-row{--rank-rule:var(--line);--seat-fill:#2b3139;--seat-edge:#4d6069;display:grid;grid-template-columns:58px minmax(0,1fr) 150px;align-items:center;position:relative;height:48px;min-height:48px;padding:0;background:var(--surface);border:1px solid #22333d;overflow:visible}
+.alt-play .ladder{display:grid;grid-template-rows:minmax(64px,1.25fr) repeat(9,minmax(52px,1fr));gap:8px;flex:1;min-height:0}
+.alt-play .ladder-row{--rank-rule:var(--line);--seat-fill:#2b3139;--seat-edge:#4d6069;display:grid;grid-template-columns:64px minmax(0,1fr) 168px;align-items:center;position:relative;height:auto;min-height:52px;padding:0;background:var(--surface);border:1px solid #22333d;overflow:visible}
 html[data-theme=light] .alt-play .ladder-row{--rank-rule:var(--ink);--seat-fill:#e3e8d6;--seat-edge:#8b9577;border-color:#c9c6bb}
-.alt-play .ladder-row:first-child{--seat-fill:#383a37;--seat-edge:#f5c168;height:64px;min-height:64px;border:1.5px solid #f5c168}
+.alt-play .ladder-row:first-child{--seat-fill:#383a37;--seat-edge:#f5c168;height:auto;min-height:66px;border:1.5px solid #f5c168}
 html[data-theme=light] .alt-play .ladder-row:first-child{--seat-fill:#cfdcb2;--seat-edge:#33452a;border-color:#19202e}
-.alt-play .ladder-row.you{--seat-fill:#2f4128;--seat-edge:#8795a0}
-html[data-theme=light] .alt-play .ladder-row.you{--seat-fill:#c2d3a0;--seat-edge:#33452a}
+.alt-play .ladder-row.you{--seat-fill:#31402e;--seat-edge:#8795a0}
+html[data-theme=light] .alt-play .ladder-row.you{--seat-fill:#d5e2a2;--seat-edge:#33452a}
 /* the share fill lives INSIDE the identity cell (mock geometry): never
    under the rank or payout columns */
 .alt-play .ladder-id::before{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--share);max-width:100%;background:var(--seat-fill);box-shadow:inset -1.5px 0 0 var(--seat-edge);z-index:0}
 .alt-play .ladder-id>*{position:relative;z-index:1}
-.alt-play .ladder-row .rank{display:flex;align-items:center;justify-content:center;height:100%;font-family:var(--mono);font-size:13px;color:var(--ink);border-right:2px dashed var(--rank-rule)}
-.alt-play .ladder-row:first-child .rank{font-size:18px}
+html[data-theme=light] .alt-play .ladder-row:hover .ladder-id::before{background:#d9f27a;box-shadow:inset -1.5px 0 0 #33452a}
+.alt-play .ladder-row:hover .ladder-id::before{background:#c3ea98;box-shadow:inset -1.5px 0 0 #2f4128}
+.alt-play .ladder-row .rank{display:flex;align-items:center;justify-content:center;height:100%;font-family:var(--mono);font-size:15px;color:var(--ink);border-right:2px dashed var(--rank-rule)}
+.alt-play .ladder-row:first-child .rank{font-size:21px}
 .alt-play .ladder-id{position:relative;display:flex;align-items:center;gap:12px;min-width:0;height:100%;padding:0 12px}
-.alt-play .ladder-art{width:30px;height:30px;border:1px solid var(--line-strong)}
+.alt-play .ladder-art{width:38px;height:38px;border:1px solid var(--line-strong)}
 .alt-play .ladder-art>svg{width:100%;height:100%;display:block}
 .alt-play .ladder-row:first-child .ladder-art{width:40px;height:40px}
 .alt-play .ladder-person{display:flex;flex-direction:column;gap:2px;min-width:0}
-.alt-play .ladder-person strong{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.alt-play .ladder-person small{font-size:10px;color:var(--muted)}
+.alt-play .ladder-person strong{font-family:var(--mono);font-size:14px;font-weight:500;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alt-play .ladder-person small{font-size:11px;color:var(--muted)}
 .alt-play .ladder-payout{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;padding-right:14px;text-align:right}
 .alt-play .ladder-payout strong{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:0;color:var(--amber)}
 html[data-theme=light] .alt-play .ladder-payout strong{color:var(--ink)}
-.alt-play .ladder-row:first-child .ladder-payout strong{font-size:20px}
+.alt-play .ladder-row:first-child .ladder-payout strong{font-size:23px}
+.alt-play .ladder-row:first-child .ladder-person strong{font-size:16px}
 .alt-play .ladder-payout small{font-size:10px;color:var(--muted)}
 .alt-play .ladder-row .open-seat{padding:0 12px;font-size:11px}
 .alt-play .notch{position:absolute;left:52px;width:12px;height:12px;border-radius:50%!important;background:var(--bg);z-index:2;pointer-events:none}
@@ -684,6 +687,7 @@ body.alt-mode .tx-toast--unknown{--tx-ink:var(--amber)}
 /* ladder payout cell, to the doc: mono amounts in ink (leader 20px vs 15px,
    no accent lane), share line muted */
 .alt-play .ladder-payout{display:flex;flex-direction:column;align-items:flex-end;gap:2px;padding-right:14px}
-.alt-play .ladder-payout strong{font-family:var(--mono);font-weight:400;font-size:15px;color:var(--ink)}
-.alt-play .ladder-row:first-child .ladder-payout strong{font-size:20px}
-.alt-play .ladder-payout small{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.alt-play .ladder-payout strong{font-family:var(--mono);font-weight:400;font-size:17px;color:var(--ink)}
+.alt-play .ladder-row:first-child .ladder-payout strong{font-size:23px}
+.alt-play .ladder-row:first-child .ladder-person strong{font-size:16px}
+.alt-play .ladder-payout small{font-family:var(--mono);font-size:11px;color:var(--muted)}
