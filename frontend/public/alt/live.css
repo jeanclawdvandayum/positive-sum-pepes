@@ -140,14 +140,20 @@ html[data-theme=light] .alt-play .live-tape .text-accent{color:var(--green-ink)}
 html[data-theme=light] .alt-play .ladder-row{--rank-rule:var(--ink);--seat-fill:#e3e8d6;--seat-edge:#8b9577;border-color:#c9c6bb}
 .alt-play .ladder-row:first-child{--seat-fill:#383a37;--seat-edge:#f5c168;height:auto;min-height:66px;border:1.5px solid #f5c168}
 html[data-theme=light] .alt-play .ladder-row:first-child{--seat-fill:#cfdcb2;--seat-edge:#33452a;border-color:#19202e}
-.alt-play .ladder-row.you{--seat-fill:#31402e;--seat-edge:#8795a0}
-html[data-theme=light] .alt-play .ladder-row.you{--seat-fill:#d5e2a2;--seat-edge:#33452a}
+.alt-play .ladder-row.you{--seat-fill:#4e6243;--seat-edge:#8795a0}
+html[data-theme=light] .alt-play .ladder-row.you{--seat-fill:#dde5b0;--seat-edge:#33452a}
 /* the share fill lives INSIDE the identity cell (mock geometry): never
    under the rank or payout columns */
 .alt-play .ladder-id::before{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--share);max-width:100%;background:var(--seat-fill);box-shadow:inset -1.5px 0 0 var(--seat-edge);z-index:0}
-.alt-play .ladder-id>*{position:relative;z-index:1}
-html[data-theme=light] .alt-play .ladder-row:hover .ladder-id::before{background:#d9f27a;box-shadow:inset -1.5px 0 0 #33452a}
-.alt-play .ladder-row:hover .ladder-id::before{background:#c3ea98;box-shadow:inset -1.5px 0 0 #2f4128}
+.alt-play .ladder-id>*{position:relative;z-index:2}
+/* hover: the seat rides the .you color while a shine band pulses across */
+html[data-theme=light] .alt-play .ladder-row:hover .ladder-id::before{background:#dde5b0;box-shadow:inset -1.5px 0 0 #33452a}
+.alt-play .ladder-row:hover .ladder-id::before{background:#4e6243;box-shadow:inset -1.5px 0 0 #2f4128}
+html[data-theme=light] .alt-play .ladder-row:hover .ladder-id::after{background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.5) 50%,transparent 65%)}
+.alt-play .ladder-row:hover .ladder-id::after{background:linear-gradient(100deg,transparent 35%,color-mix(in srgb,#c3ea98 38%,transparent) 50%,transparent 65%)}
+.alt-play .ladder-row:hover .ladder-id::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;animation:ladder-shine 1.5s ease-in-out infinite}
+@keyframes ladder-shine{0%{opacity:0;transform:translateX(-55%)}45%{opacity:1}100%{opacity:0;transform:translateX(55%)}}
+@media (prefers-reduced-motion: reduce){.alt-play .ladder-row:hover .ladder-id::after{animation:none;opacity:0}}
 .alt-play .ladder-row .rank{display:flex;align-items:center;justify-content:center;height:100%;font-family:var(--mono);font-size:15px;color:var(--ink);border-right:2px dashed var(--rank-rule)}
 .alt-play .ladder-row:first-child .rank{font-size:21px}
 .alt-play .ladder-id{position:relative;display:flex;align-items:center;gap:12px;min-width:0;height:100%;padding:0 12px}
