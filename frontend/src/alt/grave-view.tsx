@@ -288,7 +288,7 @@ function AltDeadRound({ round, connected }: { round: GraveyardRound; connected: 
 
       <section className="grv-paperwork" aria-label={`your paperwork for round ${round.roundId.toString()}`}>
         <div className="grv-paperwork-head">
-          <h2>your paperwork · round {round.roundId.toString()}</h2>
+          <h2>your paperwork</h2>
           <span className="stv-copy">take your time. redemption, withdrawals and claims stay open.</span>
         </div>
         <div className="grv-forms">
