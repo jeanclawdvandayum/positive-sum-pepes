@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { REFERRAL_QUIPS, pickReferralQuip, referralPostText, referralXIntent, loadReferralPepe } from '../src/lib/referralShare.ts'
+import { REFERRAL_QUIPS, pickReferralQuip, referralPostText, referralXIntent, loadReferralPepe, setReferralPepeRenderer } from '../src/lib/referralShare.ts'
 import { parseReferral } from '../src/lib/referrals.ts'
+setReferralPepeRenderer((dna, version) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 69 69" data-dna="${dna}" data-v="${version}"/>`)
 
 test('20 distinct quips leave room for the testnet label and X-shortened referral URL', () => {
   assert.equal(REFERRAL_QUIPS.length, 20)
@@ -41,25 +42,19 @@ test('practice-network shares identify the playtest while mainnet shares keep th
   assert.equal(referralPostText('quip', 8453), 'quip\n\npositive sum pepes')
 })
 
-test('shared art uses selected NFT on-chain DNA including zero, rather than deriving it from its ID', async () => {
+test('shared art reads only the on-chain DNA and renders locally — zero descriptor/renderSVG calls', async () => {
   const staker = '0x1111111111111111111111111111111111111111'
-  const descriptor = '0x2222222222222222222222222222222222222222'
   const id = 2n ** 255n + 123n
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 69 69"/>'
   const calls = []
   const result = await loadReferralPepe(staker, id, async (to, _abi, name, args) => {
     calls.push({ to, name, args })
     if (name === 'dnaOf') return 0n
-    if (name === 'descriptor') return descriptor
-    if (name === 'renderSVG') return svg
-    throw new Error('Unexpected read')
-  })
-  assert.equal(result, svg)
-  assert.deepEqual(calls, [
-    { to: staker, name: 'dnaOf', args: [id] },
-    { to: staker, name: 'descriptor', args: undefined },
-    { to: descriptor, name: 'renderSVG', args: [0n] },
-  ])
+    throw new Error(`Unexpected read: ${name}`)
+  }, 2n)
+  // local render of DNA 0 in release 2 (never an ID-derived stand-in)
+  assert.match(result, /^<svg/)
+  assert.match(result, /viewBox="0 0 69 69"/)
+  assert.deepEqual(calls, [{ to: staker, name: 'dnaOf', args: [id] }])
 })
 
 test('failed DNA reads stay retryable and never substitute another Pepe', async () => {

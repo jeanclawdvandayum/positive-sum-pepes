@@ -78,12 +78,12 @@ test('large address-derived NFT IDs fit labels without changing bigint identity'
   assert.equal(id.toString(), '1461501637330902918203684832716283019655932542975')
 })
 
-test('primary NFT art replaces fallback, including zero-DNA NFTs, without re-fetching cached art', async () => {
+test('primary NFT returns the on-chain DNA; art renders locally (no renderSVG calls)', async () => {
   const { state, read } = fixture()
   state.dna = 0n
-  assert.deepEqual(await read(address, staker), { tokenId: 7n, dna: 0n, svg })
-  assert.deepEqual(await read(address, staker), { tokenId: 7n, dna: 0n, svg })
-  assert.equal(state.artCalls, 1)
+  assert.deepEqual(await read(address, staker), { tokenId: 7n, dna: 0n })
+  assert.deepEqual(await read(address, staker), { tokenId: 7n, dna: 0n })
+  assert.equal(state.artCalls, 0, 'the reader never calls the descriptor')
 })
 
 test('no-NFT state is not cached: minting and transfers change the next read', async () => {
@@ -99,22 +99,19 @@ test('no-NFT state is not cached: minting and transfers change the next read', a
   assert.deepEqual(await read(other, staker), { dna: addressPepeDna(other) })
 })
 
-test('failed renderer falls back to the owned DNA and retries successfully', async () => {
-  const { state, read } = fixture()
-  state.offline = true
+test('DNA survives any renderer state — the image is always the caller\'s local render', async () => {
+  const { read } = fixture()
   assert.deepEqual(await read(address, staker), { tokenId: 7n, dna: 42n })
-  state.offline = false
-  assert.deepEqual(await read(address, staker), { tokenId: 7n, dna: 42n, svg })
-  assert.equal(state.artCalls, 2)
+  assert.deepEqual(await read(address, staker), { tokenId: 7n, dna: 42n })
 })
 
-test('art cache separates stakers and renderer changes', async () => {
+test('reads are staker-scoped and descriptor-independent', async () => {
   const { state, read } = fixture()
   await read(address, staker)
   await read(address, other)
   state.descriptor = other
   await read(address, other)
-  assert.equal(state.artCalls, 3)
+  assert.equal(state.artCalls, 0, 'no descriptor traffic regardless of renderer swaps')
 })
 
 test('missing staker needs no RPC and ownership lookup failures remain retryable', async () => {
