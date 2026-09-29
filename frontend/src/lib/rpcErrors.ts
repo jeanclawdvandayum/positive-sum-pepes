@@ -22,7 +22,7 @@ export function userFacingRpcError(error: unknown): unknown {
   while (current instanceof Error && !seen.has(current)) {
     seen.add(current)
     if (/0xfb8f41b2|ERC20InsufficientAllowance/.test(current.message)) {
-      return new Error('The mixETH approval is too small or was already used. Try again to approve the current deposit amount.', { cause: error })
+      return new Error('A token approval is too small or was already used. Try again to re-approve.', { cause: error })
     }
     current = current.cause
   }

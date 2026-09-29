@@ -133,7 +133,9 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
       const approvals: Write[] = [
         ...(husks.length > 0n ? [{ address: round.staker, abi: stakerAbi, functionName: 'claimAllTo', args: [husks.map(p => p.id), address] } as Write] : []),
         { address: round.staker, abi: stakerAbi, functionName: 'setApprovalForAll', args: [GZ, true] },
-        ...(convertP > 0n ? [{ address: round.token, abi: erc20Abi, functionName: 'approve', args: [GZ, convertP] } as Write] : []),
+        // exact-amount approvals went stale between legs (balance moves on
+        // every poll); a per-round max keeps retries idempotent
+        ...(convertP > 0n ? [{ address: round.token, abi: erc20Abi, functionName: 'approve', args: [GZ, 2n ** 256n - 1n] } as Write] : []),
       ]
       await writeWithApprovals(action, approvals)
       setExitStep('done')
