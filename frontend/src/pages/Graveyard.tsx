@@ -4,6 +4,9 @@ import { usePepeDnaVersion } from '../lib/usePepeDnaVersion'
 import { useConfirmedWrite } from '../lib/useConfirmedWrite'
 import { useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
+import { CHAIN_ID } from '../lib/config'
+import { rpcCall } from '../lib/rpc'
+import { useQuery } from '@tanstack/react-query'
 import { erc20Abi, hookAbi, stakerAbi, controllerAbi, graveZapAbi } from '../lib/abi'
 import { ADDRESSES } from '../lib/config'
 import { fmtAmount, fmtPrice, fmtPepeId } from '../lib/format'
@@ -130,12 +133,27 @@ function DeadRoundCard({ round }: { round: GraveyardRound }) {
         args: [round.hook, round.staker, staked.map(p => p.id), convertP, mixZ,
                BigInt(Math.floor(Date.now() / 1000) + 600)],
       }
+  /// already-satisfied approvals are omitted, so a retry never re-asks for
+  /// grants the chain already holds (operator flag + PSP allowance)
+  const approvalsHeld = useQuery({
+    queryKey: ['exit-approvals', CHAIN_ID, round.roundId.toString(), address, GZ],
+    enabled: isConnected && !!address && GZ !== '0x' && !!round.staker && !!round.token,
+    staleTime: 4000, refetchInterval: 8000,
+    queryFn: async () => {
+      if (!round.staker || !round.token) return { operator: false, allowance: 0n }
+      const [operator, allowance] = await Promise.all([
+        rpcCall(round.staker, stakerAbi, 'isApprovedForAll', [address!, GZ]) as Promise<boolean>,
+        rpcCall(round.token, erc20Abi, 'allowance', [address!, GZ]) as Promise<bigint>,
+      ])
+      return { operator, allowance }
+    },
+  }).data
       const approvals: Write[] = [
         ...(husks.length > 0n ? [{ address: round.staker, abi: stakerAbi, functionName: 'claimAllTo', args: [husks.map(p => p.id), address] } as Write] : []),
-        { address: round.staker, abi: stakerAbi, functionName: 'setApprovalForAll', args: [GZ, true] },
+        ...(approvalsHeld?.operator ? [] : [{ address: round.staker, abi: stakerAbi, functionName: 'setApprovalForAll', args: [GZ, true] } as Write]),
         // exact-amount approvals went stale between legs (balance moves on
         // every poll); a per-round max keeps retries idempotent
-        ...(convertP > 0n ? [{ address: round.token, abi: erc20Abi, functionName: 'approve', args: [GZ, 2n ** 256n - 1n] } as Write] : []),
+        ...(convertP > 0n && (approvalsHeld?.allowance ?? 0n) < convertP ? [{ address: round.token, abi: erc20Abi, functionName: 'approve', args: [GZ, 2n ** 256n - 1n] } as Write] : []),
       ]
       await writeWithApprovals(action, approvals)
       setExitStep('done')
