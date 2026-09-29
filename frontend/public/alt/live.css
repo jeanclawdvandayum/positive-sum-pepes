@@ -667,10 +667,12 @@ html[data-theme=dark] .receipt-teeth{background:linear-gradient(45deg,transparen
 
 /* tx toasts carry the UI's hard shadow, color-coded by stage:
    amber = attention/pending, red = failed, green = success */
-body.alt-mode .tx-toast{box-shadow:5px 5px 0 var(--amber)!important;background:var(--surface);color:var(--ink);font-family:var(--mono)}
+body.alt-mode .tx-toast{background:var(--surface);color:var(--ink);font-family:var(--mono)}
+/* attention family (preparing/simulating/wallet/pending/unknown) rides the
+   YELLOW in both themes — light --amber is rust, which read wrong */
+body.alt-mode :is(.tx-toast--unknown,.tx-toast--preparing,.tx-toast--simulating,.tx-toast--wallet,.tx-toast--pending){--tx-ink:#f5c168;box-shadow:5px 5px 0 #f5c168!important}
 body.alt-mode .tx-toast--success{box-shadow:5px 5px 0 var(--green)!important;--tx-ink:var(--green)}
 body.alt-mode .tx-toast--failed{box-shadow:5px 5px 0 var(--red)!important;--tx-ink:var(--red)}
-body.alt-mode .tx-toast--unknown{--tx-ink:var(--amber)}
 
 /* ── the curve panel, to the mock's spec (F: green-ink curve on cream,
    G: lime curve on surface; mono 11 axis labels; red marker + stamp) ── */
