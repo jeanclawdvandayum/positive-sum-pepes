@@ -135,10 +135,10 @@ html[data-theme=light] .alt-play .live-tape .text-accent{color:var(--green-ink)}
    notch circles punching the rank divider */
 .alt-play .board-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin:0 0 8px;padding-bottom:6px}
 .alt-play .board-head p{font-size:11px;color:var(--muted);text-align:right;max-width:200px}
-.alt-play .ladder{display:grid;grid-template-rows:minmax(64px,1.25fr) repeat(9,minmax(52px,1fr));gap:8px;flex:1;min-height:0}
-.alt-play .ladder-row{--rank-rule:var(--line);--seat-fill:#2b3139;--seat-edge:#4d6069;display:grid;grid-template-columns:64px minmax(0,1fr) 168px;align-items:center;position:relative;height:auto;min-height:52px;padding:0;background:var(--surface);border:1px solid #22333d;overflow:visible}
+.alt-play .ladder{display:flex;flex-direction:column;gap:8px}
+.alt-play .ladder-row{--rank-rule:var(--line);--seat-fill:#2b3139;--seat-edge:#4d6069;display:grid;grid-template-columns:64px minmax(0,1fr) 168px;align-items:center;position:relative;height:72px;min-height:72px;padding:0;background:var(--surface);border:1px solid #22333d;overflow:visible}
 html[data-theme=light] .alt-play .ladder-row{--rank-rule:var(--ink);--seat-fill:#e3e8d6;--seat-edge:#8b9577;border-color:#c9c6bb}
-.alt-play .ladder-row:first-child{--seat-fill:#383a37;--seat-edge:#f5c168;height:auto;min-height:66px;border:1.5px solid #f5c168}
+.alt-play .ladder-row:first-child{--seat-fill:#383a37;--seat-edge:#f5c168;height:92px;min-height:92px;border:1.5px solid #f5c168}
 html[data-theme=light] .alt-play .ladder-row:first-child{--seat-fill:#cfdcb2;--seat-edge:#33452a;border-color:#19202e}
 .alt-play .ladder-row.you{--seat-fill:#4e6243;--seat-edge:#8795a0}
 html[data-theme=light] .alt-play .ladder-row.you{--seat-fill:#dde5b0;--seat-edge:#33452a}
